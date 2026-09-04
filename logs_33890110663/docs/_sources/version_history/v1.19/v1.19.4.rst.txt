@@ -1,0 +1,32 @@
+.. _version_history_1.19.4:
+
+1.19.4 (April 25, 2022)
+========================
+
+
+
+
+
+Minor behavior changes
+----------------------
+
+*Changes that may cause incompatibilities for some users, but should
+not for most*
+
+
+
+* **perf**: ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret
+  update.
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **docker**: update Docker images to resolve CVE issues in container packages (#20760).
+

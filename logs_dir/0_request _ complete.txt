@@ -1,0 +1,276 @@
+﻿2026-08-18T18:24:41.2643285Z Current runner version: '2.336.0'
+2026-08-18T18:24:41.2667201Z ##[group]Runner Image Provisioner
+2026-08-18T18:24:41.2668181Z Hosted Compute Agent
+2026-08-18T18:24:41.2669031Z Version: 20260729.566
+2026-08-18T18:24:41.2669865Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-18T18:24:41.2670744Z Build Date: 2026-07-29T19:17:02Z
+2026-08-18T18:24:41.2671629Z Worker ID: {1466ecdb-9af0-403e-b40c-3035913fe1a0}
+2026-08-18T18:24:41.2672507Z Azure Region: westus
+2026-08-18T18:24:41.2673223Z ##[endgroup]
+2026-08-18T18:24:41.2674640Z ##[group]Operating System
+2026-08-18T18:24:41.2675367Z Ubuntu
+2026-08-18T18:24:41.2676319Z 24.04.4
+2026-08-18T18:24:41.2677043Z LTS
+2026-08-18T18:24:41.2677680Z ##[endgroup]
+2026-08-18T18:24:41.2678415Z ##[group]Runner Image
+2026-08-18T18:24:41.2679229Z Image: ubuntu-24.04
+2026-08-18T18:24:41.2679920Z Version: 20260810.271.1
+2026-08-18T18:24:41.2681269Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260810.271/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-18T18:24:41.2682847Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260810.271
+2026-08-18T18:24:41.2683937Z ##[endgroup]
+2026-08-18T18:24:41.2685338Z ##[group]GITHUB_TOKEN Permissions
+2026-08-18T18:24:41.2687394Z Actions: read
+2026-08-18T18:24:41.2688124Z Contents: read
+2026-08-18T18:24:41.2689073Z Metadata: read
+2026-08-18T18:24:41.2689776Z ##[endgroup]
+2026-08-18T18:24:41.2691770Z Secret source: Actions
+2026-08-18T18:24:41.2693087Z Prepare workflow directory
+2026-08-18T18:24:41.3456116Z Prepare all required actions
+2026-08-18T18:24:41.3496107Z Getting action download info
+2026-08-18T18:24:41.7029980Z Download action repository 'envoyproxy/toolshed@4a6a2986abd53c8a2d1077de4165fae369c5bc41' (SHA:4a6a2986abd53c8a2d1077de4165fae369c5bc41)
+2026-08-18T18:24:43.6066430Z Download action repository 'slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c' (SHA:45a88b9581bfab2566dc881e2cd66d334e621e2c)
+2026-08-18T18:24:44.0614840Z Uses: envoyproxy/envoy/.github/workflows/_finish.yml@refs/heads/main (447ae91525105d3bd9c5c9bc3672078d89c6958e)
+2026-08-18T18:24:44.0618557Z ##[group] Inputs
+2026-08-18T18:24:44.0629408Z   needs: {
+  "load": {
+    "result": "success",
+    "outputs": {
+      "build-image": "{\n  \"default\": \"docker.io/envoyproxy/envoy-build:v0.2.2@sha256:eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\n  \"mobile\": \"docker.io/envoyproxy/envoy-build:mobile-v0.2.2@sha256:d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\"\n}",
+      "build-image-mobile": "",
+      "check-id": "95815518379",
+      "check-name": "checks",
+      "request": "{\"check\":{\"name\":\"Envoy/Checks\",\"id\":\"checks\",\"action\":\"RUN\",\"check-id\":95815518379},\"config\":{\"envoy\":{\"icon\":\"[![](https://avatars.githubusercontent.com/u/30125649?s=24\u0026v=4)](#)\"},\"ci\":{\"agent-ubuntu\":\"ubuntu-24.04\",\"build-image\":{\"repo\":\"docker.io/envoyproxy/envoy-build\",\"repo-gcr\":\"gcr.io/envoy-ci/envoy-build\",\"sha\":\"eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\"sha-ci\":\"eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\"sha-devtools\":\"f1af63ebb1aa49a4ccd2bb4ae3bf94c5bc3221139538e21b365c9bea7575f702\",\"sha-docker\":\"6deb8633c65ec8d25364beae1cefe1fbc6ec2f330292f9157ed91fdb3ae20b0c\",\"sha-gcc\":\"d4ca56020e17aa36d6baad8e172d09c8a08e47ed0a911b779400c645957fa220\",\"sha-mobile\":\"d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\",\"sha-worker\":\"7d3c99085fa5f1cff6b7293de256cc6c93ce61cd7ccb63432113a1f8fbf12a43\",\"mobile-sha\":\"d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\",\"tag\":\"v0.2.2\"},\"cache\":{\"bazel\":{\"hash\":\"03750b7bb14932bca625354218ae7a59a6ccfaecbca43acaad934765991c9702\",\"arm64\":9334221031,\"x64\":9334356959,\"docs-x64\":9334067108,\"external-x64\":9334067946}}}},\"request\":{\"ref\":\"1f5a71c43c3f9e2a95cbd5782998ce95322f2f21\",\"sha\":\"143324b0689ad909b5da9949b35401e4379ca720\",\"pr\":46497,\"base-sha\":\"4cf50c646cf5a2bdf382eecb094a9a0ad91de487\",\"actor\":{\"name\":\"mohitdebian\",\"icon\":\"https://avatars.githubusercontent.com/u/93594454\"},\"started\":1787076200.6169,\"target-branch\":\"main\",\"trusted\":false,\"version\":{\"major\":1,\"minor\":40,\"patch\":0,\"dev\":true,\"changed\":false},\"version-current\":{\"major\":1,\"minor\":40,\"patch\":0,\"dev\":true},\"build-image\":{\"default\":\"docker.io/envoyproxy/envoy-build:v0.2.2@sha256:eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\"mobile\":\"docker.io/envoyproxy/envoy-build:mobile-v0.2.2@sha256:d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\"},\"build-image-current\":{\"default\":\"docker.io/envoyproxy/envoy-build:v0.2.2@sha256:eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\"mobile\":\"docker.io/envoyproxy/envoy-build:mobile-v0.2.2@sha256:d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\"}},\"run\":{\"build-macos\":true,\"check-build\":true,\"check-build-openssl\":true,\"check-build-openssl-presubmit\":false,\"check-coverage\":true,\"check-runtime\":false,\"check-san\":true,\"mobile-android\":false,\"mobile-android-all\":false,\"mobile-android-tests\":false,\"mobile-asan\":false,\"mobile-cc\":true,\"mobile-coverage\":false,\"mobile-format\":false,\"mobile-ios\":false,\"mobile-ios-all\":false,\"mobile-ios-tests\":false,\"mobile-perf\":false,\"mobile-python\":false,\"mobile-release-validation\":false,\"mobile-tsan\":false,\"precheck-deps\":false,\"precheck-external\":true,\"precheck-format\":true,\"precheck-publish\":true,\"precheck-publish-config\":true,\"release\":true,\"verify\":true},\"summary\":{\"title\":\"pr/46497/main@143324b\"}}",
+      "run-id": "31865235787",
+      "trusted": "false"
+    }
+  },
+  "build": {
+    "result": "failure",
+    "outputs": {}
+  },
+  "build-openssl": {
+    "result": "skipped",
+    "outputs": {}
+  },
+  "coverage": {
+    "result": "failure",
+    "outputs": {}
+  },
+  "runtime": {
+    "result": "skipped",
+    "outputs": {}
+  },
+  "san": {
+    "result": "failure",
+    "outputs": {}
+  }
+}
+2026-08-18T18:24:44.0640613Z   template-check-text: ## \($icon) Check run finished (\($outcome.name) \($outcome.icon))
+
+## The check run can be viewed here:
+
+# \($icon) \($run_link)
+
+2026-08-18T18:24:44.0641299Z   allowed-to-fail: build-openssl
+
+2026-08-18T18:24:44.0641680Z   slack-channel: #envoy-ci
+2026-08-18T18:24:44.0642061Z   slack-channel-allowed-failure: #envoy-openssl
+2026-08-18T18:24:44.0642485Z ##[endgroup]
+2026-08-18T18:24:44.0642824Z Complete job name: request / complete
+2026-08-18T18:24:44.1323738Z ##[group]Run envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41
+2026-08-18T18:24:44.1324495Z with:
+2026-08-18T18:24:44.1352199Z   input: {"check_name": "checks",
+ "repo": "envoyproxy/envoy",
+ "run_id": "32169091313",
+ "branch": "proxy-protocol-format-string",
+ "outcomes": {
+  "load": {
+    "result": "success",
+    "outputs": {
+      "build-image": "{\n  \"default\": \"docker.io/envoyproxy/envoy-build:v0.2.2@sha256:eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\n  \"mobile\": \"docker.io/envoyproxy/envoy-build:mobile-v0.2.2@sha256:d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\"\n}",
+      "build-image-mobile": "",
+      "check-id": "95815518379",
+      "check-name": "checks",
+      "request": "{\"check\":{\"name\":\"Envoy/Checks\",\"id\":\"checks\",\"action\":\"RUN\",\"check-id\":95815518379},\"config\":{\"envoy\":{\"icon\":\"[![](https://avatars.githubusercontent.com/u/30125649?s=24&v=4)](#)\"},\"ci\":{\"agent-ubuntu\":\"ubuntu-24.04\",\"build-image\":{\"repo\":\"docker.io/envoyproxy/envoy-build\",\"repo-gcr\":\"gcr.io/envoy-ci/envoy-build\",\"sha\":\"eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\"sha-ci\":\"eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\"sha-devtools\":\"f1af63ebb1aa49a4ccd2bb4ae3bf94c5bc3221139538e21b365c9bea7575f702\",\"sha-docker\":\"6deb8633c65ec8d25364beae1cefe1fbc6ec2f330292f9157ed91fdb3ae20b0c\",\"sha-gcc\":\"d4ca56020e17aa36d6baad8e172d09c8a08e47ed0a911b779400c645957fa220\",\"sha-mobile\":\"d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\",\"sha-worker\":\"7d3c99085fa5f1cff6b7293de256cc6c93ce61cd7ccb63432113a1f8fbf12a43\",\"mobile-sha\":\"d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\",\"tag\":\"v0.2.2\"},\"cache\":{\"bazel\":{\"hash\":\"03750b7bb14932bca625354218ae7a59a6ccfaecbca43acaad934765991c9702\",\"arm64\":9334221031,\"x64\":9334356959,\"docs-x64\":9334067108,\"external-x64\":9334067946}}}},\"request\":{\"ref\":\"1f5a71c43c3f9e2a95cbd5782998ce95322f2f21\",\"sha\":\"143324b0689ad909b5da9949b35401e4379ca720\",\"pr\":46497,\"base-sha\":\"4cf50c646cf5a2bdf382eecb094a9a0ad91de487\",\"actor\":{\"name\":\"mohitdebian\",\"icon\":\"https://avatars.githubusercontent.com/u/93594454\"},\"started\":1787076200.6169,\"target-branch\":\"main\",\"trusted\":false,\"version\":{\"major\":1,\"minor\":40,\"patch\":0,\"dev\":true,\"changed\":false},\"version-current\":{\"major\":1,\"minor\":40,\"patch\":0,\"dev\":true},\"build-image\":{\"default\":\"docker.io/envoyproxy/envoy-build:v0.2.2@sha256:eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\"mobile\":\"docker.io/envoyproxy/envoy-build:mobile-v0.2.2@sha256:d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\"},\"build-image-current\":{\"default\":\"docker.io/envoyproxy/envoy-build:v0.2.2@sha256:eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\"mobile\":\"docker.io/envoyproxy/envoy-build:mobile-v0.2.2@sha256:d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\"}},\"run\":{\"build-macos\":true,\"check-build\":true,\"check-build-openssl\":true,\"check-build-openssl-presubmit\":false,\"check-coverage\":true,\"check-runtime\":false,\"check-san\":true,\"mobile-android\":false,\"mobile-android-all\":false,\"mobile-android-tests\":false,\"mobile-asan\":false,\"mobile-cc\":true,\"mobile-coverage\":false,\"mobile-format\":false,\"mobile-ios\":false,\"mobile-ios-all\":false,\"mobile-ios-tests\":false,\"mobile-perf\":false,\"mobile-python\":false,\"mobile-release-validation\":false,\"mobile-tsan\":false,\"precheck-deps\":false,\"precheck-external\":true,\"precheck-format\":true,\"precheck-publish\":true,\"precheck-publish-config\":true,\"release\":true,\"verify\":true},\"summary\":{\"title\":\"pr/46497/main@143324b\"}}",
+      "run-id": "31865235787",
+      "trusted": "false"
+    }
+  },
+  "build": {
+    "result": "failure",
+    "outputs": {}
+  },
+  "build-openssl": {
+    "result": "skipped",
+    "outputs": {}
+  },
+  "coverage": {
+    "result": "failure",
+    "outputs": {}
+  },
+  "runtime": {
+    "result": "skipped",
+    "outputs": {}
+  },
+  "san": {
+    "result": "failure",
+    "outputs": {}
+  }
+},
+ "allowed_to_fail": "build-openssl\n",
+ "load": {
+  "build-image": "{\n  \"default\": \"docker.io/envoyproxy/envoy-build:v0.2.2@sha256:eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\n  \"mobile\": \"docker.io/envoyproxy/envoy-build:mobile-v0.2.2@sha256:d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\"\n}",
+  "build-image-mobile": "",
+  "check-id": "95815518379",
+  "check-name": "checks",
+  "request": "{\"check\":{\"name\":\"Envoy/Checks\",\"id\":\"checks\",\"action\":\"RUN\",\"check-id\":95815518379},\"config\":{\"envoy\":{\"icon\":\"[![](https://avatars.githubusercontent.com/u/30125649?s=24&v=4)](#)\"},\"ci\":{\"agent-ubuntu\":\"ubuntu-24.04\",\"build-image\":{\"repo\":\"docker.io/envoyproxy/envoy-build\",\"repo-gcr\":\"gcr.io/envoy-ci/envoy-build\",\"sha\":\"eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\"sha-ci\":\"eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\"sha-devtools\":\"f1af63ebb1aa49a4ccd2bb4ae3bf94c5bc3221139538e21b365c9bea7575f702\",\"sha-docker\":\"6deb8633c65ec8d25364beae1cefe1fbc6ec2f330292f9157ed91fdb3ae20b0c\",\"sha-gcc\":\"d4ca56020e17aa36d6baad8e172d09c8a08e47ed0a911b779400c645957fa220\",\"sha-mobile\":\"d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\",\"sha-worker\":\"7d3c99085fa5f1cff6b7293de256cc6c93ce61cd7ccb63432113a1f8fbf12a43\",\"mobile-sha\":\"d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\",\"tag\":\"v0.2.2\"},\"cache\":{\"bazel\":{\"hash\":\"03750b7bb14932bca625354218ae7a59a6ccfaecbca43acaad934765991c9702\",\"arm64\":9334221031,\"x64\":9334356959,\"docs-x64\":9334067108,\"external-x64\":9334067946}}}},\"request\":{\"ref\":\"1f5a71c43c3f9e2a95cbd5782998ce95322f2f21\",\"sha\":\"143324b0689ad909b5da9949b35401e4379ca720\",\"pr\":46497,\"base-sha\":\"4cf50c646cf5a2bdf382eecb094a9a0ad91de487\",\"actor\":{\"name\":\"mohitdebian\",\"icon\":\"https://avatars.githubusercontent.com/u/93594454\"},\"started\":1787076200.6169,\"target-branch\":\"main\",\"trusted\":false,\"version\":{\"major\":1,\"minor\":40,\"patch\":0,\"dev\":true,\"changed\":false},\"version-current\":{\"major\":1,\"minor\":40,\"patch\":0,\"dev\":true},\"build-image\":{\"default\":\"docker.io/envoyproxy/envoy-build:v0.2.2@sha256:eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\"mobile\":\"docker.io/envoyproxy/envoy-build:mobile-v0.2.2@sha256:d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\"},\"build-image-current\":{\"default\":\"docker.io/envoyproxy/envoy-build:v0.2.2@sha256:eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663\",\"mobile\":\"docker.io/envoyproxy/envoy-build:mobile-v0.2.2@sha256:d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2\"}},\"run\":{\"build-macos\":true,\"check-build\":true,\"check-build-openssl\":true,\"check-build-openssl-presubmit\":false,\"check-coverage\":true,\"check-runtime\":false,\"check-san\":true,\"mobile-android\":false,\"mobile-android-all\":false,\"mobile-android-tests\":false,\"mobile-asan\":false,\"mobile-cc\":true,\"mobile-coverage\":false,\"mobile-format\":false,\"mobile-ios\":false,\"mobile-ios-all\":false,\"mobile-ios-tests\":false,\"mobile-perf\":false,\"mobile-python\":false,\"mobile-release-validation\":false,\"mobile-tsan\":false,\"precheck-deps\":false,\"precheck-external\":true,\"precheck-format\":true,\"precheck-publish\":true,\"precheck-publish-config\":true,\"release\":true,\"verify\":true},\"summary\":{\"title\":\"pr/46497/main@143324b\"}}",
+  "run-id": "31865235787",
+  "trusted": "false"
+},
+ "slack_channel": "#envoy-ci",
+ "slack_channel_allowed_failure": "#envoy-openssl"}
+
+2026-08-18T18:24:44.1372713Z   print-result: false
+2026-08-18T18:24:44.1380370Z   filter: .repo as $repo
+| .run_id as $run_id
+| (.branch // "main") as $branch
+| (.slack_channel // "") as $slack_channel
+| (.slack_channel_allowed_failure // "") as $slack_channel_allowed_failure
+| .check_name as $check_name
+| .load as $load
+| $load["check-id"] as $check_id
+| $load["run-id"] as $workflow_id
+| (.load.request | fromjson) as $request
+| $request.config.envoy.icon as $icon
+| (.allowed_to_fail // "" | split("\n") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))) as $allowed_to_fail
+| (.outcomes | to_entries | map({name: .key, result: .value.result})) as $outcomes
+| ($outcomes
+   | map(select(.name as $name | ($allowed_to_fail | index($name) | not)))) as $required_outcomes
+| ($outcomes
+   | map(select((.name as $name | ($allowed_to_fail | index($name))) and .result == "failure"))) as $allowed_failures
+| ($required_outcomes | map(select(.result == "failure"))) as $required_failures
+| ($required_failures | map(.name) | sort | join("`, `")) as $req_names
+| ($allowed_failures | map(.name) | sort | join("`, `")) as $atf_names
+| "https://github.com/\($repo)/actions/runs/\($run_id)" as $run_url
+| if ($required_outcomes | any(.result == "failure")) then
+    {name: "failure", icon: ":x:"}
+  elif ($required_outcomes | any(.result == "cancelled")) then
+    {name: "cancelled", icon: ""}
+  elif ($required_outcomes | all(.result == "skipped")) then
+    {name: "skipped", icon: ""}
+  else
+    {name: "success", icon: ":heavy_check_mark:"}
+  end
+| . as $outcome
+| ($allowed_failures | map(.name) | sort | join(", ")) as $allowed_failure_names
+| "\($request.check.name) (\($request.summary.title))" as $run_link_text
+| "[\($run_link_text)](https://github.com/\($repo)/actions/runs/\($run_id))" as $run_link
+| "## \($icon) Check run finished (\($outcome.name) \($outcome.icon))
+
+## The check run can be viewed here:
+
+# \($icon) \($run_link)
+" as $text
+| (if ($allowed_failures | length) > 0 then
+     "\n\n:warning: Allowed-to-fail checks failed: \($allowed_failure_names)"
+   else
+     ""
+   end) as $allowed_failure_text
+| (if $slack_channel != "" and ($required_failures | length) > 0 then
+     {"channel": $slack_channel,
+      "text": ":x: *CI failed on `\($branch)`:* `\($req_names)`\\n<\($run_url)|View workflow run>"}
+   else null end) as $notify_required
+| (if $slack_channel_allowed_failure != "" and ($allowed_failures | length) > 0 then
+     {"channel": $slack_channel_allowed_failure,
+      "text": ":x: *OpenSSL CI failed on `\($branch)`:* `\($atf_names)`\\n<\($run_url)|View workflow run>"}
+   else null end) as $notify_openssl
+| {"summary-title": "\($icon) \($request.check.name) complete (\($outcome.name))",
+   "check-id": $check_id,
+   conclusion: $outcome.name,
+   "notify-required": $notify_required,
+   "notify-openssl": $notify_openssl,
+   checks: {
+     ($check_name): {
+       name: $request.check.name,
+       head_sha: $request.request.sha,
+       status: "completed",
+       conclusion: $outcome.name,
+       external_id: "\($run_id)",
+       output: {
+         title: "\($request.check.name) (\($outcome.name))",
+         summary: "Check has finished",
+         text: ($text + $allowed_failure_text)}}}}
+
+2026-08-18T18:24:44.1388394Z   decode: false
+2026-08-18T18:24:44.1388711Z   encode: false
+2026-08-18T18:24:44.1389094Z   options: -c
+2026-08-18T18:24:44.1389415Z   print-output: false
+2026-08-18T18:24:44.1389751Z   trim-result: true
+2026-08-18T18:24:44.1390085Z   use-tmp-file: true
+2026-08-18T18:24:44.1390422Z   use-tmp-file-filter: true
+2026-08-18T18:24:44.1390762Z   input-format: json
+2026-08-18T18:24:44.1391477Z env:
+2026-08-18T18:24:44.1391784Z   CI_DEBUG: false
+2026-08-18T18:24:44.1392108Z ##[endgroup]
+2026-08-18T18:24:44.2364835Z ##[group]Run envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41
+2026-08-18T18:24:44.2365414Z with:
+2026-08-18T18:24:44.2365837Z   filter: "## \(.)"
+
+2026-08-18T18:24:44.2366218Z   options: -Rr
+2026-08-18T18:24:44.2366573Z   output-path: GITHUB_STEP_SUMMARY
+2026-08-18T18:24:44.2366938Z   decode: false
+2026-08-18T18:24:44.2367243Z   encode: false
+2026-08-18T18:24:44.2367557Z   print-output: false
+2026-08-18T18:24:44.2367881Z   print-result: false
+2026-08-18T18:24:44.2368204Z   trim-result: true
+2026-08-18T18:24:44.2368653Z   use-tmp-file: true
+2026-08-18T18:24:44.2369000Z   use-tmp-file-filter: true
+2026-08-18T18:24:44.2369340Z   input-format: json
+2026-08-18T18:24:44.2369653Z env:
+2026-08-18T18:24:44.2370032Z   CI_DEBUG: false
+2026-08-18T18:24:44.2370511Z ##[endgroup]
+2026-08-18T18:24:44.3100202Z ##[group]Run envoyproxy/toolshed/actions/appauth@4a6a2986abd53c8a2d1077de4165fae369c5bc41
+2026-08-18T18:24:44.3100750Z with:
+2026-08-18T18:24:44.3101447Z   app_id: ***
+2026-08-18T18:24:44.3107509Z   key: ***
+
+2026-08-18T18:24:44.3107852Z   token-ok: false
+2026-08-18T18:24:44.3108168Z   retries: 5
+2026-08-18T18:24:44.3108501Z   retry-base-delay-ms: 1000
+2026-08-18T18:24:44.3108861Z   retry-max-delay-ms: 15000
+2026-08-18T18:24:44.3109187Z env:
+2026-08-18T18:24:44.3109490Z   CI_DEBUG: false
+2026-08-18T18:24:44.3109802Z ##[endgroup]
+2026-08-18T18:24:44.8521539Z ##[group]Run envoyproxy/toolshed/actions/github/checks@4a6a2986abd53c8a2d1077de4165fae369c5bc41
+2026-08-18T18:24:44.8522319Z with:
+2026-08-18T18:24:44.8522727Z   action: update
+2026-08-18T18:24:44.8525514Z   checks: {
+  "checks": {
+    "name": "Envoy/Checks",
+    "head_sha": "143324b0689ad909b5da9949b35401e4379ca720",
+    "status": "completed",
+    "conclusion": "failure",
+    "external_id": "32169091313",
+    "output": {
+      "title": "Envoy/Checks (failure)",
+      "summary": "Check has finished",
+      "text": "## [![](https://avatars.githubusercontent.com/u/30125649?s=24&v=4)](#) Check run finished (failure :x:)\n\n## The check run can be viewed here:\n\n# [![](https://avatars.githubusercontent.com/u/30125649?s=24&v=4)](#) [Envoy/Checks (pr/46497/main@143324b)](https://github.com/envoyproxy/envoy/actions/runs/32169091313)\n"
+    }
+  }
+}
+2026-08-18T18:24:44.8529688Z   ***: ghs_***_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRobmQiLCJjdHgiOiJ3M1BmMGd3dU5LdlQtZXJzRlcxOGhHT3hJNmFjRVJSbW9pVmxhY1BkcUJMUUpxUUIteEVfT3ciLCJleHAiOjE3ODcwODEwODQsImlhdCI6MTc4NzA3NzQ4NCwiaXNzIjoiZ2l0aHViIiwianRpIjoiMWVlNmU4ZWYtNmY2OC00MGE5LWIyMzAtY2FiNGM3Yjc0MmRlIiwidmVyIjozfQ.lioc6PxyCB_dlB4uZM8pkFD65u8o4VwoWKwDYsmIbIDVk7rgoP3jxv4bE8NponQXYAYPi8GUz-n1_dgpxmnh1Q
+2026-08-18T18:24:44.8531623Z   retries: 5
+2026-08-18T18:24:44.8531951Z   retry-base-delay-ms: 1000
+2026-08-18T18:24:44.8532295Z   retry-max-delay-ms: 15000
+2026-08-18T18:24:44.8532637Z   fail-on-partial: false
+2026-08-18T18:24:44.8532961Z env:
+2026-08-18T18:24:44.8533249Z   CI_DEBUG: false
+2026-08-18T18:24:44.8533563Z ##[endgroup]
+2026-08-18T18:24:45.8649338Z ##[group]Run exit 1
+2026-08-18T18:24:45.8649687Z [36;1mexit 1[0m
+2026-08-18T18:24:45.8684281Z shell: /usr/bin/bash -e {0}
+2026-08-18T18:24:45.8684596Z env:
+2026-08-18T18:24:45.8684873Z   CI_DEBUG: false
+2026-08-18T18:24:45.8685134Z ##[endgroup]
+2026-08-18T18:24:45.8761884Z ##[error]Process completed with exit code 1.
+2026-08-18T18:24:45.8837923Z Cleaning up orphan processes

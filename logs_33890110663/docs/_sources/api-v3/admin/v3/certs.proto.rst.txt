@@ -1,0 +1,231 @@
+.. _envoy_v3_api_file_envoy/admin/v3/certs.proto:
+
+Certificates (proto)
+====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.Certificates:
+
+admin.v3.Certificates
+---------------------
+
+
+:repo:`[admin.v3.Certificates proto] <api/envoy/admin/v3/certs.proto#L20>`
+
+Proto representation of certificate details. Admin endpoint uses this wrapper for ``/certs`` to
+display certificate information. See :ref:`/certs <operations_admin_interface_certs>` for more
+information.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "certificates": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.Certificates.certificates:
+
+
+certificates
+  (**repeated** :ref:`admin.v3.Certificate <envoy_v3_api_msg_admin.v3.Certificate>`) List of certificates known to an Envoy.
+
+
+
+.. _envoy_v3_api_msg_admin.v3.Certificate:
+
+admin.v3.Certificate
+--------------------
+
+
+:repo:`[admin.v3.Certificate proto] <api/envoy/admin/v3/certs.proto#L27>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ca_cert": [],
+    "cert_chain": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.Certificate.ca_cert:
+
+
+ca_cert
+  (**repeated** :ref:`admin.v3.CertificateDetails <envoy_v3_api_msg_admin.v3.CertificateDetails>`) Details of CA certificate.
+
+
+.. _envoy_v3_api_field_admin.v3.Certificate.cert_chain:
+
+
+cert_chain
+  (**repeated** :ref:`admin.v3.CertificateDetails <envoy_v3_api_msg_admin.v3.CertificateDetails>`) Details of Certificate Chain
+
+
+
+.. _envoy_v3_api_msg_admin.v3.CertificateDetails:
+
+admin.v3.CertificateDetails
+---------------------------
+
+
+:repo:`[admin.v3.CertificateDetails proto] <api/envoy/admin/v3/certs.proto#L38>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "path": ...,
+    "serial_number": ...,
+    "subject_alt_names": [],
+    "days_until_expiration": ...,
+    "valid_from": {...},
+    "expiration_time": {...},
+    "ocsp_details": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.CertificateDetails.path:
+
+
+path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Path of the certificate.
+
+
+.. _envoy_v3_api_field_admin.v3.CertificateDetails.serial_number:
+
+
+serial_number
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Certificate Serial Number.
+
+
+.. _envoy_v3_api_field_admin.v3.CertificateDetails.subject_alt_names:
+
+
+subject_alt_names
+  (**repeated** :ref:`admin.v3.SubjectAlternateName <envoy_v3_api_msg_admin.v3.SubjectAlternateName>`) List of Subject Alternate names.
+
+
+.. _envoy_v3_api_field_admin.v3.CertificateDetails.days_until_expiration:
+
+
+days_until_expiration
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Minimum of days until expiration of certificate and it's chain.
+
+
+.. _envoy_v3_api_field_admin.v3.CertificateDetails.valid_from:
+
+
+valid_from
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) Indicates the time from which the certificate is valid.
+
+
+.. _envoy_v3_api_field_admin.v3.CertificateDetails.expiration_time:
+
+
+expiration_time
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) Indicates the time at which the certificate expires.
+
+
+.. _envoy_v3_api_field_admin.v3.CertificateDetails.ocsp_details:
+
+
+ocsp_details
+  (:ref:`admin.v3.CertificateDetails.OcspDetails <envoy_v3_api_msg_admin.v3.CertificateDetails.OcspDetails>`) Details related to the OCSP response associated with this certificate, if any.
+
+
+.. _envoy_v3_api_msg_admin.v3.CertificateDetails.OcspDetails:
+
+admin.v3.CertificateDetails.OcspDetails
+---------------------------------------
+
+
+:repo:`[admin.v3.CertificateDetails.OcspDetails proto] <api/envoy/admin/v3/certs.proto#L42>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "valid_from": {...},
+    "expiration": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.CertificateDetails.OcspDetails.valid_from:
+
+
+valid_from
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) Indicates the time from which the OCSP response is valid.
+
+
+.. _envoy_v3_api_field_admin.v3.CertificateDetails.OcspDetails.expiration:
+
+
+expiration
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) Indicates the time at which the OCSP response expires.
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.SubjectAlternateName:
+
+admin.v3.SubjectAlternateName
+-----------------------------
+
+
+:repo:`[admin.v3.SubjectAlternateName proto] <api/envoy/admin/v3/certs.proto#L72>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dns": ...,
+    "uri": ...,
+    "ip_address": ...
+  }
+
+.. _envoy_v3_api_field_admin.v3.SubjectAlternateName.dns:
+
+
+dns
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+  Subject Alternate Name.
+
+
+  Only one of :ref:`dns <envoy_v3_api_field_admin.v3.SubjectAlternateName.dns>`, :ref:`uri <envoy_v3_api_field_admin.v3.SubjectAlternateName.uri>`, :ref:`ip_address <envoy_v3_api_field_admin.v3.SubjectAlternateName.ip_address>` may be set.
+
+.. _envoy_v3_api_field_admin.v3.SubjectAlternateName.uri:
+
+
+uri
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+  Subject Alternate Name.
+
+
+  Only one of :ref:`dns <envoy_v3_api_field_admin.v3.SubjectAlternateName.dns>`, :ref:`uri <envoy_v3_api_field_admin.v3.SubjectAlternateName.uri>`, :ref:`ip_address <envoy_v3_api_field_admin.v3.SubjectAlternateName.ip_address>` may be set.
+
+.. _envoy_v3_api_field_admin.v3.SubjectAlternateName.ip_address:
+
+
+ip_address
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+  Subject Alternate Name.
+
+
+  Only one of :ref:`dns <envoy_v3_api_field_admin.v3.SubjectAlternateName.dns>`, :ref:`uri <envoy_v3_api_field_admin.v3.SubjectAlternateName.uri>`, :ref:`ip_address <envoy_v3_api_field_admin.v3.SubjectAlternateName.ip_address>` may be set.
+

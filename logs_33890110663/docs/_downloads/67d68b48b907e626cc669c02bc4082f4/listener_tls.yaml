@@ -1,0 +1,68 @@
+static_resources:
+  listeners:
+  - name: outbound
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 8443
+    listener_filters:
+    - name: tls_inspector
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+    filter_chains:
+    - name: tls
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain: {filename: "certs/servercert.pem"}
+              private_key: {filename: "certs/serverkey.pem"}
+      filters:
+      - name: tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tls
+          cluster: some_service
+    - name: plaintext
+      filters:
+      - name: tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: plaintext
+          cluster: some_service
+    # Snippet: 37-56
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: transport
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.TransportProtocolInput
+        exact_match_map:
+          map:
+            "tls":
+              action:
+                name: tls
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: tls
+      on_no_match:
+        action:
+          name: plaintext
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: plaintext
+
+  clusters:
+  - name: some_service
+    load_assignment:
+      cluster_name: some_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.1.2.10
+                port_value: 10002

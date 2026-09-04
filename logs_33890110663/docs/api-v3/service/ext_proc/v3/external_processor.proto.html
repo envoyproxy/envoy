@@ -1,0 +1,966 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>External processing service (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="gRPC access log service (ALS) (proto)" href="../../accesslog/v3/als.proto.html" />
+    <link rel="prev" title="Extension config discovery service (ECDS) (proto)" href="../../extension/v3/config_discovery.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../config/config.html">Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../service.html">Services</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../auth/v3/attribute_context.proto.html">Attribute context (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../auth/v3/external_auth.proto.html">Authorization service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../status/v3/csds.proto.html">Client status discovery service (CSDS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../extension/v3/config_discovery.proto.html">Extension config discovery service (ECDS) (proto)</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">External processing service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../accesslog/v3/als.proto.html">gRPC access log service (ALS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../health/v3/hds.proto.html">Health discovery service (HDS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../load_stats/v3/lrs.proto.html">Load reporting service (LRS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../metrics/v3/metrics_service.proto.html">Metrics service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ratelimit/v3/rls.proto.html">Rate limit service (RLS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../rate_limit_quota/v3/rlqs.proto.html">Rate Limit Quota Service (RLQS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../runtime/v3/rtds.proto.html">Runtime discovery service (RTDS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../config/tap/v3/common.proto.html">Tap common configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tap/v3/tap.proto.html">Tap sink service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../redis_auth/v3/redis_external_auth.proto.html">Redis external authentication service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../network_ext_proc/v3/network_external_processor.proto.html">Network External Processing Service (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../service.html">Services</a></li>
+      <li class="breadcrumb-item active">External processing service (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/service/ext_proc/v3/external_processor.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="external-processing-service-proto">
+<span id="envoy-v3-api-file-envoy-service-ext-proc-v3-external-processor-proto"></span><h1>External processing service (proto)<a class="headerlink" href="#external-processing-service-proto" title="Link to this heading"></a></h1>
+<section id="service-ext-proc-v3-protocolconfiguration">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-protocolconfiguration"></span><h2>service.ext_proc.v3.ProtocolConfiguration<a class="headerlink" href="#service-ext-proc-v3-protocolconfiguration" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L61">[service.ext_proc.v3.ProtocolConfiguration proto]</a></p>
+<p>This message specifies the filter protocol configurations which will be sent to the ext_proc
+server in a <a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-processingrequest"><span class="std std-ref">ProcessingRequest</span></a>.
+If the server does not support these protocol configurations, it may choose to close the gRPC
+stream. If the server supports these protocol configurations, it should respond based on the
+API specifications.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;request_body_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;response_body_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;send_body_without_waiting_for_header_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-protocolconfiguration-request-body-mode">
+<dt>request_body_mode</dt><dd><p>(<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/processing_mode.proto.html#envoy-v3-api-enum-extensions-filters-http-ext-proc-v3-processingmode-bodysendmode"><span class="std std-ref">extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode</span></a>) Specifies the filter configuration
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/processing_mode.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-processingmode-request-body-mode"><span class="std std-ref">request_body_mode</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-protocolconfiguration-response-body-mode">
+<dt>response_body_mode</dt><dd><p>(<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/processing_mode.proto.html#envoy-v3-api-enum-extensions-filters-http-ext-proc-v3-processingmode-bodysendmode"><span class="std std-ref">extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode</span></a>) Specifies the filter configuration
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/processing_mode.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-processingmode-response-body-mode"><span class="std std-ref">response_body_mode</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-protocolconfiguration-send-body-without-waiting-for-header-response">
+<dt>send_body_without_waiting_for_header_response</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Specifies the filter configuration
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-send-body-without-waiting-for-header-response"><span class="std std-ref">send_body_without_waiting_for_header_response</span></a>.
+If the client is waiting for a header response from the server, setting to <code class="docutils literal notranslate"><span class="pre">true</span></code> means the
+client will send the body to the server as it arrives. Setting to <code class="docutils literal notranslate"><span class="pre">false</span></code> means the client
+will buffer the arrived data and not send it to the server immediately.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-processingrequest">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-processingrequest"></span><h2>service.ext_proc.v3.ProcessingRequest<a class="headerlink" href="#service-ext-proc-v3-processingrequest" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L83">[service.ext_proc.v3.ProcessingRequest proto]</a></p>
+<p>This represents the different types of messages that the data plane can send
+to an external processing server.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;request_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;response_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;request_body&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;response_body&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;request_trailers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;response_trailers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;metadata_context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;attributes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;observability_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;protocol_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-headers">
+<dt>request_headers</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-httpheaders"><span class="std std-ref">service.ext_proc.v3.HttpHeaders</span></a>) Information about the HTTP request headers, as well as peer info and additional
+properties. Unless <code class="docutils literal notranslate"><span class="pre">observability_mode</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code>, the server must send back a
+<code class="docutils literal notranslate"><span class="pre">HeaderResponse</span></code> message, an <code class="docutils literal notranslate"><span class="pre">ImmediateResponse</span></code> message, or close the stream.</p>
+<p>Each request message will include one of the following sub-messages. Which
+ones are set for a particular HTTP request/response depend on the
+processing mode.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-trailers"><span class="std std-ref">response_trailers</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-headers">
+<dt>response_headers</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-httpheaders"><span class="std std-ref">service.ext_proc.v3.HttpHeaders</span></a>) Information about the HTTP response headers, as well as peer info and additional
+properties. Unless <code class="docutils literal notranslate"><span class="pre">observability_mode</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code>, the server must send back a
+<code class="docutils literal notranslate"><span class="pre">HeaderResponse</span></code> message or close the stream.</p>
+<p>Each request message will include one of the following sub-messages. Which
+ones are set for a particular HTTP request/response depend on the
+processing mode.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-trailers"><span class="std std-ref">response_trailers</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-body">
+<dt>request_body</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-httpbody"><span class="std std-ref">service.ext_proc.v3.HttpBody</span></a>) A chunk of the HTTP request body. Unless <code class="docutils literal notranslate"><span class="pre">observability_mode</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code>, the server must
+send back a <code class="docutils literal notranslate"><span class="pre">BodyResponse</span></code> message, an <code class="docutils literal notranslate"><span class="pre">ImmediateResponse</span></code> message, or close the stream.</p>
+<p>Each request message will include one of the following sub-messages. Which
+ones are set for a particular HTTP request/response depend on the
+processing mode.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-trailers"><span class="std std-ref">response_trailers</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-body">
+<dt>response_body</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-httpbody"><span class="std std-ref">service.ext_proc.v3.HttpBody</span></a>) A chunk of the HTTP response body. Unless <code class="docutils literal notranslate"><span class="pre">observability_mode</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code>, the server must
+send back a <code class="docutils literal notranslate"><span class="pre">BodyResponse</span></code> message or close the stream.</p>
+<p>Each request message will include one of the following sub-messages. Which
+ones are set for a particular HTTP request/response depend on the
+processing mode.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-trailers"><span class="std std-ref">response_trailers</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-trailers">
+<dt>request_trailers</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-httptrailers"><span class="std std-ref">service.ext_proc.v3.HttpTrailers</span></a>) The HTTP trailers for the request path. Unless <code class="docutils literal notranslate"><span class="pre">observability_mode</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code>, the server
+must send back a <code class="docutils literal notranslate"><span class="pre">TrailerResponse</span></code> message or close the stream.</p>
+<p>This message is only sent if the trailers processing mode is set to <code class="docutils literal notranslate"><span class="pre">SEND</span></code> and
+the original downstream request has trailers.</p>
+<p>Each request message will include one of the following sub-messages. Which
+ones are set for a particular HTTP request/response depend on the
+processing mode.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-trailers"><span class="std std-ref">response_trailers</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-trailers">
+<dt>response_trailers</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-httptrailers"><span class="std std-ref">service.ext_proc.v3.HttpTrailers</span></a>) The HTTP trailers for the response path. Unless <code class="docutils literal notranslate"><span class="pre">observability_mode</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code>, the server
+must send back a <code class="docutils literal notranslate"><span class="pre">TrailerResponse</span></code> message or close the stream.</p>
+<p>This message is only sent if the trailers processing mode is set to <code class="docutils literal notranslate"><span class="pre">SEND</span></code> and
+the original upstream response has trailers.</p>
+<p>Each request message will include one of the following sub-messages. Which
+ones are set for a particular HTTP request/response depend on the
+processing mode.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingrequest-response-trailers"><span class="std std-ref">response_trailers</span></a> may be set.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-processingrequest-metadata-context">
+<dt>metadata_context</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-metadata"><span class="std std-ref">config.core.v3.Metadata</span></a>) Dynamic metadata associated with the request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-processingrequest-attributes">
+<dt>attributes</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct">Struct</a>&gt;) The values of properties selected by the <code class="docutils literal notranslate"><span class="pre">request_attributes</span></code>
+or <code class="docutils literal notranslate"><span class="pre">response_attributes</span></code> list in the configuration. Each entry
+in the list is populated from the standard
+<a class="reference internal" href="../../../../intro/arch_overview/advanced/attributes.html#arch-overview-attributes"><span class="std std-ref">attributes</span></a> supported in the data plane.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingrequest-observability-mode">
+<dt>observability_mode</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Specifies whether the filter that sent this request is running in
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-observability-mode"><span class="std std-ref">observability_mode</span></a>.</p>
+<ul class="simple">
+<li><p>A value of <code class="docutils literal notranslate"><span class="pre">false</span></code> indicates that the server must respond to this message by either
+sending back a matching <code class="docutils literal notranslate"><span class="pre">ProcessingResponse</span></code> message, or by closing the stream.</p></li>
+<li><p>A value of <code class="docutils literal notranslate"><span class="pre">true</span></code> indicates that the server should not respond to this message, as any
+responses will be ignored. However, it may still close the stream to indicate that no more
+messages are needed.</p></li>
+</ul>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-processingrequest-protocol-config">
+<dt>protocol_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-protocolconfiguration"><span class="std std-ref">service.ext_proc.v3.ProtocolConfiguration</span></a>) Specify the filter protocol configurations to be sent to the server.
+<code class="docutils literal notranslate"><span class="pre">protocol_config</span></code> is only encoded in the first <code class="docutils literal notranslate"><span class="pre">ProcessingRequest</span></code> message from the client to the server.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-processingresponse">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-processingresponse"></span><h2>service.ext_proc.v3.ProcessingResponse<a class="headerlink" href="#service-ext-proc-v3-processingresponse" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L245">[service.ext_proc.v3.ProcessingResponse proto]</a></p>
+<p>This represents the different types of messages the server may send back to the data plane
+when the <code class="docutils literal notranslate"><span class="pre">observability_mode</span></code> field in the received <code class="docutils literal notranslate"><span class="pre">ProcessingRequest</span></code> is set to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p>
+<ul class="simple">
+<li><p>If the corresponding <code class="docutils literal notranslate"><span class="pre">BodySendMode</span></code> in the
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-processing-mode"><span class="std std-ref">processing_mode</span></a>
+is not set to <code class="docutils literal notranslate"><span class="pre">FULL_DUPLEX_STREAMED</span></code>, then for every received <code class="docutils literal notranslate"><span class="pre">ProcessingRequest</span></code>,
+the server must send back exactly one <code class="docutils literal notranslate"><span class="pre">ProcessingResponse</span></code> message.</p></li>
+<li><p>If it is set to <code class="docutils literal notranslate"><span class="pre">FULL_DUPLEX_STREAMED</span></code>, the server must follow the API defined
+for this mode to send the <code class="docutils literal notranslate"><span class="pre">ProcessingResponse</span></code> messages.</p></li>
+</ul>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;request_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;response_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;request_body&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;response_body&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;request_trailers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;response_trailers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;immediate_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;streamed_immediate_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;dynamic_metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;typed_dynamic_metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;mode_override&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;override_message_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-headers">
+<dt>request_headers</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-headersresponse"><span class="std std-ref">service.ext_proc.v3.HeadersResponse</span></a>) The server must send back this message in response to a message with the
+<code class="docutils literal notranslate"><span class="pre">request_headers</span></code> field set.</p>
+<p>The response type that is sent by the server.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-trailers"><span class="std std-ref">response_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response"><span class="std std-ref">immediate_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-streamed-immediate-response"><span class="std std-ref">streamed_immediate_response</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-headers">
+<dt>response_headers</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-headersresponse"><span class="std std-ref">service.ext_proc.v3.HeadersResponse</span></a>) The server must send back this message in response to a message with the
+<code class="docutils literal notranslate"><span class="pre">response_headers</span></code> field set.</p>
+<p>The response type that is sent by the server.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-trailers"><span class="std std-ref">response_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response"><span class="std std-ref">immediate_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-streamed-immediate-response"><span class="std std-ref">streamed_immediate_response</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-body">
+<dt>request_body</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-bodyresponse"><span class="std std-ref">service.ext_proc.v3.BodyResponse</span></a>) The server must send back this message in response to a message with
+the <code class="docutils literal notranslate"><span class="pre">request_body</span></code> field set.</p>
+<p>The response type that is sent by the server.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-trailers"><span class="std std-ref">response_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response"><span class="std std-ref">immediate_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-streamed-immediate-response"><span class="std std-ref">streamed_immediate_response</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-body">
+<dt>response_body</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-bodyresponse"><span class="std std-ref">service.ext_proc.v3.BodyResponse</span></a>) The server must send back this message in response to a message with
+the <code class="docutils literal notranslate"><span class="pre">response_body</span></code> field set.</p>
+<p>The response type that is sent by the server.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-trailers"><span class="std std-ref">response_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response"><span class="std std-ref">immediate_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-streamed-immediate-response"><span class="std std-ref">streamed_immediate_response</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-trailers">
+<dt>request_trailers</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-trailersresponse"><span class="std std-ref">service.ext_proc.v3.TrailersResponse</span></a>) The server must send back this message in response to a message with
+the <code class="docutils literal notranslate"><span class="pre">request_trailers</span></code> field set.</p>
+<p>The response type that is sent by the server.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-trailers"><span class="std std-ref">response_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response"><span class="std std-ref">immediate_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-streamed-immediate-response"><span class="std std-ref">streamed_immediate_response</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-trailers">
+<dt>response_trailers</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-trailersresponse"><span class="std std-ref">service.ext_proc.v3.TrailersResponse</span></a>) The server must send back this message in response to a message with
+the <code class="docutils literal notranslate"><span class="pre">response_trailers</span></code> field set.</p>
+<p>The response type that is sent by the server.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-trailers"><span class="std std-ref">response_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response"><span class="std std-ref">immediate_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-streamed-immediate-response"><span class="std std-ref">streamed_immediate_response</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response">
+<dt>immediate_response</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-immediateresponse"><span class="std std-ref">service.ext_proc.v3.ImmediateResponse</span></a>) If specified, attempt to create a locally generated response, send it
+downstream, and stop processing additional filters and ignore any
+additional messages received from the remote server for this request or
+response. If a response has already started – for example, if this
+message is sent response to a <code class="docutils literal notranslate"><span class="pre">response_body</span></code> message – then
+this will either ship the reply directly to the downstream codec,
+or reset the stream.</p>
+<p>The response type that is sent by the server.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-trailers"><span class="std std-ref">response_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response"><span class="std std-ref">immediate_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-streamed-immediate-response"><span class="std std-ref">streamed_immediate_response</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingresponse-streamed-immediate-response">
+<dt>streamed_immediate_response</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-streamedimmediateresponse"><span class="std std-ref">service.ext_proc.v3.StreamedImmediateResponse</span></a>) The server sends back this message to initiate or continue local response streaming.
+The server must initiate local response streaming with the <code class="docutils literal notranslate"><span class="pre">headers_response</span></code> in response
+to a <code class="docutils literal notranslate"><span class="pre">ProcessingRequest</span></code> with the <code class="docutils literal notranslate"><span class="pre">request_headers</span></code> only.
+The server may follow up with multiple messages containing <code class="docutils literal notranslate"><span class="pre">body_response</span></code>. The server must
+indicate end of stream by setting <code class="docutils literal notranslate"><span class="pre">end_of_stream</span></code> to <code class="docutils literal notranslate"><span class="pre">true</span></code> in the <code class="docutils literal notranslate"><span class="pre">headers_response</span></code>
+or <code class="docutils literal notranslate"><span class="pre">body_response</span></code> message or by sending a <code class="docutils literal notranslate"><span class="pre">trailers_response</span></code> message.
+The client may send a <code class="docutils literal notranslate"><span class="pre">request_body</span></code> or <code class="docutils literal notranslate"><span class="pre">request_trailers</span></code> to the server depending on
+configuration.
+The streaming local response can only be sent when the <code class="docutils literal notranslate"><span class="pre">request_header_mode</span></code> in the filter
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-processing-mode"><span class="std std-ref">processing_mode</span></a>
+is set to <code class="docutils literal notranslate"><span class="pre">SEND</span></code>. The ext_proc server should not send <code class="docutils literal notranslate"><span class="pre">StreamedImmediateResponse</span></code> if it
+did not observe request headers, as it will result in a race with the upstream server
+response and reset of the client request.
+Presently only the <code class="docutils literal notranslate"><span class="pre">FULL_DUPLEX_STREAMED</span></code> or <code class="docutils literal notranslate"><span class="pre">NONE</span></code> body modes are supported.</p>
+<p>The response type that is sent by the server.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-headers"><span class="std std-ref">request_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-headers"><span class="std std-ref">response_headers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-body"><span class="std std-ref">request_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-body"><span class="std std-ref">response_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-request-trailers"><span class="std std-ref">request_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-response-trailers"><span class="std std-ref">response_trailers</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response"><span class="std std-ref">immediate_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-processingresponse-streamed-immediate-response"><span class="std std-ref">streamed_immediate_response</span></a> may be set.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-processingresponse-dynamic-metadata">
+<dt>dynamic_metadata</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct">Struct</a>) Optional metadata that will be emitted as dynamic metadata to be consumed by
+following filters. This metadata will be placed in the namespace(s) specified by the top-level
+field name(s) of the struct.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingresponse-typed-dynamic-metadata">
+<dt>typed_dynamic_metadata</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any">Any</a>&gt;) Optional typed metadata that will be emitted as dynamic metadata to be consumed by
+following filters. This metadata will be placed in the namespace(s) specified by the
+keys of the map.</p>
+<p>Typed dynamic metadata should be preferred over untyped dynamic metadata (<code class="docutils literal notranslate"><span class="pre">dynamic_metadata</span></code>)
+because it is more efficient and more type-safe.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingresponse-mode-override">
+<dt>mode_override</dt><dd><p>(<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/processing_mode.proto.html#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-processingmode"><span class="std std-ref">extensions.filters.http.ext_proc.v3.ProcessingMode</span></a>) Override how parts of the HTTP request and response are processed for the duration of this
+particular request/response only. Servers may use this to intelligently control how requests
+are processed based on the headers and other metadata that they see.</p>
+<p>This field is applicable when servers are responding to the header requests. If it is set
+in the response to the body or trailer requests, it will be ignored by the data plane.
+It is also ignored by the data plane when the ext_proc filter config
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-allow-mode-override"><span class="std std-ref">allow_mode_override</span></a>
+is set to <code class="docutils literal notranslate"><span class="pre">false</span></code>, or
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-send-body-without-waiting-for-header-response"><span class="std std-ref">send_body_without_waiting_for_header_response</span></a>
+is set to <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p>
+<p>The external processing server can override the processing mode by returning a standalone <code class="docutils literal notranslate"><span class="pre">mode_override</span></code>
+in the <code class="docutils literal notranslate"><span class="pre">ProcessingResponse</span></code> after receiving a <code class="docutils literal notranslate"><span class="pre">ProcessingRequest</span></code> for request headers. This standalone
+override must be sent before the request headers response is sent.
+Subsequent messages will adhere to this new mode.</p>
+<p>Constraints:</p>
+<ol class="arabic simple">
+<li><p>Request Path: A standalone <code class="docutils literal notranslate"><span class="pre">mode_override</span></code> only supports transitioning the body processing mode
+from other mode to <code class="docutils literal notranslate"><span class="pre">FULL_DUPLEX_STREAMED</span></code>, and the trailer mode must be set to <code class="docutils literal notranslate"><span class="pre">SEND</span></code>.</p></li>
+<li><p>Response Path: There are no restrictions on processing mode changes in this case.</p></li>
+</ol>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-processingresponse-override-message-timeout">
+<dt>override_message_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) When the ext_proc server receives a request message and needs more time to process it, it
+sends back a <code class="docutils literal notranslate"><span class="pre">ProcessingResponse</span></code> message with a new timeout value. When the data plane
+receives this response message, it ignores other fields in the response, stops the original
+timer (which has the timeout value specified in
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-message-timeout"><span class="std std-ref">message_timeout</span></a>),
+and starts a new timer with this <code class="docutils literal notranslate"><span class="pre">override_message_timeout</span></code> value while keeping the data
+plane ext_proc filter state machine intact.</p>
+<p>The value must be &gt;= 1ms and &lt;=
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-max-message-timeout"><span class="std std-ref">max_message_timeout</span></a>.
+Such a message can be sent at most once in a particular data plane ext_proc filter processing
+state. To enable this API, <code class="docutils literal notranslate"><span class="pre">max_message_timeout</span></code> must be set to a value &gt;= 1ms.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-httpheaders">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-httpheaders"></span><h2>service.ext_proc.v3.HttpHeaders<a class="headerlink" href="#service-ext-proc-v3-httpheaders" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L483">[service.ext_proc.v3.HttpHeaders proto]</a></p>
+<p>This message is sent to the external server when the HTTP request and response headers
+are first received.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;end_of_stream&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-httpheaders-headers">
+<dt>headers</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-headermap"><span class="std std-ref">config.core.v3.HeaderMap</span></a>) The HTTP request headers. All header keys will be lower-cased, because HTTP header keys are
+case-insensitive. The header value is encoded in the
+<a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-field-config-core-v3-headervalue-raw-value"><span class="std std-ref">raw_value</span></a> field.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-httpheaders-end-of-stream">
+<dt>end_of_stream</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If <code class="docutils literal notranslate"><span class="pre">true</span></code>, then there is no message body associated with this request or response.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-httpbody">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-httpbody"></span><h2>service.ext_proc.v3.HttpBody<a class="headerlink" href="#service-ext-proc-v3-httpbody" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L502">[service.ext_proc.v3.HttpBody proto]</a></p>
+<p>This message is sent to the external server when the HTTP request and response bodies are
+received.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;body&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;end_of_stream&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;grpc_message_compressed&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-httpbody-body">
+<dt>body</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bytes</a>) The contents of the body in the HTTP request/response. Note that in streaming mode multiple
+<code class="docutils literal notranslate"><span class="pre">HttpBody</span></code> messages may be sent.</p>
+<p>In <code class="docutils literal notranslate"><span class="pre">GRPC</span></code> body send mode, a separate <code class="docutils literal notranslate"><span class="pre">HttpBody</span></code> message will be sent for each message in
+the gRPC stream.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-httpbody-end-of-stream">
+<dt>end_of_stream</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If <code class="docutils literal notranslate"><span class="pre">true</span></code>, this will be the last <code class="docutils literal notranslate"><span class="pre">HttpBody</span></code> message that will be sent and no trailers
+will be sent for the current request/response.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-httpbody-grpc-message-compressed">
+<dt>grpc_message_compressed</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) This field is used in <code class="docutils literal notranslate"><span class="pre">GRPC</span></code> body send mode to indicate whether the message is compressed.
+This will never be set to <code class="docutils literal notranslate"><span class="pre">true</span></code> by gRPC but may be set to <code class="docutils literal notranslate"><span class="pre">true</span></code> by a proxy like Envoy.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-httptrailers">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-httptrailers"></span><h2>service.ext_proc.v3.HttpTrailers<a class="headerlink" href="#service-ext-proc-v3-httptrailers" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L543">[service.ext_proc.v3.HttpTrailers proto]</a></p>
+<p>This message is sent to the external server when the HTTP request and
+response trailers are received.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;trailers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-httptrailers-trailers">
+<dt>trailers</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-headermap"><span class="std std-ref">config.core.v3.HeaderMap</span></a>) The header value is encoded in the
+<a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-field-config-core-v3-headervalue-raw-value"><span class="std std-ref">raw_value</span></a> field.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-headersresponse">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-headersresponse"></span><h2>service.ext_proc.v3.HeadersResponse<a class="headerlink" href="#service-ext-proc-v3-headersresponse" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L553">[service.ext_proc.v3.HeadersResponse proto]</a></p>
+<p>This message is sent by the external server to the data plane after <code class="docutils literal notranslate"><span class="pre">HttpHeaders</span></code> was
+sent to it.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-headersresponse-response">
+<dt>response</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-commonresponse"><span class="std std-ref">service.ext_proc.v3.CommonResponse</span></a>) Details the modifications (if any) to be made by the data plane to the current
+request/response.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-bodyresponse">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-bodyresponse"></span><h2>service.ext_proc.v3.BodyResponse<a class="headerlink" href="#service-ext-proc-v3-bodyresponse" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L561">[service.ext_proc.v3.BodyResponse proto]</a></p>
+<p>This message is sent by the external server to the data plane after <code class="docutils literal notranslate"><span class="pre">HttpBody</span></code> was
+sent to it.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-bodyresponse-response">
+<dt>response</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-commonresponse"><span class="std std-ref">service.ext_proc.v3.CommonResponse</span></a>) Details the modifications (if any) to be made by the data plane to the current
+request/response.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-trailersresponse">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-trailersresponse"></span><h2>service.ext_proc.v3.TrailersResponse<a class="headerlink" href="#service-ext-proc-v3-trailersresponse" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L569">[service.ext_proc.v3.TrailersResponse proto]</a></p>
+<p>This message is sent by the external server to the data plane after <code class="docutils literal notranslate"><span class="pre">HttpTrailers</span></code> was
+sent to it.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;header_mutation&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-trailersresponse-header-mutation">
+<dt>header_mutation</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-headermutation"><span class="std std-ref">service.ext_proc.v3.HeaderMutation</span></a>) Details the modifications (if any) to be made by the data plane to the current
+request/response trailers.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-streamedimmediateresponse">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-streamedimmediateresponse"></span><h2>service.ext_proc.v3.StreamedImmediateResponse<a class="headerlink" href="#service-ext-proc-v3-streamedimmediateresponse" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L580">[service.ext_proc.v3.StreamedImmediateResponse proto]</a></p>
+<p>This message is sent by the external server to the data plane after <code class="docutils literal notranslate"><span class="pre">HttpHeaders</span></code> to initiate
+local response streaming. The server may follow up with multiple messages containing
+<code class="docutils literal notranslate"><span class="pre">body_response</span></code>. The server must indicate end of stream by setting <code class="docutils literal notranslate"><span class="pre">end_of_stream</span></code> to
+<code class="docutils literal notranslate"><span class="pre">true</span></code> in the <code class="docutils literal notranslate"><span class="pre">headers_response</span></code> or <code class="docutils literal notranslate"><span class="pre">body_response</span></code> message or by sending a
+<code class="docutils literal notranslate"><span class="pre">trailers_response</span></code> message.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;headers_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;body_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;trailers_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-streamedimmediateresponse-headers-response">
+<dt>headers_response</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-httpheaders"><span class="std std-ref">service.ext_proc.v3.HttpHeaders</span></a>) Response headers to be sent downstream. The <code class="docutils literal notranslate"><span class="pre">:status</span></code> header must be set.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-streamedimmediateresponse-headers-response"><span class="std std-ref">headers_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-streamedimmediateresponse-body-response"><span class="std std-ref">body_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-streamedimmediateresponse-trailers-response"><span class="std std-ref">trailers_response</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-streamedimmediateresponse-body-response">
+<dt>body_response</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-streamedbodyresponse"><span class="std std-ref">service.ext_proc.v3.StreamedBodyResponse</span></a>) Response body to be sent downstream.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-streamedimmediateresponse-headers-response"><span class="std std-ref">headers_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-streamedimmediateresponse-body-response"><span class="std std-ref">body_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-streamedimmediateresponse-trailers-response"><span class="std std-ref">trailers_response</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-streamedimmediateresponse-trailers-response">
+<dt>trailers_response</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-headermap"><span class="std std-ref">config.core.v3.HeaderMap</span></a>) Response trailers to be sent downstream.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-streamedimmediateresponse-headers-response"><span class="std std-ref">headers_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-streamedimmediateresponse-body-response"><span class="std std-ref">body_response</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-streamedimmediateresponse-trailers-response"><span class="std std-ref">trailers_response</span></a> may be set.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-commonresponse">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-commonresponse"></span><h2>service.ext_proc.v3.CommonResponse<a class="headerlink" href="#service-ext-proc-v3-commonresponse" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L595">[service.ext_proc.v3.CommonResponse proto]</a></p>
+<p>This message contains common fields between header and body responses.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;header_mutation&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;body_mutation&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;clear_route_cache&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-commonresponse-status">
+<dt>status</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-service-ext-proc-v3-commonresponse-responsestatus"><span class="std std-ref">service.ext_proc.v3.CommonResponse.ResponseStatus</span></a>) If set, provide additional direction on how the data plane should
+handle the rest of the HTTP filter chain.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-commonresponse-header-mutation">
+<dt>header_mutation</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-headermutation"><span class="std std-ref">service.ext_proc.v3.HeaderMutation</span></a>) Instructions on how to manipulate the headers. When responding to an
+<code class="docutils literal notranslate"><span class="pre">HttpBody</span></code> request, header mutations will only take effect if the current processing mode
+for the body is <code class="docutils literal notranslate"><span class="pre">BUFFERED</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-commonresponse-body-mutation">
+<dt>body_mutation</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-bodymutation"><span class="std std-ref">service.ext_proc.v3.BodyMutation</span></a>) Replace the body of the last message sent to the remote server on this stream. If responding
+to an <code class="docutils literal notranslate"><span class="pre">HttpBody</span></code> request, simply replace or clear the body chunk that was sent with that
+request. Body mutations may take effect in response either to <code class="docutils literal notranslate"><span class="pre">header</span></code> or <code class="docutils literal notranslate"><span class="pre">body</span></code> messages.
+When it is in response to <code class="docutils literal notranslate"><span class="pre">header</span></code> messages, it only takes effect if the
+<a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-commonresponse-status"><span class="std std-ref">status</span></a>
+is set to <code class="docutils literal notranslate"><span class="pre">CONTINUE_AND_REPLACE</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-commonresponse-clear-route-cache">
+<dt>clear_route_cache</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Clear the route cache for the current client request. This is necessary
+if the remote server modified headers that are used to calculate the route.
+This field is ignored in the response direction. This field is also ignored
+if the data plane ext_proc filter is in the upstream filter chain.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-service-ext-proc-v3-commonresponse-responsestatus">
+<span id="envoy-v3-api-enum-service-ext-proc-v3-commonresponse-responsestatus"></span><h2>Enum service.ext_proc.v3.CommonResponse.ResponseStatus<a class="headerlink" href="#enum-service-ext-proc-v3-commonresponse-responsestatus" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L597">[service.ext_proc.v3.CommonResponse.ResponseStatus proto]</a></p>
+<p>The status of the response.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-service-ext-proc-v3-commonresponse-responsestatus-continue">
+<dt>CONTINUE</dt><dd><p><em>(DEFAULT)</em> ⁣Apply the mutation instructions in this message to the
+request or response, and then continue processing the filter
+stream as normal. This is the default.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-enum-value-service-ext-proc-v3-commonresponse-responsestatus-continue-and-replace">
+<dt>CONTINUE_AND_REPLACE</dt><dd><p>⁣Apply the specified header mutation, replace the body with the body
+specified in the body mutation (if present), and do not send any
+further messages for this request or response even if the processing
+mode is configured to do so.</p>
+<p>When used in response to a <code class="docutils literal notranslate"><span class="pre">request_headers</span></code> or <code class="docutils literal notranslate"><span class="pre">response_headers</span></code> message,
+this status makes it possible to either completely replace the body
+while discarding the original body, or to add a body to a message that
+formerly did not have one.</p>
+<p>In other words, this response makes it possible to turn an HTTP GET
+into a POST, PUT, or PATCH.</p>
+<p>Not supported if the body send mode is <code class="docutils literal notranslate"><span class="pre">GRPC</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-immediateresponse">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-immediateresponse"></span><h2>service.ext_proc.v3.ImmediateResponse<a class="headerlink" href="#service-ext-proc-v3-immediateresponse" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L657">[service.ext_proc.v3.ImmediateResponse proto]</a></p>
+<p>This message causes the filter to attempt to create a locally generated response, send it
+downstream, stop processing additional filters, and ignore any additional messages received
+from the remote server for this request or response. If a response has already started, then
+this will either ship the reply directly to the downstream codec, or reset the stream.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;body&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;grpc_status&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-immediateresponse-status">
+<dt>status</dt><dd><p>(<a class="reference internal" href="../../../type/v3/http_status.proto.html#envoy-v3-api-msg-type-v3-httpstatus"><span class="std std-ref">type.v3.HttpStatus</span></a>, <em>REQUIRED</em>) The response code to return.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-immediateresponse-headers">
+<dt>headers</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-headermutation"><span class="std std-ref">service.ext_proc.v3.HeaderMutation</span></a>) Apply changes to the default headers, which will include <code class="docutils literal notranslate"><span class="pre">content-type</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-immediateresponse-body">
+<dt>body</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bytes</a>) The message body to return with the response which is sent using the
+<code class="docutils literal notranslate"><span class="pre">text/plain</span></code> content type, or encoded in the <code class="docutils literal notranslate"><span class="pre">grpc-message</span></code> header.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-immediateresponse-grpc-status">
+<dt>grpc_status</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-grpcstatus"><span class="std std-ref">service.ext_proc.v3.GrpcStatus</span></a>) If set, then include a gRPC status trailer.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-immediateresponse-details">
+<dt>details</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) A string detailing why this local reply was sent, which may be included
+in log and debug output (e.g., this populates the <code class="docutils literal notranslate"><span class="pre">%RESPONSE_CODE_DETAILS%</span></code>
+command operator field for use in access logging).</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-grpcstatus">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-grpcstatus"></span><h2>service.ext_proc.v3.GrpcStatus<a class="headerlink" href="#service-ext-proc-v3-grpcstatus" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L678">[service.ext_proc.v3.GrpcStatus proto]</a></p>
+<p>This message specifies a gRPC status for an <code class="docutils literal notranslate"><span class="pre">ImmediateResponse</span></code> message.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-grpcstatus-status">
+<dt>status</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) The actual gRPC status.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-headermutation">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-headermutation"></span><h2>service.ext_proc.v3.HeaderMutation<a class="headerlink" href="#service-ext-proc-v3-headermutation" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L685">[service.ext_proc.v3.HeaderMutation proto]</a></p>
+<p>Change HTTP headers or trailers by appending, replacing, or removing
+headers.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;set_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;remove_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-headermutation-set-headers">
+<dt>set_headers</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-headervalueoption"><span class="std std-ref">config.core.v3.HeaderValueOption</span></a>) Add or replace HTTP headers. Attempts to set the value of
+any <code class="docutils literal notranslate"><span class="pre">x-envoy</span></code> header, and attempts to set the <code class="docutils literal notranslate"><span class="pre">:method</span></code>,
+<code class="docutils literal notranslate"><span class="pre">:authority</span></code>, <code class="docutils literal notranslate"><span class="pre">:scheme</span></code>, or <code class="docutils literal notranslate"><span class="pre">host</span></code> headers will be ignored.
+The header value is encoded in the
+<a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-field-config-core-v3-headervalue-raw-value"><span class="std std-ref">raw_value</span></a> field.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-headermutation-remove-headers">
+<dt>remove_headers</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Remove these HTTP headers. Attempts to remove system headers –
+any header starting with <code class="docutils literal notranslate"><span class="pre">:</span></code>, plus <code class="docutils literal notranslate"><span class="pre">host</span></code> – will be ignored.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-streamedbodyresponse">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-streamedbodyresponse"></span><h2>service.ext_proc.v3.StreamedBodyResponse<a class="headerlink" href="#service-ext-proc-v3-streamedbodyresponse" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L700">[service.ext_proc.v3.StreamedBodyResponse proto]</a></p>
+<p>The body response message corresponding to <code class="docutils literal notranslate"><span class="pre">FULL_DUPLEX_STREAMED</span></code> or <code class="docutils literal notranslate"><span class="pre">GRPC</span></code> body modes.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;body&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;end_of_stream&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;end_of_stream_without_message&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;grpc_message_compressed&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-streamedbodyresponse-body">
+<dt>body</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bytes</a>) In <code class="docutils literal notranslate"><span class="pre">FULL_DUPLEX_STREAMED</span></code> body send mode, contains the body response chunk that will be
+passed to the upstream/downstream by the data plane. In <code class="docutils literal notranslate"><span class="pre">GRPC</span></code> body send mode, contains
+a serialized gRPC message to be passed to the upstream/downstream by the data plane.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-streamedbodyresponse-end-of-stream">
+<dt>end_of_stream</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) The server sets this flag to <code class="docutils literal notranslate"><span class="pre">true</span></code> if it has received a body request with
+<a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-httpbody-end-of-stream"><span class="std std-ref">end_of_stream</span></a> set to
+<code class="docutils literal notranslate"><span class="pre">true</span></code>, and this is the last chunk of body responses.</p>
+<p>Note that in <code class="docutils literal notranslate"><span class="pre">GRPC</span></code> body send mode, this allows the ext_proc server to tell the data plane
+to send a half close after a client message, which will result in discarding any other
+messages sent by the client application.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-streamedbodyresponse-end-of-stream-without-message">
+<dt>end_of_stream_without_message</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) This field is used in <code class="docutils literal notranslate"><span class="pre">GRPC</span></code> body send mode when <code class="docutils literal notranslate"><span class="pre">end_of_stream</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code> and <code class="docutils literal notranslate"><span class="pre">body</span></code>
+is empty. Those values would normally indicate an empty message on the stream with the
+end-of-stream bit set. However, if the half-close happens after the last message on the stream
+was already sent, then this field will be <code class="docutils literal notranslate"><span class="pre">true</span></code> to indicate an end-of-stream with <em>no</em>
+message (as opposed to an empty message).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-ext-proc-v3-streamedbodyresponse-grpc-message-compressed">
+<dt>grpc_message_compressed</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) This field is used in <code class="docutils literal notranslate"><span class="pre">GRPC</span></code> body send mode to indicate whether the message is compressed.
+This will never be set to <code class="docutils literal notranslate"><span class="pre">true</span></code> by gRPC but may be set to <code class="docutils literal notranslate"><span class="pre">true</span></code> by a proxy like Envoy.</p>
+</dd>
+</dl>
+</section>
+<section id="service-ext-proc-v3-bodymutation">
+<span id="envoy-v3-api-msg-service-ext-proc-v3-bodymutation"></span><h2>service.ext_proc.v3.BodyMutation<a class="headerlink" href="#service-ext-proc-v3-bodymutation" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/ext_proc/v3/external_processor.proto#L741">[service.ext_proc.v3.BodyMutation proto]</a></p>
+<p>This message specifies the body mutation the server sends to the data plane.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;body&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;clear_body&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;streamed_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-bodymutation-body">
+<dt>body</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bytes</a>) The entire body to replace.
+Should only be used when the corresponding <code class="docutils literal notranslate"><span class="pre">BodySendMode</span></code> in the
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-processing-mode"><span class="std std-ref">processing_mode</span></a>
+is not set to <code class="docutils literal notranslate"><span class="pre">FULL_DUPLEX_STREAMED</span></code> or <code class="docutils literal notranslate"><span class="pre">GRPC</span></code>.</p>
+<p>The type of mutation for the body.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-bodymutation-body"><span class="std std-ref">body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-bodymutation-clear-body"><span class="std std-ref">clear_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-bodymutation-streamed-response"><span class="std std-ref">streamed_response</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-bodymutation-clear-body">
+<dt>clear_body</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Clear the corresponding body chunk. Should only be used when the corresponding
+<code class="docutils literal notranslate"><span class="pre">BodySendMode</span></code> in the
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-processing-mode"><span class="std std-ref">processing_mode</span></a>
+is not set to <code class="docutils literal notranslate"><span class="pre">FULL_DUPLEX_STREAMED</span></code> or <code class="docutils literal notranslate"><span class="pre">GRPC</span></code>.</p>
+<p>The type of mutation for the body.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-bodymutation-body"><span class="std std-ref">body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-bodymutation-clear-body"><span class="std std-ref">clear_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-bodymutation-streamed-response"><span class="std std-ref">streamed_response</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-ext-proc-v3-bodymutation-streamed-response">
+<dt>streamed_response</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-ext-proc-v3-streamedbodyresponse"><span class="std std-ref">service.ext_proc.v3.StreamedBodyResponse</span></a>) Must be used when the corresponding <code class="docutils literal notranslate"><span class="pre">BodySendMode</span></code> in the
+<a class="reference internal" href="../../../extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-processing-mode"><span class="std std-ref">processing_mode</span></a>
+is set to <code class="docutils literal notranslate"><span class="pre">FULL_DUPLEX_STREAMED</span></code> or <code class="docutils literal notranslate"><span class="pre">GRPC</span></code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the <a class="reference internal" href="../../../../intro/arch_overview/security/threat_model.html#arch-overview-threat-model"><span class="std std-ref">threat model</span></a>, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.</p>
+</div>
+<p>The type of mutation for the body.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-bodymutation-body"><span class="std std-ref">body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-bodymutation-clear-body"><span class="std std-ref">clear_body</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-ext-proc-v3-bodymutation-streamed-response"><span class="std std-ref">streamed_response</span></a> may be set.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../extension/v3/config_discovery.proto.html" class="btn btn-neutral float-left" title="Extension config discovery service (ECDS) (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../accesslog/v3/als.proto.html" class="btn btn-neutral float-right" title="gRPC access log service (ALS) (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">External processing service (proto)</a><ul>
+<li><a class="reference internal" href="#service-ext-proc-v3-protocolconfiguration">service.ext_proc.v3.ProtocolConfiguration</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-processingrequest">service.ext_proc.v3.ProcessingRequest</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-processingresponse">service.ext_proc.v3.ProcessingResponse</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-httpheaders">service.ext_proc.v3.HttpHeaders</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-httpbody">service.ext_proc.v3.HttpBody</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-httptrailers">service.ext_proc.v3.HttpTrailers</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-headersresponse">service.ext_proc.v3.HeadersResponse</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-bodyresponse">service.ext_proc.v3.BodyResponse</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-trailersresponse">service.ext_proc.v3.TrailersResponse</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-streamedimmediateresponse">service.ext_proc.v3.StreamedImmediateResponse</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-commonresponse">service.ext_proc.v3.CommonResponse</a></li>
+<li><a class="reference internal" href="#enum-service-ext-proc-v3-commonresponse-responsestatus">Enum service.ext_proc.v3.CommonResponse.ResponseStatus</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-immediateresponse">service.ext_proc.v3.ImmediateResponse</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-grpcstatus">service.ext_proc.v3.GrpcStatus</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-headermutation">service.ext_proc.v3.HeaderMutation</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-streamedbodyresponse">service.ext_proc.v3.StreamedBodyResponse</a></li>
+<li><a class="reference internal" href="#service-ext-proc-v3-bodymutation">service.ext_proc.v3.BodyMutation</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

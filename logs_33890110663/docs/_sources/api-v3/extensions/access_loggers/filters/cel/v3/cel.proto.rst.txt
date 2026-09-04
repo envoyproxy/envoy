@@ -1,0 +1,83 @@
+.. _envoy_v3_api_file_envoy/extensions/access_loggers/filters/cel/v3/cel.proto:
+
+ExpressionFilter (proto)
+========================
+
+.. _extension_envoy.access_loggers.extension_filters.cel:
+
+This extension has the qualified name ``envoy.access_loggers.extension_filters.cel``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.access_loggers.extension_filters <extension_category_envoy.access_loggers.extension_filters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter <envoy_v3_api_msg_extensions.access_loggers.filters.cel.v3.ExpressionFilter>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.filters.cel.v3.ExpressionFilter:
+
+extensions.access_loggers.filters.cel.v3.ExpressionFilter
+---------------------------------------------------------
+
+
+:repo:`[extensions.access_loggers.filters.cel.v3.ExpressionFilter proto] <api/envoy/extensions/access_loggers/filters/cel/v3/cel.proto#L20>`
+
+ExpressionFilter is an access logging filter that evaluates configured
+symbolic Common Expression Language expressions to inform the decision
+to generate an access log.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "expression": ...,
+    "cel_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.filters.cel.v3.ExpressionFilter.expression:
+
+
+expression
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Expression that, when evaluated, will be used to filter access logs.
+  Expressions are based on the set of Envoy :ref:`attributes <arch_overview_attributes>`.
+  The provided expression must evaluate to true for logging (expression errors are considered false).
+  Examples:
+
+  * ``response.code >= 400``
+  * ``(connection.mtls && request.headers['x-log-mtls'] == 'true') || request.url_path.contains('v1beta3')``
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.filters.cel.v3.ExpressionFilter.cel_config:
+
+
+cel_config
+  (:ref:`config.core.v3.CelExpressionConfig <envoy_v3_api_msg_config.core.v3.CelExpressionConfig>`) CEL expression configuration that modifies the evaluation behavior of the ``expression`` field.
+  If specified, string conversion, concatenation, and manipulation functions may be enabled
+  for the filter expression. See :ref:`CelExpressionConfig <envoy_v3_api_msg_config.core.v3.CelExpressionConfig>`
+  for more details.
+
+

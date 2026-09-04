@@ -1,0 +1,20 @@
+.. _version_history_1.30.3:
+
+1.30.3 (June 26, 2024)
+=======================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **datadog**: Bumped the version of datadog to resolve a crashing bug in earlier versions of the library.
+

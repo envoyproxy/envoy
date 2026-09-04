@@ -1,0 +1,117 @@
+.. _envoy_v3_api_file_envoy/type/v3/range.proto:
+
+Range (proto)
+=============
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.v3.Int64Range:
+
+type.v3.Int64Range
+------------------
+
+
+:repo:`[type.v3.Int64Range proto] <api/envoy/type/v3/range.proto#L17>`
+
+Specifies the int64 start and end of the range using half-open interval semantics [start,
+end).
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "start": ...,
+    "end": ...
+  }
+
+.. _envoy_v3_api_field_type.v3.Int64Range.start:
+
+
+start
+  (`int64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) start of the range (inclusive)
+
+
+.. _envoy_v3_api_field_type.v3.Int64Range.end:
+
+
+end
+  (`int64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) end of the range (exclusive)
+
+
+
+.. _envoy_v3_api_msg_type.v3.Int32Range:
+
+type.v3.Int32Range
+------------------
+
+
+:repo:`[type.v3.Int32Range proto] <api/envoy/type/v3/range.proto#L29>`
+
+Specifies the int32 start and end of the range using half-open interval semantics [start,
+end).
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "start": ...,
+    "end": ...
+  }
+
+.. _envoy_v3_api_field_type.v3.Int32Range.start:
+
+
+start
+  (`int32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) start of the range (inclusive)
+
+
+.. _envoy_v3_api_field_type.v3.Int32Range.end:
+
+
+end
+  (`int32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) end of the range (exclusive)
+
+
+
+.. _envoy_v3_api_msg_type.v3.DoubleRange:
+
+type.v3.DoubleRange
+-------------------
+
+
+:repo:`[type.v3.DoubleRange proto] <api/envoy/type/v3/range.proto#L41>`
+
+Specifies the double start and end of the range using half-open interval semantics [start,
+end).
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "start": ...,
+    "end": ...
+  }
+
+.. _envoy_v3_api_field_type.v3.DoubleRange.start:
+
+
+start
+  (`double <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) start of the range (inclusive)
+
+
+.. _envoy_v3_api_field_type.v3.DoubleRange.end:
+
+
+end
+  (`double <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) end of the range (exclusive)
+
+

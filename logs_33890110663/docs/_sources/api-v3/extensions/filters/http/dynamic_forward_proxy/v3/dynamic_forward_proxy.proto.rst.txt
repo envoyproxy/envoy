@@ -1,0 +1,204 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.proto:
+
+Dynamic forward proxy (proto)
+=============================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig:
+
+extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
+-------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig proto] <api/envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.proto#L23>`
+
+Configuration for the dynamic forward proxy HTTP filter. See the :ref:`architecture overview
+<arch_overview_http_dynamic_forward_proxy>` for more information.
+
+.. _extension_envoy.filters.http.dynamic_forward_proxy:
+
+This extension has the qualified name ``envoy.filters.http.dynamic_forward_proxy``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dns_cache_config": {...},
+    "sub_cluster_config": {...},
+    "save_upstream_address": ...,
+    "allow_dynamic_host_from_filter_state": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.dns_cache_config:
+
+
+dns_cache_config
+  (:ref:`extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig <envoy_v3_api_msg_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig>`) The DNS cache configuration that the filter will attach to. Note this configuration must
+  match that of associated :ref:`dynamic forward proxy cluster configuration
+  <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
+
+
+  
+
+  Only one of :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.dns_cache_config>`, :ref:`sub_cluster_config <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.sub_cluster_config>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.sub_cluster_config:
+
+
+sub_cluster_config
+  (:ref:`extensions.filters.http.dynamic_forward_proxy.v3.SubClusterConfig <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.SubClusterConfig>`) The configuration that the filter will use, when the related dynamic forward proxy cluster enabled
+  sub clusters.
+
+
+  
+
+  Only one of :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.dns_cache_config>`, :ref:`sub_cluster_config <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.sub_cluster_config>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.save_upstream_address:
+
+
+save_upstream_address
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When this flag is set, the filter will add the resolved upstream address in the filter
+  state. The state should be saved with key
+  ``envoy.stream.upstream_address`` (See
+  :repo:`upstream_address.h<source/common/stream_info/upstream_address.h>`).
+
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state:
+
+
+allow_dynamic_host_from_filter_state
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When this flag is set, the filter will check for the ``envoy.upstream.dynamic_host``
+  and/or ``envoy.upstream.dynamic_port`` filter state values before using the HTTP
+  Host header for DNS resolution. This provides consistency with the
+  :ref:`SNI dynamic forward proxy <envoy_v3_api_msg_extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig>` and
+  :ref:`UDP dynamic forward proxy <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3.FilterConfig>`
+  filters behavior when enabled.
+
+  If the flag is not set (default), the filter will use the HTTP Host header
+  for DNS resolution, maintaining backward compatibility.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig:
+
+extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig
+---------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig proto] <api/envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.proto#L57>`
+
+Per route Configuration for the dynamic forward proxy HTTP filter.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "host_rewrite_literal": ...,
+    "host_rewrite_header": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig.host_rewrite_literal:
+
+
+host_rewrite_literal
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates that before DNS lookup, the host header will be swapped with
+  this value. If not set or empty, the original host header value
+  will be used and no rewrite will happen.
+
+  .. note::
+
+    This rewrite affects both DNS lookup and host header forwarding. However, this option shouldn't be used with
+    :ref:`HCM host rewrite header <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>` given that
+    the value set here would be used for DNS lookups whereas the value set in the HCM would be used for host
+    header forwarding which might not be the desired outcome.
+
+
+
+  
+
+  Only one of :ref:`host_rewrite_literal <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig.host_rewrite_literal>`, :ref:`host_rewrite_header <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig.host_rewrite_header>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig.host_rewrite_header:
+
+
+host_rewrite_header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates that before DNS lookup, the host header will be swapped with
+  the value of this header. If not set or empty, the original host header
+  value will be used and no rewrite will happen.
+
+  .. note::
+
+    This rewrite affects both DNS lookup and host header forwarding. However, this option shouldn't be used with
+    :ref:`HCM host rewrite header <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>` given that
+    the value set here would be used for DNS lookups whereas the value set in the HCM would be used for host
+    header forwarding which might not be the desired outcome.
+
+  .. note::
+
+    If the header appears multiple times only the first value is used.
+
+
+  
+
+  Only one of :ref:`host_rewrite_literal <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig.host_rewrite_literal>`, :ref:`host_rewrite_header <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig.host_rewrite_header>` may be set.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.SubClusterConfig:
+
+extensions.filters.http.dynamic_forward_proxy.v3.SubClusterConfig
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.dynamic_forward_proxy.v3.SubClusterConfig proto] <api/envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.proto#L93>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster_init_timeout": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.SubClusterConfig.cluster_init_timeout:
+
+
+cluster_init_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The timeout used for sub cluster initialization. Defaults to **5s** if not set.
+
+

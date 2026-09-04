@@ -1,0 +1,68 @@
+.. _envoy_v3_api_file_envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.proto:
+
+apple DNS resolver (proto)
+==========================
+
+.. _extension_envoy.network.dns_resolver.apple:
+
+This extension has the qualified name ``envoy.network.dns_resolver.apple``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.network.dns_resolver <extension_category_envoy.network.dns_resolver>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig:
+
+extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig
+---------------------------------------------------------------
+
+
+:repo:`[extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig proto] <api/envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.proto#L16>`
+
+Configuration for apple DNS resolver.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "include_unroutable_families": ...
+  }
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig.include_unroutable_families:
+
+
+include_unroutable_families
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The resolver will avoid the system's heuristics to only return
+  IPv4 or IPv6 addresses that it considers to be "routable", instead
+  returning all possible IPv4 or IPv6 addresses. This setting is
+  ignored if the DNS lookup family is set to v4-only or v6-only.
+  This should remain false in the vast majority of cases, but may be
+  useful when performing custom filtering of addresses, such as with
+  Happy Eyeballs.
+
+

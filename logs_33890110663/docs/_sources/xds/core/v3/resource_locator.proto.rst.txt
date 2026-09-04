@@ -1,0 +1,213 @@
+.. _envoy_v3_api_file_xds/core/v3/resource_locator.proto:
+
+xds/core/v3/resource_locator.proto (proto)
+==========================================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+.. _envoy_v3_api_msg_.xds.core.v3.ResourceLocator:
+
+.xds.core.v3.ResourceLocator
+----------------------------
+
+
+`[.xds.core.v3.ResourceLocator proto] <https://github.com/cncf/xds/blob/main/xds/core/v3/resource_locator.proto#L33>`_
+
+xDS resource locators identify a xDS resource name and instruct the
+data-plane load balancer on how the resource may be located.
+
+Resource locators have a canonical xdstp:// URI representation:
+
+  xdstp://{authority}/{type_url}/{id}?{context_params}{#directive,*}
+
+where context_params take the form of URI query parameters.
+
+Resource locators have a similar canonical http:// URI representation:
+
+  http://{authority}/{type_url}/{id}?{context_params}{#directive,*}
+
+Resource locators also have a simplified file:// URI representation:
+
+  file:///{id}{#directive,*}
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "scheme": ...,
+    "id": ...,
+    "authority": ...,
+    "resource_type": ...,
+    "exact_context": {...},
+    "directives": []
+  }
+
+.. _envoy_v3_api_field_.xds.core.v3.ResourceLocator.scheme:
+
+
+scheme
+  (:ref:`.xds.core.v3.ResourceLocator.Scheme <envoy_v3_api_enum_.xds.core.v3.ResourceLocator.Scheme>`) URI scheme.
+
+
+.. _envoy_v3_api_field_.xds.core.v3.ResourceLocator.id:
+
+
+id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Opaque identifier for the resource. Any '/' will not be escaped during URI
+  encoding and will form part of the URI path. This may end
+  with ‘*’ for glob collection references.
+
+
+.. _envoy_v3_api_field_.xds.core.v3.ResourceLocator.authority:
+
+
+authority
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Logical authority for resource (not necessarily transport network address).
+  Authorities are opaque in the xDS API, data-plane load balancers will map
+  them to concrete network transports such as an xDS management server, e.g.
+  via envoy.config.core.v3.ConfigSource.
+
+
+.. _envoy_v3_api_field_.xds.core.v3.ResourceLocator.resource_type:
+
+
+resource_type
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Fully qualified resource type (as in type URL without types.googleapis.com/
+  prefix).
+
+
+.. _envoy_v3_api_field_.xds.core.v3.ResourceLocator.exact_context:
+
+
+exact_context
+  (:ref:`.xds.core.v3.ContextParams <envoy_v3_api_msg_.xds.core.v3.ContextParams>`) Additional parameters that can be used to select resource variants.
+  Matches must be exact, i.e. all context parameters must match exactly and
+  there must be no additional context parameters set on the matched
+  resource.
+
+
+  
+
+.. _envoy_v3_api_field_.xds.core.v3.ResourceLocator.directives:
+
+
+directives
+  (**repeated** :ref:`.xds.core.v3.ResourceLocator.Directive <envoy_v3_api_msg_.xds.core.v3.ResourceLocator.Directive>`) A list of directives that appear in the xDS resource locator #fragment.
+
+  When encoding to URI form, directives are percent encoded with comma
+  separation.
+
+
+.. _envoy_v3_api_msg_.xds.core.v3.ResourceLocator.Directive:
+
+.xds.core.v3.ResourceLocator.Directive
+--------------------------------------
+
+
+`[.xds.core.v3.ResourceLocator.Directive proto] <https://github.com/cncf/xds/blob/main/xds/core/v3/resource_locator.proto#L89>`_
+
+Directives provide information to data-plane load balancers on how xDS
+resource names are to be interpreted and potentially further resolved. For
+example, they may provide alternative resource locators for when primary
+resolution fails. Directives are not part of resource names and do not
+appear in a xDS transport discovery request.
+
+When encoding to URIs, directives take the form:
+
+<directive name>=<string representation of directive value>
+
+For example, we can have alt=xdstp://foo/bar or entry=some%20thing. Each
+directive value type may have its own string encoding, in the case of
+ResourceLocator there is a recursive URI encoding.
+
+Percent encoding applies to the URI encoding of the directive value.
+Multiple directives are comma-separated, so the reserved characters that
+require percent encoding in a directive value are [',', '#', '[', ']',
+'%']. These are the RFC3986 fragment reserved characters with the addition
+of the xDS scheme specific ','. See
+https://tools.ietf.org/html/rfc3986#page-49 for further details on URI ABNF
+and reserved characters.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "alt": {...},
+    "entry": ...
+  }
+
+.. _envoy_v3_api_field_.xds.core.v3.ResourceLocator.Directive.alt:
+
+
+alt
+  (:ref:`.xds.core.v3.ResourceLocator <envoy_v3_api_msg_.xds.core.v3.ResourceLocator>`) An alternative resource locator for fallback if the resource is
+  unavailable. For example, take the resource locator:
+
+    xdstp://foo/some-type/some-route-table#alt=xdstp://bar/some-type/another-route-table
+
+  If the data-plane load balancer is unable to reach `foo` to fetch the
+  resource, it will fallback to `bar`. Alternative resources do not need
+  to have equivalent content, but they should be functional substitutes.
+
+
+  
+
+  Precisely one of :ref:`alt <envoy_v3_api_field_.xds.core.v3.ResourceLocator.Directive.alt>`, :ref:`entry <envoy_v3_api_field_.xds.core.v3.ResourceLocator.Directive.entry>` must be set.
+
+.. _envoy_v3_api_field_.xds.core.v3.ResourceLocator.Directive.entry:
+
+
+entry
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) List collections support inlining of resources via the entry field in
+  Resource. These inlined Resource objects may have an optional name
+  field specified. When specified, the entry directive allows
+  ResourceLocator to directly reference these inlined resources, e.g.
+  xdstp://.../foo#entry=bar.
+
+
+  
+
+  Precisely one of :ref:`alt <envoy_v3_api_field_.xds.core.v3.ResourceLocator.Directive.alt>`, :ref:`entry <envoy_v3_api_field_.xds.core.v3.ResourceLocator.Directive.entry>` must be set.
+
+
+.. _envoy_v3_api_enum_.xds.core.v3.ResourceLocator.Scheme:
+
+Enum .xds.core.v3.ResourceLocator.Scheme
+----------------------------------------
+
+
+`[.xds.core.v3.ResourceLocator.Scheme proto] <https://github.com/cncf/xds/blob/main/xds/core/v3/resource_locator.proto#L34>`_
+
+
+
+
+.. _envoy_v3_api_enum_value_.xds.core.v3.ResourceLocator.Scheme.XDSTP:
+
+
+XDSTP
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_.xds.core.v3.ResourceLocator.Scheme.HTTP:
+
+
+HTTP
+  ⁣
+
+.. _envoy_v3_api_enum_value_.xds.core.v3.ResourceLocator.Scheme.FILE:
+
+
+FILE
+  ⁣
+
+

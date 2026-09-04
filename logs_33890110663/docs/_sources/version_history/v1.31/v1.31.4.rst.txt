@@ -1,0 +1,34 @@
+.. _version_history_1.31.4:
+
+1.31.4 (December 8, 2024)
+==========================
+
+
+
+
+
+Minor behavior changes
+----------------------
+
+*Changes that may cause incompatibilities for some users, but should
+not for most*
+
+
+
+* **dns**: Patched c-ares to address CVE-2024-25629.
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **access_log**: Relaxed the restriction on SNI logging to allow the ``_`` character, even if
+  ``envoy.reloadable_features.sanitize_sni_in_access_log`` is enabled.
+* **tracers**: Avoid possible overflow when setting span attributes in Dynatrace sampler.
+* **validation/tools**: Add back missing extension for ``schema_validator_tool``.
+

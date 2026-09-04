@@ -1,0 +1,50 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/udp/udp_proxy/session/http_capsule/v3/http_capsule.proto:
+
+UDP HTTP Capsule filter (proto)
+===============================
+
+.. _extension_envoy.filters.udp.session.http_capsule:
+
+This extension has the qualified name ``envoy.filters.udp.session.http_capsule``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.udp.session <extension_category_envoy.filters.udp.session>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig>`
+
+
+
+UDP to HTTP capsules :ref:`overview <config_udp_session_filters_http_capsule>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig:
+
+extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig
+---------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig proto] <api/envoy/extensions/filters/udp/udp_proxy/session/http_capsule/v3/http_capsule.proto#L16>`
+
+
+
+
+

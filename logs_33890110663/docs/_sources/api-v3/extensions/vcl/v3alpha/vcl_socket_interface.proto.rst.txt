@@ -1,0 +1,53 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/vcl/v3alpha/vcl_socket_interface.proto:
+
+VCL socket interface configuration (proto)
+==========================================
+
+.. _extension_envoy.bootstrap.vcl:
+
+This extension has the qualified name ``envoy.bootstrap.vcl``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.bootstrap <extension_category_envoy.bootstrap>`
+
+
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+VCL :ref:`configuration overview <config_sock_interface_vcl>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.vcl.v3alpha.VclSocketInterface:
+
+extensions.vcl.v3alpha.VclSocketInterface
+-----------------------------------------
+
+
+:repo:`[extensions.vcl.v3alpha.VclSocketInterface proto] <api/contrib/envoy/extensions/vcl/v3alpha/vcl_socket_interface.proto#L18>`
+
+Configuration for vcl socket interface that relies on ``vpp`` ``comms`` library (VCL)
+
+
+
+

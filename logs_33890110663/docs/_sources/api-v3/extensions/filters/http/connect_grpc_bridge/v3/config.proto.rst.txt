@@ -1,0 +1,58 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/connect_grpc_bridge/v3/config.proto:
+
+Connect RPC to gRPC (proto)
+===========================
+
+.. _extension_envoy.filters.http.connect_grpc_bridge:
+
+This extension has the qualified name ``envoy.filters.http.connect_grpc_bridge``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.connect_grpc_bridge.v3.FilterConfig <envoy_v3_api_msg_extensions.filters.http.connect_grpc_bridge.v3.FilterConfig>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+Connect RPC to gRPC bridge
+:ref:`configuration overview <config_http_filters_connect_grpc_bridge>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.connect_grpc_bridge.v3.FilterConfig:
+
+extensions.filters.http.connect_grpc_bridge.v3.FilterConfig
+-----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.connect_grpc_bridge.v3.FilterConfig proto] <api/envoy/extensions/filters/http/connect_grpc_bridge/v3/config.proto#L20>`
+
+Connect RPC to gRPC bridge filter configuration
+
+
+
+

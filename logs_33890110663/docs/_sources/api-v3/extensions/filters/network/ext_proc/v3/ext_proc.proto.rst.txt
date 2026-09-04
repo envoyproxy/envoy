@@ -1,0 +1,287 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/ext_proc/v3/ext_proc.proto:
+
+External Processing Filter (proto)
+==================================
+
+.. _extension_envoy.filters.network.ext_proc:
+
+This extension has the qualified name ``envoy.filters.network.ext_proc``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.ext_proc.v3.NetworkExternalProcessor <envoy_v3_api_msg_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+External Processing Filter: Process network traffic using an external service.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor:
+
+extensions.filters.network.ext_proc.v3.NetworkExternalProcessor
+---------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.ext_proc.v3.NetworkExternalProcessor proto] <api/envoy/extensions/filters/network/ext_proc/v3/ext_proc.proto#L37>`
+
+The Network External Processing filter allows an external service to process raw TCP/UDP traffic
+in a flexible way using a bidirectional gRPC stream. Unlike the HTTP External Processing filter,
+this filter operates at the L4 (transport) layer, giving access to raw network traffic.
+
+The filter communicates with an external gRPC service that can:
+
+1. Inspect traffic in both directions
+2. Modify the network traffic
+3. Control connection lifecycle (continue, close, or reset)
+
+By using the filter's processing mode, you can selectively choose which data
+directions to process (read, write or both), allowing for efficient processing.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "grpc_service": {...},
+    "failure_mode_allow": ...,
+    "processing_mode": {...},
+    "message_timeout": {...},
+    "stat_prefix": ...,
+    "metadata_options": {...},
+    "connection_attributes": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor.grpc_service:
+
+
+grpc_service
+  (:ref:`config.core.v3.GrpcService <envoy_v3_api_msg_config.core.v3.GrpcService>`) The gRPC service that will process network traffic.
+  This service must implement the NetworkExternalProcessor service
+  defined in the proto file /envoy/service/network_ext_proc/v3/external_processor.proto.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor.failure_mode_allow:
+
+
+failure_mode_allow
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) By default, if the gRPC stream cannot be established, or if it is closed
+  prematurely with an error, the filter will fail, leading to the close of connection.
+  With this parameter set to true, however, then if the gRPC stream is prematurely closed
+  or could not be opened, processing continues without error.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor.processing_mode:
+
+
+processing_mode
+  (:ref:`extensions.filters.network.ext_proc.v3.ProcessingMode <envoy_v3_api_msg_extensions.filters.network.ext_proc.v3.ProcessingMode>`) Options for controlling processing behavior.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor.message_timeout:
+
+
+message_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Specifies the timeout for each individual message sent on the stream and
+  when the filter is running in synchronous mode. Whenever
+  the proxy sends a message on the stream that requires a response, it will
+  reset this timer, and will stop processing and return an error (subject
+  to the processing mode) if the timer expires. Default is 200 ms.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) 
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor.metadata_options:
+
+
+metadata_options
+  (:ref:`extensions.filters.network.ext_proc.v3.MetadataOptions <envoy_v3_api_msg_extensions.filters.network.ext_proc.v3.MetadataOptions>`) Options related to the sending and receiving of dynamic metadata.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor.connection_attributes:
+
+
+connection_attributes
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The data plane provides a number of :ref:`attributes <arch_overview_attributes>`
+  for expressive policies. Each attribute name provided in this field will be
+  evaluated against the connection and filter state and populated in the
+  :ref:`ProcessingRequest.attributes <envoy_v3_api_field_service.network_ext_proc.v3.ProcessingRequest.attributes>` field.
+  See the :ref:`attribute documentation <arch_overview_attributes>`
+  for the list of supported attributes and their types.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.ext_proc.v3.ProcessingMode:
+
+extensions.filters.network.ext_proc.v3.ProcessingMode
+-----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.ext_proc.v3.ProcessingMode proto] <api/envoy/extensions/filters/network/ext_proc/v3/ext_proc.proto#L78>`
+
+Options for controlling processing behavior.
+Filter will reject the config if both read and write are SKIP mode.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "process_read": ...,
+    "process_write": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.ProcessingMode.process_read:
+
+
+process_read
+  (:ref:`extensions.filters.network.ext_proc.v3.ProcessingMode.DataSendMode <envoy_v3_api_enum_extensions.filters.network.ext_proc.v3.ProcessingMode.DataSendMode>`) Controls whether inbound (read) data from the client is sent to the external processor.
+  Default: STREAMED
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.ProcessingMode.process_write:
+
+
+process_write
+  (:ref:`extensions.filters.network.ext_proc.v3.ProcessingMode.DataSendMode <envoy_v3_api_enum_extensions.filters.network.ext_proc.v3.ProcessingMode.DataSendMode>`) Controls whether outbound (write) data to the client is sent to the external processor.
+  Default: STREAMED
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.ext_proc.v3.ProcessingMode.DataSendMode:
+
+Enum extensions.filters.network.ext_proc.v3.ProcessingMode.DataSendMode
+-----------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.ext_proc.v3.ProcessingMode.DataSendMode proto] <api/envoy/extensions/filters/network/ext_proc/v3/ext_proc.proto#L80>`
+
+Defines how traffic should be handled by the external processor.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.ext_proc.v3.ProcessingMode.DataSendMode.STREAMED:
+
+
+STREAMED
+  *(DEFAULT)* ⁣Send the data to the external processor for processing whenever the data is ready.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.ext_proc.v3.ProcessingMode.DataSendMode.SKIP:
+
+
+SKIP
+  ⁣Skip sending the data to the external processor.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.ext_proc.v3.MetadataOptions:
+
+extensions.filters.network.ext_proc.v3.MetadataOptions
+------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.ext_proc.v3.MetadataOptions proto] <api/envoy/extensions/filters/network/ext_proc/v3/ext_proc.proto#L99>`
+
+The MetadataOptions structure defines options for sending dynamic metadata. Specifically,
+which namespaces to send to the server.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "forwarding_namespaces": {...},
+    "receiving_namespaces": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.MetadataOptions.forwarding_namespaces:
+
+
+forwarding_namespaces
+  (:ref:`extensions.filters.network.ext_proc.v3.MetadataOptions.MetadataNamespaces <envoy_v3_api_msg_extensions.filters.network.ext_proc.v3.MetadataOptions.MetadataNamespaces>`) Describes which typed or untyped dynamic metadata namespaces to forward to
+  the external processing server.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.MetadataOptions.receiving_namespaces:
+
+
+receiving_namespaces
+  (:ref:`extensions.filters.network.ext_proc.v3.MetadataOptions.MetadataNamespaces <envoy_v3_api_msg_extensions.filters.network.ext_proc.v3.MetadataOptions.MetadataNamespaces>`) Describes which typed or untyped dynamic metadata namespaces to receive
+  from the external processing server.
+  Since the server returns untyped dynamic metadata, this configuration acts
+  as a allowlist. Only metadata namespaces explicitly listed here will be
+  ingested by Envoy from the server's response.
+  Receiving of typed metadata is not supported.
+  Set to empty or leave unset to disallow writing any received dynamic metadata.
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.ext_proc.v3.MetadataOptions.MetadataNamespaces:
+
+extensions.filters.network.ext_proc.v3.MetadataOptions.MetadataNamespaces
+-------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.ext_proc.v3.MetadataOptions.MetadataNamespaces proto] <api/envoy/extensions/filters/network/ext_proc/v3/ext_proc.proto#L100>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "untyped": [],
+    "typed": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.MetadataOptions.MetadataNamespaces.untyped:
+
+
+untyped
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies a list of metadata namespaces whose values, if present,
+  will be passed to the ext_proc service as an opaque *protobuf::Struct*.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_proc.v3.MetadataOptions.MetadataNamespaces.typed:
+
+
+typed
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies a list of metadata namespaces whose values, if present,
+  will be passed to the ext_proc service as a *protobuf::Any*. This allows
+  envoy and the external processing server to share the protobuf message
+  definition for safe parsing.
+
+
+

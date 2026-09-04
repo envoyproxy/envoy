@@ -1,0 +1,73 @@
+.. _envoy_v3_api_file_envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.proto:
+
+Round Robin Load Balancing Policy (proto)
+=========================================
+
+.. _extension_envoy.load_balancing_policies.round_robin:
+
+This extension has the qualified name ``envoy.load_balancing_policies.round_robin``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.load_balancing_policies <extension_category_envoy.load_balancing_policies>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin <envoy_v3_api_msg_extensions.load_balancing_policies.round_robin.v3.RoundRobin>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.round_robin.v3.RoundRobin:
+
+extensions.load_balancing_policies.round_robin.v3.RoundRobin
+------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.round_robin.v3.RoundRobin proto] <api/envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.proto#L20>`
+
+This configuration allows the built-in ROUND_ROBIN LB policy to be configured via the LB policy
+extension point. See the :ref:`load balancing architecture overview
+<arch_overview_load_balancing_types>` for more information.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "slow_start_config": {...},
+    "locality_lb_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.round_robin.v3.RoundRobin.slow_start_config:
+
+
+slow_start_config
+  (:ref:`extensions.load_balancing_policies.common.v3.SlowStartConfig <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.SlowStartConfig>`) Configuration for slow start mode.
+  If this configuration is not set, slow start will not be not enabled.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.round_robin.v3.RoundRobin.locality_lb_config:
+
+
+locality_lb_config
+  (:ref:`extensions.load_balancing_policies.common.v3.LocalityLbConfig <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.LocalityLbConfig>`) Configuration for local zone aware load balancing or locality weighted load balancing.
+
+

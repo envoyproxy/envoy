@@ -1,0 +1,142 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/set_metadata/v3/set_metadata.proto:
+
+Set-Metadata Filter (proto)
+===========================
+
+.. _extension_envoy.filters.http.set_metadata:
+
+This extension has the qualified name ``envoy.filters.http.set_metadata``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config <envoy_v3_api_msg_extensions.filters.http.set_metadata.v3.Config>`
+
+
+
+
+This filters adds or updates dynamic metadata with static data.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.set_metadata.v3.Metadata:
+
+extensions.filters.http.set_metadata.v3.Metadata
+------------------------------------------------
+
+
+:repo:`[extensions.filters.http.set_metadata.v3.Metadata proto] <api/envoy/extensions/filters/http/set_metadata/v3/set_metadata.proto#L23>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "metadata_namespace": ...,
+    "allow_overwrite": ...,
+    "value": {...},
+    "typed_value": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.metadata_namespace:
+
+
+metadata_namespace
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The metadata namespace.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.allow_overwrite:
+
+
+allow_overwrite
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Allow the filter to overwrite or merge with an existing value in the namespace.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.value:
+
+
+value
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) The value to place at the namespace. If ``allow_overwrite``, this will
+  overwrite or merge with any existing values in that namespace. See
+  :ref:`the filter documentation <config_http_filters_set_metadata>` for
+  more information on how this value is merged with potentially existing
+  ones if ``allow_overwrite`` is configured. Only one of ``value`` and
+  ``typed_value`` may be set.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.typed_value:
+
+
+typed_value
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The value to place at the namespace. If ``allow_overwrite``, this will
+  overwrite any existing values in that namespace. Only one of ``value`` and
+  ``typed_value`` may be set.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.set_metadata.v3.Config:
+
+extensions.filters.http.set_metadata.v3.Config
+----------------------------------------------
+
+
+:repo:`[extensions.filters.http.set_metadata.v3.Config proto] <api/envoy/extensions/filters/http/set_metadata/v3/set_metadata.proto#L44>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "metadata_namespace": ...,
+    "value": {...},
+    "metadata": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.metadata_namespace:
+
+
+metadata_namespace
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The metadata namespace.
+  This field is deprecated; please use ``metadata`` as replacement.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.value:
+
+
+value
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) The untyped value to update the dynamic metadata namespace with. See
+  :ref:`the filter documentation <config_http_filters_set_metadata>` for
+  more information on how this value is merged with potentially existing
+  ones.
+  This field is deprecated; please use ``metadata`` as replacement.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.metadata:
+
+
+metadata
+  (**repeated** :ref:`extensions.filters.http.set_metadata.v3.Metadata <envoy_v3_api_msg_extensions.filters.http.set_metadata.v3.Metadata>`) Defines changes to be made to dynamic metadata.
+
+

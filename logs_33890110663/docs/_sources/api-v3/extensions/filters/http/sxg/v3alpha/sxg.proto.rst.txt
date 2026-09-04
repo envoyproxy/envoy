@@ -1,0 +1,142 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.proto:
+
+Signed HTTP Exchange Filter (proto)
+===================================
+
+.. _extension_envoy.filters.http.sxg:
+
+This extension has the qualified name ``envoy.filters.http.sxg``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+SXG :ref:`configuration overview <config_http_filters_sxg>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.sxg.v3alpha.SXG:
+
+extensions.filters.http.sxg.v3alpha.SXG
+---------------------------------------
+
+
+:repo:`[extensions.filters.http.sxg.v3alpha.SXG proto] <api/contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.proto#L23>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "certificate": {...},
+    "private_key": {...},
+    "duration": {...},
+    "mi_record_size": ...,
+    "cbor_url": ...,
+    "validity_url": ...,
+    "client_can_accept_sxg_header": ...,
+    "should_encode_sxg_header": ...,
+    "header_prefix_filters": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.sxg.v3alpha.SXG.certificate:
+
+
+certificate
+  (:ref:`extensions.transport_sockets.tls.v3.SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>`) The SDS configuration for the public key data for the SSL certificate that will be used to sign the
+  SXG response.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.sxg.v3alpha.SXG.private_key:
+
+
+private_key
+  (:ref:`extensions.transport_sockets.tls.v3.SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>`) The SDS configuration for the private key data for the SSL certificate that will be used to sign the
+  SXG response.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.sxg.v3alpha.SXG.duration:
+
+
+duration
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The duration for which the generated SXG package will be valid. Default is 604800s (7 days in seconds).
+  Note that in order to account for clock skew, the timestamp will be backdated by a day. So, if duration
+  is set to 7 days, that will be 7 days from 24 hours ago (6 days from now). Also note that while 6/7 days
+  is appropriate for most content, if the downstream service is serving Javascript, or HTML with inline
+  Javascript, 1 day (so, with backdated expiry, 2 days, or 172800 seconds) is more appropriate.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.sxg.v3alpha.SXG.mi_record_size:
+
+
+mi_record_size
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The SXG response payload is `Merkle Integrity Content Encoding (MICE) encoded
+  <https://datatracker.ietf.org/doc/html/draft-thomson-http-mice-03>`_.
+  This value indicates the record size in the encoded payload. The default value is 4096.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.sxg.v3alpha.SXG.cbor_url:
+
+
+cbor_url
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The URI of certificate CBOR file published. Since it is required that the certificate CBOR file
+  be served from the same domain as the SXG document, this should be a relative URI.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.sxg.v3alpha.SXG.validity_url:
+
+
+validity_url
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) URL to retrieve validity data for signature, a CBOR map. See specification
+  `here <https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-00#section-3.6>`_
+
+
+.. _envoy_v3_api_field_extensions.filters.http.sxg.v3alpha.SXG.client_can_accept_sxg_header:
+
+
+client_can_accept_sxg_header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Header that will be set if it is determined that the client can accept SXG (typically ``accept: application/signed-exchange;v=b3``)
+  If not set, filter will default to: ``x-client-can-accept-sxg``
+
+
+.. _envoy_v3_api_field_extensions.filters.http.sxg.v3alpha.SXG.should_encode_sxg_header:
+
+
+should_encode_sxg_header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Header set by downstream service to signal that the response should be transformed to SXG If not set,
+  filter will default to: ``x-should-encode-sxg``
+
+
+.. _envoy_v3_api_field_extensions.filters.http.sxg.v3alpha.SXG.header_prefix_filters:
+
+
+header_prefix_filters
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Headers that will be stripped from the SXG document, by listing a prefix (i.e. ``x-custom-`` will cause
+  all headers prefixed by ``x-custom-`` to be omitted from the SXG document)
+
+

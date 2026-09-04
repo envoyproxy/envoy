@@ -1,0 +1,259 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/a2a/v3/a2a.proto:
+
+A2A (proto)
+===========
+
+.. _extension_envoy.filters.http.a2a:
+
+This extension has the qualified name ``envoy.filters.http.a2a``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.a2a.v3.A2a <envoy_v3_api_msg_extensions.filters.http.a2a.v3.A2a>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+A2A filter :ref:`configuration overview <config_http_filters_a2a>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.a2a.v3.A2a:
+
+extensions.filters.http.a2a.v3.A2a
+----------------------------------
+
+
+:repo:`[extensions.filters.http.a2a.v3.A2a proto] <api/envoy/extensions/filters/http/a2a/v3/a2a.proto#L24>`
+
+This filter will inspect and get attributes from A2A traffic.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "traffic_mode": ...,
+    "max_request_body_size": {...},
+    "parser_config": {...},
+    "storage_mode": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.a2a.v3.A2a.traffic_mode:
+
+
+traffic_mode
+  (:ref:`extensions.filters.http.a2a.v3.A2a.TrafficMode <envoy_v3_api_enum_extensions.filters.http.a2a.v3.A2a.TrafficMode>`) Configures how the filter handles non-A2A traffic.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.a2a.v3.A2a.max_request_body_size:
+
+
+max_request_body_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Maximum size of the request body to buffer for JSON-RPC validation.
+  If the request body exceeds this size, the request is rejected with ``413
+  Payload Too Large``. This limit applies to both ``REJECT`` and
+  ``PASS_THROUGH`` modes to prevent unbounded buffering.
+
+  It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB
+  (10485760 bytes).
+
+  Setting it to 0 would disable the limit. It is not recommended to do so in
+  production.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.a2a.v3.A2a.parser_config:
+
+
+parser_config
+  (:ref:`extensions.filters.http.a2a.v3.ParserConfig <envoy_v3_api_msg_extensions.filters.http.a2a.v3.ParserConfig>`) Customized configuration for A2A parser.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.a2a.v3.A2a.storage_mode:
+
+
+storage_mode
+  (:ref:`extensions.filters.http.a2a.v3.A2a.StorageMode <envoy_v3_api_enum_extensions.filters.http.a2a.v3.A2a.StorageMode>`) Where to store parsed A2A message attributes.
+  Controls whether attributes are written to dynamic metadata, filter state, or both.
+  Default is no storage.
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.a2a.v3.A2a.TrafficMode:
+
+Enum extensions.filters.http.a2a.v3.A2a.TrafficMode
+---------------------------------------------------
+
+
+:repo:`[extensions.filters.http.a2a.v3.A2a.TrafficMode proto] <api/envoy/extensions/filters/http/a2a/v3/a2a.proto#L26>`
+
+Traffic handling mode for non-A2A traffic.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.a2a.v3.A2a.TrafficMode.PASS_THROUGH:
+
+
+PASS_THROUGH
+  *(DEFAULT)* ⁣Proxies the HTTP request and response without A2A spec check.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.a2a.v3.A2a.TrafficMode.REJECT:
+
+
+REJECT
+  ⁣Reject requests that are not following A2A spec.
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.a2a.v3.A2a.StorageMode:
+
+Enum extensions.filters.http.a2a.v3.A2a.StorageMode
+---------------------------------------------------
+
+
+:repo:`[extensions.filters.http.a2a.v3.A2a.StorageMode proto] <api/envoy/extensions/filters/http/a2a/v3/a2a.proto#L35>`
+
+Where to store parsed A2A message attributes.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.a2a.v3.A2a.StorageMode.NONE:
+
+
+NONE
+  *(DEFAULT)* ⁣Default behavior: no storage.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.a2a.v3.A2a.StorageMode.DYNAMIC_METADATA:
+
+
+DYNAMIC_METADATA
+  ⁣Store message attributes in dynamic metadata only.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.a2a.v3.A2a.StorageMode.FILTER_STATE:
+
+
+FILTER_STATE
+  ⁣Store message attributes in filter state only.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.a2a.v3.A2a.StorageMode.DYNAMIC_METADATA_AND_FILTER_STATE:
+
+
+DYNAMIC_METADATA_AND_FILTER_STATE
+  ⁣Store message attributes in both dynamic metadata and filter state.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.a2a.v3.MethodParsingConfig:
+
+extensions.filters.http.a2a.v3.MethodParsingConfig
+--------------------------------------------------
+
+
+:repo:`[extensions.filters.http.a2a.v3.MethodParsingConfig proto] <api/envoy/extensions/filters/http/a2a/v3/a2a.proto#L73>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "group": ...,
+    "paths": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.a2a.v3.MethodParsingConfig.group:
+
+
+group
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The group/category name to assign to this method (e.g., "tasks", "message").
+  If provided, this overrides any built-in classification for the method.
+  This will be emitted to dynamic metadata under the key specified by ``group_metadata_key``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.a2a.v3.MethodParsingConfig.paths:
+
+
+paths
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) List of attributes to extract for this method, specified by their JSON paths (e.g., "params.name").
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.a2a.v3.ParserConfig:
+
+extensions.filters.http.a2a.v3.ParserConfig
+-------------------------------------------
+
+
+:repo:`[extensions.filters.http.a2a.v3.ParserConfig proto] <api/envoy/extensions/filters/http/a2a/v3/a2a.proto#L83>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "method_configs": {...},
+    "always_extract_attributes": [],
+    "group_metadata_key": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.a2a.v3.ParserConfig.method_configs:
+
+
+method_configs
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.filters.http.a2a.v3.MethodParsingConfig <envoy_v3_api_msg_extensions.filters.http.a2a.v3.MethodParsingConfig>`>) Method-specific overrides for grouping and attribute extraction.
+  If a method is not specified in method_configs, or if 'group' is empty in its config,
+  its group will be determined by built-in classification based on method prefix
+  (e.g., "message" for "message/send") and default extraction rules will be applied for that method.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.a2a.v3.ParserConfig.always_extract_attributes:
+
+
+always_extract_attributes
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Attributes that should always be extracted regardless of the method.
+  Specified by their JSON paths (e.g., "params.id").
+
+
+.. _envoy_v3_api_field_extensions.filters.http.a2a.v3.ParserConfig.group_metadata_key:
+
+
+group_metadata_key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The dynamic metadata key under which the method's group name will be stored
+  (e.g., "a2a_group"). If this key is empty, group information will not be
+  added to dynamic metadata.
+
+
+
+

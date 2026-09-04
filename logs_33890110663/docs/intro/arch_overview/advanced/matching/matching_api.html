@@ -1,0 +1,1032 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Matching API &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="Matching Filter Chains in Listeners" href="matching_listener.html" />
+    <link rel="prev" title="Generic Matching" href="matching.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../http/http.html">HTTP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../advanced.html">Advanced</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../data_sharing_between_filters.html">Sharing data between filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../attributes.html">Attributes</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="matching.html">Generic Matching</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../wasm.html">Wasm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../dynamic_modules.html">Dynamic modules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../../arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="../advanced.html">Advanced</a></li>
+          <li class="breadcrumb-item"><a href="matching.html">Generic Matching</a></li>
+      <li class="breadcrumb-item active">Matching API</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/intro/arch_overview/advanced/matching/matching_api.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="matching-api">
+<span id="arch-overview-matching-api"></span><h1>Matching API<a class="headerlink" href="#matching-api" title="Link to this heading"></a></h1>
+<p>Envoy makes use of a <a class="reference internal" href="../../../../api-v3/config/common/matcher/v3/matcher.proto.html#envoy-v3-api-msg-config-common-matcher-v3-matcher"><span class="std std-ref">matching API</span></a>
+to allow the various subsystems to express actions that should be performed based on incoming data.</p>
+<p>The matching API is designed as a tree structure to allow for sublinear matching algorithms for
+better performance than the linear list matching as seen in Envoy’s HTTP routing. It makes heavy
+use of extension points to make it easy to extend to different inputs based on protocol or
+environment data as well as custom sublinear matchers and direct matchers.</p>
+<section id="inputs-and-matching-algorithms">
+<h2>Inputs and Matching Algorithms<a class="headerlink" href="#inputs-and-matching-algorithms" title="Link to this heading"></a></h2>
+<p>Matching inputs define a way to extract the input value used for matching.
+The input functions are context-sensitive. For example, HTTP header inputs are
+applicable only in HTTP contexts, e.g. for matching HTTP requests.</p>
+<section id="http-input-functions">
+<span id="extension-category-envoy-matching-http-input"></span><h3>HTTP Input Functions<a class="headerlink" href="#http-input-functions" title="Link to this heading"></a></h3>
+<p>These input functions are available for matching HTTP requests:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../api-v3/type/matcher/v3/http_inputs.proto.html#extension-envoy-matching-inputs-request-headers"><span class="std std-ref">Request header value</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/type/matcher/v3/http_inputs.proto.html#extension-envoy-matching-inputs-request-trailers"><span class="std std-ref">Request trailer value</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/type/matcher/v3/http_inputs.proto.html#extension-envoy-matching-inputs-response-headers"><span class="std std-ref">Response header value</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/type/matcher/v3/http_inputs.proto.html#extension-envoy-matching-inputs-response-trailers"><span class="std std-ref">Response trailer value</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/type/matcher/v3/http_inputs.proto.html#extension-envoy-matching-inputs-query-params"><span class="std std-ref">Query parameters value</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-dynamic-metadata"><span class="std std-ref">Dynamic metadata</span></a>.</p></li>
+</ul>
+</section>
+<section id="network-input-functions">
+<span id="extension-category-envoy-matching-network-input"></span><h3>Network Input Functions<a class="headerlink" href="#network-input-functions" title="Link to this heading"></a></h3>
+<p>These input functions are available for matching TCP connections, UDP datagrams, and HTTP requests:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-destination-ip"><span class="std std-ref">Destination IP</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-destination-port"><span class="std std-ref">Destination port</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-source-ip"><span class="std std-ref">Source IP</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-source-port"><span class="std std-ref">Source port</span></a>.</p></li>
+</ul>
+<p>These input functions are available for matching TCP connections and HTTP requests:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-direct-source-ip"><span class="std std-ref">Direct source IP</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-source-type"><span class="std std-ref">Source type</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-server-name"><span class="std std-ref">Server name</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-network-namespace"><span class="std std-ref">Network namespace</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-filter-state"><span class="std std-ref">Filter state</span></a>.</p></li>
+</ul>
+<p>These input functions are available for matching TCP connections:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-transport-protocol"><span class="std std-ref">Transport protocol</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-application-protocol"><span class="std std-ref">Application protocol</span></a>.</p></li>
+</ul>
+</section>
+<section id="ssl-input-functions">
+<span id="extension-category-envoy-matching-ssl-input"></span><h3>SSL Input Functions<a class="headerlink" href="#ssl-input-functions" title="Link to this heading"></a></h3>
+<p>These input functions are available for matching TCP connections and HTTP requests:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto.html#extension-envoy-matching-inputs-uri-san"><span class="std std-ref">URI SAN</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto.html#extension-envoy-matching-inputs-dns-san"><span class="std std-ref">DNS SAN</span></a>.</p></li>
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto.html#extension-envoy-matching-inputs-subject"><span class="std std-ref">Subject</span></a>.</p></li>
+</ul>
+</section>
+<section id="transport-socket-matching-input-functions">
+<span id="extension-category-envoy-matching-transport-socket-input"></span><h3>Transport Socket Matching Input Functions<a class="headerlink" href="#transport-socket-matching-input-functions" title="Link to this heading"></a></h3>
+<p>These input functions are available for transport socket matching in clusters:</p>
+<ul class="simple" id="extension-envoy-matching-inputs-endpoint-metadata">
+<li><p>Endpoint metadata - extracts metadata from the selected endpoint for transport socket selection.</p></li>
+</ul>
+<ul class="simple" id="extension-envoy-matching-inputs-locality-metadata">
+<li><p>Locality metadata - extracts metadata from the endpoint’s locality for transport socket selection.</p></li>
+</ul>
+<ul class="simple" id="extension-envoy-matching-inputs-transport-socket-filter-state">
+<li><p>Filter state: extracts values from filter state that was explicitly shared from the downstream
+connection to the upstream connection via transport socket options. This enables downstream
+connection-based transport socket selection.</p></li>
+</ul>
+</section>
+<section id="common-input-functions">
+<h3>Common Input Functions<a class="headerlink" href="#common-input-functions" title="Link to this heading"></a></h3>
+<p>These input functions are available in any context:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../api-v3/extensions/matching/common_inputs/environment_variable/v3/input.proto.html#extension-envoy-matching-common-inputs-environment-variable"><span class="std std-ref">Environment variable</span></a>.</p></li>
+</ul>
+</section>
+<section id="custom-matching-algorithms">
+<h3>Custom Matching Algorithms<a class="headerlink" href="#custom-matching-algorithms" title="Link to this heading"></a></h3>
+<p>In addition to the built-in exact and prefix matchers, these custom matchers
+are available in some contexts:</p>
+<ul class="simple" id="extension-envoy-matching-custom-matchers-ip-range-matcher">
+<li><p><a class="reference internal" href="../../../../xds/type/matcher/v3/ip.proto.html#envoy-v3-api-msg-xds-type-matcher-v3-ipmatcher"><span class="std std-ref">IP range matcher</span></a> applies to network inputs.</p></li>
+</ul>
+<ul class="simple" id="extension-envoy-matching-custom-matchers-domain-matcher">
+<li><p><a class="reference internal" href="../../../../xds/type/matcher/v3/domain.proto.html#envoy-v3-api-msg-xds-type-matcher-v3-servernamematcher"><span class="std std-ref">Trie-based server name matcher</span></a> applies to network and HTTP inputs.</p></li>
+<li><p><a class="reference external" href="https://github.com/google/cel-spec">Common Expression Language</a> (CEL) based matching:</p></li>
+</ul>
+<blockquote id="extension-envoy-matching-inputs-cel-data-input">
+<div><ul class="simple">
+<li><p>CEL matching data input: <a class="reference internal" href="../../../../xds/type/matcher/v3/http_inputs.proto.html#envoy-v3-api-msg-xds-type-matcher-v3-httpattributescelmatchinput"><span class="std std-ref">CEL data input value</span></a>.</p></li>
+</ul>
+</div></blockquote>
+<blockquote id="extension-envoy-matching-matchers-cel-matcher">
+<div><ul class="simple">
+<li><p>CEL matching input matcher: <a class="reference internal" href="../../../../xds/type/matcher/v3/cel.proto.html#envoy-v3-api-msg-xds-type-matcher-v3-celmatcher"><span class="std std-ref">CEL input matcher</span></a>.</p></li>
+</ul>
+</div></blockquote>
+<ul class="simple">
+<li><p>Regex matching using <a class="reference internal" href="../../../../api-v3/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.proto.html#envoy-v3-api-msg-extensions-matching-input-matchers-hyperscan-v3alpha-hyperscan"><span class="std std-ref">Hyperscan matcher</span></a>.</p></li>
+</ul>
+</section>
+</section>
+<section id="matching-actions">
+<h2>Matching actions<a class="headerlink" href="#matching-actions" title="Link to this heading"></a></h2>
+<p>The action in the matcher framework typically refers to the selected resource by name.</p>
+<p>Network filter chain matching supports the following extensions:</p>
+<ul class="simple" id="extension-envoy-matching-actions-format-string">
+<li><p><a class="reference internal" href="../../../../api-v3/config/core/v3/substitution_format_string.proto.html#envoy-v3-api-msg-config-core-v3-substitutionformatstring"><span class="std std-ref">Format string action</span></a> computes the filter chain name
+from the connection dynamic metadata and its filter state. Example:</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">action</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">  </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">    </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.core.v3.SubstitutionFormatString</span>
+<span class="w">    </span><span class="nt">text_format_source</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">inline_string</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%DYNAMIC_METADATA(com.test_filter:test_key)%&quot;</span>
+</pre></div>
+</div>
+<section id="extension-category-envoy-matching-action">
+<span id="id1"></span><h3>Matching Actions<a class="headerlink" href="#extension-category-envoy-matching-action" title="Link to this heading"></a></h3>
+<p>These actions are available for use with matchers:</p>
+<ul class="simple" id="extension-envoy-matching-action-transport-socket-name">
+<li><p>Transport socket name action - selects a named transport socket from the cluster’s transport_socket_matches configuration based on matching criteria.</p></li>
+</ul>
+</section>
+</section>
+<section id="filter-integration">
+<h2>Filter Integration<a class="headerlink" href="#filter-integration" title="Link to this heading"></a></h2>
+<p>Within supported environments (currently only HTTP filters), a wrapper proto can be used to
+instantiate a matching filter associated with the wrapped structure:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">static_resources</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">listeners</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0.0.0</span>
+<span class="w">        </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="w">    </span><span class="nt">listener_filters</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">filter_chains</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filters</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.network.http_connection_manager</span>
+<span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+<span class="w">          </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress_http</span>
+<span class="w">          </span><span class="nt">http_filters</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">with-matcher</span>
+<span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher</span>
+<span class="w">              </span><span class="nt">extension_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.fault</span>
+<span class="w">                </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">                  </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault</span>
+<span class="w">                  </span><span class="nt">abort</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">http_status</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">503</span>
+<span class="w">                    </span><span class="nt">percentage</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">numerator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">                      </span><span class="nt">denominator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HUNDRED</span>
+<span class="w">                  </span><span class="nt">delay</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">fixed_delay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3s</span>
+<span class="w">                    </span><span class="nt">percentage</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">numerator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">                      </span><span class="nt">denominator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HUNDRED</span>
+<span class="w">              </span><span class="nt">xds_matcher</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">matcher_tree</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">input</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="w">                    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">                      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="w">                      </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some-header</span>
+<span class="w">                  </span><span class="nt">exact_match_map</span><span class="p">:</span>
+<span class="w">                    </span><span class="c1"># Note this additional indirection; this is a workaround for Protobuf oneof limitations.</span>
+<span class="w">                    </span><span class="nt">map</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">some_value_to_match_on</span><span class="p">:</span><span class="w">  </span><span class="c1"># This is the header value we&#39;re trying to match against.</span>
+<span class="w">                        </span><span class="nt">action</span><span class="p">:</span>
+<span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip</span>
+<span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.router</span>
+<span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span>
+<span class="w">          </span><span class="nt">route_config</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="w">              </span><span class="nt">domains</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;*&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/&quot;</span><span class="p p-Indicator">}</span>
+<span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_foo</span>
+<span class="w">  </span><span class="nt">clusters</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_foo</span>
+<span class="w">    </span><span class="nt">load_assignment</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some_service</span>
+<span class="w">      </span><span class="nt">endpoints</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">lb_endpoints</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080</span>
+</pre></div>
+</div>
+<p>The above example wraps a HTTP filter (the
+<a class="reference internal" href="../../../../api-v3/extensions/filters/http/fault/v3/fault.proto.html#envoy-v3-api-msg-extensions-filters-http-fault-v3-httpfault"><span class="std std-ref">HTTPFault</span></a> filter) in an
+<a class="reference internal" href="../../../../api-v3/extensions/common/matching/v3/extension_matcher.proto.html#envoy-v3-api-msg-extensions-common-matching-v3-extensionwithmatcher"><span class="std std-ref">ExtensionWithMatcher</span></a>,
+allowing us to define a match tree to be evaluated in conjunction with evaluation of the wrapped
+filter. Prior to data being made available to the filter, it will be provided to the match tree,
+which will then attempt to evaluate the matching rules with the provided data, triggering an
+action if match evaluation results in an action.</p>
+<p>In the above example, we are specifying that we want to match on the incoming request header
+<code class="docutils literal notranslate"><span class="pre">some-header</span></code> by setting the <code class="docutils literal notranslate"><span class="pre">input</span></code> to
+<a class="reference internal" href="../../../../api-v3/type/matcher/v3/http_inputs.proto.html#envoy-v3-api-msg-type-matcher-v3-httprequestheadermatchinput"><span class="std std-ref">HttpRequestHeaderMatchInput</span></a>
+and configuring the header key to use. Using the value contained by this header, the provided
+<code class="docutils literal notranslate"><span class="pre">exact_match_map</span></code> specifies which values we care about: we’ve configured a single value
+(<code class="docutils literal notranslate"><span class="pre">some_value_to_match_on</span></code>) to match against. As a result, this config means that if we
+receive a request which contains <code class="docutils literal notranslate"><span class="pre">some-header:</span> <span class="pre">some_value_to_match_on</span></code> as a header, the
+<a class="reference internal" href="../../../../api-v3/extensions/filters/common/matcher/action/v3/skip_action.proto.html#envoy-v3-api-msg-extensions-filters-common-matcher-action-v3-skipfilter"><span class="std std-ref">SkipFilter</span></a>
+action will be resolved (causing the associated HTTP filter to be skipped). If no such header is
+present, no action will be resolved and the filter will be applied as usual.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">static_resources</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">listeners</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0.0.0</span>
+<span class="w">        </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="w">    </span><span class="nt">listener_filters</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">filter_chains</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filters</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.network.http_connection_manager</span>
+<span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+<span class="w">          </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress_http</span>
+<span class="w">          </span><span class="nt">http_filters</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">with-matcher</span>
+<span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher</span>
+<span class="w">              </span><span class="nt">extension_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.fault</span>
+<span class="w">                </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">                  </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault</span>
+<span class="w">                  </span><span class="nt">abort</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">http_status</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">503</span>
+<span class="w">                    </span><span class="nt">percentage</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">numerator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">                      </span><span class="nt">denominator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HUNDRED</span>
+<span class="w">                  </span><span class="nt">delay</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">fixed_delay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3s</span>
+<span class="w">                    </span><span class="nt">percentage</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">numerator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">                      </span><span class="nt">denominator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HUNDRED</span>
+<span class="w">              </span><span class="nt">xds_matcher</span><span class="p">:</span>
+<span class="w">                </span><span class="c1"># The top level matcher is a matcher tree which conceptually selects one of several subtrees.</span>
+<span class="w">                </span><span class="nt">matcher_tree</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">input</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="w">                    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">                      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="w">                      </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some-header</span>
+<span class="w">                  </span><span class="nt">exact_match_map</span><span class="p">:</span>
+<span class="w">                    </span><span class="c1"># Note this additional indirection; this is a workaround for Protobuf oneof limitations.</span>
+<span class="w">                    </span><span class="nt">map</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">some_value_to_match_on</span><span class="p">:</span><span class="w">  </span><span class="c1"># This is the header value we&#39;re trying to match against.</span>
+<span class="w">                        </span><span class="c1"># The OnMatch resulting on matching with this branch of the exact matcher is another matcher,</span>
+<span class="w">                        </span><span class="c1"># allowing for recursive matching.</span>
+<span class="w">                        </span><span class="nt">matcher</span><span class="p">:</span>
+<span class="w">                          </span><span class="c1"># The inner matcher is a matcher list, which attempts to match a list of predicates.</span>
+<span class="w">                          </span><span class="nt">matcher_list</span><span class="p">:</span>
+<span class="w">                            </span><span class="nt">matchers</span><span class="p">:</span>
+<span class="w">                            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">predicate</span><span class="p">:</span>
+<span class="w">                                </span><span class="nt">or_matcher</span><span class="p">:</span>
+<span class="w">                                  </span><span class="nt">predicate</span><span class="p">:</span>
+<span class="w">                                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">single_predicate</span><span class="p">:</span>
+<span class="w">                                      </span><span class="nt">input</span><span class="p">:</span>
+<span class="w">                                        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="w">                                        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">                                          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="w">                                          </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">second-header</span>
+<span class="w">                                      </span><span class="nt">value_match</span><span class="p">:</span>
+<span class="w">                                        </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">                                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">single_predicate</span><span class="p">:</span>
+<span class="w">                                      </span><span class="nt">input</span><span class="p">:</span>
+<span class="w">                                        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="w">                                        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">                                          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="w">                                          </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">second-header</span>
+<span class="w">                                      </span><span class="nt">value_match</span><span class="p">:</span>
+<span class="w">                                        </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bar</span>
+<span class="w">                              </span><span class="nt">on_match</span><span class="p">:</span>
+<span class="w">                                </span><span class="nt">action</span><span class="p">:</span>
+<span class="w">                                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip</span>
+<span class="w">                                  </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">                                    </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.router</span>
+<span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span>
+<span class="w">          </span><span class="nt">route_config</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="w">              </span><span class="nt">domains</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;*&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/&quot;</span><span class="p p-Indicator">}</span>
+<span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_foo</span>
+<span class="w">  </span><span class="nt">clusters</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_foo</span>
+<span class="w">    </span><span class="nt">load_assignment</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some_service</span>
+<span class="w">      </span><span class="nt">endpoints</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">lb_endpoints</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080</span>
+</pre></div>
+</div>
+<p>Above is a slightly more complicated example which combines a top level tree matcher with a
+linear matcher. While the tree matchers provide very efficient matching, they are not very
+expressive. The list matcher can be used to provide a much richer matching API, and can be combined
+with the tree matcher in an arbitrary order. The example describes the following match logic: skip
+the filter if <code class="docutils literal notranslate"><span class="pre">some-header:</span> <span class="pre">skip_filter</span></code> is present and <code class="docutils literal notranslate"><span class="pre">second-header</span></code> is set to <em>either</em> <code class="docutils literal notranslate"><span class="pre">foo</span></code> or
+<code class="docutils literal notranslate"><span class="pre">bar</span></code>.</p>
+<section id="http-filter-iteration-impact">
+<span id="arch-overview-matching-api-iteration-impact"></span><h3>HTTP Filter Iteration Impact<a class="headerlink" href="#http-filter-iteration-impact" title="Link to this heading"></a></h3>
+<p>The above example only demonstrates matching on request headers, which ends up being the simplest
+case due to it happening before the associated filter receives any data. Matching on other HTTP
+input sources is supported (e.g. response headers), but some discussion is warranted on how this
+works at a filter level.</p>
+<p>Currently the match evaluation for HTTP filters does not impact control flow at all: if
+insufficient data is available to perform the match, callbacks will be sent to the associated
+filter as normal. Once sufficient data is available to match an action, this is provided to the
+filter. A consequence of this is that if the filter wishes to gate some behavior on a match result,
+it has to manage stopping the iteration on its own.</p>
+<p>When it comes to actions such as
+<a class="reference internal" href="../../../../api-v3/extensions/filters/common/matcher/action/v3/skip_action.proto.html#envoy-v3-api-msg-extensions-filters-common-matcher-action-v3-skipfilter"><span class="std std-ref">SkipFilter</span></a>,
+this means that if the skip condition is based on anything but the request headers, the filter might
+get partially applied, which might result in surprising behavior. An example of this would be to
+have a matching tree that attempts to skip the gRPC-Web filter based on response headers: clients
+assume that if they send a gRPC-Web request to Envoy, the filter will transform that into a gRPC
+request before proxying it upstream, then back into a gRPC-Web response on the encoding path. By
+skipping the filter based on response headers, the forward transformation will happen (the upstream
+receives a gRPC request), but the response is never converted back to gRPC-Web. As a result, the
+client will receive an invalid response back from Envoy. If the skip action was instead resolved on
+trailers, the same gRPC-Web filter would consume all the data but never write it back out (as this
+happens when it sees the trailers), resulting in a gRPC-Web response with an empty body.</p>
+</section>
+</section>
+<section id="http-routing-integration">
+<h2>HTTP Routing Integration<a class="headerlink" href="#http-routing-integration" title="Link to this heading"></a></h2>
+<p>The matching API can be used with HTTP routing, by specifying a match tree as part of the virtual host
+and specifying a <a class="reference internal" href="../../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-route"><span class="std std-ref">Route</span></a> or <a class="reference internal" href="../../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-routelist"><span class="std std-ref">RouteList</span></a> as the resulting action. See <a class="reference internal" href="../../http/http_routing.html#arch-overview-http-routing-matcher"><span class="std std-ref">the examples</span></a> for how the match tree can be configured.</p>
+</section>
+<section id="sublinear-route-matching">
+<span id="arch-overview-sublinear-routing"></span><h2>Sublinear Route Matching<a class="headerlink" href="#sublinear-route-matching" title="Link to this heading"></a></h2>
+<p>An incoming request to Envoy needs to be matched to a cluster based on defined <a class="reference internal" href="../../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-virtualhost"><span class="std std-ref">routes</span></a>. Typically, a well understood, linear route search matching with O(n) search cost is employed which can become a scalability issue with higher latencies as the number of routes go up to O(1k+).</p>
+<p>To overcome these scalability challenges the Generic Matcher API (<a class="reference internal" href="../../../../api-v3/config/common/matcher/v3/matcher.proto.html#envoy-v3-api-field-config-common-matcher-v3-matcher-matcher-tree"><span class="std std-ref">matcher_tree</span></a> can offer a robust and flexible framework for route matching with two distinct sublinear matching implementations:</p>
+<ul class="simple">
+<li><p><strong>Trie-based Matching</strong> (<a class="reference internal" href="../../../../api-v3/config/common/matcher/v3/matcher.proto.html#envoy-v3-api-field-config-common-matcher-v3-matcher-matchertree-prefix-match-map"><span class="std std-ref">prefix_match_map</span></a>): Employs a prefix trie structure for efficient longest prefix matching in significantly much lower time complexity of O(min{input key length, longest prefix match}) compared to traditional linear search with O(# of routes x avg length of routes). Trie implementation in Envoy leverages ranged vectors for storing child nodes to optimize on memory. Also, note that longest-prefix-match lookup of chars in trie does not support wildcards and each char is matched literally.</p></li>
+<li><p><strong>HashMap-based Matching</strong> (<a class="reference internal" href="../../../../api-v3/config/common/matcher/v3/matcher.proto.html#envoy-v3-api-field-config-common-matcher-v3-matcher-matchertree-exact-match-map"><span class="std std-ref">exact_match_map</span></a>): Uses a hashmap structure for exact string matching in practically constant time O(1).</p></li>
+</ul>
+<p>These implementations can be used recursively and even combined with each other in nested fashion using the <a class="reference internal" href="#arch-overview-matching-api"><span class="std std-ref">Generic Matching API</span></a>. It also enables mixing sublinear and linear route matching for breaking up route matching space for diverse use-cases.</p>
+<p><strong>Example 1:</strong> A single trie structure for all url paths in <code class="docutils literal notranslate"><span class="pre">:path</span></code> header</p>
+<p>Suppose one wants to route requests with following path prefixes to respective clusters using trie or hashmap for sublinear route searching</p>
+<img alt="../../../../_images/sublinear_routing_img1.png" src="../../../../_images/sublinear_routing_img1.png" />
+<p>A request with <code class="docutils literal notranslate"><span class="pre">:path</span></code> header set to url <code class="docutils literal notranslate"><span class="pre">/new_endpoint/path/2/abc</span></code> should be routed to <code class="docutils literal notranslate"><span class="pre">cluster_2</span></code></p>
+<p>To achieve the above results, Envoy config below will create a single trie structure with above path strings and calls <code class="docutils literal notranslate"><span class="pre">findLongestPrefix()</span></code> match once, for paths in incoming request <code class="docutils literal notranslate"><span class="pre">:path</span></code> header.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Changing <code class="docutils literal notranslate"><span class="pre">prefix_match_map</span></code> to <code class="docutils literal notranslate"><span class="pre">exact_match_map</span></code> in below configuration will result in use of hash-based path matching (instead of trie) and will succeed in lookup if <code class="docutils literal notranslate"><span class="pre">:path</span></code> header in request matches exactly with one of the routes defined.</p>
+</div>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../../_downloads/f1cf2d6ce3a96b97d36a08b5e1c43421/sublinear_routing_example1.yaml"><code class="xref download docutils literal notranslate"><span class="pre">single_trie.yaml</span></code></a></span><a class="headerlink" href="#id2" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="w">                </span><span class="nt">matcher_tree</span><span class="p">:</span>
+<span class="linenos"> 2</span><span class="w">                  </span><span class="nt">input</span><span class="p">:</span>
+<span class="linenos"> 3</span><span class="w">                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="linenos"> 4</span><span class="w">                    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos"> 5</span><span class="w">                      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="linenos"> 6</span><span class="w">                      </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">:path</span>
+<span class="hll"><span class="linenos"> 7</span><span class="w">                  </span><span class="nt">prefix_match_map</span><span class="p">:</span>
+</span><span class="linenos"> 8</span><span class="w">                    </span><span class="nt">map</span><span class="p">:</span>
+<span class="linenos"> 9</span><span class="w">                      </span><span class="s">&quot;/new_endpoint/path/1&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">10</span><span class="w">                        </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">11</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_foo</span>
+<span class="linenos">12</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">13</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">14</span><span class="w">                            </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">15</span><span class="w">                              </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">16</span><span class="w">                            </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">17</span><span class="w">                              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_1</span>
+<span class="linenos">18</span><span class="w">                      </span><span class="s">&quot;/new_endpoint/path/2&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">19</span><span class="w">                        </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">20</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_foo</span>
+<span class="linenos">21</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">22</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">23</span><span class="w">                            </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">24</span><span class="w">                              </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">25</span><span class="w">                            </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">26</span><span class="w">                              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_2</span>
+<span class="linenos">27</span><span class="w">                      </span><span class="s">&quot;/new_endpoint/path/3&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">28</span><span class="w">                        </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">29</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_bar</span>
+<span class="linenos">30</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">31</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">32</span><span class="w">                            </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">                              </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">34</span><span class="w">                            </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">35</span><span class="w">                              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_3</span>
+</pre></div>
+</div>
+</div>
+<p><strong>Example 2:</strong> Configuration for hierarchical trie structures in the example below illustrates how three different trie structures can be created by Envoy using nested <code class="docutils literal notranslate"><span class="pre">prefix_match_map</span></code> which can do request matching across various headers.:</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Use of <code class="docutils literal notranslate"><span class="pre">exact_match_map</span></code> will result in creation of hashmaps instead of tries.</p>
+</div>
+<img alt="../../../../_images/sublinear_routing_img2.png" src="../../../../_images/sublinear_routing_img2.png" />
+<p>For an incoming request with <code class="docutils literal notranslate"><span class="pre">:path</span></code> header set to say <code class="docutils literal notranslate"><span class="pre">/new_endpoint/path/2/video</span></code>, <code class="docutils literal notranslate"><span class="pre">x-foo-header</span></code> set to <code class="docutils literal notranslate"><span class="pre">foo-2</span></code> and <code class="docutils literal notranslate"><span class="pre">x-bar-header</span></code> set to <code class="docutils literal notranslate"><span class="pre">bar-2</span></code>, three longest-prefix-match trie lookups will happen across A, B and C tries in the order of nesting for a successful request match.</p>
+<div class="literal-block-wrapper docutils container" id="id3">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../../_downloads/00c8ecbc72a89fef8df13239a9026e69/sublinear_routing_example2.yaml"><code class="xref download docutils literal notranslate"><span class="pre">nested_trie.yaml</span></code></a></span><a class="headerlink" href="#id3" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="w">                </span><span class="nt">matcher_tree</span><span class="p">:</span>
+<span class="linenos"> 2</span><span class="w">                  </span><span class="nt">input</span><span class="p">:</span>
+<span class="linenos"> 3</span><span class="w">                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="linenos"> 4</span><span class="w">                    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos"> 5</span><span class="w">                      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="linenos"> 6</span><span class="w">                      </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">:path</span>
+<span class="hll"><span class="linenos"> 7</span><span class="w">                  </span><span class="nt">prefix_match_map</span><span class="p">:</span>
+</span><span class="linenos"> 8</span><span class="w">                    </span><span class="nt">map</span><span class="p">:</span>
+<span class="linenos"> 9</span><span class="w">                      </span><span class="s">&quot;/new_endpoint/path/1&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">10</span><span class="w">                        </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">11</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_foo</span>
+<span class="linenos">12</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">13</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">14</span><span class="w">                            </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">15</span><span class="w">                              </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">16</span><span class="w">                            </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">17</span><span class="w">                              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_1</span>
+<span class="linenos">18</span><span class="w">                      </span><span class="s">&quot;/new_endpoint/path/2&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">19</span><span class="w">                        </span><span class="nt">matcher</span><span class="p">:</span>
+<span class="linenos">20</span><span class="w">                          </span><span class="nt">matcher_tree</span><span class="p">:</span>
+<span class="linenos">21</span><span class="w">                            </span><span class="nt">input</span><span class="p">:</span>
+<span class="linenos">22</span><span class="w">                              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="linenos">23</span><span class="w">                              </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">24</span><span class="w">                                </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="linenos">25</span><span class="w">                                </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-foo-header</span>
+<span class="hll"><span class="linenos">26</span><span class="w">                            </span><span class="nt">prefix_match_map</span><span class="p">:</span>
+</span><span class="linenos">27</span><span class="w">                              </span><span class="nt">map</span><span class="p">:</span>
+<span class="linenos">28</span><span class="w">                                </span><span class="s">&quot;foo-1&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">29</span><span class="w">                                  </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">30</span><span class="w">                                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_foo</span>
+<span class="linenos">31</span><span class="w">                                    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">32</span><span class="w">                                      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">33</span><span class="w">                                      </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">34</span><span class="w">                                        </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">35</span><span class="w">                                      </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">36</span><span class="w">                                        </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_foo_1</span>
+<span class="linenos">37</span><span class="w">                                </span><span class="s">&quot;foo-2&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">38</span><span class="w">                                  </span><span class="nt">matcher</span><span class="p">:</span>
+<span class="linenos">39</span><span class="w">                                    </span><span class="nt">matcher_tree</span><span class="p">:</span>
+<span class="linenos">40</span><span class="w">                                      </span><span class="nt">input</span><span class="p">:</span>
+<span class="linenos">41</span><span class="w">                                        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="linenos">42</span><span class="w">                                        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">43</span><span class="w">                                          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="linenos">44</span><span class="w">                                          </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-bar-header</span>
+<span class="hll"><span class="linenos">45</span><span class="w">                                      </span><span class="nt">prefix_match_map</span><span class="p">:</span>
+</span><span class="linenos">46</span><span class="w">                                        </span><span class="nt">map</span><span class="p">:</span>
+<span class="linenos">47</span><span class="w">                                          </span><span class="s">&quot;bar-1&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">48</span><span class="w">                                            </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">49</span><span class="w">                                              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_foo</span>
+<span class="linenos">50</span><span class="w">                                              </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">51</span><span class="w">                                                </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">52</span><span class="w">                                                </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">53</span><span class="w">                                                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">54</span><span class="w">                                                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">55</span><span class="w">                                                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_bar_1</span>
+<span class="linenos">56</span><span class="w">                                          </span><span class="s">&quot;bar-2&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">57</span><span class="w">                                            </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">58</span><span class="w">                                              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_foo</span>
+<span class="linenos">59</span><span class="w">                                              </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">60</span><span class="w">                                                </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">61</span><span class="w">                                                </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">62</span><span class="w">                                                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">63</span><span class="w">                                                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">64</span><span class="w">                                                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_bar_2</span>
+<span class="linenos">65</span><span class="w">                                          </span><span class="s">&quot;bar-3&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">66</span><span class="w">                                            </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">67</span><span class="w">                                              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_foo</span>
+<span class="linenos">68</span><span class="w">                                              </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">69</span><span class="w">                                                </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">70</span><span class="w">                                                </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">71</span><span class="w">                                                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">72</span><span class="w">                                                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">73</span><span class="w">                                                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_bar_3</span>
+<span class="linenos">74</span><span class="w">                                </span><span class="s">&quot;foo-3&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">75</span><span class="w">                                  </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">76</span><span class="w">                                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_foo</span>
+<span class="linenos">77</span><span class="w">                                    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">78</span><span class="w">                                      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">79</span><span class="w">                                      </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">80</span><span class="w">                                        </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">81</span><span class="w">                                      </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">82</span><span class="w">                                        </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_foo_3</span>
+<span class="linenos">83</span><span class="w">                      </span><span class="s">&quot;/new_endpoint/path/3&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">84</span><span class="w">                        </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">85</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_bar</span>
+<span class="linenos">86</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">87</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">88</span><span class="w">                            </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">89</span><span class="w">                              </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">90</span><span class="w">                            </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">91</span><span class="w">                              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_3</span>
+</pre></div>
+</div>
+</div>
+<p><strong>Example 3:</strong> Mixing sublinear route matching with traditional prefix based inorder linear routing.</p>
+<img alt="../../../../_images/sublinear_routing_img3.png" src="../../../../_images/sublinear_routing_img3.png" />
+<div class="literal-block-wrapper docutils container" id="id4">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../../_downloads/118d652a7d978c6bc3ef49ddfd14a465/sublinear_routing_example3.yaml"><code class="xref download docutils literal notranslate"><span class="pre">mix_sublinear_linear.yaml</span></code></a></span><a class="headerlink" href="#id4" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="w">                </span><span class="nt">matcher_tree</span><span class="p">:</span>
+<span class="linenos"> 2</span><span class="w">                  </span><span class="nt">input</span><span class="p">:</span>
+<span class="linenos"> 3</span><span class="w">                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="linenos"> 4</span><span class="w">                    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos"> 5</span><span class="w">                      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="linenos"> 6</span><span class="w">                      </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">:path</span>
+<span class="hll"><span class="linenos"> 7</span><span class="w">                  </span><span class="nt">prefix_match_map</span><span class="p">:</span>
+</span><span class="linenos"> 8</span><span class="w">                    </span><span class="nt">map</span><span class="p">:</span>
+<span class="linenos"> 9</span><span class="w">                      </span><span class="s">&quot;/new_endpoint/path/1&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">10</span><span class="w">                        </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">11</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_foo</span>
+<span class="linenos">12</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">13</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">14</span><span class="w">                            </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">15</span><span class="w">                              </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">16</span><span class="w">                            </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">17</span><span class="w">                              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_1</span>
+<span class="linenos">18</span><span class="w">                      </span><span class="s">&quot;/new_endpoint/path/2&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">19</span><span class="w">                        </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">20</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_bar</span>
+<span class="linenos">21</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">22</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">23</span><span class="w">                            </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">24</span><span class="w">                              </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">25</span><span class="w">                            </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">26</span><span class="w">                              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_2</span>
+<span class="linenos">27</span><span class="w">                      </span><span class="s">&quot;/new_endpoint/path/3&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">28</span><span class="w">                        </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">29</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_list</span>
+<span class="linenos">30</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="hll"><span class="linenos">31</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.RouteList</span>
+</span><span class="linenos">32</span><span class="w">                            </span><span class="nt">routes</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">                            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">34</span><span class="w">                                </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">35</span><span class="w">                                </span><span class="nt">headers</span><span class="p">:</span>
+<span class="linenos">36</span><span class="w">                                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-foo-header</span>
+<span class="linenos">37</span><span class="w">                                  </span><span class="nt">string_match</span><span class="p">:</span>
+<span class="linenos">38</span><span class="w">                                    </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo-1</span>
+<span class="linenos">39</span><span class="w">                              </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">40</span><span class="w">                                </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_3_1</span>
+<span class="linenos">41</span><span class="w">                            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">42</span><span class="w">                                </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">43</span><span class="w">                                </span><span class="nt">headers</span><span class="p">:</span>
+<span class="linenos">44</span><span class="w">                                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-foo-header</span>
+<span class="linenos">45</span><span class="w">                                  </span><span class="nt">string_match</span><span class="p">:</span>
+<span class="linenos">46</span><span class="w">                                    </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo-2</span>
+<span class="linenos">47</span><span class="w">                              </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">48</span><span class="w">                                </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_3_2</span>
+<span class="linenos">49</span><span class="w">                            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">50</span><span class="w">                                </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">51</span><span class="w">                                </span><span class="nt">headers</span><span class="p">:</span>
+<span class="linenos">52</span><span class="w">                                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-foo-header</span>
+<span class="linenos">53</span><span class="w">                                  </span><span class="nt">string_match</span><span class="p">:</span>
+<span class="linenos">54</span><span class="w">                                    </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo-3</span>
+<span class="linenos">55</span><span class="w">                              </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">56</span><span class="w">                                </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_3_3</span>
+</pre></div>
+</div>
+</div>
+<p><strong>Example 4:</strong> This example shows how one can run exact matches first (using hashmap) and if no matches are found then attempt prefix matches (using tries).</p>
+<div class="literal-block-wrapper docutils container" id="id5">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../../_downloads/9e76f2818174c42052d536d7db0bb1dd/sublinear_routing_example4.yaml"><code class="xref download docutils literal notranslate"><span class="pre">exact_prefix_mix.yaml</span></code></a></span><a class="headerlink" href="#id5" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="w">                </span><span class="nt">matcher_tree</span><span class="p">:</span>
+<span class="linenos"> 2</span><span class="w">                  </span><span class="nt">input</span><span class="p">:</span>
+<span class="linenos"> 3</span><span class="w">                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="linenos"> 4</span><span class="w">                    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos"> 5</span><span class="w">                      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="linenos"> 6</span><span class="w">                      </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">:path</span>
+<span class="hll"><span class="linenos"> 7</span><span class="w">                  </span><span class="nt">exact_match_map</span><span class="p">:</span>
+</span><span class="linenos"> 8</span><span class="w">                    </span><span class="nt">map</span><span class="p">:</span>
+<span class="linenos"> 9</span><span class="w">                      </span><span class="s">&quot;/new_endpoint/foo/0&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">10</span><span class="w">                        </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">11</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_foo</span>
+<span class="linenos">12</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">13</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">14</span><span class="w">                            </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">15</span><span class="w">                              </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">16</span><span class="w">                            </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">17</span><span class="w">                              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_0</span>
+<span class="linenos">18</span><span class="w">                      </span><span class="s">&quot;/new_endpoint/foo/1&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">19</span><span class="w">                        </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">20</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_bar</span>
+<span class="linenos">21</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">22</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">23</span><span class="w">                            </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">24</span><span class="w">                              </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">25</span><span class="w">                            </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">26</span><span class="w">                              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_1</span>
+<span class="linenos">27</span><span class="w">                      </span><span class="s">&quot;/new_endpoint/foo/2&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">28</span><span class="w">                        </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">29</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_bar</span>
+<span class="linenos">30</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">31</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">32</span><span class="w">                            </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">                              </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">34</span><span class="w">                            </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">35</span><span class="w">                              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_2</span>
+<span class="hll"><span class="linenos">36</span><span class="w">                </span><span class="nt">on_no_match</span><span class="p">:</span>
+</span><span class="linenos">37</span><span class="w">                  </span><span class="nt">matcher</span><span class="p">:</span>
+<span class="linenos">38</span><span class="w">                    </span><span class="nt">matcher_tree</span><span class="p">:</span>
+<span class="linenos">39</span><span class="w">                      </span><span class="nt">input</span><span class="p">:</span>
+<span class="linenos">40</span><span class="w">                        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix-matches</span>
+<span class="linenos">41</span><span class="w">                        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">42</span><span class="w">                          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="linenos">43</span><span class="w">                          </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">:path</span>
+<span class="hll"><span class="linenos">44</span><span class="w">                      </span><span class="nt">prefix_match_map</span><span class="p">:</span>
+</span><span class="linenos">45</span><span class="w">                        </span><span class="nt">map</span><span class="p">:</span>
+<span class="linenos">46</span><span class="w">                          </span><span class="s">&quot;/new_endpoint/foo&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">47</span><span class="w">                            </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">48</span><span class="w">                              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_foo_prefix</span>
+<span class="linenos">49</span><span class="w">                              </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">50</span><span class="w">                                </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">51</span><span class="w">                                </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">52</span><span class="w">                                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">53</span><span class="w">                                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">54</span><span class="w">                                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_1</span>
+<span class="linenos">55</span><span class="w">                          </span><span class="s">&quot;/new_endpoint&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">56</span><span class="w">                            </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">57</span><span class="w">                              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_foo_prefix</span>
+<span class="linenos">58</span><span class="w">                              </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">59</span><span class="w">                                </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.route.v3.Route</span>
+<span class="linenos">60</span><span class="w">                                </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">61</span><span class="w">                                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="linenos">62</span><span class="w">                                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">63</span><span class="w">                                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_2</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="match-tree-validation">
+<h2>Match Tree Validation<a class="headerlink" href="#match-tree-validation" title="Link to this heading"></a></h2>
+<p>As the match tree structure is very flexible, some filters might need to impose additional restrictions
+on what kind of match trees can be used. This system is somewhat inflexible at the moment, only supporting
+limiting the input sources to a specific set. For example, a filter might specify that it only works with
+request headers: in this case a match tree that attempts to match on request trailers or response headers
+will fail during configuration load, reporting back which data input was invalid.</p>
+<p>This is done for example to limit the issues talked about in
+<a class="reference internal" href="#arch-overview-matching-api-iteration-impact"><span class="std std-ref">the above section</span></a> or to help users understand in what
+context a match tree can be used for a specific filter. Due to the limitations of the validation framework
+at the current time, it is not used for all filters.</p>
+<p>For HTTP filters, the restrictions are specified by the filter implementation, so consult the individual
+filter documentation to understand whether there are restrictions in place.</p>
+<p>For example, in the example below, the match tree could not be used with a filter that restricts the the
+match tree to only use
+<a class="reference internal" href="../../../../api-v3/type/matcher/v3/http_inputs.proto.html#envoy-v3-api-msg-type-matcher-v3-httprequestheadermatchinput"><span class="std std-ref">HttpRequestHeaderMatchInput</span></a>.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">static_resources</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">listeners</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0.0.0</span>
+<span class="w">        </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="w">    </span><span class="nt">listener_filters</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">filter_chains</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filters</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.network.http_connection_manager</span>
+<span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+<span class="w">          </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress_http</span>
+<span class="w">          </span><span class="nt">http_filters</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">with-matcher</span>
+<span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher</span>
+<span class="w">              </span><span class="nt">extension_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.fault</span>
+<span class="w">                </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">                  </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault</span>
+<span class="w">                  </span><span class="nt">abort</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">http_status</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">503</span>
+<span class="w">                    </span><span class="nt">percentage</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">numerator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">                      </span><span class="nt">denominator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HUNDRED</span>
+<span class="w">                  </span><span class="nt">delay</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">fixed_delay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3s</span>
+<span class="w">                    </span><span class="nt">percentage</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">numerator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">                      </span><span class="nt">denominator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HUNDRED</span>
+<span class="w">              </span><span class="nt">xds_matcher</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">matcher_list</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">matchers</span><span class="p">:</span>
+<span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">predicate</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">or_matcher</span><span class="p">:</span>
+<span class="w">                        </span><span class="nt">predicate</span><span class="p">:</span>
+<span class="w">                        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">single_predicate</span><span class="p">:</span>
+<span class="w">                            </span><span class="nt">input</span><span class="p">:</span>
+<span class="w">                              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="w">                              </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">                                </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="w">                                </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-header</span>
+<span class="w">                            </span><span class="nt">value_match</span><span class="p">:</span>
+<span class="w">                              </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">                        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">single_predicate</span><span class="p">:</span>
+<span class="w">                            </span><span class="nt">input</span><span class="p">:</span>
+<span class="w">                              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="w">                              </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">                                </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput</span>
+<span class="w">                                </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">response-header</span>
+<span class="w">                            </span><span class="nt">value_match</span><span class="p">:</span>
+<span class="w">                              </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bar</span>
+<span class="w">                    </span><span class="nt">on_match</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">action</span><span class="p">:</span>
+<span class="w">                        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip</span>
+<span class="w">                        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">                          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.router</span>
+<span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span>
+<span class="w">          </span><span class="nt">route_config</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="w">              </span><span class="nt">domains</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;*&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/&quot;</span><span class="p p-Indicator">}</span>
+<span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_foo</span>
+<span class="w">  </span><span class="nt">clusters</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_foo</span>
+<span class="w">    </span><span class="nt">load_assignment</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some_service</span>
+<span class="w">      </span><span class="nt">endpoints</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">lb_endpoints</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="matching.html" class="btn btn-neutral float-left" title="Generic Matching" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="matching_listener.html" class="btn btn-neutral float-right" title="Matching Filter Chains in Listeners" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Matching API</a><ul>
+<li><a class="reference internal" href="#inputs-and-matching-algorithms">Inputs and Matching Algorithms</a><ul>
+<li><a class="reference internal" href="#http-input-functions">HTTP Input Functions</a></li>
+<li><a class="reference internal" href="#network-input-functions">Network Input Functions</a></li>
+<li><a class="reference internal" href="#ssl-input-functions">SSL Input Functions</a></li>
+<li><a class="reference internal" href="#transport-socket-matching-input-functions">Transport Socket Matching Input Functions</a></li>
+<li><a class="reference internal" href="#common-input-functions">Common Input Functions</a></li>
+<li><a class="reference internal" href="#custom-matching-algorithms">Custom Matching Algorithms</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#matching-actions">Matching actions</a><ul>
+<li><a class="reference internal" href="#extension-category-envoy-matching-action">Matching Actions</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#filter-integration">Filter Integration</a><ul>
+<li><a class="reference internal" href="#http-filter-iteration-impact">HTTP Filter Iteration Impact</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#http-routing-integration">HTTP Routing Integration</a></li>
+<li><a class="reference internal" href="#sublinear-route-matching">Sublinear Route Matching</a></li>
+<li><a class="reference internal" href="#match-tree-validation">Match Tree Validation</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

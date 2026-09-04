@@ -1,0 +1,872 @@
+.. _envoy_v3_api_file_envoy/admin/v3/config_dump_shared.proto:
+
+ConfigDump (proto)
+==================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.UpdateFailureState:
+
+admin.v3.UpdateFailureState
+---------------------------
+
+
+:repo:`[admin.v3.UpdateFailureState proto] <api/envoy/admin/v3/config_dump_shared.proto#L51>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "failed_configuration": {...},
+    "last_update_attempt": {...},
+    "details": ...
+  }
+
+.. _envoy_v3_api_field_admin.v3.UpdateFailureState.failed_configuration:
+
+
+failed_configuration
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) What the component configuration would have been if the update had succeeded.
+  This field may not be populated by xDS clients due to storage overhead.
+
+
+.. _envoy_v3_api_field_admin.v3.UpdateFailureState.last_update_attempt:
+
+
+last_update_attempt
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) Time of the latest failed update attempt.
+
+
+.. _envoy_v3_api_field_admin.v3.UpdateFailureState.details:
+
+
+details
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Details about the last failed update attempt.
+
+
+
+.. _envoy_v3_api_msg_admin.v3.ListenersConfigDump:
+
+admin.v3.ListenersConfigDump
+----------------------------
+
+
+:repo:`[admin.v3.ListenersConfigDump proto] <api/envoy/admin/v3/config_dump_shared.proto#L73>`
+
+Envoy's listener manager fills this message with all currently known listeners. Listener
+configuration information can be used to recreate an Envoy configuration by populating all
+listeners as static listeners or by returning them in a LDS response.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "version_info": ...,
+    "static_listeners": [],
+    "dynamic_listeners": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.version_info:
+
+
+version_info
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This is the :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` in the
+  last processed LDS discovery response. If there are only static bootstrap listeners, this field
+  will be "".
+
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.static_listeners:
+
+
+static_listeners
+  (**repeated** :ref:`admin.v3.ListenersConfigDump.StaticListener <envoy_v3_api_msg_admin.v3.ListenersConfigDump.StaticListener>`) The statically loaded listener configs.
+
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.dynamic_listeners:
+
+
+dynamic_listeners
+  (**repeated** :ref:`admin.v3.ListenersConfigDump.DynamicListener <envoy_v3_api_msg_admin.v3.ListenersConfigDump.DynamicListener>`) State for any warming, active, or draining listeners.
+
+
+.. _envoy_v3_api_msg_admin.v3.ListenersConfigDump.StaticListener:
+
+admin.v3.ListenersConfigDump.StaticListener
+-------------------------------------------
+
+
+:repo:`[admin.v3.ListenersConfigDump.StaticListener proto] <api/envoy/admin/v3/config_dump_shared.proto#L78>`
+
+Describes a statically loaded listener.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "listener": {...},
+    "last_updated": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.StaticListener.listener:
+
+
+listener
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The listener config.
+
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.StaticListener.last_updated:
+
+
+last_updated
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the Listener was last successfully updated.
+
+
+
+.. _envoy_v3_api_msg_admin.v3.ListenersConfigDump.DynamicListenerState:
+
+admin.v3.ListenersConfigDump.DynamicListenerState
+-------------------------------------------------
+
+
+:repo:`[admin.v3.ListenersConfigDump.DynamicListenerState proto] <api/envoy/admin/v3/config_dump_shared.proto#L89>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "version_info": ...,
+    "listener": {...},
+    "last_updated": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.DynamicListenerState.version_info:
+
+
+version_info
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This is the per-resource version information. This version is currently taken from the
+  :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time
+  that the listener was loaded. In the future, discrete per-listener versions may be supported
+  by the API.
+
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.DynamicListenerState.listener:
+
+
+listener
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The listener config.
+
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.DynamicListenerState.last_updated:
+
+
+last_updated
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the Listener was last successfully updated.
+
+
+
+.. _envoy_v3_api_msg_admin.v3.ListenersConfigDump.DynamicListener:
+
+admin.v3.ListenersConfigDump.DynamicListener
+--------------------------------------------
+
+
+:repo:`[admin.v3.ListenersConfigDump.DynamicListener proto] <api/envoy/admin/v3/config_dump_shared.proto#L108>`
+
+Describes a dynamically loaded listener via the LDS API.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "active_state": {...},
+    "warming_state": {...},
+    "draining_state": {...},
+    "error_state": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.DynamicListener.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name or unique id of this listener, pulled from the DynamicListenerState config.
+
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.DynamicListener.active_state:
+
+
+active_state
+  (:ref:`admin.v3.ListenersConfigDump.DynamicListenerState <envoy_v3_api_msg_admin.v3.ListenersConfigDump.DynamicListenerState>`) The listener state for any active listener by this name.
+  These are listeners that are available to service data plane traffic.
+
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.DynamicListener.warming_state:
+
+
+warming_state
+  (:ref:`admin.v3.ListenersConfigDump.DynamicListenerState <envoy_v3_api_msg_admin.v3.ListenersConfigDump.DynamicListenerState>`) The listener state for any warming listener by this name.
+  These are listeners that are currently undergoing warming in preparation to service data
+  plane traffic. Note that if attempting to recreate an Envoy configuration from a
+  configuration dump, the warming listeners should generally be discarded.
+
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.DynamicListener.draining_state:
+
+
+draining_state
+  (:ref:`admin.v3.ListenersConfigDump.DynamicListenerState <envoy_v3_api_msg_admin.v3.ListenersConfigDump.DynamicListenerState>`) The listener state for any draining listener by this name.
+  These are listeners that are currently undergoing draining in preparation to stop servicing
+  data plane traffic. Note that if attempting to recreate an Envoy configuration from a
+  configuration dump, the draining listeners should generally be discarded.
+
+
+.. _envoy_v3_api_field_admin.v3.ListenersConfigDump.DynamicListener.error_state:
+
+
+error_state
+  (:ref:`admin.v3.UpdateFailureState <envoy_v3_api_msg_admin.v3.UpdateFailureState>`) Set if the last update failed, cleared after the next successful update.
+  The ``error_state`` field contains the rejected version of this particular
+  resource along with the reason and timestamp. For successfully updated or
+  acknowledged resource, this field should be empty.
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.ClustersConfigDump:
+
+admin.v3.ClustersConfigDump
+---------------------------
+
+
+:repo:`[admin.v3.ClustersConfigDump proto] <api/envoy/admin/v3/config_dump_shared.proto#L157>`
+
+Envoy's cluster manager fills this message with all currently known clusters. Cluster
+configuration information can be used to recreate an Envoy configuration by populating all
+clusters as static clusters or by returning them in a CDS response.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "version_info": ...,
+    "static_clusters": [],
+    "dynamic_active_clusters": [],
+    "dynamic_warming_clusters": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.ClustersConfigDump.version_info:
+
+
+version_info
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This is the :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` in the
+  last processed CDS discovery response. If there are only static bootstrap clusters, this field
+  will be "".
+
+
+.. _envoy_v3_api_field_admin.v3.ClustersConfigDump.static_clusters:
+
+
+static_clusters
+  (**repeated** :ref:`admin.v3.ClustersConfigDump.StaticCluster <envoy_v3_api_msg_admin.v3.ClustersConfigDump.StaticCluster>`) The statically loaded cluster configs.
+
+
+.. _envoy_v3_api_field_admin.v3.ClustersConfigDump.dynamic_active_clusters:
+
+
+dynamic_active_clusters
+  (**repeated** :ref:`admin.v3.ClustersConfigDump.DynamicCluster <envoy_v3_api_msg_admin.v3.ClustersConfigDump.DynamicCluster>`) The dynamically loaded active clusters. These are clusters that are available to service
+  data plane traffic.
+
+
+.. _envoy_v3_api_field_admin.v3.ClustersConfigDump.dynamic_warming_clusters:
+
+
+dynamic_warming_clusters
+  (**repeated** :ref:`admin.v3.ClustersConfigDump.DynamicCluster <envoy_v3_api_msg_admin.v3.ClustersConfigDump.DynamicCluster>`) The dynamically loaded warming clusters. These are clusters that are currently undergoing
+  warming in preparation to service data plane traffic. Note that if attempting to recreate an
+  Envoy configuration from a configuration dump, the warming clusters should generally be
+  discarded.
+
+
+.. _envoy_v3_api_msg_admin.v3.ClustersConfigDump.StaticCluster:
+
+admin.v3.ClustersConfigDump.StaticCluster
+-----------------------------------------
+
+
+:repo:`[admin.v3.ClustersConfigDump.StaticCluster proto] <api/envoy/admin/v3/config_dump_shared.proto#L162>`
+
+Describes a statically loaded cluster.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster": {...},
+    "last_updated": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.ClustersConfigDump.StaticCluster.cluster:
+
+
+cluster
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The cluster config.
+
+
+.. _envoy_v3_api_field_admin.v3.ClustersConfigDump.StaticCluster.last_updated:
+
+
+last_updated
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the Cluster was last updated.
+
+
+
+.. _envoy_v3_api_msg_admin.v3.ClustersConfigDump.DynamicCluster:
+
+admin.v3.ClustersConfigDump.DynamicCluster
+------------------------------------------
+
+
+:repo:`[admin.v3.ClustersConfigDump.DynamicCluster proto] <api/envoy/admin/v3/config_dump_shared.proto#L175>`
+
+Describes a dynamically loaded cluster via the CDS API.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "version_info": ...,
+    "cluster": {...},
+    "last_updated": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.ClustersConfigDump.DynamicCluster.version_info:
+
+
+version_info
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This is the per-resource version information. This version is currently taken from the
+  :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time
+  that the cluster was loaded. In the future, discrete per-cluster versions may be supported by
+  the API.
+
+
+.. _envoy_v3_api_field_admin.v3.ClustersConfigDump.DynamicCluster.cluster:
+
+
+cluster
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The cluster config.
+
+
+.. _envoy_v3_api_field_admin.v3.ClustersConfigDump.DynamicCluster.last_updated:
+
+
+last_updated
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the Cluster was last updated.
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.RoutesConfigDump:
+
+admin.v3.RoutesConfigDump
+-------------------------
+
+
+:repo:`[admin.v3.RoutesConfigDump proto] <api/envoy/admin/v3/config_dump_shared.proto#L227>`
+
+Envoy's RDS implementation fills this message with all currently loaded routes, as described by
+their RouteConfiguration objects. Static routes that are either defined in the bootstrap configuration
+or defined inline while configuring listeners are separated from those configured dynamically via RDS.
+Route configuration information can be used to recreate an Envoy configuration by populating all routes
+as static routes or by returning them in RDS responses.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "static_route_configs": [],
+    "dynamic_route_configs": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.RoutesConfigDump.static_route_configs:
+
+
+static_route_configs
+  (**repeated** :ref:`admin.v3.RoutesConfigDump.StaticRouteConfig <envoy_v3_api_msg_admin.v3.RoutesConfigDump.StaticRouteConfig>`) The statically loaded route configs.
+
+
+.. _envoy_v3_api_field_admin.v3.RoutesConfigDump.dynamic_route_configs:
+
+
+dynamic_route_configs
+  (**repeated** :ref:`admin.v3.RoutesConfigDump.DynamicRouteConfig <envoy_v3_api_msg_admin.v3.RoutesConfigDump.DynamicRouteConfig>`) The dynamically loaded route configs.
+
+
+.. _envoy_v3_api_msg_admin.v3.RoutesConfigDump.StaticRouteConfig:
+
+admin.v3.RoutesConfigDump.StaticRouteConfig
+-------------------------------------------
+
+
+:repo:`[admin.v3.RoutesConfigDump.StaticRouteConfig proto] <api/envoy/admin/v3/config_dump_shared.proto#L231>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "route_config": {...},
+    "last_updated": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.RoutesConfigDump.StaticRouteConfig.route_config:
+
+
+route_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The route config.
+
+
+.. _envoy_v3_api_field_admin.v3.RoutesConfigDump.StaticRouteConfig.last_updated:
+
+
+last_updated
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the Route was last updated.
+
+
+
+.. _envoy_v3_api_msg_admin.v3.RoutesConfigDump.DynamicRouteConfig:
+
+admin.v3.RoutesConfigDump.DynamicRouteConfig
+--------------------------------------------
+
+
+:repo:`[admin.v3.RoutesConfigDump.DynamicRouteConfig proto] <api/envoy/admin/v3/config_dump_shared.proto#L243>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "version_info": ...,
+    "route_config": {...},
+    "last_updated": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.RoutesConfigDump.DynamicRouteConfig.version_info:
+
+
+version_info
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This is the per-resource version information. This version is currently taken from the
+  :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
+  the route configuration was loaded.
+
+
+.. _envoy_v3_api_field_admin.v3.RoutesConfigDump.DynamicRouteConfig.route_config:
+
+
+route_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The route config.
+
+
+.. _envoy_v3_api_field_admin.v3.RoutesConfigDump.DynamicRouteConfig.last_updated:
+
+
+last_updated
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the Route was last updated.
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.ScopedRoutesConfigDump:
+
+admin.v3.ScopedRoutesConfigDump
+-------------------------------
+
+
+:repo:`[admin.v3.ScopedRoutesConfigDump proto] <api/envoy/admin/v3/config_dump_shared.proto#L281>`
+
+Envoy's scoped RDS implementation fills this message with all currently loaded route
+configuration scopes (defined via ScopedRouteConfigurationsSet protos). This message lists both
+the scopes defined inline with the higher order object (i.e., the HttpConnectionManager) and the
+dynamically obtained scopes via the SRDS API.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "inline_scoped_route_configs": [],
+    "dynamic_scoped_route_configs": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.ScopedRoutesConfigDump.inline_scoped_route_configs:
+
+
+inline_scoped_route_configs
+  (**repeated** :ref:`admin.v3.ScopedRoutesConfigDump.InlineScopedRouteConfigs <envoy_v3_api_msg_admin.v3.ScopedRoutesConfigDump.InlineScopedRouteConfigs>`) The statically loaded scoped route configs.
+
+
+.. _envoy_v3_api_field_admin.v3.ScopedRoutesConfigDump.dynamic_scoped_route_configs:
+
+
+dynamic_scoped_route_configs
+  (**repeated** :ref:`admin.v3.ScopedRoutesConfigDump.DynamicScopedRouteConfigs <envoy_v3_api_msg_admin.v3.ScopedRoutesConfigDump.DynamicScopedRouteConfigs>`) The dynamically loaded scoped route configs.
+
+
+.. _envoy_v3_api_msg_admin.v3.ScopedRoutesConfigDump.InlineScopedRouteConfigs:
+
+admin.v3.ScopedRoutesConfigDump.InlineScopedRouteConfigs
+--------------------------------------------------------
+
+
+:repo:`[admin.v3.ScopedRoutesConfigDump.InlineScopedRouteConfigs proto] <api/envoy/admin/v3/config_dump_shared.proto#L285>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "scoped_route_configs": [],
+    "last_updated": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.ScopedRoutesConfigDump.InlineScopedRouteConfigs.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name assigned to the scoped route configurations.
+
+
+.. _envoy_v3_api_field_admin.v3.ScopedRoutesConfigDump.InlineScopedRouteConfigs.scoped_route_configs:
+
+
+scoped_route_configs
+  (**repeated** `Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The scoped route configurations.
+
+
+.. _envoy_v3_api_field_admin.v3.ScopedRoutesConfigDump.InlineScopedRouteConfigs.last_updated:
+
+
+last_updated
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the scoped route config set was last updated.
+
+
+
+.. _envoy_v3_api_msg_admin.v3.ScopedRoutesConfigDump.DynamicScopedRouteConfigs:
+
+admin.v3.ScopedRoutesConfigDump.DynamicScopedRouteConfigs
+---------------------------------------------------------
+
+
+:repo:`[admin.v3.ScopedRoutesConfigDump.DynamicScopedRouteConfigs proto] <api/envoy/admin/v3/config_dump_shared.proto#L300>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "version_info": ...,
+    "scoped_route_configs": [],
+    "last_updated": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.ScopedRoutesConfigDump.DynamicScopedRouteConfigs.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name assigned to the scoped route configurations.
+
+
+.. _envoy_v3_api_field_admin.v3.ScopedRoutesConfigDump.DynamicScopedRouteConfigs.version_info:
+
+
+version_info
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This is the per-resource version information. This version is currently taken from the
+  :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
+  the scoped routes configuration was loaded.
+
+
+.. _envoy_v3_api_field_admin.v3.ScopedRoutesConfigDump.DynamicScopedRouteConfigs.scoped_route_configs:
+
+
+scoped_route_configs
+  (**repeated** `Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The scoped route configurations.
+
+
+.. _envoy_v3_api_field_admin.v3.ScopedRoutesConfigDump.DynamicScopedRouteConfigs.last_updated:
+
+
+last_updated
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the scoped route config set was last updated.
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.EndpointsConfigDump:
+
+admin.v3.EndpointsConfigDump
+----------------------------
+
+
+:repo:`[admin.v3.EndpointsConfigDump proto] <api/envoy/admin/v3/config_dump_shared.proto#L340>`
+
+Envoy's admin fill this message with all currently known endpoints. Endpoint
+configuration information can be used to recreate an Envoy configuration by populating all
+endpoints as static endpoints or by returning them in an EDS response.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "static_endpoint_configs": [],
+    "dynamic_endpoint_configs": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.EndpointsConfigDump.static_endpoint_configs:
+
+
+static_endpoint_configs
+  (**repeated** :ref:`admin.v3.EndpointsConfigDump.StaticEndpointConfig <envoy_v3_api_msg_admin.v3.EndpointsConfigDump.StaticEndpointConfig>`) The statically loaded endpoint configs.
+
+
+.. _envoy_v3_api_field_admin.v3.EndpointsConfigDump.dynamic_endpoint_configs:
+
+
+dynamic_endpoint_configs
+  (**repeated** :ref:`admin.v3.EndpointsConfigDump.DynamicEndpointConfig <envoy_v3_api_msg_admin.v3.EndpointsConfigDump.DynamicEndpointConfig>`) The dynamically loaded endpoint configs.
+
+
+.. _envoy_v3_api_msg_admin.v3.EndpointsConfigDump.StaticEndpointConfig:
+
+admin.v3.EndpointsConfigDump.StaticEndpointConfig
+-------------------------------------------------
+
+
+:repo:`[admin.v3.EndpointsConfigDump.StaticEndpointConfig proto] <api/envoy/admin/v3/config_dump_shared.proto#L341>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "endpoint_config": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.EndpointsConfigDump.StaticEndpointConfig.endpoint_config:
+
+
+endpoint_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The endpoint config.
+
+
+
+.. _envoy_v3_api_msg_admin.v3.EndpointsConfigDump.DynamicEndpointConfig:
+
+admin.v3.EndpointsConfigDump.DynamicEndpointConfig
+--------------------------------------------------
+
+
+:repo:`[admin.v3.EndpointsConfigDump.DynamicEndpointConfig proto] <api/envoy/admin/v3/config_dump_shared.proto#L350>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "endpoint_config": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.EndpointsConfigDump.DynamicEndpointConfig.endpoint_config:
+
+
+endpoint_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The endpoint config.
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.EcdsConfigDump:
+
+admin.v3.EcdsConfigDump
+-----------------------
+
+
+:repo:`[admin.v3.EcdsConfigDump proto] <api/envoy/admin/v3/config_dump_shared.proto#L385>`
+
+Envoy's ECDS service fills this message with all currently extension
+configuration. Extension configuration information can be used to recreate
+an Envoy ECDS listener and HTTP filters as static filters or by returning
+them in ECDS response.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ecds_filters": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.EcdsConfigDump.ecds_filters:
+
+
+ecds_filters
+  (**repeated** :ref:`admin.v3.EcdsConfigDump.EcdsFilterConfig <envoy_v3_api_msg_admin.v3.EcdsConfigDump.EcdsFilterConfig>`) The ECDS filter configs.
+
+
+.. _envoy_v3_api_msg_admin.v3.EcdsConfigDump.EcdsFilterConfig:
+
+admin.v3.EcdsConfigDump.EcdsFilterConfig
+----------------------------------------
+
+
+:repo:`[admin.v3.EcdsConfigDump.EcdsFilterConfig proto] <api/envoy/admin/v3/config_dump_shared.proto#L389>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "version_info": ...,
+    "ecds_filter": {...},
+    "last_updated": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.EcdsConfigDump.EcdsFilterConfig.version_info:
+
+
+version_info
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This is the per-resource version information. This version is currently
+  taken from the :ref:`version_info
+  <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>`
+  field at the time that the ECDS filter was loaded.
+
+
+.. _envoy_v3_api_field_admin.v3.EcdsConfigDump.EcdsFilterConfig.ecds_filter:
+
+
+ecds_filter
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The ECDS filter config.
+
+
+.. _envoy_v3_api_field_admin.v3.EcdsConfigDump.EcdsFilterConfig.last_updated:
+
+
+last_updated
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the ECDS filter was last updated.
+
+
+
+
+.. _envoy_v3_api_enum_admin.v3.ClientResourceStatus:
+
+Enum admin.v3.ClientResourceStatus
+----------------------------------
+
+
+:repo:`[admin.v3.ClientResourceStatus proto] <api/envoy/admin/v3/config_dump_shared.proto#L20>`
+
+Resource status from the view of a xDS client, which tells the synchronization
+status between the xDS client and the xDS server.
+
+
+
+.. _envoy_v3_api_enum_value_admin.v3.ClientResourceStatus.UNKNOWN:
+
+
+UNKNOWN
+  *(DEFAULT)* ⁣Resource status is not available/unknown.
+
+
+.. _envoy_v3_api_enum_value_admin.v3.ClientResourceStatus.REQUESTED:
+
+
+REQUESTED
+  ⁣Client requested this resource but hasn't received any update from management
+  server. The client will not fail requests, but will queue them until update
+  arrives or the client times out waiting for the resource.
+
+
+.. _envoy_v3_api_enum_value_admin.v3.ClientResourceStatus.DOES_NOT_EXIST:
+
+
+DOES_NOT_EXIST
+  ⁣This resource has been requested by the client but has either not been
+  delivered by the server or was previously delivered by the server and then
+  subsequently removed from resources provided by the server. For more
+  information, please refer to the :ref:`"Knowing When a Requested Resource
+  Does Not Exist" <xds_protocol_resource_not_existed>` section.
+
+
+.. _envoy_v3_api_enum_value_admin.v3.ClientResourceStatus.ACKED:
+
+
+ACKED
+  ⁣Client received this resource and replied with ACK.
+
+
+.. _envoy_v3_api_enum_value_admin.v3.ClientResourceStatus.NACKED:
+
+
+NACKED
+  ⁣Client received this resource and replied with NACK.
+
+
+.. _envoy_v3_api_enum_value_admin.v3.ClientResourceStatus.RECEIVED_ERROR:
+
+
+RECEIVED_ERROR
+  ⁣Client received an error from the control plane. The attached config
+  dump is the most recent accepted one. If no config is accepted yet,
+  the attached config dump will be empty.
+
+
+.. _envoy_v3_api_enum_value_admin.v3.ClientResourceStatus.TIMEOUT:
+
+
+TIMEOUT
+  ⁣Client timed out waiting for the resource from the control plane.
+
+

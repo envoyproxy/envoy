@@ -1,0 +1,193 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/decompressor/v3/decompressor.proto:
+
+Decompressor (proto)
+====================
+
+.. _extension_envoy.filters.http.decompressor:
+
+This extension has the qualified name ``envoy.filters.http.decompressor``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor <envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor:
+
+extensions.filters.http.decompressor.v3.Decompressor
+----------------------------------------------------
+
+
+:repo:`[extensions.filters.http.decompressor.v3.Decompressor proto] <api/envoy/extensions/filters/http/decompressor/v3/decompressor.proto#L21>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "decompressor_library": {...},
+    "request_direction_config": {...},
+    "response_direction_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.decompressor.v3.Decompressor.decompressor_library:
+
+
+decompressor_library
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`, *REQUIRED*) A decompressor library to use for both request and response decompression. Currently only
+  :ref:`envoy.compression.gzip.compressor<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`
+  is included in Envoy.
+
+
+  .. _extension_category_envoy.compression.decompressor:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.compression.brotli.decompressor <extension_envoy.compression.brotli.decompressor>`
+
+    - :ref:`envoy.compression.gzip.decompressor <extension_envoy.compression.gzip.decompressor>`
+
+    - :ref:`envoy.compression.zstd.decompressor <extension_envoy.compression.zstd.decompressor>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.decompressor.v3.Decompressor.request_direction_config:
+
+
+request_direction_config
+  (:ref:`extensions.filters.http.decompressor.v3.Decompressor.RequestDirectionConfig <envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor.RequestDirectionConfig>`) Configuration for request decompression. Decompression is enabled by default if left empty.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.decompressor.v3.Decompressor.response_direction_config:
+
+
+response_direction_config
+  (:ref:`extensions.filters.http.decompressor.v3.Decompressor.ResponseDirectionConfig <envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor.ResponseDirectionConfig>`) Configuration for response decompression. Decompression is enabled by default if left empty.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor.CommonDirectionConfig:
+
+extensions.filters.http.decompressor.v3.Decompressor.CommonDirectionConfig
+--------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.decompressor.v3.Decompressor.CommonDirectionConfig proto] <api/envoy/extensions/filters/http/decompressor/v3/decompressor.proto#L23>`
+
+Common configuration for filter behavior on both the request and response direction.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "enabled": {...},
+    "ignore_no_transform_header": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.decompressor.v3.Decompressor.CommonDirectionConfig.enabled:
+
+
+enabled
+  (:ref:`config.core.v3.RuntimeFeatureFlag <envoy_v3_api_msg_config.core.v3.RuntimeFeatureFlag>`) Runtime flag that controls whether the filter is enabled for decompression or not. If set to false, the
+  filter will operate as a pass-through filter. If the message is unspecified, the filter will be enabled.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.decompressor.v3.Decompressor.CommonDirectionConfig.ignore_no_transform_header:
+
+
+ignore_no_transform_header
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to true, will decompress response even if a ``no-transform`` cache control header is set.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor.RequestDirectionConfig:
+
+extensions.filters.http.decompressor.v3.Decompressor.RequestDirectionConfig
+---------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.decompressor.v3.Decompressor.RequestDirectionConfig proto] <api/envoy/extensions/filters/http/decompressor/v3/decompressor.proto#L33>`
+
+Configuration for filter behavior on the request direction.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "common_config": {...},
+    "advertise_accept_encoding": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.decompressor.v3.Decompressor.RequestDirectionConfig.common_config:
+
+
+common_config
+  (:ref:`extensions.filters.http.decompressor.v3.Decompressor.CommonDirectionConfig <envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor.CommonDirectionConfig>`) 
+
+.. _envoy_v3_api_field_extensions.filters.http.decompressor.v3.Decompressor.RequestDirectionConfig.advertise_accept_encoding:
+
+
+advertise_accept_encoding
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If set to true, and response decompression is enabled, the filter modifies the Accept-Encoding
+  request header by appending the decompressor_library's encoding. Defaults to true.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor.ResponseDirectionConfig:
+
+extensions.filters.http.decompressor.v3.Decompressor.ResponseDirectionConfig
+----------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.decompressor.v3.Decompressor.ResponseDirectionConfig proto] <api/envoy/extensions/filters/http/decompressor/v3/decompressor.proto#L42>`
+
+Configuration for filter behavior on the response direction.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "common_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.decompressor.v3.Decompressor.ResponseDirectionConfig.common_config:
+
+
+common_config
+  (:ref:`extensions.filters.http.decompressor.v3.Decompressor.CommonDirectionConfig <envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor.CommonDirectionConfig>`) 
+
+

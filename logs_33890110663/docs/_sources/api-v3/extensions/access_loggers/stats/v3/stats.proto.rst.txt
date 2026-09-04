@@ -1,0 +1,457 @@
+.. _envoy_v3_api_file_envoy/extensions/access_loggers/stats/v3/stats.proto:
+
+Stats logger (proto)
+====================
+
+.. _extension_envoy.access_loggers.stats:
+
+This extension has the qualified name ``envoy.access_loggers.stats``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.access_loggers <extension_category_envoy.access_loggers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`
+
+
+
+Configuration for an access logger that emits custom Envoy stats according to its
+configuration. The stats can have tags and values derived from
+:ref:`command operators <config_access_log_command_operators>`.
+
+.. warning::
+  It is easy to configure and use this extension in ways that create very
+  large numbers of stats in Envoy, which can cause excessive memory or CPU use
+  leading to a denial of service in Envoy, or can overwhelm any configured
+  stat sinks by sending too many unique metrics.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config:
+
+extensions.access_loggers.stats.v3.Config
+-----------------------------------------
+
+
+:repo:`[extensions.access_loggers.stats.v3.Config proto] <api/envoy/extensions/access_loggers/stats/v3/stats.proto#L34>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "stats_scope": {...},
+    "histograms": [],
+    "counters": [],
+    "gauges": []
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The stat prefix for the generated stats.
+  Deprecated: please use ``stats_scope.prefix`` instead.
+  It will override ``stats_scope.prefix`` if non-empty.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.stats_scope:
+
+
+stats_scope
+  (:ref:`type.v3.Scope <envoy_v3_api_msg_type.v3.Scope>`) Configuration for stats scope limits and sharing.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.histograms:
+
+
+histograms
+  (**repeated** :ref:`extensions.access_loggers.stats.v3.Config.Histogram <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Histogram>`) The histograms this logger will emit.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.counters:
+
+
+counters
+  (**repeated** :ref:`extensions.access_loggers.stats.v3.Config.Counter <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Counter>`) The counters this logger will emit.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.gauges:
+
+
+gauges
+  (**repeated** :ref:`extensions.access_loggers.stats.v3.Config.Gauge <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Gauge>`) The gauges this logger will emit.
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Tag:
+
+extensions.access_loggers.stats.v3.Config.Tag
+---------------------------------------------
+
+
+:repo:`[extensions.access_loggers.stats.v3.Config.Tag proto] <api/envoy/extensions/access_loggers/stats/v3/stats.proto#L36>`
+
+Defines a tag on a stat.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "value_format": ...,
+    "rules": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Tag.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the tag.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Tag.value_format:
+
+
+value_format
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The value of the tag, using :ref:`command operators
+  <config_access_log_command_operators>`.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Tag.rules:
+
+
+rules
+  (:ref:`.xds.type.matcher.v3.Matcher <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`) The custom rules to generate the stat tags. Currently, the only
+  supported input is
+  :ref:`Stat tag value input <envoy_v3_api_msg_extensions.matching.common_inputs.stats.v3.StatTagValueInput>`.
+  The supported actions are
+  - :ref:`Transform stat action <envoy_v3_api_msg_extensions.matching.actions.transform_stat.v3.TransformStat>`.
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Stat:
+
+extensions.access_loggers.stats.v3.Config.Stat
+----------------------------------------------
+
+
+:repo:`[extensions.access_loggers.stats.v3.Config.Stat proto] <api/envoy/extensions/access_loggers/stats/v3/stats.proto#L53>`
+
+Defines the name and tags of a stat.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "tags": []
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Stat.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the stat.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Stat.tags:
+
+
+tags
+  (**repeated** :ref:`extensions.access_loggers.stats.v3.Config.Tag <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Tag>`) The tags for the stat.
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Histogram:
+
+extensions.access_loggers.stats.v3.Config.Histogram
+---------------------------------------------------
+
+
+:repo:`[extensions.access_loggers.stats.v3.Config.Histogram proto] <api/envoy/extensions/access_loggers/stats/v3/stats.proto#L62>`
+
+Configuration for a histogram stat.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat": {...},
+    "unit": ...,
+    "value_format": ...
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Histogram.stat:
+
+
+stat
+  (:ref:`extensions.access_loggers.stats.v3.Config.Stat <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Stat>`, *REQUIRED*) The name and tags of this histogram.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Histogram.unit:
+
+
+unit
+  (:ref:`extensions.access_loggers.stats.v3.Config.Histogram.Unit <envoy_v3_api_enum_extensions.access_loggers.stats.v3.Config.Histogram.Unit>`) The units for this histogram.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Histogram.value_format:
+
+
+value_format
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The format string for the value of this histogram, using :ref:`command operators <config_access_log_command_operators>`.
+  This must evaluate to a positive number.
+
+
+.. _envoy_v3_api_enum_extensions.access_loggers.stats.v3.Config.Histogram.Unit:
+
+Enum extensions.access_loggers.stats.v3.Config.Histogram.Unit
+-------------------------------------------------------------
+
+
+:repo:`[extensions.access_loggers.stats.v3.Config.Histogram.Unit proto] <api/envoy/extensions/access_loggers/stats/v3/stats.proto#L64>`
+
+The histogram units. The units are needed for some stat sinks.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.access_loggers.stats.v3.Config.Histogram.Unit.Unspecified:
+
+
+Unspecified
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.access_loggers.stats.v3.Config.Histogram.Unit.Bytes:
+
+
+Bytes
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.access_loggers.stats.v3.Config.Histogram.Unit.Microseconds:
+
+
+Microseconds
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.access_loggers.stats.v3.Config.Histogram.Unit.Milliseconds:
+
+
+Milliseconds
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.access_loggers.stats.v3.Config.Histogram.Unit.Percent:
+
+
+Percent
+  ⁣Values are scaled to range 0-1.0, indicating 0%-100%. Values can be outside this range,
+  but must be positive. Values extremely far out of this range may overflow.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Counter:
+
+extensions.access_loggers.stats.v3.Config.Counter
+-------------------------------------------------
+
+
+:repo:`[extensions.access_loggers.stats.v3.Config.Counter proto] <api/envoy/extensions/access_loggers/stats/v3/stats.proto#L90>`
+
+Configuration for a counter stat.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat": {...},
+    "value_format": ...,
+    "value_fixed": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Counter.stat:
+
+
+stat
+  (:ref:`extensions.access_loggers.stats.v3.Config.Stat <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Stat>`, *REQUIRED*) The name and tags of this counter.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Counter.value_format:
+
+
+value_format
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The format string for the value to add to this counter, using :ref:`command operators <config_access_log_command_operators>`.
+  One of ``value_format`` or ``value_fixed`` must be configured.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Counter.value_fixed:
+
+
+value_fixed
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) A fixed value to add to this counter.
+  One of ``value_format`` or ``value_fixed`` must be configured.
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Gauge:
+
+extensions.access_loggers.stats.v3.Config.Gauge
+-----------------------------------------------
+
+
+:repo:`[extensions.access_loggers.stats.v3.Config.Gauge proto] <api/envoy/extensions/access_loggers/stats/v3/stats.proto#L108>`
+
+Configuration for a gauge stat. Gauges can be used to add, subtract, or set
+values, and are useful for tracking concurrency or other mutable values
+over time.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat": {...},
+    "value_format": ...,
+    "value_fixed": {...},
+    "add_subtract": {...},
+    "set": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Gauge.stat:
+
+
+stat
+  (:ref:`extensions.access_loggers.stats.v3.Config.Stat <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Stat>`, *REQUIRED*) The name and tags of this gauge.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Gauge.value_format:
+
+
+value_format
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The format string for the value of this gauge, using :ref:`command
+  operators <config_access_log_command_operators>`. This must evaluate to a
+  positive number.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Gauge.value_fixed:
+
+
+value_fixed
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) A fixed value to add/subtract/set to this gauge.
+  One of ``value_format`` or ``value_fixed`` must be configured.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Gauge.add_subtract:
+
+
+add_subtract
+  (:ref:`extensions.access_loggers.stats.v3.Config.Gauge.PairedAddSubtract <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Gauge.PairedAddSubtract>`) The PairedAddSubtract operation.
+  Only one of PairedAddSubtract and Set can be defined.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Gauge.set:
+
+
+set
+  (:ref:`extensions.access_loggers.stats.v3.Config.Gauge.Set <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Gauge.Set>`) The Set operation.
+  Only one of PairedAddSubtract and Set can be defined.
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Gauge.Set:
+
+extensions.access_loggers.stats.v3.Config.Gauge.Set
+---------------------------------------------------
+
+
+:repo:`[extensions.access_loggers.stats.v3.Config.Gauge.Set proto] <api/envoy/extensions/access_loggers/stats/v3/stats.proto#L110>`
+
+The Set operation config.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "log_type": ...
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Gauge.Set.log_type:
+
+
+log_type
+  (:ref:`data.accesslog.v3.AccessLogType <envoy_v3_api_enum_data.accesslog.v3.AccessLogType>`) The access log type to trigger the operation.
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config.Gauge.PairedAddSubtract:
+
+extensions.access_loggers.stats.v3.Config.Gauge.PairedAddSubtract
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.access_loggers.stats.v3.Config.Gauge.PairedAddSubtract proto] <api/envoy/extensions/access_loggers/stats/v3/stats.proto#L124>`
+
+The PairedAddSubtract operation config.
+Usage restrictions:
+
+1. We only support add first then subtract logic and we rely on the symmetrical log types
+   (e.g., DownstreamStart/DownstreamEnd) to increment and decrement the gauge.
+2. During runtime, sub_log_type will execute if and only if add_log_type operation has
+   been done, tracked by inflight counter in filter state.
+3. If the add_log_type operation was executed, the sub_log_type will happen when the
+   stream/connection is closed, even if the configured log type didn't happen.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "add_log_type": ...,
+    "sub_log_type": ...
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Gauge.PairedAddSubtract.add_log_type:
+
+
+add_log_type
+  (:ref:`data.accesslog.v3.AccessLogType <envoy_v3_api_enum_data.accesslog.v3.AccessLogType>`) The access log type to trigger the add operation.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.stats.v3.Config.Gauge.PairedAddSubtract.sub_log_type:
+
+
+sub_log_type
+  (:ref:`data.accesslog.v3.AccessLogType <envoy_v3_api_enum_data.accesslog.v3.AccessLogType>`) The access log type to trigger the subtract operation.
+
+
+
+

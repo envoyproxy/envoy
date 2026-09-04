@@ -1,0 +1,50 @@
+.. _envoy_v3_api_file_envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory.proto:
+
+UDP packet writer config (proto)
+================================
+
+.. _extension_envoy.udp_packet_writer.default:
+
+This extension has the qualified name ``envoy.udp_packet_writer.default``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.udp_packet_writer <extension_category_envoy.udp_packet_writer>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.udp_packet_writer.v3.UdpDefaultWriterFactory <envoy_v3_api_msg_extensions.udp_packet_writer.v3.UdpDefaultWriterFactory>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.udp_packet_writer.v3.UdpDefaultWriterFactory:
+
+extensions.udp_packet_writer.v3.UdpDefaultWriterFactory
+-------------------------------------------------------
+
+
+:repo:`[extensions.udp_packet_writer.v3.UdpDefaultWriterFactory proto] <api/envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory.proto#L17>`
+
+Configuration for the default UDP packet writer factory which simply
+uses the kernel's sendmsg() to send UDP packets.
+
+
+
+

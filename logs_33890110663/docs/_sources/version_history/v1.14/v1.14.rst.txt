@@ -1,0 +1,26 @@
+.. _version_history_v1.14:
+
+v1.14
+-----
+
+Latest release:
+  `1.14.7 <https://github.com/envoyproxy/envoy/releases/tag/v1.14.7>`_ (April 15, 2020)
+
+Initial release date:
+  July 7, 2020
+
+
+.. toctree::
+  :titlesonly:
+  :maxdepth: 2
+  :caption: Changelog
+
+  v1.14.7
+  v1.14.6
+  v1.14.5
+  v1.14.4
+  v1.14.3
+  v1.14.2
+  v1.14.1
+  v1.14.0
+

@@ -1,0 +1,76 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/grpc_http1_bridge/v3/config.proto:
+
+gRPC HTTP/1.1 Bridge (proto)
+============================
+
+.. _extension_envoy.filters.http.grpc_http1_bridge:
+
+This extension has the qualified name ``envoy.filters.http.grpc_http1_bridge``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.grpc_http1_bridge.v3.Config <envoy_v3_api_msg_extensions.filters.http.grpc_http1_bridge.v3.Config>`
+
+
+
+gRPC HTTP/1.1 Bridge Filter :ref:`configuration overview <config_http_filters_grpc_bridge>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.grpc_http1_bridge.v3.Config:
+
+extensions.filters.http.grpc_http1_bridge.v3.Config
+---------------------------------------------------
+
+
+:repo:`[extensions.filters.http.grpc_http1_bridge.v3.Config proto] <api/envoy/extensions/filters/http/grpc_http1_bridge/v3/config.proto#L18>`
+
+gRPC HTTP/1.1 Bridge filter config.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "upgrade_protobuf_to_grpc": ...,
+    "ignore_query_parameters": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.grpc_http1_bridge.v3.Config.upgrade_protobuf_to_grpc:
+
+
+upgrade_protobuf_to_grpc
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true then requests with content type set to ``application/x-protobuf`` will be automatically converted to gRPC.
+  This works by prepending the payload data with the gRPC header frame, as defined by the wiring format, and
+  Content-Type will be updated accordingly before sending the request.
+  For the requests that went through this upgrade the filter will also strip the frame before forwarding the
+  response to the client.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.grpc_http1_bridge.v3.Config.ignore_query_parameters:
+
+
+ignore_query_parameters
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true then query parameters in request's URL path will be removed.
+
+

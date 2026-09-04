@@ -1,0 +1,27 @@
+External dependencies: ``build``
+================================
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `Apple Rules for Bazel <https://github.com/bazelbuild/rules_apple>`__, `3.20.1.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/rules_apple/3.20.1.envoy/>`__, 2025-03-14, , `Apache-2.0 <https://github.com/bazelbuild/rules_apple/blob/3.20.1.envoy/LICENSE>`__
+  `Aspect Bazel helpers <https://github.com/aspect-build/bazel-lib>`__, `2.22.0 <https://bcr.bazel.build/modules/aspect_bazel_lib/2.22.0/>`__, 2025-09-17, , `Apache-2.0 <https://github.com/aspect-build/bazel-lib/blob/v2.22.0/LICENSE>`__
+  `Bazel features <https://github.com/bazel-contrib/bazel_features>`__, `1.50.0 <https://bcr.bazel.build/modules/bazel_features/1.50.0/>`__, 2026-07-06, , `Apache-2.0 <https://github.com/bazel-contrib/bazel_features/blob/v1.50.0/LICENSE>`__
+  `bazel-compilation-database <https://github.com/grailbio/bazel-compilation-database>`__, `0.0.0-20220906-4086479.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/bazel-compdb/0.0.0-20220906-4086479.envoy/>`__, 2022-09-06, , `Apache-2.0 <https://github.com/grailbio/bazel-compilation-database/blob/0.0.0-20220906-4086479.envoy/LICENSE>`__
+  `C++ rules for Bazel <https://github.com/bazelbuild/rules_cc>`__, `0.2.22 <https://bcr.bazel.build/modules/rules_cc/0.2.22/>`__, 2026-07-07, , `Apache-2.0 <https://github.com/bazelbuild/rules_cc/blob/0.2.22/LICENSE>`__
+  `envoy_toolshed <https://github.com/envoyproxy/toolshed>`__, `0.4.13.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/envoy_toolshed/0.4.13.envoy/>`__, 2026-09-03, , `Apache-2.0 <https://github.com/envoyproxy/toolshed/blob/bazel-v0.4.13.envoy/LICENSE>`__
+  `Gazelle <https://github.com/bazelbuild/bazel-gazelle>`__, `0.47.0 <https://bcr.bazel.build/modules/gazelle/0.47.0/>`__, 2025-11-07, , `Apache-2.0 <https://github.com/bazelbuild/bazel-gazelle/blob/v0.47.0/LICENSE>`__
+  `Go rules for Bazel <https://github.com/bazelbuild/rules_go>`__, `0.59.0 <https://bcr.bazel.build/modules/rules_go/0.59.0/>`__, 2026-06-04, , `Apache-2.0 <https://github.com/bazelbuild/rules_go/blob/v0.59.0/LICENSE.txt>`__
+  `Java rules for Bazel <https://github.com/bazelbuild/rules_java/>`__, `9.3.0 <https://bcr.bazel.build/modules/rules_java/9.3.0/>`__, 2026-07-15, , `Apache-2.0 <https://github.com/bazelbuild/rules_java/blob/9.3.0/LICENSE>`__
+  `Java Rules for Bazel <https://github.com/bazelbuild/rules_jvm_external>`__, `6.10 <https://bcr.bazel.build/modules/rules_jvm_external/6.10/>`__, 2026-02-04, , `Apache-2.0 <https://github.com/bazelbuild/rules_jvm_external/blob/6.10/LICENSE>`__
+  `LLVM toolchain for Bazel <https://github.com/bazel-contrib/toolchains_llvm>`__, `1.9.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/toolchains_llvm/1.9.0.envoy/>`__, 2026-08-29, , `Apache-2.0 <https://github.com/bazel-contrib/toolchains_llvm/blob/v1.9.0.envoy/LICENSE>`__
+  `Packaging rules for Bazel <https://github.com/bazelbuild/rules_pkg>`__, `1.1.0 <https://bcr.bazel.build/modules/rules_pkg/1.1.0/>`__, 2025-12-03, , `Apache-2.0 <https://github.com/bazelbuild/rules_pkg/blob/1.1.0/LICENSE>`__
+  `platforms <https://github.com/bazelbuild/platforms>`__, `1.0.0 <https://bcr.bazel.build/modules/platforms/1.0.0/>`__, 2026-05-01, , `Apache-2.0 <https://github.com/bazelbuild/platforms/blob/1.0.0/LICENSE>`__
+  `Python rules for Bazel <https://github.com/bazelbuild/rules_python>`__, `2.2.0 <https://bcr.bazel.build/modules/rules_python/2.2.0/>`__, 2026-07-04, , `Apache-2.0 <https://github.com/bazelbuild/rules_python/blob/2.2.0/LICENSE>`__
+  `Rules for using foreign build systems in Bazel <https://github.com/bazelbuild/rules_foreign_cc>`__, `0.15.1 <https://bcr.bazel.build/modules/rules_foreign_cc/0.15.1/>`__, 2025-06-24, , `Apache-2.0 <https://github.com/bazelbuild/rules_foreign_cc/blob/0.15.1/LICENSE>`__
+  `rules_license <https://github.com/bazelbuild/rules_license>`__, `1.0.0 <https://bcr.bazel.build/modules/rules_license/1.0.0/>`__, 2024-09-05, , `Apache-2.0 <https://github.com/bazelbuild/rules_license/blob/1.0.0/LICENSE>`__
+  `Shell script rules for Bazel <https://github.com/bazelbuild/rules_shell>`__, `0.8.0 <https://bcr.bazel.build/modules/rules_shell/0.8.0/>`__, 2026-04-15, , `Apache-2.0 <https://github.com/protocolbuffers/rules_shell/blob/0.8.0/LICENSE>`__
+  `Shellcheck rules for bazel <https://github.com/aignas/rules_shellcheck>`__, `0.4.0 <https://bcr.bazel.build/modules/rules_shellcheck/0.4.0/>`__, 2025-08-13, , `MIT <https://github.com/aignas/rules_shellcheck/blob/0.4.0/LICENSE>`__
+  `yq.bzl <https://github.com/bazel-contrib/yq.bzl>`__, `0.1.1.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/yq.bzl/0.1.1.envoy/>`__, 2025-05-26, , `Apache-2.0 <https://github.com/bazel-contrib/yq.bzl/blob/v0.1.1.envoy/LICENSE>`__
+

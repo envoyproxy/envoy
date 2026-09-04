@@ -1,0 +1,54 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/generic_proxy/codecs/dubbo/v3/dubbo.proto:
+
+Dubbo codec configuration for Generic Proxy (proto)
+===================================================
+
+.. _extension_envoy.generic_proxy.codecs.dubbo:
+
+This extension has the qualified name ``envoy.generic_proxy.codecs.dubbo``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.generic_proxy.codecs <extension_category_envoy.generic_proxy.codecs>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig:
+
+extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig
+-------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig proto] <api/envoy/extensions/filters/network/generic_proxy/codecs/dubbo/v3/dubbo.proto#L18>`
+
+
+
+
+

@@ -1,0 +1,919 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Statistics &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Runtime" href="runtime.html" />
+    <link rel="prev" title="Response Code Details" href="response_code_details.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../http.html">HTTP</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="http_conn_man.html">HTTP connection manager</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="route_matching.html">Route matching</a></li>
+<li class="toctree-l4"><a class="reference internal" href="traffic_splitting.html">Traffic Shifting/Splitting</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_casing.html">HTTP/1.1 Header Casing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="headers.html">HTTP header manipulation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_sanitizing.html">HTTP header sanitizing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="local_reply.html">Local reply modification</a></li>
+<li class="toctree-l4"><a class="reference internal" href="response_code_details.html">Response Code Details</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="runtime.html">Runtime</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rds.html">Route discovery service (RDS)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vhds.html">Virtual Host Discovery Service (VHDS)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../http_filters/http_filters.html">HTTP filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../caches/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../caches_v2/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../cluster_specifier/cluster_specifier.html">HTTP cluster specifier</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tcp_bridge/tcp_bridge.html">HTTP TCP bridge</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../http.html">HTTP</a></li>
+          <li class="breadcrumb-item"><a href="http_conn_man.html">HTTP connection manager</a></li>
+      <li class="breadcrumb-item active">Statistics</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/http/http_conn_man/stats.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="statistics">
+<span id="config-http-conn-man-stats"></span><h1>Statistics<a class="headerlink" href="#statistics" title="Link to this heading"></a></h1>
+<p>Every connection manager has a statistics tree rooted at <code class="docutils literal notranslate"><span class="pre">http.&lt;stat_prefix&gt;.</span></code> with the following
+statistics:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_ssl_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total TLS connections</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_http1_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total HTTP/1.1 connections</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_upgrades_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total successfully upgraded connections. These are also counted as total http1/http2 connections.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_http2_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total HTTP/2 connections</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_http3_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total HTTP/3 connections</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_destroy</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections destroyed</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_destroy_remote</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections destroyed due to remote close</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_destroy_local</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections destroyed due to local close</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_destroy_active_rq</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections destroyed with 1+ active request</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_destroy_local_active_rq</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections destroyed locally with 1+ active request</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_destroy_remote_active_rq</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections destroyed remotely with 1+ active request</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_active</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Total active connections</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_ssl_active</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Total active TLS connections</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_http1_active</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Total active HTTP/1.1 connections</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_upgrades_active</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Total active upgraded connections. These are also counted as active http1/http2 connections.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_http1_soft_drain</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Total active HTTP/1.x connections waiting for another downstream request to safely close the connection.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_http2_active</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Total active HTTP/2 connections</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_http3_active</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Total active HTTP/3 connections</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_protocol_error</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total protocol errors</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_length_ms</span></code></p></td>
+<td><p>Histogram</p></td>
+<td><p>Connection length milliseconds</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_rx_bytes_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total bytes received</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_rx_bytes_buffered</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Total received bytes currently buffered</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_tx_bytes_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total bytes sent</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_tx_bytes_buffered</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Total sent bytes currently buffered</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_drain_close</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections closed due to draining</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_idle_timeout</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections closed due to idle timeout</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_max_duration_reached</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections closed due to max connection duration</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_max_requests_reached</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections closed due to max requests per connection</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_overload_disable_keepalive</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections for which HTTP 1.x keepalive has been disabled due to Envoy overload</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_flow_control_paused_reading_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of times reads were disabled due to flow control</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_flow_control_resumed_reading_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of times reads were enabled on the connection due to flow control</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_http1_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total HTTP/1.1 requests</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_http2_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total HTTP/2 requests</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_http3_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total HTTP/3 requests</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_active</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Total active requests</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_rejected_via_ip_detection</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests rejected because the original IP detection failed</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_response_before_rq_complete</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total responses sent before the request was complete</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_rx_reset</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total request resets received</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_tx_reset</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total request resets sent</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_non_relative_path</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests with a non-relative HTTP path</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_too_large</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests resulting in a 413 due to buffering an overly large body</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_completed</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that resulted in a response (e.g. does not include aborted requests)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_failed_path_normalization</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests redirected due to different original and normalized URL paths or when path normalization failed. This action is configured by setting the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-path-with-escaped-slashes-action"><span class="std std-ref">path_with_escaped_slashes_action</span></a> config option.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_1xx</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total 1xx responses</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_2xx</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total 2xx responses</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_3xx</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total 3xx responses</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_4xx</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total 4xx responses</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_5xx</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total 5xx responses</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_ws_on_non_ws_route</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total upgrade requests rejected by non upgrade routes. This now applies both to WebSocket and non-WebSocket upgrades</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_time</span></code></p></td>
+<td><p>Histogram</p></td>
+<td><p>Total time for request and response (milliseconds)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_idle_timeout</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests closed due to idle timeout</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_max_duration_reached</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests closed due to max duration reached</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_timeout</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests closed due to a timeout on the request path</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_overload_close</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests closed due to Envoy overload</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_redirected_with_normalized_path</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests redirected due to different original and normalized URL paths. This action is configured by setting the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-path-with-escaped-slashes-action"><span class="std std-ref">path_with_escaped_slashes_action</span></a> config option.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_too_many_premature_resets</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of connections closed due to too many premature request resets on the connection.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">rs_too_large</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total response errors due to buffering an overly large body</p></td>
+</tr>
+</tbody>
+</table>
+<section id="per-user-agent-statistics">
+<span id="config-http-conn-man-stats-per-ua"></span><h2>Per user agent statistics<a class="headerlink" href="#per-user-agent-statistics" title="Link to this heading"></a></h2>
+<p>Additional per user agent statistics are rooted at <code class="docutils literal notranslate"><span class="pre">http.&lt;stat_prefix&gt;.user_agent.&lt;user_agent&gt;.</span></code>
+Currently Envoy matches user agent for both iOS (<code class="docutils literal notranslate"><span class="pre">ios</span></code>) and Android (<code class="docutils literal notranslate"><span class="pre">android</span></code>) and produces
+the following statistics:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_destroy_remote_active_rq</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections destroyed remotely with 1+ active requests</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_length_ms</span></code></p></td>
+<td><p>Histogram</p></td>
+<td><p>Connection length milliseconds</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_cx_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_total</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="per-listener-statistics">
+<span id="config-http-conn-man-stats-per-listener"></span><h2>Per listener statistics<a class="headerlink" href="#per-listener-statistics" title="Link to this heading"></a></h2>
+<p>Per listener statistics are rooted at <code class="docutils literal notranslate"><span class="pre">listener.&lt;address&gt;.</span></code>.</p>
+<section id="http-per-listener-statistics">
+<span id="config-http-conn-man-stats-per-listener-http"></span><h3>HTTP per listener statistics<a class="headerlink" href="#http-per-listener-statistics" title="Link to this heading"></a></h3>
+<p>Additional HTTP statistics are of the form <code class="docutils literal notranslate"><span class="pre">http.&lt;stat_prefix&gt;.</span></code> with the
+following statistics:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_completed</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total responses</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_1xx</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total 1xx responses</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_2xx</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total 2xx responses</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_3xx</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total 3xx responses</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_4xx</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total 4xx responses</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">downstream_rq_5xx</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total 5xx responses</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="http-3-per-listener-statistics">
+<span id="config-http-conn-man-stats-per-listener-http3"></span><h3>HTTP/3 per listener statistics<a class="headerlink" href="#http-3-per-listener-statistics" title="Link to this heading"></a></h3>
+<p>HTTP/3 statistics with the form of <code class="docutils literal notranslate"><span class="pre">http3.downstream.&lt;stat_prefix&gt;.</span></code>:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;tx/rx&gt;.quic_connection_close_error_code_&lt;error_code&gt;</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>A collection of counters that are lazily initialized to record each quic connection close error code that’s present.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;tx/rx&gt;.quic_reset_stream_error_code_&lt;error_code&gt;</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>A collection of counters that that lazily initialized to record quic stream reset error codes.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="per-codec-statistics">
+<span id="config-http-conn-man-stats-per-codec"></span><h2>Per codec statistics<a class="headerlink" href="#per-codec-statistics" title="Link to this heading"></a></h2>
+<p>Each codec has the option of adding per-codec statistics. http1, http2, and http3 all have codec stats.</p>
+<section id="http-1-codec-statistics">
+<h3>HTTP/1 codec statistics<a class="headerlink" href="#http-1-codec-statistics" title="Link to this heading"></a></h3>
+<p>On the downstream side all http1 statistics are rooted at <code class="docutils literal notranslate"><span class="pre">http1.</span></code></p>
+<p>On the upstream side all http1 statistics are rooted at <code class="docutils literal notranslate"><span class="pre">cluster.&lt;name&gt;.http1.</span></code></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dropped_headers_with_underscores</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of dropped headers with names containing underscores. This action is configured by setting the <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-httpprotocoloptions-headers-with-underscores-action"><span class="std std-ref">headers_with_underscores_action config setting</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">metadata_not_supported_error</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of metadata dropped during HTTP/1 encoding</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">response_flood</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of connections closed due to response flooding</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">requests_rejected_with_underscores_in_headers</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-httpprotocoloptions-headers-with-underscores-action"><span class="std std-ref">headers_with_underscores_action config setting</span></a>.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="http-2-codec-statistics">
+<h3>HTTP/2 codec statistics<a class="headerlink" href="#http-2-codec-statistics" title="Link to this heading"></a></h3>
+<p>On the downstream side all http2 statistics are rooted at <code class="docutils literal notranslate"><span class="pre">http2.</span></code></p>
+<p>On the upstream side all http2 statistics are rooted at <code class="docutils literal notranslate"><span class="pre">cluster.&lt;name&gt;.http2.</span></code></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">cookie_count</span></code></p></td>
+<td><p>Histogram</p></td>
+<td><p>Number of individial <code class="docutils literal notranslate"><span class="pre">cookie</span></code> headers. Enabled by setting the <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.http2_record_histograms</span></code> to <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cookie_size</span></code></p></td>
+<td><p>Histogram</p></td>
+<td><p>Byte size of the re-assebled <code class="docutils literal notranslate"><span class="pre">cookie</span></code> header. Enabled by setting the <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.http2_record_histograms</span></code> to <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">cookies_total_bytes_too_large</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of streams reset due to the re-assembled <code class="docutils literal notranslate"><span class="pre">cookie</span></code> header exceeding the <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.http2_max_cookies_size_in_kb</span></code> runtime value.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dropped_headers_with_underscores</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of dropped headers with names containing underscores. This action is configured by setting the <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-httpprotocoloptions-headers-with-underscores-action"><span class="std std-ref">headers_with_underscores_action config setting</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">goaway_sent</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number <code class="docutils literal notranslate"><span class="pre">GOAWAY</span></code> frames that have been submitted to the codec to send.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">header_overflow</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of connections reset due to the headers being larger than the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-max-request-headers-kb"><span class="std std-ref">configured value</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">headers_cb_no_stream</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of errors where a header callback is called without an associated stream. This tracks an unexpected occurrence due to an as yet undiagnosed bug</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">header_count</span></code></p></td>
+<td><p>Histogram</p></td>
+<td><p>Number of headers including individual <code class="docutils literal notranslate"><span class="pre">cookie</span></code> headers. Enabled by setting the <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.http2_record_histograms</span></code> to <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">header_list_size</span></code></p></td>
+<td><p>Histogram</p></td>
+<td><p>Byte size of all headers including <code class="docutils literal notranslate"><span class="pre">cookie</span></code> headers. Enabled by setting the <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.http2_record_histograms</span></code> to <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">inbound_empty_frames_flood</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of connections terminated for exceeding the limit on consecutive inbound frames with an empty payload and no end stream flag. The limit is configured by setting the <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-http2protocoloptions-max-consecutive-inbound-frames-with-empty-payload"><span class="std std-ref">max_consecutive_inbound_frames_with_empty_payload config setting</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">inbound_priority_frames_flood</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of connections terminated for exceeding the limit on inbound frames of type PRIORITY. The limit is configured by setting the <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-http2protocoloptions-max-inbound-priority-frames-per-stream"><span class="std std-ref">max_inbound_priority_frames_per_stream config setting</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">inbound_window_update_frames_flood</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of connections terminated for exceeding the limit on inbound frames of type WINDOW_UPDATE. The limit is configured by setting the <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-http2protocoloptions-max-inbound-window-update-frames-per-data-frame-sent"><span class="std std-ref">max_inbound_window_updateframes_per_data_frame_sent config setting</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">keepalive_timeout</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of connections closed due to <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-keepalivesettings-timeout"><span class="std std-ref">keepalive timeout</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">metadata_empty_frames</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of metadata frames that were received and contained empty maps.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">outbound_control_frames_active</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Total outbound control frames that are active.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">outbound_control_flood</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of connections terminated for exceeding the limit on outbound frames of types PING, SETTINGS and RST_STREAM. The limit is configured by setting the <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-http2protocoloptions-max-outbound-control-frames"><span class="std std-ref">max_outbound_control_frames config setting</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">outbound_frames_active</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Total outbound frames that are active.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">outbound_flood</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of connections terminated for exceeding the limit on outbound frames of all types. The limit is configured by setting the <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-http2protocoloptions-max-outbound-frames"><span class="std std-ref">max_outbound_frames config setting</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">requests_rejected_with_underscores_in_headers</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-httpprotocoloptions-headers-with-underscores-action"><span class="std std-ref">headers_with_underscores_action config setting</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">rx_messaging_error</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of invalid received frames that violated <a class="reference external" href="https://tools.ietf.org/html/rfc7540#section-8">section 8</a> of the HTTP/2 spec. This will result in a <code class="docutils literal notranslate"><span class="pre">tx_reset</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">rx_reset</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of reset stream frames received by Envoy</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">stream_refused_errors</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of invalid frames received by Envoy with a <code class="docutils literal notranslate"><span class="pre">REFUSED_STREAM</span></code> error code</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">trailers</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of trailers seen on requests coming from downstream</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tx_flush_timeout</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-stream-idle-timeout"><span class="std std-ref">stream idle timeouts</span></a> waiting for open stream window to flush the remainder of a stream</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tx_reset</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of reset stream frames transmitted by Envoy</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">streams_active</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Active streams as observed by the codec</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pending_send_bytes</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Currently buffered body data in bytes waiting to be written when stream/connection window is opened.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">deferred_stream_close</span></code></p></td>
+<td><p>Gauge</p></td>
+<td><p>Number of HTTP/2 streams where the stream has been closed but processing of the stream close has been deferred due to network backup. This is expected to be incremented when a downstream stream is backed up and the corresponding upstream stream has received end stream but we defer processing of the upstream stream close due to downstream backup. This is decremented as we finally delete the stream when either the deferred close stream has its buffered data drained or receives a reset.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>The HTTP/2 <code class="docutils literal notranslate"><span class="pre">streams_active</span></code> gauge may be greater than the HTTP connection manager
+<code class="docutils literal notranslate"><span class="pre">downstream_rq_active</span></code> gauge due to differences in stream accounting between the codec and the
+HTTP connection manager.</p>
+</div>
+</section>
+<section id="http-3-codec-statistics">
+<h3>HTTP/3 codec statistics<a class="headerlink" href="#http-3-codec-statistics" title="Link to this heading"></a></h3>
+<p>On the downstream side all http3 statistics are rooted at <code class="docutils literal notranslate"><span class="pre">http3.</span></code></p>
+<p>On the upstream side all http3 statistics are rooted at <code class="docutils literal notranslate"><span class="pre">cluster.&lt;name&gt;.http3.</span></code></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dropped_headers_with_underscores</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of dropped headers with names containing underscores. This action is configured by setting the <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-httpprotocoloptions-headers-with-underscores-action"><span class="std std-ref">headers_with_underscores_action config setting</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>requests_rejected_with_underscores_in_headers</p></td>
+<td><p>Counter</p></td>
+<td><p>Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-httpprotocoloptions-headers-with-underscores-action"><span class="std std-ref">headers_with_underscores_action config setting</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">rx_reset</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of reset stream frames received by Envoy</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tx_reset</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of reset stream frames transmitted by Envoy</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">metadata_not_supported_error</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of metadata dropped during HTTP/3 encoding</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">quic_version_h3_29</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of quic connections that use transport version h3-29. QUIC h3-29 is unsupported by default and this counter will be removed when h3-29 support is completely removed.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">quic_version_rfc_v1</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of quic connections that use transport version rfc-v1.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="tracing-statistics">
+<h2>Tracing statistics<a class="headerlink" href="#tracing-statistics" title="Link to this heading"></a></h2>
+<p>Tracing statistics are emitted when tracing decisions are made. All tracing statistics are rooted at <code class="docutils literal notranslate"><span class="pre">http.&lt;stat_prefix&gt;.tracing.</span></code> with the following statistics:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">random_sampling</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of traceable decisions by random sampling</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">service_forced</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of traceable decisions by server runtime flag <code class="docutils literal notranslate"><span class="pre">tracing.global_enabled</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">client_enabled</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of traceable decisions by request header <code class="docutils literal notranslate"><span class="pre">x-envoy-force-trace</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">not_traceable</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of non-traceable decisions by request id</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">health_check</span></code></p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of non-traceable decisions by health check</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="response_code_details.html" class="btn btn-neutral float-left" title="Response Code Details" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="runtime.html" class="btn btn-neutral float-right" title="Runtime" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Statistics</a><ul>
+<li><a class="reference internal" href="#per-user-agent-statistics">Per user agent statistics</a></li>
+<li><a class="reference internal" href="#per-listener-statistics">Per listener statistics</a><ul>
+<li><a class="reference internal" href="#http-per-listener-statistics">HTTP per listener statistics</a></li>
+<li><a class="reference internal" href="#http-3-per-listener-statistics">HTTP/3 per listener statistics</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#per-codec-statistics">Per codec statistics</a><ul>
+<li><a class="reference internal" href="#http-1-codec-statistics">HTTP/1 codec statistics</a></li>
+<li><a class="reference internal" href="#http-2-codec-statistics">HTTP/2 codec statistics</a></li>
+<li><a class="reference internal" href="#http-3-codec-statistics">HTTP/3 codec statistics</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#tracing-statistics">Tracing statistics</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

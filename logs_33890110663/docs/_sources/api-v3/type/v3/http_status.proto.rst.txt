@@ -1,0 +1,450 @@
+.. _envoy_v3_api_file_envoy/type/v3/http_status.proto:
+
+HTTP status codes (proto)
+=========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.v3.HttpStatus:
+
+type.v3.HttpStatus
+------------------
+
+
+:repo:`[type.v3.HttpStatus proto] <api/envoy/type/v3/http_status.proto#L193>`
+
+HTTP status.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "code": ...
+  }
+
+.. _envoy_v3_api_field_type.v3.HttpStatus.code:
+
+
+code
+  (:ref:`type.v3.StatusCode <envoy_v3_api_enum_type.v3.StatusCode>`) Supplies HTTP response code.
+
+
+
+.. _envoy_v3_api_enum_type.v3.StatusCode:
+
+Enum type.v3.StatusCode
+-----------------------
+
+
+:repo:`[type.v3.StatusCode proto] <api/envoy/type/v3/http_status.proto#L18>`
+
+HTTP response codes supported in Envoy.
+For more details: https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
+
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.Empty:
+
+
+Empty
+  *(DEFAULT)* ⁣Empty - This code not part of the HTTP status code specification, but it is needed for proto
+  `enum` type.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.Continue:
+
+
+Continue
+  ⁣Continue - ``100`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.OK:
+
+
+OK
+  ⁣OK - ``200`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.Created:
+
+
+Created
+  ⁣Created - ``201`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.Accepted:
+
+
+Accepted
+  ⁣Accepted - ``202`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.NonAuthoritativeInformation:
+
+
+NonAuthoritativeInformation
+  ⁣NonAuthoritativeInformation - ``203`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.NoContent:
+
+
+NoContent
+  ⁣NoContent - ``204`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.ResetContent:
+
+
+ResetContent
+  ⁣ResetContent - ``205`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.PartialContent:
+
+
+PartialContent
+  ⁣PartialContent - ``206`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.MultiStatus:
+
+
+MultiStatus
+  ⁣MultiStatus - ``207`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.AlreadyReported:
+
+
+AlreadyReported
+  ⁣AlreadyReported - ``208`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.IMUsed:
+
+
+IMUsed
+  ⁣IMUsed - ``226`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.MultipleChoices:
+
+
+MultipleChoices
+  ⁣MultipleChoices - ``300`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.MovedPermanently:
+
+
+MovedPermanently
+  ⁣MovedPermanently - ``301`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.Found:
+
+
+Found
+  ⁣Found - ``302`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.SeeOther:
+
+
+SeeOther
+  ⁣SeeOther - ``303`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.NotModified:
+
+
+NotModified
+  ⁣NotModified - ``304`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.UseProxy:
+
+
+UseProxy
+  ⁣UseProxy - ``305`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.TemporaryRedirect:
+
+
+TemporaryRedirect
+  ⁣TemporaryRedirect - ``307`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.PermanentRedirect:
+
+
+PermanentRedirect
+  ⁣PermanentRedirect - ``308`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.BadRequest:
+
+
+BadRequest
+  ⁣BadRequest - ``400`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.Unauthorized:
+
+
+Unauthorized
+  ⁣Unauthorized - ``401`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.PaymentRequired:
+
+
+PaymentRequired
+  ⁣PaymentRequired - ``402`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.Forbidden:
+
+
+Forbidden
+  ⁣Forbidden - ``403`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.NotFound:
+
+
+NotFound
+  ⁣NotFound - ``404`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.MethodNotAllowed:
+
+
+MethodNotAllowed
+  ⁣MethodNotAllowed - ``405`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.NotAcceptable:
+
+
+NotAcceptable
+  ⁣NotAcceptable - ``406`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.ProxyAuthenticationRequired:
+
+
+ProxyAuthenticationRequired
+  ⁣ProxyAuthenticationRequired - ``407`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.RequestTimeout:
+
+
+RequestTimeout
+  ⁣RequestTimeout - ``408`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.Conflict:
+
+
+Conflict
+  ⁣Conflict - ``409`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.Gone:
+
+
+Gone
+  ⁣Gone - ``410`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.LengthRequired:
+
+
+LengthRequired
+  ⁣LengthRequired - ``411`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.PreconditionFailed:
+
+
+PreconditionFailed
+  ⁣PreconditionFailed - ``412`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.PayloadTooLarge:
+
+
+PayloadTooLarge
+  ⁣PayloadTooLarge - ``413`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.URITooLong:
+
+
+URITooLong
+  ⁣URITooLong - ``414`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.UnsupportedMediaType:
+
+
+UnsupportedMediaType
+  ⁣UnsupportedMediaType - ``415`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.RangeNotSatisfiable:
+
+
+RangeNotSatisfiable
+  ⁣RangeNotSatisfiable - ``416`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.ExpectationFailed:
+
+
+ExpectationFailed
+  ⁣ExpectationFailed - ``417`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.MisdirectedRequest:
+
+
+MisdirectedRequest
+  ⁣MisdirectedRequest - ``421`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.UnprocessableEntity:
+
+
+UnprocessableEntity
+  ⁣UnprocessableEntity - ``422`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.Locked:
+
+
+Locked
+  ⁣Locked - ``423`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.FailedDependency:
+
+
+FailedDependency
+  ⁣FailedDependency - ``424`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.UpgradeRequired:
+
+
+UpgradeRequired
+  ⁣UpgradeRequired - ``426`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.PreconditionRequired:
+
+
+PreconditionRequired
+  ⁣PreconditionRequired - ``428`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.TooManyRequests:
+
+
+TooManyRequests
+  ⁣TooManyRequests - ``429`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.RequestHeaderFieldsTooLarge:
+
+
+RequestHeaderFieldsTooLarge
+  ⁣RequestHeaderFieldsTooLarge - ``431`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.InternalServerError:
+
+
+InternalServerError
+  ⁣InternalServerError - ``500`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.NotImplemented:
+
+
+NotImplemented
+  ⁣NotImplemented - ``501`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.BadGateway:
+
+
+BadGateway
+  ⁣BadGateway - ``502`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.ServiceUnavailable:
+
+
+ServiceUnavailable
+  ⁣ServiceUnavailable - ``503`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.GatewayTimeout:
+
+
+GatewayTimeout
+  ⁣GatewayTimeout - ``504`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.HTTPVersionNotSupported:
+
+
+HTTPVersionNotSupported
+  ⁣HTTPVersionNotSupported - ``505`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.VariantAlsoNegotiates:
+
+
+VariantAlsoNegotiates
+  ⁣VariantAlsoNegotiates - ``506`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.InsufficientStorage:
+
+
+InsufficientStorage
+  ⁣InsufficientStorage - ``507`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.LoopDetected:
+
+
+LoopDetected
+  ⁣LoopDetected - ``508`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.NotExtended:
+
+
+NotExtended
+  ⁣NotExtended - ``510`` status code.
+
+
+.. _envoy_v3_api_enum_value_type.v3.StatusCode.NetworkAuthenticationRequired:
+
+
+NetworkAuthenticationRequired
+  ⁣NetworkAuthenticationRequired - ``511`` status code.
+
+

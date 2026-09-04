@@ -1,0 +1,170 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/gzip/v3/gzip.proto:
+
+Gzip (proto)
+============
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.gzip.v3.Gzip:
+
+extensions.filters.http.gzip.v3.Gzip
+------------------------------------
+
+
+:repo:`[extensions.filters.http.gzip.v3.Gzip proto] <api/envoy/extensions/filters/http/gzip/v3/gzip.proto#L21>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "memory_level": {...},
+    "compression_level": ...,
+    "compression_strategy": ...,
+    "window_bits": {...},
+    "compressor": {...},
+    "chunk_size": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.gzip.v3.Gzip.memory_level:
+
+
+memory_level
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value from 1 to 9 that controls the amount of internal memory used by zlib. Higher values
+  use more memory, but are faster and produce better compression results. The default value is 5.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gzip.v3.Gzip.compression_level:
+
+
+compression_level
+  (:ref:`extensions.filters.http.gzip.v3.Gzip.CompressionLevel.Enum <envoy_v3_api_enum_extensions.filters.http.gzip.v3.Gzip.CompressionLevel.Enum>`) A value used for selecting the zlib compression level. This setting will affect speed and
+  amount of compression applied to the content. "BEST" provides higher compression at the cost of
+  higher latency, "SPEED" provides lower compression with minimum impact on response time.
+  "DEFAULT" provides an optimal result between speed and compression. This field will be set to
+  "DEFAULT" if not specified.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gzip.v3.Gzip.compression_strategy:
+
+
+compression_strategy
+  (:ref:`extensions.filters.http.gzip.v3.Gzip.CompressionStrategy <envoy_v3_api_enum_extensions.filters.http.gzip.v3.Gzip.CompressionStrategy>`) A value used for selecting the zlib compression strategy which is directly related to the
+  characteristics of the content. Most of the time "DEFAULT" will be the best choice, though
+  there are situations which changing this parameter might produce better results. For example,
+  run-length encoding (RLE) is typically used when the content is known for having sequences
+  which same data occurs many consecutive times. For more information about each strategy, please
+  refer to zlib manual.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gzip.v3.Gzip.window_bits:
+
+
+window_bits
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value from 9 to 15 that represents the base two logarithmic of the compressor's window size.
+  Larger window results in better compression at the expense of memory usage. The default is 12
+  which will produce a 4096 bytes window. For more details about this parameter, please refer to
+  zlib manual > deflateInit2.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gzip.v3.Gzip.compressor:
+
+
+compressor
+  (:ref:`extensions.filters.http.compressor.v3.Compressor <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`) Set of configuration parameters common for all compression filters. You can define
+  ``content_length``, ``content_type`` and other parameters in this field.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gzip.v3.Gzip.chunk_size:
+
+
+chunk_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value for Zlib's next output buffer. If not set, defaults to 4096.
+  See https://www.zlib.net/manual.html for more details. Also see
+  https://github.com/envoyproxy/envoy/issues/8448 for context on this filter's performance.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.gzip.v3.Gzip.CompressionLevel:
+
+extensions.filters.http.gzip.v3.Gzip.CompressionLevel
+-----------------------------------------------------
+
+
+:repo:`[extensions.filters.http.gzip.v3.Gzip.CompressionLevel proto] <api/envoy/extensions/filters/http/gzip/v3/gzip.proto#L32>`
+
+
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.gzip.v3.Gzip.CompressionLevel.Enum:
+
+Enum extensions.filters.http.gzip.v3.Gzip.CompressionLevel.Enum
+---------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.gzip.v3.Gzip.CompressionLevel.Enum proto] <api/envoy/extensions/filters/http/gzip/v3/gzip.proto#L36>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.gzip.v3.Gzip.CompressionLevel.Enum.DEFAULT:
+
+
+DEFAULT
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.gzip.v3.Gzip.CompressionLevel.Enum.BEST:
+
+
+BEST
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.gzip.v3.Gzip.CompressionLevel.Enum.SPEED:
+
+
+SPEED
+  ⁣
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.gzip.v3.Gzip.CompressionStrategy:
+
+Enum extensions.filters.http.gzip.v3.Gzip.CompressionStrategy
+-------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.gzip.v3.Gzip.CompressionStrategy proto] <api/envoy/extensions/filters/http/gzip/v3/gzip.proto#L25>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.gzip.v3.Gzip.CompressionStrategy.DEFAULT:
+
+
+DEFAULT
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.gzip.v3.Gzip.CompressionStrategy.FILTERED:
+
+
+FILTERED
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.gzip.v3.Gzip.CompressionStrategy.HUFFMAN:
+
+
+HUFFMAN
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.gzip.v3.Gzip.CompressionStrategy.RLE:
+
+
+RLE
+  ⁣
+
+

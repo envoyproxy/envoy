@@ -1,0 +1,103 @@
+.. _envoy_v3_api_file_envoy/data/tap/v3/common.proto:
+
+Tap common data (proto)
+=======================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_data.tap.v3.Body:
+
+data.tap.v3.Body
+----------------
+
+
+:repo:`[data.tap.v3.Body proto] <api/envoy/data/tap/v3/common.proto#L19>`
+
+Wrapper for tapped body data. This includes HTTP request/response body, transport socket received
+and transmitted data, etc.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "as_bytes": ...,
+    "as_string": ...,
+    "truncated": ...
+  }
+
+.. _envoy_v3_api_field_data.tap.v3.Body.as_bytes:
+
+
+as_bytes
+  (`bytes <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Body data as bytes. By default, tap body data will be present in this field, as the proto
+  ``bytes`` type can contain any valid byte.
+
+
+  
+
+  Only one of :ref:`as_bytes <envoy_v3_api_field_data.tap.v3.Body.as_bytes>`, :ref:`as_string <envoy_v3_api_field_data.tap.v3.Body.as_string>` may be set.
+
+.. _envoy_v3_api_field_data.tap.v3.Body.as_string:
+
+
+as_string
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Body data as string. This field is only used when the :ref:`JSON_BODY_AS_STRING
+  <envoy_v3_api_enum_value_config.tap.v3.OutputSink.Format.JSON_BODY_AS_STRING>` sink
+  format type is selected. See the documentation for that option for why this is useful.
+
+
+  
+
+  Only one of :ref:`as_bytes <envoy_v3_api_field_data.tap.v3.Body.as_bytes>`, :ref:`as_string <envoy_v3_api_field_data.tap.v3.Body.as_string>` may be set.
+
+.. _envoy_v3_api_field_data.tap.v3.Body.truncated:
+
+
+truncated
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies whether body data has been truncated to fit within the specified
+  :ref:`max_buffered_rx_bytes
+  <envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_rx_bytes>` and
+  :ref:`max_buffered_tx_bytes
+  <envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_tx_bytes>` settings.
+
+
+
+.. _envoy_v3_api_msg_data.tap.v3.Connection:
+
+data.tap.v3.Connection
+----------------------
+
+
+:repo:`[data.tap.v3.Connection proto] <api/envoy/data/tap/v3/common.proto#L42>`
+
+Connection properties.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "local_address": {...},
+    "remote_address": {...}
+  }
+
+.. _envoy_v3_api_field_data.tap.v3.Connection.local_address:
+
+
+local_address
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) Local address.
+
+
+.. _envoy_v3_api_field_data.tap.v3.Connection.remote_address:
+
+
+remote_address
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) Remote address.
+
+

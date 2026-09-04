@@ -1,0 +1,243 @@
+.. _envoy_v3_api_file_envoy/admin/v3/config_dump.proto:
+
+ConfigDump (proto)
+==================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.ConfigDump:
+
+admin.v3.ConfigDump
+-------------------
+
+
+:repo:`[admin.v3.ConfigDump proto] <api/envoy/admin/v3/config_dump.proto#L23>`
+
+The :ref:`/config_dump <operations_admin_interface_config_dump>` admin endpoint uses this wrapper
+message to maintain and serve arbitrary configuration information from any component in Envoy.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "configs": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.ConfigDump.configs:
+
+
+configs
+  (**repeated** `Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) This list is serialized and dumped in its entirety at the
+  :ref:`/config_dump <operations_admin_interface_config_dump>` endpoint.
+
+  The following configurations are currently supported and will be dumped in the order given
+  below:
+
+  * ``bootstrap``: :ref:`BootstrapConfigDump <envoy_v3_api_msg_admin.v3.BootstrapConfigDump>`
+  * ``clusters``: :ref:`ClustersConfigDump <envoy_v3_api_msg_admin.v3.ClustersConfigDump>`
+  * ``ecds_filter_http``: :ref:`EcdsConfigDump <envoy_v3_api_msg_admin.v3.EcdsConfigDump>`
+  * ``ecds_filter_quic_listener``: :ref:`EcdsConfigDump <envoy_v3_api_msg_admin.v3.EcdsConfigDump>`
+  * ``ecds_filter_tcp_listener``: :ref:`EcdsConfigDump <envoy_v3_api_msg_admin.v3.EcdsConfigDump>`
+  * ``endpoints``:  :ref:`EndpointsConfigDump <envoy_v3_api_msg_admin.v3.EndpointsConfigDump>`
+  * ``listeners``: :ref:`ListenersConfigDump <envoy_v3_api_msg_admin.v3.ListenersConfigDump>`
+  * ``scoped_routes``: :ref:`ScopedRoutesConfigDump <envoy_v3_api_msg_admin.v3.ScopedRoutesConfigDump>`
+  * ``routes``:  :ref:`RoutesConfigDump <envoy_v3_api_msg_admin.v3.RoutesConfigDump>`
+  * ``secrets``:  :ref:`SecretsConfigDump <envoy_v3_api_msg_admin.v3.SecretsConfigDump>`
+
+  EDS Configuration will only be dumped by using parameter ``?include_eds``
+
+  Currently ECDS is supported in HTTP and listener filters. Note, ECDS configuration for
+  either HTTP or listener filter will only be dumped if it is actually configured.
+
+  You can filter output with the resource and mask query parameters.
+  See :ref:`/config_dump?resource={} <operations_admin_interface_config_dump_by_resource>`,
+  :ref:`/config_dump?mask={} <operations_admin_interface_config_dump_by_mask>`,
+  or :ref:`/config_dump?resource={},mask={}
+  <operations_admin_interface_config_dump_by_resource_and_mask>` for more information.
+
+
+
+.. _envoy_v3_api_msg_admin.v3.BootstrapConfigDump:
+
+admin.v3.BootstrapConfigDump
+----------------------------
+
+
+:repo:`[admin.v3.BootstrapConfigDump proto] <api/envoy/admin/v3/config_dump.proto#L60>`
+
+This message describes the bootstrap configuration that Envoy was started with. This includes
+any CLI overrides that were merged. Bootstrap configuration information can be used to recreate
+the static portions of an Envoy configuration by reusing the output as the bootstrap
+configuration for another Envoy.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "bootstrap": {...},
+    "last_updated": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.BootstrapConfigDump.bootstrap:
+
+
+bootstrap
+  (:ref:`config.bootstrap.v3.Bootstrap <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>`) 
+
+.. _envoy_v3_api_field_admin.v3.BootstrapConfigDump.last_updated:
+
+
+last_updated
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the BootstrapConfig was last updated.
+
+
+
+.. _envoy_v3_api_msg_admin.v3.SecretsConfigDump:
+
+admin.v3.SecretsConfigDump
+--------------------------
+
+
+:repo:`[admin.v3.SecretsConfigDump proto] <api/envoy/admin/v3/config_dump.proto#L71>`
+
+Envoys SDS implementation fills this message with all secrets fetched dynamically via SDS.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "static_secrets": [],
+    "dynamic_active_secrets": [],
+    "dynamic_warming_secrets": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.SecretsConfigDump.static_secrets:
+
+
+static_secrets
+  (**repeated** :ref:`admin.v3.SecretsConfigDump.StaticSecret <envoy_v3_api_msg_admin.v3.SecretsConfigDump.StaticSecret>`) The statically loaded secrets.
+
+
+.. _envoy_v3_api_field_admin.v3.SecretsConfigDump.dynamic_active_secrets:
+
+
+dynamic_active_secrets
+  (**repeated** :ref:`admin.v3.SecretsConfigDump.DynamicSecret <envoy_v3_api_msg_admin.v3.SecretsConfigDump.DynamicSecret>`) The dynamically loaded active secrets. These are secrets that are available to service
+  clusters or listeners.
+
+
+.. _envoy_v3_api_field_admin.v3.SecretsConfigDump.dynamic_warming_secrets:
+
+
+dynamic_warming_secrets
+  (**repeated** :ref:`admin.v3.SecretsConfigDump.DynamicSecret <envoy_v3_api_msg_admin.v3.SecretsConfigDump.DynamicSecret>`) The dynamically loaded warming secrets. These are secrets that are currently undergoing
+  warming in preparation to service clusters or listeners.
+
+
+.. _envoy_v3_api_msg_admin.v3.SecretsConfigDump.DynamicSecret:
+
+admin.v3.SecretsConfigDump.DynamicSecret
+----------------------------------------
+
+
+:repo:`[admin.v3.SecretsConfigDump.DynamicSecret proto] <api/envoy/admin/v3/config_dump.proto#L77>`
+
+DynamicSecret contains secret information fetched via SDS.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "version_info": ...,
+    "last_updated": {...},
+    "secret": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.SecretsConfigDump.DynamicSecret.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name assigned to the secret.
+
+
+.. _envoy_v3_api_field_admin.v3.SecretsConfigDump.DynamicSecret.version_info:
+
+
+version_info
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This is the per-resource version information.
+
+
+.. _envoy_v3_api_field_admin.v3.SecretsConfigDump.DynamicSecret.last_updated:
+
+
+last_updated
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the secret was last updated.
+
+
+.. _envoy_v3_api_field_admin.v3.SecretsConfigDump.DynamicSecret.secret:
+
+
+secret
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The actual secret information.
+  Security sensitive information is redacted (replaced with "[redacted]") for
+  private keys and passwords in TLS certificates.
+
+
+
+.. _envoy_v3_api_msg_admin.v3.SecretsConfigDump.StaticSecret:
+
+admin.v3.SecretsConfigDump.StaticSecret
+---------------------------------------
+
+
+:repo:`[admin.v3.SecretsConfigDump.StaticSecret proto] <api/envoy/admin/v3/config_dump.proto#L108>`
+
+StaticSecret specifies statically loaded secret in bootstrap.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "last_updated": {...},
+    "secret": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.SecretsConfigDump.StaticSecret.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name assigned to the secret.
+
+
+.. _envoy_v3_api_field_admin.v3.SecretsConfigDump.StaticSecret.last_updated:
+
+
+last_updated
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the secret was last updated.
+
+
+.. _envoy_v3_api_field_admin.v3.SecretsConfigDump.StaticSecret.secret:
+
+
+secret
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The actual secret information.
+  Security sensitive information is redacted (replaced with "[redacted]") for
+  private keys and passwords in TLS certificates.
+
+
+

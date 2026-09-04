@@ -1,0 +1,86 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/listener/local_ratelimit/v3/local_ratelimit.proto:
+
+Local Rate Limit Filter (proto)
+===============================
+
+.. _extension_envoy.filters.listener.local_ratelimit:
+
+This extension has the qualified name ``envoy.filters.listener.local_ratelimit``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.listener <extension_category_envoy.filters.listener>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.listener.local_ratelimit.v3.LocalRateLimit <envoy_v3_api_msg_extensions.filters.listener.local_ratelimit.v3.LocalRateLimit>`
+
+
+
+Local rate limit :ref:`configuration overview <config_listener_filters_local_rate_limit>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.listener.local_ratelimit.v3.LocalRateLimit:
+
+extensions.filters.listener.local_ratelimit.v3.LocalRateLimit
+-------------------------------------------------------------
+
+
+:repo:`[extensions.filters.listener.local_ratelimit.v3.LocalRateLimit proto] <api/envoy/extensions/filters/listener/local_ratelimit/v3/local_ratelimit.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "token_bucket": {...},
+    "runtime_enabled": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.listener.local_ratelimit.v3.LocalRateLimit.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The prefix to use when emitting :ref:`statistics
+  <config_listener_filters_local_rate_limit_stats>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.local_ratelimit.v3.LocalRateLimit.token_bucket:
+
+
+token_bucket
+  (:ref:`type.v3.TokenBucket <envoy_v3_api_msg_type.v3.TokenBucket>`, *REQUIRED*) The token bucket configuration to use for rate limiting all incoming sockets. If the token is available,
+  the socket will be allowed. If no tokens are available, the socket will be immediately closed.
+
+  .. note::
+    In the current implementation the token bucket's :ref:`fill_interval
+    <envoy_v3_api_field_type.v3.TokenBucket.fill_interval>` must be >= 50ms to avoid too aggressive
+    refills.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.local_ratelimit.v3.LocalRateLimit.runtime_enabled:
+
+
+runtime_enabled
+  (:ref:`config.core.v3.RuntimeFeatureFlag <envoy_v3_api_msg_config.core.v3.RuntimeFeatureFlag>`) Runtime flag that controls whether the filter is enabled or not. If not specified, defaults
+  to enabled.
+
+

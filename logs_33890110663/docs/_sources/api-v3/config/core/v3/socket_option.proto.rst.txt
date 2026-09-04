@@ -1,0 +1,288 @@
+.. _envoy_v3_api_file_envoy/config/core/v3/socket_option.proto:
+
+Socket option (proto)
+=====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.SocketOption:
+
+config.core.v3.SocketOption
+---------------------------
+
+
+:repo:`[config.core.v3.SocketOption proto] <api/envoy/config/core/v3/socket_option.proto#L39>`
+
+Generic socket option message. This would be used to set socket options that
+might not exist in upstream kernels or precompiled Envoy binaries.
+
+For example:
+
+.. code-block:: json
+
+ {
+   "description": "support tcp keep alive",
+   "state": 0,
+   "level": 1,
+   "name": 9,
+   "int_value": 1,
+ }
+
+1 means SOL_SOCKET and 9 means SO_KEEPALIVE on Linux.
+With the above configuration, `TCP Keep-Alives <https://www.freesoft.org/CIE/RFC/1122/114.htm>`_
+can be enabled in socket with Linux, which can be used in
+:ref:`listener's<envoy_v3_api_field_config.listener.v3.Listener.socket_options>` or
+:ref:`admin's <envoy_v3_api_field_config.bootstrap.v3.Admin.socket_options>` socket_options etc.
+
+It should be noted that the name or level may have different values on different platforms.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "description": ...,
+    "level": ...,
+    "name": ...,
+    "int_value": ...,
+    "buf_value": ...,
+    "state": ...,
+    "type": {...},
+    "ip_version": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.SocketOption.description:
+
+
+description
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) An optional name to give this socket option for debugging, etc.
+  Uniqueness is not required and no special meaning is assumed.
+
+
+.. _envoy_v3_api_field_config.core.v3.SocketOption.level:
+
+
+level
+  (`int64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Corresponding to the level value passed to setsockopt, such as IPPROTO_TCP
+
+
+.. _envoy_v3_api_field_config.core.v3.SocketOption.name:
+
+
+name
+  (`int64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The numeric name as passed to setsockopt
+
+
+.. _envoy_v3_api_field_config.core.v3.SocketOption.int_value:
+
+
+int_value
+  (`int64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Because many sockopts take an int value.
+
+
+  
+
+  Precisely one of :ref:`int_value <envoy_v3_api_field_config.core.v3.SocketOption.int_value>`, :ref:`buf_value <envoy_v3_api_field_config.core.v3.SocketOption.buf_value>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.SocketOption.buf_value:
+
+
+buf_value
+  (`bytes <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Otherwise it's a byte buffer.
+
+
+  
+
+  Precisely one of :ref:`int_value <envoy_v3_api_field_config.core.v3.SocketOption.int_value>`, :ref:`buf_value <envoy_v3_api_field_config.core.v3.SocketOption.buf_value>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.SocketOption.state:
+
+
+state
+  (:ref:`config.core.v3.SocketOption.SocketState <envoy_v3_api_enum_config.core.v3.SocketOption.SocketState>`) The state in which the option will be applied. When used in BindConfig
+  STATE_PREBIND is currently the only valid value.
+
+
+.. _envoy_v3_api_field_config.core.v3.SocketOption.type:
+
+
+type
+  (:ref:`config.core.v3.SocketOption.SocketType <envoy_v3_api_msg_config.core.v3.SocketOption.SocketType>`) Apply the socket option to the specified `socket type <https://linux.die.net/man/2/socket>`_.
+  If not specified, the socket option will be applied to all socket types.
+
+
+.. _envoy_v3_api_field_config.core.v3.SocketOption.ip_version:
+
+
+ip_version
+  (:ref:`config.core.v3.SocketOption.SocketIpVersion <envoy_v3_api_enum_config.core.v3.SocketOption.SocketIpVersion>`) Apply the socket option to the specified `socket Ip version
+  <https://linux.die.net/man/2/socket>`_. If not specified, the socket option
+  will be applied to all socket ip versions.
+
+
+.. _envoy_v3_api_msg_config.core.v3.SocketOption.SocketType:
+
+config.core.v3.SocketOption.SocketType
+--------------------------------------
+
+
+:repo:`[config.core.v3.SocketOption.SocketType proto] <api/envoy/config/core/v3/socket_option.proto#L73>`
+
+The `socket type <https://linux.die.net/man/2/socket>`_ to apply the socket option to.
+Only one field should be set. If multiple fields are set, the precedence order will determine
+the selected one. If none of the fields is set, the socket option will be applied to all socket types.
+
+For example:
+If :ref:`stream <envoy_v3_api_field_config.core.v3.SocketOption.SocketType.stream>` is set,
+it takes precedence over :ref:`datagram <envoy_v3_api_field_config.core.v3.SocketOption.SocketType.datagram>`.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stream": {...},
+    "datagram": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.SocketOption.SocketType.stream:
+
+
+stream
+  (:ref:`config.core.v3.SocketOption.SocketType.Stream <envoy_v3_api_msg_config.core.v3.SocketOption.SocketType.Stream>`) Apply the socket option to the stream socket type.
+
+
+.. _envoy_v3_api_field_config.core.v3.SocketOption.SocketType.datagram:
+
+
+datagram
+  (:ref:`config.core.v3.SocketOption.SocketType.Datagram <envoy_v3_api_msg_config.core.v3.SocketOption.SocketType.Datagram>`) Apply the socket option to the datagram socket type.
+
+
+.. _envoy_v3_api_msg_config.core.v3.SocketOption.SocketType.Stream:
+
+config.core.v3.SocketOption.SocketType.Stream
+---------------------------------------------
+
+
+:repo:`[config.core.v3.SocketOption.SocketType.Stream proto] <api/envoy/config/core/v3/socket_option.proto#L75>`
+
+The stream socket type.
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.SocketOption.SocketType.Datagram:
+
+config.core.v3.SocketOption.SocketType.Datagram
+-----------------------------------------------
+
+
+:repo:`[config.core.v3.SocketOption.SocketType.Datagram proto] <api/envoy/config/core/v3/socket_option.proto#L79>`
+
+The datagram socket type.
+
+
+
+
+
+
+.. _envoy_v3_api_enum_config.core.v3.SocketOption.SocketState:
+
+Enum config.core.v3.SocketOption.SocketState
+--------------------------------------------
+
+
+:repo:`[config.core.v3.SocketOption.SocketState proto] <api/envoy/config/core/v3/socket_option.proto#L42>`
+
+
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.SocketOption.SocketState.STATE_PREBIND:
+
+
+STATE_PREBIND
+  *(DEFAULT)* ⁣Socket options are applied after socket creation but before binding the socket to a port
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.SocketOption.SocketState.STATE_BOUND:
+
+
+STATE_BOUND
+  ⁣Socket options are applied after binding the socket to a port but before calling listen()
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.SocketOption.SocketState.STATE_LISTENING:
+
+
+STATE_LISTENING
+  ⁣Socket options are applied after calling listen()
+
+
+
+.. _envoy_v3_api_enum_config.core.v3.SocketOption.SocketIpVersion:
+
+Enum config.core.v3.SocketOption.SocketIpVersion
+------------------------------------------------
+
+
+:repo:`[config.core.v3.SocketOption.SocketIpVersion proto] <api/envoy/config/core/v3/socket_option.proto#L55>`
+
+The `socket IP version <https://linux.die.net/man/2/socket>`_ to apply the
+socket option to.
+
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.SocketOption.SocketIpVersion.SOCKET_IP_VERSION_UNSPECIFIED:
+
+
+SOCKET_IP_VERSION_UNSPECIFIED
+  *(DEFAULT)* ⁣Apply the socket option to all socket IP versions.
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.SocketOption.SocketIpVersion.SOCKET_IP_VERSION_IPV4:
+
+
+SOCKET_IP_VERSION_IPV4
+  ⁣Apply the socket option to the IPv4 socket type.
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.SocketOption.SocketIpVersion.SOCKET_IP_VERSION_IPV6:
+
+
+SOCKET_IP_VERSION_IPV6
+  ⁣Apply the socket option to the IPv6 socket type.
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.SocketOptionsOverride:
+
+config.core.v3.SocketOptionsOverride
+------------------------------------
+
+
+:repo:`[config.core.v3.SocketOptionsOverride proto] <api/envoy/config/core/v3/socket_option.proto#L123>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "socket_options": []
+  }
+
+.. _envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options:
+
+
+socket_options
+  (**repeated** :ref:`config.core.v3.SocketOption <envoy_v3_api_msg_config.core.v3.SocketOption>`) 
+

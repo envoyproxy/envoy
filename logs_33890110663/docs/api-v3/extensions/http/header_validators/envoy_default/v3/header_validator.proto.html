@@ -1,0 +1,548 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Envoy’s default Header Validator config (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../../../_static/favicon.ico"/>
+      <script src="../../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+    <link rel="next" title="HTTP original IP detection" href="../../../../../config/http/original_ip_detection.html" />
+    <link rel="prev" title="HTTP header validators" href="../../../../../config/http/header_validators.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../../../searchindex.js"
+          data-envoy-search-page="../../../../../../search.html"
+          data-envoy-root="../../../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../../config/config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../../config/http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/http/header_validators.html">HTTP header validators</a></li>
+      <li class="breadcrumb-item active">Envoy’s default Header Validator config (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../../_sources/api-v3/extensions/http/header_validators/envoy_default/v3/header_validator.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="envoy-s-default-header-validator-config-proto">
+<span id="envoy-v3-api-file-envoy-extensions-http-header-validators-envoy-default-v3-header-validator-proto"></span><h1>Envoy’s default Header Validator config (proto)<a class="headerlink" href="#envoy-s-default-header-validator-config-proto" title="Link to this heading"></a></h1>
+<section id="extensions-http-header-validators-envoy-default-v3-headervalidatorconfig">
+<span id="envoy-v3-api-msg-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig"></span><h2>extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig<a class="headerlink" href="#extensions-http-header-validators-envoy-default-v3-headervalidatorconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/http/header_validators/envoy_default/v3/header_validator.proto#L35">[extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig proto]</a></p>
+<p>This extension validates that HTTP request and response headers are well formed according to respective RFCs.</p>
+<p>The validator performs comprehensive HTTP header validation including:</p>
+<ol class="arabic simple">
+<li><p>HTTP/1 header map validity according to <a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc7230#section-3.2">RFC 7230 section 3.2</a>.</p></li>
+<li><p>Syntax of HTTP/1 request target URI and response status.</p></li>
+<li><p>HTTP/2 header map validity according to <a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2">RFC 7540 section 8.1.2</a>.</p></li>
+<li><p>Syntax of HTTP/2 pseudo headers.</p></li>
+<li><p>HTTP/3 header map validity according to <a class="reference external" href="https://www.rfc-editor.org/rfc/rfc9114.html">RFC 9114 section 4.3</a>.</p></li>
+<li><p>Syntax of HTTP/3 pseudo headers.</p></li>
+<li><p>Syntax of Content-Length and Transfer-Encoding.</p></li>
+<li><p>Validation of HTTP/1 requests with both <code class="docutils literal notranslate"><span class="pre">Content-Length</span></code> and <code class="docutils literal notranslate"><span class="pre">Transfer-Encoding</span></code> headers.</p></li>
+<li><p>Normalization of the URI path according to <a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc3986#section-6">Normalization and Comparison</a>
+without <a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc3986#section-6.2.2.1">case normalization</a>.</p></li>
+</ol>
+<p>This validator ensures that HTTP traffic processed by Envoy conforms to established
+standards and helps prevent issues caused by malformed headers or invalid HTTP syntax.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;http1_protocol_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;uri_path_normalization_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;restrict_http_methods&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;headers_with_underscores_action&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;strip_fragment_from_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-http1-protocol-options">
+<dt>http1_protocol_options</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-http1protocoloptions"><span class="std std-ref">extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.Http1ProtocolOptions</span></a>) HTTP/1 protocol specific options.
+These settings control HTTP/1 specific validation behaviors.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uri-path-normalization-options">
+<dt>uri_path_normalization_options</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions"><span class="std std-ref">extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.UriPathNormalizationOptions</span></a>) The URI path normalization options.</p>
+<p>By default Envoy normalizes URI path using the default values of the <a class="reference internal" href="#envoy-v3-api-msg-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions"><span class="std std-ref">UriPathNormalizationOptions</span></a>.
+URI path transformations specified by the <code class="docutils literal notranslate"><span class="pre">uri_path_normalization_options</span></code> configuration can be applied to a portion
+of requests by setting the <code class="docutils literal notranslate"><span class="pre">envoy_default_header_validator.uri_path_transformations</span></code> runtime value.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Disabling path normalization may lead to path confusion vulnerabilities in access control or incorrect service
+selection.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-restrict-http-methods">
+<dt>restrict_http_methods</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Restrict HTTP methods to these defined in the <a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc7231#section-4.1">RFC 7231 section 4.1</a>.</p>
+<p>Envoy will respond with 400 to requests with disallowed methods.
+By default methods with arbitrary names are accepted.</p>
+<p>This setting helps enforce HTTP compliance and can prevent attacks that rely on
+non-standard HTTP methods.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-headers-with-underscores-action">
+<dt>headers_with_underscores_action</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-headerswithunderscoresaction"><span class="std std-ref">extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.HeadersWithUnderscoresAction</span></a>) Action to take when a client request with a header name containing underscore characters is received.</p>
+<p>If this setting is not specified, the value defaults to <code class="docutils literal notranslate"><span class="pre">ALLOW</span></code>.</p>
+<p>This setting provides security control over headers with underscores, which can be a source
+of security issues when different systems interpret underscores and hyphens differently.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-strip-fragment-from-path">
+<dt>strip_fragment_from_path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Allow requests with fragment in URL path and strip the fragment before request processing.</p>
+<p>By default Envoy rejects requests with fragment in URL path. When this option is enabled,
+the fragment portion (everything after <code class="docutils literal notranslate"><span class="pre">#</span></code>) will be removed from the path before
+further processing.</p>
+<p>Fragments are typically used by client-side applications and should not normally
+be sent to the server, so stripping them can help normalize requests.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions">
+<span id="envoy-v3-api-msg-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions"></span><h2>extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.UriPathNormalizationOptions<a class="headerlink" href="#extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/http/header_validators/envoy_default/v3/header_validator.proto#L66">[extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.UriPathNormalizationOptions proto]</a></p>
+<p>Configuration options for URI path normalization and transformation.</p>
+<p>These options control how Envoy processes and normalizes incoming request URI paths
+to ensure consistent behavior and security. Path normalization helps prevent
+path traversal attacks and ensures that equivalent paths are handled consistently.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;skip_path_normalization&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;skip_merging_slashes&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;path_with_escaped_slashes_action&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-skip-path-normalization">
+<dt>skip_path_normalization</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Should paths be normalized according to RFC 3986?</p>
+<p>This operation overwrites the original request URI path and the new path is used for processing of
+the request by HTTP filters and proxied to the upstream service.
+Envoy will respond with 400 to requests with malformed paths that fail path normalization.
+The default behavior is to normalize the path.</p>
+<p>This value may be overridden by the runtime variable
+<a class="reference internal" href="../../../../../../configuration/http/http_conn_man/runtime.html#config-http-conn-man-runtime-normalize-path"><span class="std std-ref">http_connection_manager.normalize_path</span></a>.
+See <a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc3986#section-6">Normalization and Comparison</a>
+for details of normalization.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Envoy does not perform
+<a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc3986#section-6.2.2.1">case normalization</a>.
+URI path normalization can be applied to a portion of requests by setting the
+<code class="docutils literal notranslate"><span class="pre">envoy_default_header_validator.path_normalization</span></code> runtime value.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-skip-merging-slashes">
+<dt>skip_merging_slashes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Determines if adjacent slashes in the path are merged into one.</p>
+<p>This operation overwrites the original request URI path and the new path is used for processing of
+the request by HTTP filters and proxied to the upstream service.
+Setting this option to <code class="docutils literal notranslate"><span class="pre">true</span></code> will cause incoming requests with path <code class="docutils literal notranslate"><span class="pre">//dir///file</span></code> to not match against
+route with <code class="docutils literal notranslate"><span class="pre">prefix</span></code> match set to <code class="docutils literal notranslate"><span class="pre">/dir</span></code>. Defaults to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Slash merging is not part of the
+<a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc3986">HTTP spec</a> and is provided for convenience.
+Merging of slashes in URI path can be applied to a portion of requests by setting the
+<code class="docutils literal notranslate"><span class="pre">envoy_default_header_validator.merge_slashes</span></code> runtime value.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-path-with-escaped-slashes-action">
+<dt>path_with_escaped_slashes_action</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-pathwithescapedslashesaction"><span class="std std-ref">extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.UriPathNormalizationOptions.PathWithEscapedSlashesAction</span></a>) The action to take when request URL path contains escaped slash sequences (<code class="docutils literal notranslate"><span class="pre">%2F</span></code>, <code class="docutils literal notranslate"><span class="pre">%2f</span></code>, <code class="docutils literal notranslate"><span class="pre">%5C</span></code> and <code class="docutils literal notranslate"><span class="pre">%5c</span></code>).</p>
+<p>This operation may overwrite the original request URI path and the new path is used for processing of
+the request by HTTP filters and proxied to the upstream service.</p>
+<p>The handling of escaped slashes is important for security as these sequences can be used
+in path confusion attacks to bypass access controls.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-pathwithescapedslashesaction">
+<span id="envoy-v3-api-enum-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-pathwithescapedslashesaction"></span><h2>Enum extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.UriPathNormalizationOptions.PathWithEscapedSlashesAction<a class="headerlink" href="#enum-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-pathwithescapedslashesaction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/http/header_validators/envoy_default/v3/header_validator.proto#L72">[extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.UriPathNormalizationOptions.PathWithEscapedSlashesAction proto]</a></p>
+<p>Determines the action for requests that contain <code class="docutils literal notranslate"><span class="pre">%2F</span></code>, <code class="docutils literal notranslate"><span class="pre">%2f</span></code>, <code class="docutils literal notranslate"><span class="pre">%5C</span></code> or <code class="docutils literal notranslate"><span class="pre">%5c</span></code> sequences in the URI path.
+This operation occurs before URL normalization and the merge slashes transformations if they were enabled.</p>
+<p>Escaped slash sequences in URLs can be used for path confusion attacks, so proper handling
+is important for security.</p>
+<dl id="envoy-v3-api-enum-value-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-pathwithescapedslashesaction-implementation-specific-default">
+<dt>IMPLEMENTATION_SPECIFIC_DEFAULT</dt><dd><p><em>(DEFAULT)</em> ⁣Default behavior specific to implementation (i.e. Envoy) of this configuration option.
+Envoy, by default, takes the <code class="docutils literal notranslate"><span class="pre">KEEP_UNCHANGED</span></code> action.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The implementation may change the default behavior at-will.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-pathwithescapedslashesaction-keep-unchanged">
+<dt>KEEP_UNCHANGED</dt><dd><p>⁣Keep escaped slashes unchanged in the URI path.
+This preserves the original request path without any modifications to escaped sequences.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-enum-value-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-pathwithescapedslashesaction-reject-request">
+<dt>REJECT_REQUEST</dt><dd><p>⁣Reject client request with the 400 status. gRPC requests will be rejected with the <code class="docutils literal notranslate"><span class="pre">INTERNAL</span></code> (13) error code.
+The <a class="reference internal" href="../../../../../../configuration/http/http_conn_man/stats.html#config-http-conn-man-stats-per-codec"><span class="std std-ref">httpN.downstream_rq_failed_path_normalization</span></a> counter is incremented for each rejected request.</p>
+<p>This is the safest option when security is a primary concern, as it prevents any potential
+path confusion attacks by rejecting requests with escaped slashes entirely.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-enum-value-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-pathwithescapedslashesaction-unescape-and-redirect">
+<dt>UNESCAPE_AND_REDIRECT</dt><dd><p>⁣Unescape <code class="docutils literal notranslate"><span class="pre">%2F</span></code> and <code class="docutils literal notranslate"><span class="pre">%5C</span></code> sequences and redirect the request to the new path if these sequences were present.
+The redirect occurs after path normalization and merge slashes transformations if they were configured.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>gRPC requests will be rejected with the <code class="docutils literal notranslate"><span class="pre">INTERNAL</span></code> (13) error code.
+This option minimizes possibility of path confusion exploits by forcing request with unescaped slashes to
+traverse all parties: downstream client, intermediate proxies, Envoy and upstream server.</p>
+</div>
+<p>The <a class="reference internal" href="../../../../../../configuration/http/http_conn_man/stats.html#config-http-conn-man-stats-per-codec"><span class="std std-ref">httpN.downstream_rq_redirected_with_normalized_path</span></a> counter is incremented for each
+redirected request.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-enum-value-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-pathwithescapedslashesaction-unescape-and-forward">
+<dt>UNESCAPE_AND_FORWARD</dt><dd><p>⁣Unescape <code class="docutils literal notranslate"><span class="pre">%2F</span></code> and <code class="docutils literal notranslate"><span class="pre">%5C</span></code> sequences.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>This option should not be enabled if intermediaries perform path based access control as
+it may lead to path confusion vulnerabilities.</p>
+</div>
+</dd>
+</dl>
+</section>
+<section id="extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-http1protocoloptions">
+<span id="envoy-v3-api-msg-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-http1protocoloptions"></span><h2>extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.Http1ProtocolOptions<a class="headerlink" href="#extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-http1protocoloptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/http/header_validators/envoy_default/v3/header_validator.proto#L168">[extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.Http1ProtocolOptions proto]</a></p>
+<p>HTTP/1 protocol specific options for header validation.</p>
+<p>These options control how Envoy handles HTTP/1 specific behaviors and edge cases
+that may not apply to HTTP/2 or HTTP/3 protocols.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;allow_chunked_length&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-http1protocoloptions-allow-chunked-length">
+<dt>allow_chunked_length</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Allows Envoy to process HTTP/1 requests/responses with both <code class="docutils literal notranslate"><span class="pre">Content-Length</span></code> and <code class="docutils literal notranslate"><span class="pre">Transfer-Encoding</span></code>
+headers set. By default such messages are rejected, but if option is enabled - Envoy will
+remove the <code class="docutils literal notranslate"><span class="pre">Content-Length</span></code> header and process the message.</p>
+<p>See <a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc7230#section-3.3.3">RFC7230, sec. 3.3.3</a> for details.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Enabling this option might lead to request smuggling vulnerabilities, especially if traffic
+is proxied via multiple layers of proxies.</p>
+</div>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-headerswithunderscoresaction">
+<span id="envoy-v3-api-enum-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-headerswithunderscoresaction"></span><h2>Enum extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.HeadersWithUnderscoresAction<a class="headerlink" href="#enum-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-headerswithunderscoresaction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/http/header_validators/envoy_default/v3/header_validator.proto#L44">[extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.HeadersWithUnderscoresAction proto]</a></p>
+<p>Action to take when Envoy receives client request with header names containing underscore
+characters.</p>
+<p>Underscore character is allowed in header names by RFC-7230, and this behavior is implemented
+as a security measure due to systems that treat <code class="docutils literal notranslate"><span class="pre">_</span></code> and <code class="docutils literal notranslate"><span class="pre">-</span></code> as interchangeable. Envoy by
+default allows client request headers with underscore characters.</p>
+<p>This setting provides control over how to handle such headers for security and compatibility reasons.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-headerswithunderscoresaction-allow">
+<dt>ALLOW</dt><dd><p><em>(DEFAULT)</em> ⁣Allow headers with underscores. This is the default behavior.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-headerswithunderscoresaction-reject-request">
+<dt>REJECT_REQUEST</dt><dd><p>⁣Reject client request. HTTP/1 requests are rejected with the 400 status. HTTP/2 requests
+end with the stream reset. The
+<a class="reference internal" href="../../../../../../configuration/http/http_conn_man/stats.html#config-http-conn-man-stats-per-codec"><span class="std std-ref">httpN.requests_rejected_with_underscores_in_headers</span></a> counter
+is incremented for each rejected request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-headerswithunderscoresaction-drop-header">
+<dt>DROP_HEADER</dt><dd><p>⁣Drop the client header with name containing underscores. The header is dropped before the filter chain is
+invoked and as such filters will not see dropped headers. The
+<a class="reference internal" href="../../../../../../configuration/http/http_conn_man/stats.html#config-http-conn-man-stats-per-codec"><span class="std std-ref">httpN.dropped_headers_with_underscores</span></a> is incremented for
+each dropped header.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../../../../config/http/header_validators.html" class="btn btn-neutral float-left" title="HTTP header validators" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../../../../config/http/original_ip_detection.html" class="btn btn-neutral float-right" title="HTTP original IP detection" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Envoy’s default Header Validator config (proto)</a><ul>
+<li><a class="reference internal" href="#extensions-http-header-validators-envoy-default-v3-headervalidatorconfig">extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig</a></li>
+<li><a class="reference internal" href="#extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions">extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.UriPathNormalizationOptions</a></li>
+<li><a class="reference internal" href="#enum-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-uripathnormalizationoptions-pathwithescapedslashesaction">Enum extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.UriPathNormalizationOptions.PathWithEscapedSlashesAction</a></li>
+<li><a class="reference internal" href="#extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-http1protocoloptions">extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.Http1ProtocolOptions</a></li>
+<li><a class="reference internal" href="#enum-extensions-http-header-validators-envoy-default-v3-headervalidatorconfig-headerswithunderscoresaction">Enum extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.HeadersWithUnderscoresAction</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

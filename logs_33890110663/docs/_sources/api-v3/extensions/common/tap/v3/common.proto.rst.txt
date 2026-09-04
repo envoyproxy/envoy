@@ -1,0 +1,82 @@
+.. _envoy_v3_api_file_envoy/extensions/common/tap/v3/common.proto:
+
+Common tap extension configuration (proto)
+==========================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.common.tap.v3.CommonExtensionConfig:
+
+extensions.common.tap.v3.CommonExtensionConfig
+----------------------------------------------
+
+
+:repo:`[extensions.common.tap.v3.CommonExtensionConfig proto] <api/envoy/extensions/common/tap/v3/common.proto#L19>`
+
+Common configuration for all tap extensions.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "admin_config": {...},
+    "static_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.common.tap.v3.CommonExtensionConfig.admin_config:
+
+
+admin_config
+  (:ref:`extensions.common.tap.v3.AdminConfig <envoy_v3_api_msg_extensions.common.tap.v3.AdminConfig>`) If specified, the tap filter will be configured via an admin handler.
+
+
+  
+
+  Precisely one of :ref:`admin_config <envoy_v3_api_field_extensions.common.tap.v3.CommonExtensionConfig.admin_config>`, :ref:`static_config <envoy_v3_api_field_extensions.common.tap.v3.CommonExtensionConfig.static_config>` must be set.
+
+.. _envoy_v3_api_field_extensions.common.tap.v3.CommonExtensionConfig.static_config:
+
+
+static_config
+  (:ref:`config.tap.v3.TapConfig <envoy_v3_api_msg_config.tap.v3.TapConfig>`) If specified, the tap filter will be configured via a static configuration that cannot be
+  changed.
+
+
+  
+
+  Precisely one of :ref:`admin_config <envoy_v3_api_field_extensions.common.tap.v3.CommonExtensionConfig.admin_config>`, :ref:`static_config <envoy_v3_api_field_extensions.common.tap.v3.CommonExtensionConfig.static_config>` must be set.
+
+
+.. _envoy_v3_api_msg_extensions.common.tap.v3.AdminConfig:
+
+extensions.common.tap.v3.AdminConfig
+------------------------------------
+
+
+:repo:`[extensions.common.tap.v3.AdminConfig proto] <api/envoy/extensions/common/tap/v3/common.proto#L37>`
+
+Configuration for the admin handler. See :ref:`here <config_http_filters_tap_admin_handler>` for
+more information.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config_id": ...
+  }
+
+.. _envoy_v3_api_field_extensions.common.tap.v3.AdminConfig.config_id:
+
+
+config_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Opaque configuration ID. When requests are made to the admin handler, the passed opaque ID is
+  matched to the configured filter opaque ID to determine which filter to configure.
+
+

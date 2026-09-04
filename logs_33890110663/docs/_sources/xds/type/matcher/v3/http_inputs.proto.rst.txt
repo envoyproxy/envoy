@@ -1,0 +1,31 @@
+.. _envoy_v3_api_file_xds/type/matcher/v3/http_inputs.proto:
+
+Common HTTP Inputs (proto)
+==========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.HttpAttributesCelMatchInput:
+
+.xds.type.matcher.v3.HttpAttributesCelMatchInput
+------------------------------------------------
+
+
+`[.xds.type.matcher.v3.HttpAttributesCelMatchInput proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/http_inputs.proto#L21>`_
+
+Specifies that matching should be performed on the set of :ref:`HTTP attributes
+<arch_overview_attributes>`.
+
+The attributes will be exposed via `Common Expression Language
+<https://github.com/google/cel-spec>`_ runtime to associated CEL matcher.
+
+Refer to :ref:`Unified Matcher API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>` documentation
+for usage details.
+
+
+
+
+

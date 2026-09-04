@@ -1,0 +1,208 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.proto:
+
+Generic Proxy Route Matcher Configuration (proto)
+=================================================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput:
+
+extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput
+---------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput proto] <api/envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.proto#L23>`
+
+Used to match request service of the downstream request. Only applicable if a service provided
+by the application protocol.
+This is deprecated and should be replaced by HostMatchInput. This is kept for backward compatibility.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.matcher.v3.HostMatchInput:
+
+extensions.filters.network.generic_proxy.matcher.v3.HostMatchInput
+------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.matcher.v3.HostMatchInput proto] <api/envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.proto#L29>`
+
+Used to match request host of the generic downstream request. Only applicable if a host provided
+by the application protocol.
+This is same with the ServiceMatchInput and this should be preferred over ServiceMatchInput.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.matcher.v3.PathMatchInput:
+
+extensions.filters.network.generic_proxy.matcher.v3.PathMatchInput
+------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.matcher.v3.PathMatchInput proto] <api/envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.proto#L34>`
+
+Used to match request path of the generic downstream request. Only applicable if a path provided
+by the application protocol.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.matcher.v3.MethodMatchInput:
+
+extensions.filters.network.generic_proxy.matcher.v3.MethodMatchInput
+--------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.matcher.v3.MethodMatchInput proto] <api/envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.proto#L39>`
+
+Used to match request method of the generic downstream request. Only applicable if a method provided
+by the application protocol.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput:
+
+extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput proto] <api/envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.proto#L44>`
+
+Used to match an arbitrary property of the generic downstream request.
+These properties are populated by the codecs of application protocols.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "property_name": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput.property_name:
+
+
+property_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The property name to match on.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.matcher.v3.RequestMatchInput:
+
+extensions.filters.network.generic_proxy.matcher.v3.RequestMatchInput
+---------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.matcher.v3.RequestMatchInput proto] <api/envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.proto#L50>`
+
+Used to match an whole generic downstream request.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.matcher.v3.KeyValueMatchEntry:
+
+extensions.filters.network.generic_proxy.matcher.v3.KeyValueMatchEntry
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.matcher.v3.KeyValueMatchEntry proto] <api/envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.proto#L54>`
+
+Used to match an arbitrary key-value pair for headers, trailers or properties.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "string_match": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.matcher.v3.KeyValueMatchEntry.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The key name to match on.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.matcher.v3.KeyValueMatchEntry.string_match:
+
+
+string_match
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`, *REQUIRED*) The key value pattern.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.matcher.v3.RequestMatcher:
+
+extensions.filters.network.generic_proxy.matcher.v3.RequestMatcher
+------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.matcher.v3.RequestMatcher proto] <api/envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.proto#L65>`
+
+Custom matcher to match on the generic downstream request. This is used to match
+multiple fields of the downstream request and avoid complex combinations of
+HostMatchInput, PathMatchInput, MethodMatchInput and PropertyMatchInput.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "host": {...},
+    "path": {...},
+    "method": {...},
+    "properties": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.matcher.v3.RequestMatcher.host:
+
+
+host
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) Optional host pattern to match on. If not specified, any host will match.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.matcher.v3.RequestMatcher.path:
+
+
+path
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) Optional path pattern to match on. If not specified, any path will match.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.matcher.v3.RequestMatcher.method:
+
+
+method
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) Optional method pattern to match on. If not specified, any method will match.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.matcher.v3.RequestMatcher.properties:
+
+
+properties
+  (**repeated** :ref:`extensions.filters.network.generic_proxy.matcher.v3.KeyValueMatchEntry <envoy_v3_api_msg_extensions.filters.network.generic_proxy.matcher.v3.KeyValueMatchEntry>`) Optional arbitrary properties to match on. If not specified, any properties
+  will match. The key is the property name and the value is the property value
+  to match on.
+
+

@@ -1,0 +1,503 @@
+.. _envoy_v3_api_file_envoy/extensions/wasm/v3/wasm.proto:
+
+Wasm (proto)
+============
+
+.. _extension_envoy.bootstrap.wasm:
+
+This extension has the qualified name ``envoy.bootstrap.wasm``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.bootstrap <extension_category_envoy.bootstrap>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.wasm.v3.WasmService <envoy_v3_api_msg_extensions.wasm.v3.WasmService>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.wasm.v3.ReloadConfig:
+
+extensions.wasm.v3.ReloadConfig
+-------------------------------
+
+
+:repo:`[extensions.wasm.v3.ReloadConfig proto] <api/envoy/extensions/wasm/v3/wasm.proto#L43>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "backoff": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.wasm.v3.ReloadConfig.backoff:
+
+
+backoff
+  (:ref:`config.core.v3.BackoffStrategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`) Backoff strategy for the VM failure reload. If not specified, the default 1s base interval
+  will be applied.
+
+
+
+.. _envoy_v3_api_msg_extensions.wasm.v3.CapabilityRestrictionConfig:
+
+extensions.wasm.v3.CapabilityRestrictionConfig
+----------------------------------------------
+
+
+:repo:`[extensions.wasm.v3.CapabilityRestrictionConfig proto] <api/envoy/extensions/wasm/v3/wasm.proto#L50>`
+
+Configuration for restricting Proxy-Wasm capabilities available to modules.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "allowed_capabilities": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.wasm.v3.CapabilityRestrictionConfig.allowed_capabilities:
+
+
+allowed_capabilities
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.wasm.v3.SanitizationConfig <envoy_v3_api_msg_extensions.wasm.v3.SanitizationConfig>`>) The Proxy-Wasm capabilities which will be allowed. Capabilities are mapped by
+  name. The ``SanitizationConfig`` which each capability maps to is currently unimplemented and ignored,
+  and so should be left empty.
+
+  The capability names are given in the
+  `Proxy-Wasm ABI <https://github.com/proxy-wasm/spec/tree/master/abi-versions/vNEXT>`_.
+  Additionally, the following WASI capabilities from
+  `this list <https://github.com/WebAssembly/WASI/blob/master/phases/snapshot/docs.md#modules>`_
+  are implemented and can be allowed:
+  ``fd_write``, ``fd_read``, ``fd_seek``, ``fd_close``, ``fd_fdstat_get``, ``environ_get``, ``environ_sizes_get``,
+  ``args_get``, ``args_sizes_get``, ``proc_exit``, ``clock_time_get``, ``random_get``.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.wasm.v3.SanitizationConfig:
+
+extensions.wasm.v3.SanitizationConfig
+-------------------------------------
+
+
+:repo:`[extensions.wasm.v3.SanitizationConfig proto] <api/envoy/extensions/wasm/v3/wasm.proto#L69>`
+
+Configuration for sanitization of inputs to an allowed capability.
+
+.. note::
+  This is currently unimplemented.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.wasm.v3.VmConfig:
+
+extensions.wasm.v3.VmConfig
+---------------------------
+
+
+:repo:`[extensions.wasm.v3.VmConfig proto] <api/envoy/extensions/wasm/v3/wasm.proto#L74>`
+
+Configuration for a Wasm VM.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "vm_id": ...,
+    "runtime": ...,
+    "code": {...},
+    "configuration": {...},
+    "allow_precompiled": ...,
+    "nack_on_code_cache_miss": ...,
+    "environment_variables": {...},
+    "capability_restriction_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.wasm.v3.VmConfig.vm_id:
+
+
+vm_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) An ID which will be used along with a hash of the wasm code (or the name of the registered Null
+  VM plugin) to determine which VM will be used for the plugin. All plugins which use the same
+  ``vm_id`` and code will use the same VM. May be left blank. Sharing a VM between plugins can
+  reduce memory utilization and make sharing of data easier which may have security implications.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.VmConfig.runtime:
+
+
+runtime
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The Wasm runtime type, defaults to the first available Wasm engine used at Envoy build-time.
+  The priority to search for the available engine is: v8 -> wasmtime -> wamr.
+  Available Wasm runtime types are registered as extensions. The following runtimes are included
+  in Envoy code base:
+
+  .. _extension_envoy.wasm.runtime.null:
+
+  **envoy.wasm.runtime.null**: Null sandbox, the Wasm module must be compiled and linked into the
+  Envoy binary. The registered name is given in the ``code`` field as ``inline_string``.
+
+  .. _extension_envoy.wasm.runtime.v8:
+
+  **envoy.wasm.runtime.v8**: `V8 <https://v8.dev/>`_-based WebAssembly runtime.
+
+  .. _extension_envoy.wasm.runtime.wamr:
+
+  **envoy.wasm.runtime.wamr**: `WAMR <https://github.com/bytecodealliance/wasm-micro-runtime/>`_-based WebAssembly runtime.
+  This runtime is not enabled in the official build.
+
+  .. _extension_envoy.wasm.runtime.wasmtime:
+
+  **envoy.wasm.runtime.wasmtime**: `Wasmtime <https://wasmtime.dev/>`_-based WebAssembly runtime.
+  This runtime is not enabled in the official build.
+
+
+
+  .. _extension_category_envoy.wasm.runtime:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.wasm.runtime.null <extension_envoy.wasm.runtime.null>`
+
+    - :ref:`envoy.wasm.runtime.v8 <extension_envoy.wasm.runtime.v8>`
+
+    - :ref:`envoy.wasm.runtime.wamr <extension_envoy.wasm.runtime.wamr>`
+
+    - :ref:`envoy.wasm.runtime.wasmtime <extension_envoy.wasm.runtime.wasmtime>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.VmConfig.code:
+
+
+code
+  (:ref:`config.core.v3.AsyncDataSource <envoy_v3_api_msg_config.core.v3.AsyncDataSource>`) The Wasm code that Envoy will execute.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.VmConfig.configuration:
+
+
+configuration
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The Wasm configuration used in initialization of a new VM
+  (``proxy_on_start``). ``google.protobuf.Struct`` is serialized as JSON before
+  passing it to the plugin. ``google.protobuf.BytesValue`` and
+  ``google.protobuf.StringValue`` are passed directly without the wrapper.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.VmConfig.allow_precompiled:
+
+
+allow_precompiled
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Allow the wasm file to include pre-compiled code on VMs which support it.
+
+  .. warning::
+    This should only be enabled for trusted sources as the precompiled code is not
+    verified.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.VmConfig.nack_on_code_cache_miss:
+
+
+nack_on_code_cache_miss
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true and the code needs to be remotely fetched and it is not in the cache then NACK the configuration
+  update and do a background fetch to fill the cache, otherwise fetch the code asynchronously and enter
+  warming state.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.VmConfig.environment_variables:
+
+
+environment_variables
+  (:ref:`extensions.wasm.v3.EnvironmentVariables <envoy_v3_api_msg_extensions.wasm.v3.EnvironmentVariables>`) Specifies environment variables to be injected to this VM which will be available through
+  WASI's ``environ_get`` and ``environ_get_sizes`` system calls. Note that these functions
+  are generally called implicitly by your language's standard library. Therefore, you do not
+  need to call them directly. You can access environment variables in the same way you would
+  on native platforms.
+
+  .. warning::
+    Envoy rejects the configuration if there's conflict of key space.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.VmConfig.capability_restriction_config:
+
+
+capability_restriction_config
+  (:ref:`extensions.wasm.v3.CapabilityRestrictionConfig <envoy_v3_api_msg_extensions.wasm.v3.CapabilityRestrictionConfig>`) Configuration for restricting Proxy-Wasm capabilities available to modules.
+
+  The restrictions are applied when the VM is created and are shared by every plugin running in
+  that VM, so they are a property of the VM rather than of an individual plugin.
+
+
+
+.. _envoy_v3_api_msg_extensions.wasm.v3.EnvironmentVariables:
+
+extensions.wasm.v3.EnvironmentVariables
+---------------------------------------
+
+
+:repo:`[extensions.wasm.v3.EnvironmentVariables proto] <api/envoy/extensions/wasm/v3/wasm.proto#L147>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "host_env_keys": [],
+    "key_values": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.wasm.v3.EnvironmentVariables.host_env_keys:
+
+
+host_env_keys
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The keys of *Envoy's* environment variables exposed to this VM. In other words, if a key exists in Envoy's environment
+  variables, then that key-value pair will be injected. Note that if a key does not exist, it will be ignored.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.EnvironmentVariables.key_values:
+
+
+key_values
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_>) Explicitly given key-value pairs to be injected to this VM in the form of "KEY=VALUE".
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.wasm.v3.PluginConfig:
+
+extensions.wasm.v3.PluginConfig
+-------------------------------
+
+
+:repo:`[extensions.wasm.v3.PluginConfig proto] <api/envoy/extensions/wasm/v3/wasm.proto#L158>`
+
+Base Configuration for Wasm Plugins e.g. filters and services.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "root_id": ...,
+    "vm_config": {...},
+    "configuration": {...},
+    "fail_open": ...,
+    "failure_policy": ...,
+    "reload_config": {...},
+    "capability_restriction_config": {...},
+    "allow_on_headers_stop_iteration": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.wasm.v3.PluginConfig.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) A unique name for a filters/services in a VM for use in identifying the filter/service if
+  multiple filters/services are handled by the same ``vm_id`` and ``root_id`` and for
+  logging/debugging.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.PluginConfig.root_id:
+
+
+root_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) A unique ID for a set of filters/services in a VM which will share a RootContext and Contexts
+  if applicable (e.g. an Wasm HttpFilter and an Wasm AccessLog). If left blank, all
+  filters/services with a blank root_id with the same ``vm_id`` will share Context(s).
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.PluginConfig.vm_config:
+
+
+vm_config
+  (:ref:`extensions.wasm.v3.VmConfig <envoy_v3_api_msg_extensions.wasm.v3.VmConfig>`) 
+  Configuration for finding or starting VM.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.PluginConfig.configuration:
+
+
+configuration
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) Filter/service configuration used to configure or reconfigure a plugin
+  (``proxy_on_configure``).
+  ``google.protobuf.Struct`` is serialized as JSON before
+  passing it to the plugin. ``google.protobuf.BytesValue`` and
+  ``google.protobuf.StringValue`` are passed directly without the wrapper.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.PluginConfig.fail_open:
+
+
+fail_open
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If there is a fatal error on the VM (e.g. exception, ``abort()``, ``on_start`` or ``on_configure`` return false),
+  then all plugins associated with the VM will either fail closed (by default), e.g. by returning an HTTP 503 error,
+  or fail open (if 'fail_open' is set to true) by bypassing the filter.
+
+  .. note::
+    When ``on_start`` or ``on_configure`` return ``false`` during xDS updates the xDS configuration will be rejected and when ``on_start`` or ``on_configure`` return ``false`` on
+    initial startup the proxy will not start.
+
+  This field is deprecated in favor of the ``failure_policy`` field.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.PluginConfig.failure_policy:
+
+
+failure_policy
+  (:ref:`extensions.wasm.v3.FailurePolicy <envoy_v3_api_enum_extensions.wasm.v3.FailurePolicy>`) The failure policy for the plugin.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.PluginConfig.reload_config:
+
+
+reload_config
+  (:ref:`extensions.wasm.v3.ReloadConfig <envoy_v3_api_msg_extensions.wasm.v3.ReloadConfig>`) Reload configuration. This is only applied when ``failure_policy`` is set to ``FAIL_RELOAD``.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.PluginConfig.capability_restriction_config:
+
+
+capability_restriction_config
+  (:ref:`extensions.wasm.v3.CapabilityRestrictionConfig <envoy_v3_api_msg_extensions.wasm.v3.CapabilityRestrictionConfig>`) Configuration for restricting Proxy-Wasm capabilities available to modules.
+
+  This field is deprecated in favor of the :ref:`vm_config.capability_restriction_config
+  <envoy_v3_api_field_extensions.wasm.v3.VmConfig.capability_restriction_config>` field, because
+  the restrictions are applied to the Wasm VM and are therefore shared by every plugin running in
+  it. If this field is set and ``vm_config.capability_restriction_config`` is not, this field is
+  used to populate it.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.PluginConfig.allow_on_headers_stop_iteration:
+
+
+allow_on_headers_stop_iteration
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Whether or not to allow plugin onRequestHeaders and onResponseHeaders callbacks to return
+  FilterHeadersStatus::StopIteration.
+
+
+
+.. _envoy_v3_api_msg_extensions.wasm.v3.WasmService:
+
+extensions.wasm.v3.WasmService
+------------------------------
+
+
+:repo:`[extensions.wasm.v3.WasmService proto] <api/envoy/extensions/wasm/v3/wasm.proto#L216>`
+
+WasmService is configured as a built-in ``envoy.wasm_service`` :ref:`WasmService
+<config_wasm_service>` This opaque configuration will be used to create a Wasm Service.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config": {...},
+    "singleton": ...
+  }
+
+.. _envoy_v3_api_field_extensions.wasm.v3.WasmService.config:
+
+
+config
+  (:ref:`extensions.wasm.v3.PluginConfig <envoy_v3_api_msg_extensions.wasm.v3.PluginConfig>`) General plugin configuration.
+
+
+.. _envoy_v3_api_field_extensions.wasm.v3.WasmService.singleton:
+
+
+singleton
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, create a single VM rather than creating one VM per worker. Such a singleton can
+  not be used with filters.
+
+
+
+.. _envoy_v3_api_enum_extensions.wasm.v3.FailurePolicy:
+
+Enum extensions.wasm.v3.FailurePolicy
+-------------------------------------
+
+
+:repo:`[extensions.wasm.v3.FailurePolicy proto] <api/envoy/extensions/wasm/v3/wasm.proto#L23>`
+
+If there is a fatal error on the VM (e.g. exception, ``abort()``), then the policy will be applied.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.wasm.v3.FailurePolicy.UNSPECIFIED:
+
+
+UNSPECIFIED
+  *(DEFAULT)* ⁣No policy is specified. The default policy will be used. The default policy is ``FAIL_CLOSED``.
+
+
+.. _envoy_v3_api_enum_value_extensions.wasm.v3.FailurePolicy.FAIL_RELOAD:
+
+
+FAIL_RELOAD
+  ⁣New plugin instance will be created for the new request if the VM is failed. Note this will only
+  be applied to the following failures:
+
+  * ``proxy_wasm::FailState::RuntimeError``
+
+  This will fallback to the ``FAIL_CLOSED`` for all other failures.
+
+
+.. _envoy_v3_api_enum_value_extensions.wasm.v3.FailurePolicy.FAIL_CLOSED:
+
+
+FAIL_CLOSED
+  ⁣All plugins associated with the VM will return an HTTP 503 error.
+
+
+.. _envoy_v3_api_enum_value_extensions.wasm.v3.FailurePolicy.FAIL_OPEN:
+
+
+FAIL_OPEN
+  ⁣All plugins associated with the VM will be ignored and the filter chain will continue. This
+  makes sense when the plugin is optional.
+
+

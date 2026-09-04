@@ -1,0 +1,787 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Threat model &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="External dependencies" href="external_deps.html" />
+    <link rel="prev" title="Role Based Access Control" href="rbac_filter.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../http/http.html">HTTP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../observability/observability.html">Observability</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="security.html">Security</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="ssl.html">TLS</a></li>
+<li class="toctree-l4"><a class="reference internal" href="jwt_authn_filter.html">JSON Web Token (JWT) Authentication</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ext_authz_filter.html">External Authorization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rbac_filter.html">Role Based Access Control</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Threat model</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#extension-security-robust-to-untrusted-downstream-and-upstream">Extension security: <code class="docutils literal notranslate"><span class="pre">robust_to_untrusted_downstream_and_upstream</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#extension-security-data-plane-agnostic">Extension security: <code class="docutils literal notranslate"><span class="pre">data_plane_agnostic</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#extension-security-robust-to-untrusted-downstream">Extension security: <code class="docutils literal notranslate"><span class="pre">robust_to_untrusted_downstream</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#extension-security-requires-trusted-downstream-and-upstream">Extension security: <code class="docutils literal notranslate"><span class="pre">requires_trusted_downstream_and_upstream</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#extension-security-unknown">Extension security: <code class="docutils literal notranslate"><span class="pre">unknown</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="external_deps.html">External dependencies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="external_deps.html#external-dependencies-dataplane-core">External dependencies: <code class="docutils literal notranslate"><span class="pre">dataplane_core</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="external_deps.html#external-dependencies-dataplane-ext">External dependencies: <code class="docutils literal notranslate"><span class="pre">dataplane_ext</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="external_deps.html#external-dependencies-controlplane">External dependencies: <code class="docutils literal notranslate"><span class="pre">controlplane</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="external_deps.html#external-dependencies-api">External dependencies: <code class="docutils literal notranslate"><span class="pre">api</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="external_deps.html#external-dependencies-observability-core">External dependencies: <code class="docutils literal notranslate"><span class="pre">observability_core</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="external_deps.html#external-dependencies-observability-ext">External dependencies: <code class="docutils literal notranslate"><span class="pre">observability_ext</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="external_deps.html#external-dependencies-build">External dependencies: <code class="docutils literal notranslate"><span class="pre">build</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="external_deps.html#external-dependencies-other">External dependencies: <code class="docutils literal notranslate"><span class="pre">other</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="external_deps.html#external-dependencies-test-only">External dependencies: <code class="docutils literal notranslate"><span class="pre">test_only</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="google_vrp.html">Google Patch Reward Program (PRP)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced/advanced.html">Advanced</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="security.html">Security</a></li>
+      <li class="breadcrumb-item active">Threat model</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/intro/arch_overview/security/threat_model.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="threat-model">
+<span id="arch-overview-threat-model"></span><h1>Threat model<a class="headerlink" href="#threat-model" title="Link to this heading"></a></h1>
+<p>Below we articulate the Envoy threat model, which is of relevance to Envoy operators, developers and
+security researchers. We detail our security release process at
+<a class="reference external" href="https://github.com/envoyproxy/envoy/security/policy">https://github.com/envoyproxy/envoy/security/policy</a>.</p>
+<section id="confidentiality-integrity-and-availability">
+<h2>Confidentiality, integrity and availability<a class="headerlink" href="#confidentiality-integrity-and-availability" title="Link to this heading"></a></h2>
+<p>We consider vulnerabilities leading to the compromise of data confidentiality or integrity to be our
+highest priority concerns. Availability, in particular in areas relating to DoS and resource
+exhaustion, is also a serious security concern for Envoy operators, in particular those utilizing
+Envoy in edge deployments.</p>
+<p>We will activate the security release process for disclosures that meet the following criteria:</p>
+<ul class="simple">
+<li><p>All issues that lead to loss of data confidentiality or integrity trigger the security release process.</p></li>
+<li><p>An availability issue, such as Query-of-Death (QoD) or resource exhaustion needs to meet all of the
+following criteria to trigger the security release process:</p>
+<ul>
+<li><p>A component tagged as hardened is affected (see <a class="reference internal" href="#core-and-extensions">Core and extensions</a> for the list of hardened components).</p></li>
+<li><p>The type of traffic (upstream or downstream) that exhibits the issue matches the component’s hardening tag.
+I.e. component tagged as “hardened to untrusted downstream” is affected by downstream request.</p></li>
+<li><p>A resource exhaustion issue needs to meet these additional criteria:</p>
+<ul>
+<li><p>Not covered by an existing timeout or where applying short timeout values is impractical and either</p>
+<ul>
+<li><p>Memory exhaustion, including out of memory conditions, where per-request memory use 100x or more above
+the configured header or high watermark limit. I.e. 10 KiB client request leading to 1 MiB bytes of
+memory consumed by Envoy;</p></li>
+<li><p>Highly asymmetric CPU utilization where Envoy uses 100x or more CPU compared to client.</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>The Envoy availability stance around CPU and memory DoS is still evolving, especially for brute force
+attacks. We acknowledge that brute force (i.e. these with amplification factor less than 100) attacks are
+likely for Envoy deployments as part of cloud infrastructure or with the use of botnets. We will continue
+to iterate and fix well known resource issues in the open, e.g. overload manager and watermark improvements.
+We will activate the security process for brute force disclosures that appear to present a risk to
+existing Envoy deployments.</p>
+<p>Note that we do not currently consider the default settings for Envoy to be safe from an availability
+perspective. It is necessary for operators to explicitly <a class="reference internal" href="../../../configuration/best_practices/edge.html#best-practices-edge"><span class="std std-ref">configure</span></a>
+watermarks, the overload manager, circuit breakers and other resource related features in Envoy to
+provide a robust availability story. We will not act on any security disclosure that relates to a
+lack of safe defaults. Over time, we will work towards improved safe-by-default configuration, but
+due to backwards compatibility and performance concerns, this will require following the breaking
+change deprecation policy.</p>
+</section>
+<section id="build-configurations">
+<h2>Build configurations<a class="headerlink" href="#build-configurations" title="Link to this heading"></a></h2>
+<p>Issues that do not affect Envoy in published release configurations are not covered by the threat model
+and will not be considered security issues. This includes:</p>
+<ul class="simple">
+<li><p>Debug assertion failures, which are compiled out of Envoy release builds</p></li>
+<li><p>Use of TLS libraries other than BoringSSL</p></li>
+</ul>
+</section>
+<section id="envoy-configurations">
+<h2>Envoy configurations<a class="headerlink" href="#envoy-configurations" title="Link to this heading"></a></h2>
+<p>Issues that can only be hit by configuring a feature marked as deprecated (via protobuf annotations) are not
+covered by the security policy.</p>
+<p>Issues that can only be hit by enabling a <a class="reference internal" href="../operations/runtime.html#arch-overview-runtime"><span class="std std-ref">runtime flag</span></a> which defaults to
+false are not covered by the security policy.</p>
+</section>
+<section id="data-and-control-plane">
+<h2>Data and control plane<a class="headerlink" href="#data-and-control-plane" title="Link to this heading"></a></h2>
+<p>We divide our threat model into data and control plane, reflecting the internal division in Envoy of
+these concepts from an architectural perspective. Envoy’s core components are considered to be hardened
+against both untrusted downstream and upstream peers. As such our highest priority in risk assessment is the
+threat posed by untrusted downstream client or untrusted upstream server traffic on the data plane. This
+reflects the use of Envoy in an edge serving capacity and also the use of Envoy as a networking component in a
+service mesh deployment with unstrusted services.</p>
+<p>The control plane management server is generally trusted. We do not consider wire-level exploits
+against the xDS transport protocol to be a concern as a result. However, the configuration delivered
+to Envoy over xDS may originate from untrusted sources and may not be fully sanitized. An example of
+this might be a service operator that hosts multiple tenants on an Envoy, where tenants may specify
+a regular expression on a header match in <code class="docutils literal notranslate"><span class="pre">RouteConfiguration</span></code>. In this case, we expect that Envoy
+is resilient against the risks posed by malicious configuration from a confidentiality, integrity
+and availability perspective, as described above.</p>
+<p>For issues requiring control plane and data plane coordination, such as a configuration option which
+results in a Query of Death, risk is assessed by Envoy Security Team. If the configuration option is
+long-standing, turning it off presents a risk (e.g turning off overload manager) and leaving it on
+results in risk, the Security Team would usually opt to fix the issue under embargo. If a feature is new
+and a config change always results in a data plane crash, it might be classified as something the
+trusted control plane should disallow, and be fixed in the clear. For more nuanced issues, such as long
+standing configuration where only one variant is problematic, the Security Team will try to assess if
+there is an attack which presents a risk to any users, including large scale multi-tenant operators
+to determine if it should be fixed in the clear or not.</p>
+<p>We generally assume that services utilized for side calls during the request processing, e.g.
+external authorization, credential suppliers, rate limit services, are trusted. When this is not the
+case, an extension will explicitly state this in its documentation.</p>
+</section>
+<section id="core-and-extensions">
+<h2>Core and extensions<a class="headerlink" href="#core-and-extensions" title="Link to this heading"></a></h2>
+<p>Anything in the Envoy core may be used in both untrusted and trusted deployments, with the exception
+of features explicitly marked as alpha; alpha features are only supported in trusted deployments
+and do not qualify for treatment under the threat model below. As a consequence, the stable core should be hardened
+with this model in mind. Security issues related to core code will usually trigger the security release process as
+described in this document.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib</span></a> extensions are noted below and are not officially covered by
+the threat model or the Envoy security team. All indications below are best effort.</p>
+</div>
+<p>The following extensions are intended to be hardened against untrusted downstream and upstreams:</p>
+</section>
+</section>
+<section id="extension-security-robust-to-untrusted-downstream-and-upstream">
+<h1>Extension security: <code class="docutils literal notranslate"><span class="pre">robust_to_untrusted_downstream_and_upstream</span></code><a class="headerlink" href="#extension-security-robust-to-untrusted-downstream-and-upstream" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api-v3/extensions/bootstrap/internal_listener/v3/internal_listener.proto.html#extension-envoy-bootstrap-internal-listener"><span class="std std-ref">envoy.bootstrap.internal_listener</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/clusters/dns/v3/dns_cluster.proto.html#extension-envoy-clusters-dns"><span class="std std-ref">envoy.clusters.dns</span></a></p></li>
+<li><p><a class="reference internal" href="../upstream/service_discovery.html#extension-envoy-clusters-eds"><span class="std std-ref">envoy.clusters.eds</span></a></p></li>
+<li><p><a class="reference internal" href="../upstream/service_discovery.html#extension-envoy-clusters-logical-dns"><span class="std std-ref">envoy.clusters.logical_dns</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/cluster/v3/cluster.proto.html#extension-envoy-clusters-original-dst"><span class="std std-ref">envoy.clusters.original_dst</span></a></p></li>
+<li><p><a class="reference internal" href="../upstream/service_discovery.html#extension-envoy-clusters-static"><span class="std std-ref">envoy.clusters.static</span></a></p></li>
+<li><p><a class="reference internal" href="../upstream/service_discovery.html#extension-envoy-clusters-strict-dns"><span class="std std-ref">envoy.clusters.strict_dns</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/compression/qatzip/compressor/v3alpha/qatzip.proto.html#extension-envoy-compression-qatzip-compressor"><span class="std std-ref">envoy.compression.qatzip.compressor</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/compression/qatzstd/compressor/v3alpha/qatzstd.proto.html#extension-envoy-compression-qatzstd-compressor"><span class="std std-ref">envoy.compression.qatzstd.compressor</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/decompressor/v3/decompressor.proto.html#extension-envoy-filters-http-decompressor"><span class="std std-ref">envoy.filters.http.decompressor</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/ext_authz/v3/ext_authz.proto.html#extension-envoy-filters-http-ext-authz"><span class="std std-ref">envoy.filters.http.ext_authz</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/ext_proc/v3/processing_mode.proto.html#extension-envoy-filters-http-ext-proc"><span class="std std-ref">envoy.filters.http.ext_proc</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/router/v3/router.proto.html#extension-envoy-filters-http-router"><span class="std std-ref">envoy.filters.http.router</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/set_metadata/v3/set_metadata.proto.html#extension-envoy-filters-http-set-metadata"><span class="std std-ref">envoy.filters.http.set_metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/upstream_codec/v3/upstream_codec.proto.html#extension-envoy-filters-http-upstream-codec"><span class="std std-ref">envoy.filters.http.upstream_codec</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/listener/original_dst/v3/original_dst.proto.html#extension-envoy-filters-listener-original-dst"><span class="std std-ref">envoy.filters.listener.original_dst</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/listener/tls_inspector/v3/tls_inspector.proto.html#extension-envoy-filters-listener-tls-inspector"><span class="std std-ref">envoy.filters.listener.tls_inspector</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/connection_limit/v3/connection_limit.proto.html#extension-envoy-filters-network-connection-limit"><span class="std std-ref">envoy.filters.network.connection_limit</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/formatter/cel/v3/cel.proto.html#extension-envoy-formatter-cel"><span class="std std-ref">envoy.formatter.cel</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/formatter/file_content/v3/file_content.proto.html#extension-envoy-formatter-file-content"><span class="std std-ref">envoy.formatter.file_content</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/formatter/generic_secret/v3/generic_secret.proto.html#extension-envoy-formatter-generic-secret"><span class="std std-ref">envoy.formatter.generic_secret</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/formatter/metadata/v3/metadata.proto.html#extension-envoy-formatter-metadata"><span class="std std-ref">envoy.formatter.metadata</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/formatter/req_without_query/v3/req_without_query.proto.html#extension-envoy-formatter-req-without-query"><span class="std std-ref">envoy.formatter.req_without_query</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/health_check/event_sinks/file/v3/file.proto.html#extension-envoy-health-check-event-sinks-file"><span class="std std-ref">envoy.health_check.event_sinks.file</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.proto.html#extension-envoy-http-early-header-mutation-header-mutation"><span class="std std-ref">envoy.http.early_header_mutation.header_mutation</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/http/header_formatters/preserve_case/v3/preserve_case.proto.html#extension-envoy-http-stateful-header-formatters-preserve-case"><span class="std std-ref">envoy.http.stateful_header_formatters.preserve_case</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.proto.html#extension-envoy-internal-redirect-predicates-allow-listed-routes"><span class="std std-ref">envoy.internal_redirect_predicates.allow_listed_routes</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/internal_redirect/filter_state/v3/filter_state_config.proto.html#extension-envoy-internal-redirect-predicates-filter-state"><span class="std std-ref">envoy.internal_redirect_predicates.filter_state</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/internal_redirect/previous_routes/v3/previous_routes_config.proto.html#extension-envoy-internal-redirect-predicates-previous-routes"><span class="std std-ref">envoy.internal_redirect_predicates.previous_routes</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/internal_redirect/safe_cross_scheme/v3/safe_cross_scheme_config.proto.html#extension-envoy-internal-redirect-predicates-safe-cross-scheme"><span class="std std-ref">envoy.internal_redirect_predicates.safe_cross_scheme</span></a></p></li>
+<li><p>envoy.io_socket.user_space</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/load_balancing_policies/cluster_provided/v3/cluster_provided.proto.html#extension-envoy-load-balancing-policies-cluster-provided"><span class="std std-ref">envoy.load_balancing_policies.cluster_provided</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/load_balancing_policies/maglev/v3/maglev.proto.html#extension-envoy-load-balancing-policies-maglev"><span class="std std-ref">envoy.load_balancing_policies.maglev</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/load_balancing_policies/random/v3/random.proto.html#extension-envoy-load-balancing-policies-random"><span class="std std-ref">envoy.load_balancing_policies.random</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/load_balancing_policies/ring_hash/v3/ring_hash.proto.html#extension-envoy-load-balancing-policies-ring-hash"><span class="std std-ref">envoy.load_balancing_policies.ring_hash</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/load_balancing_policies/round_robin/v3/round_robin.proto.html#extension-envoy-load-balancing-policies-round-robin"><span class="std std-ref">envoy.load_balancing_policies.round_robin</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/load_balancing_policies/subset/v3/subset.proto.html#extension-envoy-load-balancing-policies-subset"><span class="std std-ref">envoy.load_balancing_policies.subset</span></a></p></li>
+<li><p><a class="reference internal" href="../advanced/matching/matching_api.html#extension-envoy-matching-matchers-cel-matcher"><span class="std std-ref">envoy.matching.matchers.cel_matcher</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/input_matchers/ip/v3/ip.proto.html#extension-envoy-matching-matchers-ip"><span class="std std-ref">envoy.matching.matchers.ip</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/input_matchers/runtime_fraction/v3/runtime_fraction.proto.html#extension-envoy-matching-matchers-runtime-fraction"><span class="std std-ref">envoy.matching.matchers.runtime_fraction</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.proto.html#extension-envoy-network-dns-resolver-apple"><span class="std std-ref">envoy.network.dns_resolver.apple</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.proto.html#extension-envoy-network-dns-resolver-cares"><span class="std std-ref">envoy.network.dns_resolver.cares</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.proto.html#extension-envoy-network-dns-resolver-getaddrinfo"><span class="std std-ref">envoy.network.dns_resolver.getaddrinfo</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/network/dns_resolver/hickory/v3/hickory_dns_resolver.proto.html#extension-envoy-network-dns-resolver-hickory"><span class="std std-ref">envoy.network.dns_resolver.hickory</span></a> (alpha)</p></li>
+<li><p>envoy.path.match.uri_template.uri_template_matcher</p></li>
+<li><p>envoy.path.rewrite.uri_template.uri_template_rewriter</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/queue_policy/fifo/v3/fifo.proto.html#extension-envoy-queue-policy-fifo"><span class="std std-ref">envoy.queue_policy.fifo</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/quic/connection_debug_visitor/quic_stats/v3/quic_stats.proto.html#extension-envoy-quic-connection-debug-visitor-quic-stats"><span class="std std-ref">envoy.quic.connection_debug_visitor.quic_stats</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator.proto.html#extension-envoy-quic-deterministic-connection-id-generator"><span class="std std-ref">envoy.quic.deterministic_connection_id_generator</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/quic/client_writer_factory/v3/default_client_writer.proto.html#extension-envoy-quic-packet-writer-default"><span class="std std-ref">envoy.quic.packet_writer.default</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/rbac/principals/mtls_authenticated/v3/mtls_authenticated.proto.html#extension-envoy-rbac-principals-mtls-authenticated"><span class="std std-ref">envoy.rbac.principals.mtls_authenticated</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/regex_engines/v3/google_re2.proto.html#extension-envoy-regex-engines-google-re2"><span class="std std-ref">envoy.regex_engines.google_re2</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/request_id/uuid/v3/uuid.proto.html#extension-envoy-request-id-uuid"><span class="std std-ref">envoy.request_id.uuid</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/router/cluster_specifiers/lua/v3/lua.proto.html#extension-envoy-router-cluster-specifier-plugin-lua"><span class="std std-ref">envoy.router.cluster_specifier_plugin.lua</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/router/cluster_specifiers/matcher/v3/matcher.proto.html#extension-envoy-router-cluster-specifier-plugin-matcher"><span class="std std-ref">envoy.router.cluster_specifier_plugin.matcher</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/string_matcher/lua/v3/lua.proto.html#extension-envoy-string-matcher-lua"><span class="std std-ref">envoy.string_matcher.lua</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/alts/v3/alts.proto.html#extension-envoy-transport-sockets-alts"><span class="std std-ref">envoy.transport_sockets.alts</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/internal_upstream/v3/internal_upstream.proto.html#extension-envoy-transport-sockets-internal-upstream"><span class="std std-ref">envoy.transport_sockets.internal_upstream</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/quic/v3/quic_transport.proto.html#extension-envoy-transport-sockets-quic"><span class="std std-ref">envoy.transport_sockets.quic</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/raw_buffer/v3/raw_buffer.proto.html#extension-envoy-transport-sockets-raw-buffer"><span class="std std-ref">envoy.transport_sockets.raw_buffer</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/starttls/v3/starttls.proto.html#extension-envoy-transport-sockets-starttls"><span class="std std-ref">envoy.transport_sockets.starttls</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/tcp_stats/v3/tcp_stats.proto.html#extension-envoy-transport-sockets-tcp-stats"><span class="std std-ref">envoy.transport_sockets.tcp_stats</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/tls/v3/tls.proto.html#extension-envoy-transport-sockets-tls"><span class="std std-ref">envoy.transport_sockets.tls</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.proto.html#extension-envoy-transport-sockets-upstream-proxy-protocol"><span class="std std-ref">envoy.transport_sockets.upstream_proxy_protocol</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/udp_packet_writer/v3/udp_default_writer_factory.proto.html#extension-envoy-udp-packet-writer-default"><span class="std std-ref">envoy.udp_packet_writer.default</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/udp_packet_writer/v3/udp_gso_batch_writer_factory.proto.html#extension-envoy-udp-packet-writer-gso"><span class="std std-ref">envoy.udp_packet_writer.gso</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/wasm/v3/wasm.proto.html#extension-envoy-wasm-runtime-null"><span class="std std-ref">envoy.wasm.runtime.null</span></a></p></li>
+</ul>
+<p>The following extensions should not be exposed to data plane attack vectors and hence are intended
+to be robust to untrusted downstreams and upstreams:</p>
+</section>
+<section id="extension-security-data-plane-agnostic">
+<h1>Extension security: <code class="docutils literal notranslate"><span class="pre">data_plane_agnostic</span></code><a class="headerlink" href="#extension-security-data-plane-agnostic" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api-v3/config/grpc_credential/v3/file_based_metadata.proto.html#extension-envoy-grpc-credentials-file-based-metadata"><span class="std std-ref">envoy.grpc_credentials.file_based_metadata</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/key_value/file_based/v3/config.proto.html#extension-envoy-key-value-file-based"><span class="std std-ref">envoy.key_value.file_based</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/resource_monitors/cgroup_memory/v3/cgroup_memory.proto.html#extension-envoy-resource-monitors-cgroup-memory"><span class="std std-ref">envoy.resource_monitors.cgroup_memory</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.proto.html#extension-envoy-resource-monitors-cpu-utilization"><span class="std std-ref">envoy.resource_monitors.cpu_utilization</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/resource_monitors/fixed_heap/v3/fixed_heap.proto.html#extension-envoy-resource-monitors-fixed-heap"><span class="std std-ref">envoy.resource_monitors.fixed_heap</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/resource_monitors/downstream_connections/v3/downstream_connections.proto.html#extension-envoy-resource-monitors-global-downstream-max-connections"><span class="std std-ref">envoy.resource_monitors.global_downstream_max_connections</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/resource_monitors/injected_resource/v3/injected_resource.proto.html#extension-envoy-resource-monitors-injected-resource"><span class="std std-ref">envoy.resource_monitors.injected_resource</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/metrics/v3/stats.proto.html#extension-envoy-stat-sinks-dog-statsd"><span class="std std-ref">envoy.stat_sinks.dog_statsd</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/stat_sinks/graphite_statsd/v3/graphite_statsd.proto.html#extension-envoy-stat-sinks-graphite-statsd"><span class="std std-ref">envoy.stat_sinks.graphite_statsd</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/metrics/v3/stats.proto.html#extension-envoy-stat-sinks-hystrix"><span class="std std-ref">envoy.stat_sinks.hystrix</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/stat_sinks/kafka/v3/kafka_stats_sink.proto.html#extension-envoy-stat-sinks-kafka"><span class="std std-ref">envoy.stat_sinks.kafka</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/metrics/v3/metrics_service.proto.html#extension-envoy-stat-sinks-metrics-service"><span class="std std-ref">envoy.stat_sinks.metrics_service</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/stat_sinks/open_telemetry/v3/open_telemetry.proto.html#extension-envoy-stat-sinks-open-telemetry"><span class="std std-ref">envoy.stat_sinks.open_telemetry</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/metrics/v3/stats.proto.html#extension-envoy-stat-sinks-statsd"><span class="std std-ref">envoy.stat_sinks.statsd</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/stat_sinks/wasm/v3/wasm.proto.html#extension-envoy-stat-sinks-wasm"><span class="std std-ref">envoy.stat_sinks.wasm</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/stat_sinks/wasm_filter/v3/wasm_filter.proto.html#extension-envoy-stat-sinks-wasm-filter"><span class="std std-ref">envoy.stat_sinks.wasm_filter</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/watchdog/backtrace_action/v3/backtrace_action.proto.html#extension-envoy-watchdog-backtrace-action"><span class="std std-ref">envoy.watchdog.backtrace_action</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/watchdog/profile_action/v3/profile_action.proto.html#extension-envoy-watchdog-profile-action"><span class="std std-ref">envoy.watchdog.profile_action</span></a> (alpha)</p></li>
+</ul>
+<p>The following extensions are intended to be hardened against untrusted downstreams but assume trusted
+upstreams:</p>
+</section>
+<section id="extension-security-robust-to-untrusted-downstream">
+<h1>Extension security: <code class="docutils literal notranslate"><span class="pre">robust_to_untrusted_downstream</span></code><a class="headerlink" href="#extension-security-robust-to-untrusted-downstream" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api-v3/extensions/access_loggers/file/v3/file.proto.html#extension-envoy-access-loggers-file"><span class="std std-ref">envoy.access_loggers.file</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/access_loggers/fluentd/v3/fluentd.proto.html#extension-envoy-access-loggers-fluentd"><span class="std std-ref">envoy.access_loggers.fluentd</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/access_loggers/grpc/v3/als.proto.html#extension-envoy-access-loggers-http-grpc"><span class="std std-ref">envoy.access_loggers.http_grpc</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/access_loggers/open_telemetry/v3/logs_service.proto.html#extension-envoy-access-loggers-open-telemetry"><span class="std std-ref">envoy.access_loggers.open_telemetry</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/access_loggers/stream/v3/stream.proto.html#extension-envoy-access-loggers-stderr"><span class="std std-ref">envoy.access_loggers.stderr</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/access_loggers/stream/v3/stream.proto.html#extension-envoy-access-loggers-stdout"><span class="std std-ref">envoy.access_loggers.stdout</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/access_loggers/grpc/v3/als.proto.html#extension-envoy-access-loggers-tcp-grpc"><span class="std std-ref">envoy.access_loggers.tcp_grpc</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/clusters/dynamic_forward_proxy/v3/cluster.proto.html#extension-envoy-clusters-dynamic-forward-proxy"><span class="std std-ref">envoy.clusters.dynamic_forward_proxy</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/compression/brotli/compressor/v3/brotli.proto.html#extension-envoy-compression-brotli-compressor"><span class="std std-ref">envoy.compression.brotli.compressor</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/compression/brotli/decompressor/v3/brotli.proto.html#extension-envoy-compression-brotli-decompressor"><span class="std std-ref">envoy.compression.brotli.decompressor</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/compression/gzip/compressor/v3/gzip.proto.html#extension-envoy-compression-gzip-compressor"><span class="std std-ref">envoy.compression.gzip.compressor</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/compression/gzip/decompressor/v3/gzip.proto.html#extension-envoy-compression-gzip-decompressor"><span class="std std-ref">envoy.compression.gzip.decompressor</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/compression/zstd/compressor/v3/zstd.proto.html#extension-envoy-compression-zstd-compressor"><span class="std std-ref">envoy.compression.zstd.compressor</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/content_parsers/json/v3/json_content_parser.proto.html#extension-envoy-content-parsers-json"><span class="std std-ref">envoy.content_parsers.json</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/api_key_auth/v3/api_key_auth.proto.html#extension-envoy-filters-http-api-key-auth"><span class="std std-ref">envoy.filters.http.api_key_auth</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/aws_eventstream_parser/v3/aws_eventstream_parser.proto.html#extension-envoy-filters-http-aws-eventstream-parser"><span class="std std-ref">envoy.filters.http.aws_eventstream_parser</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/basic_auth/v3/basic_auth.proto.html#extension-envoy-filters-http-basic-auth"><span class="std std-ref">envoy.filters.http.basic_auth</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/body_size_limit/v3/body_size_limit.proto.html#extension-envoy-filters-http-body-size-limit"><span class="std std-ref">envoy.filters.http.body_size_limit</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/buffer/v3/buffer.proto.html#extension-envoy-filters-http-buffer"><span class="std std-ref">envoy.filters.http.buffer</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/compressor/v3/compressor.proto.html#extension-envoy-filters-http-compressor"><span class="std std-ref">envoy.filters.http.compressor</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/cors/v3/cors.proto.html#extension-envoy-filters-http-cors"><span class="std std-ref">envoy.filters.http.cors</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/csrf/v3/csrf.proto.html#extension-envoy-filters-http-csrf"><span class="std std-ref">envoy.filters.http.csrf</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.proto.html#extension-envoy-filters-http-dynamic-forward-proxy"><span class="std std-ref">envoy.filters.http.dynamic_forward_proxy</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/fault/v3/fault.proto.html#extension-envoy-filters-http-fault"><span class="std std-ref">envoy.filters.http.fault</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/grpc_json_transcoder/v3/transcoder.proto.html#extension-envoy-filters-http-grpc-json-transcoder"><span class="std std-ref">envoy.filters.http.grpc_json_transcoder</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/grpc_web/v3/grpc_web.proto.html#extension-envoy-filters-http-grpc-web"><span class="std std-ref">envoy.filters.http.grpc_web</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/header_to_metadata/v3/header_to_metadata.proto.html#extension-envoy-filters-http-header-to-metadata"><span class="std std-ref">envoy.filters.http.header_to_metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/health_check/v3/health_check.proto.html#extension-envoy-filters-http-health-check"><span class="std std-ref">envoy.filters.http.health_check</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/ip_tagging/v3/ip_tagging.proto.html#extension-envoy-filters-http-ip-tagging"><span class="std std-ref">envoy.filters.http.ip_tagging</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/json_to_metadata/v3/json_to_metadata.proto.html#extension-envoy-filters-http-json-to-metadata"><span class="std std-ref">envoy.filters.http.json_to_metadata</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#extension-envoy-filters-http-jwt-authn"><span class="std std-ref">envoy.filters.http.jwt_authn</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/kill_request/v3/kill_request.proto.html#extension-envoy-filters-http-kill-request"><span class="std std-ref">envoy.filters.http.kill_request</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/lua/v3/lua.proto.html#extension-envoy-filters-http-lua"><span class="std std-ref">envoy.filters.http.lua</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#extension-envoy-filters-http-oauth2"><span class="std std-ref">envoy.filters.http.oauth2</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/on_demand/v3/on_demand.proto.html#extension-envoy-filters-http-on-demand"><span class="std std-ref">envoy.filters.http.on_demand</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/original_src/v3/original_src.proto.html#extension-envoy-filters-http-original-src"><span class="std std-ref">envoy.filters.http.original_src</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/ratelimit/v3/rate_limit.proto.html#extension-envoy-filters-http-ratelimit"><span class="std std-ref">envoy.filters.http.ratelimit</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/rbac/v3/rbac.proto.html#extension-envoy-filters-http-rbac"><span class="std std-ref">envoy.filters.http.rbac</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/sse_to_metadata/v3/sse_to_metadata.proto.html#extension-envoy-filters-http-sse-to-metadata"><span class="std std-ref">envoy.filters.http.sse_to_metadata</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/sxg/v3alpha/sxg.proto.html#extension-envoy-filters-http-sxg"><span class="std std-ref">envoy.filters.http.sxg</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/thrift_to_metadata/v3/thrift_to_metadata.proto.html#extension-envoy-filters-http-thrift-to-metadata"><span class="std std-ref">envoy.filters.http.thrift_to_metadata</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../configuration/http/http_filters/upstream_rbac_filter.html#extension-envoy-filters-http-upstream-rbac"><span class="std std-ref">envoy.filters.http.upstream_rbac</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/listener/local_ratelimit/v3/local_ratelimit.proto.html#extension-envoy-filters-listener-local-ratelimit"><span class="std std-ref">envoy.filters.listener.local_ratelimit</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/listener/original_src/v3/original_src.proto.html#extension-envoy-filters-listener-original-src"><span class="std std-ref">envoy.filters.listener.original_src</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/listener/postgres_inspector/v3alpha/postgres_inspector.proto.html#extension-envoy-filters-listener-postgres-inspector"><span class="std std-ref">envoy.filters.listener.postgres_inspector</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.proto.html#extension-envoy-filters-listener-proxy-protocol"><span class="std std-ref">envoy.filters.listener.proxy_protocol</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.proto.html#extension-envoy-filters-network-client-ssl-auth"><span class="std std-ref">envoy.filters.network.client_ssl_auth</span></a> (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#extension-envoy-filters-network-envoy-mobile-http-connection-manager"><span class="std std-ref">envoy.filters.network.envoy_mobile_http_connection_manager</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/ext_authz/v3/ext_authz.proto.html#extension-envoy-filters-network-ext-authz"><span class="std std-ref">envoy.filters.network.ext_authz</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#extension-envoy-filters-network-http-connection-manager"><span class="std std-ref">envoy.filters.network.http_connection_manager</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/local_ratelimit/v3/local_rate_limit.proto.html#extension-envoy-filters-network-local-ratelimit"><span class="std std-ref">envoy.filters.network.local_ratelimit</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/ratelimit/v3/rate_limit.proto.html#extension-envoy-filters-network-ratelimit"><span class="std std-ref">envoy.filters.network.ratelimit</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/rbac/v3/rbac.proto.html#extension-envoy-filters-network-rbac"><span class="std std-ref">envoy.filters.network.rbac</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto.html#extension-envoy-filters-network-tcp-proxy"><span class="std std-ref">envoy.filters.network.tcp_proxy</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/udp/dns_filter/v3/dns_filter.proto.html#extension-envoy-filters-udp-dns-filter"><span class="std std-ref">envoy.filters.udp.dns_filter</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/session/dynamic_forward_proxy/v3/dynamic_forward_proxy.proto.html#extension-envoy-filters-udp-session-dynamic-forward-proxy"><span class="std std-ref">envoy.filters.udp.session.dynamic_forward_proxy</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/session/ext_authz/v3/ext_authz.proto.html#extension-envoy-filters-udp-session-ext-authz"><span class="std std-ref">envoy.filters.udp.session.ext_authz</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/session/http_capsule/v3/http_capsule.proto.html#extension-envoy-filters-udp-session-http-capsule"><span class="std std-ref">envoy.filters.udp.session.http_capsule</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.html#extension-envoy-filters-udp-listener-udp-proxy"><span class="std std-ref">envoy.filters.udp_listener.udp_proxy</span></a></p></li>
+<li><p><a class="reference internal" href="../upstream/health_checking.html#extension-envoy-health-checkers-grpc"><span class="std std-ref">envoy.health_checkers.grpc</span></a></p></li>
+<li><p><a class="reference internal" href="../upstream/health_checking.html#extension-envoy-health-checkers-http"><span class="std std-ref">envoy.health_checkers.http</span></a></p></li>
+<li><p><a class="reference internal" href="../upstream/health_checking.html#extension-envoy-health-checkers-tcp"><span class="std std-ref">envoy.health_checkers.tcp</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/http/original_ip_detection/custom_header/v3/custom_header.proto.html#extension-envoy-http-original-ip-detection-custom-header"><span class="std std-ref">envoy.http.original_ip_detection.custom_header</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/http/original_ip_detection/xff/v3/xff.proto.html#extension-envoy-http-original-ip-detection-xff"><span class="std std-ref">envoy.http.original_ip_detection.xff</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/environment_variable/v3/input.proto.html#extension-envoy-matching-common-inputs-environment-variable"><span class="std std-ref">envoy.matching.common_inputs.environment_variable</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.proto.html#extension-envoy-matching-matchers-consistent-hashing"><span class="std std-ref">envoy.matching.matchers.consistent_hashing</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/quic/crypto_stream/v3/crypto_stream.proto.html#extension-envoy-quic-crypto-stream-server-quiche"><span class="std std-ref">envoy.quic.crypto_stream.server.quiche</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/quic/proof_source/v3/proof_source.proto.html#extension-envoy-quic-proof-source-filter-chain"><span class="std std-ref">envoy.quic.proof_source.filter_chain</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/quic/server_preferred_address/v3/datasource.proto.html#extension-envoy-quic-server-preferred-address-datasource"><span class="std std-ref">envoy.quic.server_preferred_address.datasource</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/quic/server_preferred_address/v3/fixed_server_preferred_address_config.proto.html#extension-envoy-quic-server-preferred-address-fixed"><span class="std std-ref">envoy.quic.server_preferred_address.fixed</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/retry/host/omit_canary_hosts/v3/omit_canary_hosts.proto.html#extension-envoy-retry-host-predicates-omit-canary-hosts"><span class="std std-ref">envoy.retry_host_predicates.omit_canary_hosts</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.proto.html#extension-envoy-retry-host-predicates-omit-host-metadata"><span class="std std-ref">envoy.retry_host_predicates.omit_host_metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/retry/host/previous_hosts/v3/previous_hosts.proto.html#extension-envoy-retry-host-predicates-previous-hosts"><span class="std std-ref">envoy.retry_host_predicates.previous_hosts</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.proto.html#extension-envoy-retry-priorities-previous-priorities"><span class="std std-ref">envoy.retry_priorities.previous_priorities</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/early_data/v3/default_early_data_policy.proto.html#extension-envoy-route-early-data-policy-default"><span class="std std-ref">envoy.route.early_data_policy.default</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/private_key_providers/cryptomb/v3alpha/cryptomb.proto.html#extension-envoy-tls-key-providers-cryptomb"><span class="std std-ref">envoy.tls.key_providers.cryptomb</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/private_key_providers/kae/v3alpha/kae.proto.html#extension-envoy-tls-key-providers-kae"><span class="std std-ref">envoy.tls.key_providers.kae</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/private_key_providers/qat/v3alpha/qat.proto.html#extension-envoy-tls-key-providers-qat"><span class="std std-ref">envoy.tls.key_providers.qat</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/trace/v3/datadog.proto.html#extension-envoy-tracers-datadog"><span class="std std-ref">envoy.tracers.datadog</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/trace/v3/xray.proto.html#extension-envoy-tracers-xray"><span class="std std-ref">envoy.tracers.xray</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/trace/v3/zipkin.proto.html#extension-envoy-tracers-zipkin"><span class="std std-ref">envoy.tracers.zipkin</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/upstreams/http/generic/v3/generic_connection_pool.proto.html#extension-envoy-upstreams-http-generic"><span class="std std-ref">envoy.upstreams.http.generic</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/upstreams/http/http/v3/http_connection_pool.proto.html#extension-envoy-upstreams-http-http"><span class="std std-ref">envoy.upstreams.http.http</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/upstreams/http/v3/http_protocol_options.proto.html#extension-envoy-upstreams-http-http-protocol-options"><span class="std std-ref">envoy.upstreams.http.http_protocol_options</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/upstreams/http/tcp/v3/tcp_connection_pool.proto.html#extension-envoy-upstreams-http-tcp"><span class="std std-ref">envoy.upstreams.http.tcp</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/upstreams/http/udp/v3/udp_connection_pool.proto.html#extension-envoy-upstreams-http-udp"><span class="std std-ref">envoy.upstreams.http.udp</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/upstreams/tcp/generic/v3/generic_connection_pool.proto.html#extension-envoy-upstreams-tcp-generic"><span class="std std-ref">envoy.upstreams.tcp.generic</span></a></p></li>
+</ul>
+<p>The following extensions should only be used when both the downstream and upstream are trusted:</p>
+</section>
+<section id="extension-security-requires-trusted-downstream-and-upstream">
+<h1>Extension security: <code class="docutils literal notranslate"><span class="pre">requires_trusted_downstream_and_upstream</span></code><a class="headerlink" href="#extension-security-requires-trusted-downstream-and-upstream" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api-v3/extensions/access_loggers/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-access-loggers-dynamic-modules"><span class="std std-ref">envoy.access_loggers.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/bootstrap/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-bootstrap-dynamic-modules"><span class="std std-ref">envoy.bootstrap.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/contrib/reverse_tunnel_reporter/reverse_tunnel_reporter.html#extension-envoy-bootstrap-reverse-tunnel-reverse-tunnel-reporting-service"><span class="std std-ref">envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/vcl/v3alpha/vcl_socket_interface.proto.html#extension-envoy-bootstrap-vcl"><span class="std std-ref">envoy.bootstrap.vcl</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/clusters/aggregate/v3/cluster.proto.html#extension-envoy-clusters-aggregate"><span class="std std-ref">envoy.clusters.aggregate</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/clusters/composite/v3/cluster.proto.html#extension-envoy-clusters-composite"><span class="std std-ref">envoy.clusters.composite</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/clusters/dynamic_modules/v3/cluster.proto.html#extension-envoy-clusters-dynamic-modules"><span class="std std-ref">envoy.clusters.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/clusters/mcp_multicluster/v3/cluster.proto.html#extension-envoy-clusters-mcp-multicluster"><span class="std std-ref">envoy.clusters.mcp_multicluster</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/clusters/redis/v3/redis_cluster.proto.html#extension-envoy-clusters-redis"><span class="std std-ref">envoy.clusters.redis</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/compression/zstd/decompressor/v3/zstd.proto.html#extension-envoy-compression-zstd-decompressor"><span class="std std-ref">envoy.compression.zstd.decompressor</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/generic_proxy/router/v3/router.proto.html#extension-envoy-filters-generic-router"><span class="std std-ref">envoy.filters.generic.router</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/alpn/v3/alpn.proto.html#extension-envoy-filters-http-alpn"><span class="std std-ref">envoy.filters.http.alpn</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/aws_lambda/v3/aws_lambda.proto.html#extension-envoy-filters-http-aws-lambda"><span class="std std-ref">envoy.filters.http.aws_lambda</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/aws_request_signing/v3/aws_request_signing.proto.html#extension-envoy-filters-http-aws-request-signing"><span class="std std-ref">envoy.filters.http.aws_request_signing</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/checksum/v3alpha/checksum.proto.html#extension-envoy-filters-http-checksum"><span class="std std-ref">envoy.filters.http.checksum</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-filters-http-dynamic-modules"><span class="std std-ref">envoy.filters.http.dynamic_modules</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/dynamo/v3/dynamo.proto.html#extension-envoy-filters-http-dynamo"><span class="std std-ref">envoy.filters.http.dynamo</span></a> (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/golang/v3alpha/golang.proto.html#extension-envoy-filters-http-golang"><span class="std std-ref">envoy.filters.http.golang</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/istio_stats/v3/istio_stats.proto.html#extension-envoy-filters-http-istio-stats"><span class="std std-ref">envoy.filters.http.istio_stats</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/language/v3alpha/language.proto.html#extension-envoy-filters-http-language"><span class="std std-ref">envoy.filters.http.language</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/contrib/load_balancing_policies/peak_ewma/peak_ewma.html#extension-envoy-filters-http-peak-ewma"><span class="std std-ref">envoy.filters.http.peak_ewma</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/peer_metadata/v3/peer_metadata.proto.html#extension-envoy-filters-http-peer-metadata"><span class="std std-ref">envoy.filters.http.peer_metadata</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/stateful_session/v3/stateful_session.proto.html#extension-envoy-filters-http-stateful-session"><span class="std std-ref">envoy.filters.http.stateful_session</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/tap/v3/tap.proto.html#extension-envoy-filters-http-tap"><span class="std std-ref">envoy.filters.http.tap</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/listener/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-filters-listener-dynamic-modules"><span class="std std-ref">envoy.filters.listener.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/listener/http_inspector/v3/http_inspector.proto.html#extension-envoy-filters-listener-http-inspector"><span class="std std-ref">envoy.filters.listener.http_inspector</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.proto.html#extension-envoy-filters-network-dubbo-proxy"><span class="std std-ref">envoy.filters.network.dubbo_proxy</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-filters-network-dynamic-modules"><span class="std std-ref">envoy.filters.network.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/generic_proxy/v3/generic_proxy.proto.html#extension-envoy-filters-network-generic-proxy"><span class="std std-ref">envoy.filters.network.generic_proxy</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/golang/v3alpha/golang.proto.html#extension-envoy-filters-network-golang"><span class="std std-ref">envoy.filters.network.golang</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/metadata_exchange/v3/metadata_exchange.proto.html#extension-envoy-filters-network-metadata-exchange"><span class="std std-ref">envoy.filters.network.metadata_exchange</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/mongo_proxy/v3/mongo_proxy.proto.html#extension-envoy-filters-network-mongo-proxy"><span class="std std-ref">envoy.filters.network.mongo_proxy</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/mysql_proxy/v3/mysql_proxy.proto.html#extension-envoy-filters-network-mysql-proxy"><span class="std std-ref">envoy.filters.network.mysql_proxy</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/peer_metadata/v3/peer_metadata.proto.html#extension-envoy-filters-network-peer-metadata"><span class="std std-ref">envoy.filters.network.peer_metadata</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.proto.html#extension-envoy-filters-network-postgres-proxy"><span class="std std-ref">envoy.filters.network.postgres_proxy</span></a> (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/redis_proxy/v3/redis_proxy.proto.html#extension-envoy-filters-network-redis-proxy"><span class="std std-ref">envoy.filters.network.redis_proxy</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.proto.html#extension-envoy-filters-network-rocketmq-proxy"><span class="std std-ref">envoy.filters.network.rocketmq_proxy</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.proto.html#extension-envoy-filters-network-sip-proxy"><span class="std std-ref">envoy.filters.network.sip_proxy</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/thrift_proxy/v3/thrift_proxy.proto.html#extension-envoy-filters-network-thrift-proxy"><span class="std std-ref">envoy.filters.network.thrift_proxy</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.proto.html#extension-envoy-filters-network-zookeeper-proxy"><span class="std std-ref">envoy.filters.network.zookeeper_proxy</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/sip_proxy/router/v3alpha/router.proto.html#extension-envoy-filters-sip-router"><span class="std std-ref">envoy.filters.sip.router</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/thrift_proxy/filters/header_to_metadata/v3/header_to_metadata.proto.html#extension-envoy-filters-thrift-header-to-metadata"><span class="std std-ref">envoy.filters.thrift.header_to_metadata</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/v3/payload_to_metadata.proto.html#extension-envoy-filters-thrift-payload-to-metadata"><span class="std std-ref">envoy.filters.thrift.payload_to_metadata</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.proto.html#extension-envoy-filters-thrift-rate-limit"><span class="std std-ref">envoy.filters.thrift.rate_limit</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/thrift_proxy/router/v3/router.proto.html#extension-envoy-filters-thrift-router"><span class="std std-ref">envoy.filters.thrift.router</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/udp/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-filters-udp-listener-dynamic-modules"><span class="std std-ref">envoy.filters.udp_listener.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/formatter/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-formatter-dynamic-modules"><span class="std std-ref">envoy.formatter.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/generic_proxy/codecs/dubbo/v3/dubbo.proto.html#extension-envoy-generic-proxy-codecs-dubbo"><span class="std std-ref">envoy.generic_proxy.codecs.dubbo</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/generic_proxy/codecs/http1/v3/http1.proto.html#extension-envoy-generic-proxy-codecs-http1"><span class="std std-ref">envoy.generic_proxy.codecs.http1</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/health_checkers/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-health-checkers-dynamic-modules"><span class="std std-ref">envoy.health_checkers.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/health_checkers/redis/v3/redis.proto.html#extension-envoy-health-checkers-redis"><span class="std std-ref">envoy.health_checkers.redis</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/health_checkers/thrift/v3/thrift.proto.html#extension-envoy-health-checkers-thrift"><span class="std std-ref">envoy.health_checkers.thrift</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/load_balancing_policies/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-load-balancing-policies-dynamic-modules"><span class="std std-ref">envoy.load_balancing_policies.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/contrib/load_balancing_policies/peak_ewma/peak_ewma.html#extension-envoy-load-balancing-policies-peak-ewma"><span class="std std-ref">envoy.load_balancing_policies.peak_ewma</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.proto.html#extension-envoy-matching-input-matchers-hyperscan"><span class="std std-ref">envoy.matching.input_matchers.hyperscan</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/http/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-matching-inputs-dynamic-module-data-input"><span class="std std-ref">envoy.matching.inputs.dynamic_module_data_input</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/http/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-matching-inputs-dynamic-module-string-data-input"><span class="std std-ref">envoy.matching.inputs.dynamic_module_string_data_input</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/input_matchers/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-matching-matchers-dynamic-modules"><span class="std std-ref">envoy.matching.matchers.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/quic/connection_debug_visitor/v3/connection_debug_visitor_basic.proto.html#extension-envoy-quic-connection-debug-visitor-basic"><span class="std std-ref">envoy.quic.connection_debug_visitor.basic</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/rate_limit_descriptors/jwt_claim/v3/jwt_claim.proto.html#extension-envoy-rate-limit-descriptors-jwt-claim"><span class="std std-ref">envoy.rate_limit_descriptors.jwt_claim</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/regex_engines/hyperscan/v3alpha/hyperscan.proto.html#extension-envoy-regex-engines-hyperscan"><span class="std std-ref">envoy.regex_engines.hyperscan</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-router-cluster-specifier-plugin-dynamic-modules"><span class="std std-ref">envoy.router.cluster_specifier_plugin.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/router/cluster_specifier/golang/v3alpha/golang.proto.html#extension-envoy-router-cluster-specifier-plugin-golang"><span class="std std-ref">envoy.router.cluster_specifier_plugin.golang</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-stat-sinks-dynamic-modules"><span class="std std-ref">envoy.stat_sinks.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/tap_sinks/udp_sink/v3alpha/udp_sink.proto.html#extension-envoy-tap-sinks-udp-sink"><span class="std std-ref">envoy.tap_sinks.udp_sink</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-tls-cert-validator-dynamic-modules"><span class="std std-ref">envoy.tls.cert_validator.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.proto.html#extension-envoy-tls-cert-validator-spiffe"><span class="std std-ref">envoy.tls.cert_validator.spiffe</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/tracers/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-tracers-dynamic-modules"><span class="std std-ref">envoy.tracers.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-transport-sockets-dynamic-modules"><span class="std std-ref">envoy.transport_sockets.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/tap/v3/tap.proto.html#extension-envoy-transport-sockets-tap"><span class="std std-ref">envoy.transport_sockets.tap</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/upstreams/http/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-upstreams-http-dynamic-modules"><span class="std std-ref">envoy.upstreams.http.dynamic_modules</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/upstreams/http/reverse_tunnel/v3/reverse_tunnel_codec.proto.html#extension-envoy-upstreams-http-reverse-tunnel"><span class="std std-ref">envoy.upstreams.http.reverse_tunnel</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/upstreams/http/tcp/golang/v3alpha/golang.proto.html#extension-envoy-upstreams-http-tcp-golang"><span class="std std-ref">envoy.upstreams.http.tcp.golang</span></a> (alpha) (<a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib builds</span></a> only)</p></li>
+</ul>
+<p>The following extensions have an unknown security posture:</p>
+</section>
+<section id="extension-security-unknown">
+<h1>Extension security: <code class="docutils literal notranslate"><span class="pre">unknown</span></code><a class="headerlink" href="#extension-security-unknown" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api-v3/extensions/access_loggers/filters/cel/v3/cel.proto.html#extension-envoy-access-loggers-extension-filters-cel"><span class="std std-ref">envoy.access_loggers.extension_filters.cel</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/access_loggers/filters/process_ratelimit/v3/process_ratelimit.proto.html#extension-envoy-access-loggers-extension-filters-process-ratelimit"><span class="std std-ref">envoy.access_loggers.extension_filters.process_ratelimit</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/access_loggers/wasm/v3/wasm.proto.html#extension-envoy-access-loggers-wasm"><span class="std std-ref">envoy.access_loggers.wasm</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/wasm/v3/wasm.proto.html#extension-envoy-bootstrap-wasm"><span class="std std-ref">envoy.bootstrap.wasm</span></a> (alpha)</p></li>
+<li><p>envoy.built_in_formatters.xfcc_value (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/config/validators/minimum_clusters/v3/minimum_clusters.proto.html#extension-envoy-config-validators-minimum-clusters-validator"><span class="std std-ref">envoy.config.validators.minimum_clusters_validator</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-docs/xds_protocol.html#extension-envoy-config-mux-delta-grpc-mux-factory"><span class="std std-ref">envoy.config_mux.delta_grpc_mux_factory</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-docs/xds_protocol.html#extension-envoy-config-mux-sotw-grpc-mux-factory"><span class="std std-ref">envoy.config_mux.sotw_grpc_mux_factory</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-docs/xds_protocol.html#extension-envoy-config-subscription-ads"><span class="std std-ref">envoy.config_subscription.ads</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-docs/xds_protocol.html#extension-envoy-config-subscription-ads-collection"><span class="std std-ref">envoy.config_subscription.ads_collection</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-docs/xds_protocol.html#extension-envoy-config-subscription-aggregated-delta-grpc-collection"><span class="std std-ref">envoy.config_subscription.aggregated_delta_grpc_collection</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-docs/xds_protocol.html#extension-envoy-config-subscription-aggregated-grpc-collection"><span class="std std-ref">envoy.config_subscription.aggregated_grpc_collection</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-docs/xds_protocol.html#extension-envoy-config-subscription-delta-grpc"><span class="std std-ref">envoy.config_subscription.delta_grpc</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-docs/xds_protocol.html#extension-envoy-config-subscription-filesystem"><span class="std std-ref">envoy.config_subscription.filesystem</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-docs/xds_protocol.html#extension-envoy-config-subscription-filesystem-collection"><span class="std std-ref">envoy.config_subscription.filesystem_collection</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-docs/xds_protocol.html#extension-envoy-config-subscription-grpc"><span class="std std-ref">envoy.config_subscription.grpc</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-docs/xds_protocol.html#extension-envoy-config-subscription-rest"><span class="std std-ref">envoy.config_subscription.rest</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/a2a/v3/a2a.proto.html#extension-envoy-filters-http-a2a"><span class="std std-ref">envoy.filters.http.a2a</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.proto.html#extension-envoy-filters-http-adaptive-concurrency"><span class="std std-ref">envoy.filters.http.adaptive_concurrency</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/admission_control/v3/admission_control.proto.html#extension-envoy-filters-http-admission-control"><span class="std std-ref">envoy.filters.http.admission_control</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.proto.html#extension-envoy-filters-http-ai-protocol-manager"><span class="std std-ref">envoy.filters.http.ai_protocol_manager</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.proto.html#extension-envoy-filters-http-alternate-protocols-cache"><span class="std std-ref">envoy.filters.http.alternate_protocols_cache</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/bandwidth_limit/v3/bandwidth_limit.proto.html#extension-envoy-filters-http-bandwidth-limit"><span class="std std-ref">envoy.filters.http.bandwidth_limit</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/cdn_loop/v3/cdn_loop.proto.html#extension-envoy-filters-http-cdn-loop"><span class="std std-ref">envoy.filters.http.cdn_loop</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/composite/v3/composite.proto.html#extension-envoy-filters-http-composite"><span class="std std-ref">envoy.filters.http.composite</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/connect_grpc_bridge/v3/config.proto.html#extension-envoy-filters-http-connect-grpc-bridge"><span class="std std-ref">envoy.filters.http.connect_grpc_bridge</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/credential_injector/v3/credential_injector.proto.html#extension-envoy-filters-http-credential-injector"><span class="std std-ref">envoy.filters.http.credential_injector</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/filter_chain/v3/filter_chain.proto.html#extension-envoy-filters-http-filter-chain"><span class="std std-ref">envoy.filters.http.filter_chain</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/gcp_authn/v3/gcp_authn.proto.html#extension-envoy-filters-http-gcp-authn"><span class="std std-ref">envoy.filters.http.gcp_authn</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/geoip/v3/geoip.proto.html#extension-envoy-filters-http-geoip"><span class="std std-ref">envoy.filters.http.geoip</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/grpc_field_extraction/v3/config.proto.html#extension-envoy-filters-http-grpc-field-extraction"><span class="std std-ref">envoy.filters.http.grpc_field_extraction</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/grpc_http1_bridge/v3/config.proto.html#extension-envoy-filters-http-grpc-http1-bridge"><span class="std std-ref">envoy.filters.http.grpc_http1_bridge</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.proto.html#extension-envoy-filters-http-grpc-http1-reverse-bridge"><span class="std std-ref">envoy.filters.http.grpc_http1_reverse_bridge</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/grpc_json_reverse_transcoder/v3/transcoder.proto.html#extension-envoy-filters-http-grpc-json-reverse-transcoder"><span class="std std-ref">envoy.filters.http.grpc_json_reverse_transcoder</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/grpc_stats/v3/config.proto.html#extension-envoy-filters-http-grpc-stats"><span class="std std-ref">envoy.filters.http.grpc_stats</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/header_mutation/v3/header_mutation.proto.html#extension-envoy-filters-http-header-mutation"><span class="std std-ref">envoy.filters.http.header_mutation</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/local_ratelimit/v3/local_rate_limit.proto.html#extension-envoy-filters-http-local-ratelimit"><span class="std std-ref">envoy.filters.http.local_ratelimit</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/mcp/v3/mcp.proto.html#extension-envoy-filters-http-mcp"><span class="std std-ref">envoy.filters.http.mcp</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.proto.html#extension-envoy-filters-http-mcp-json-rest-bridge"><span class="std std-ref">envoy.filters.http.mcp_json_rest_bridge</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/mcp_router/v3/mcp_router.proto.html#extension-envoy-filters-http-mcp-router"><span class="std std-ref">envoy.filters.http.mcp_router</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/proto_api_scrubber/v3/config.proto.html#extension-envoy-filters-http-proto-api-scrubber"><span class="std std-ref">envoy.filters.http.proto_api_scrubber</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/proto_message_extraction/v3/config.proto.html#extension-envoy-filters-http-proto-message-extraction"><span class="std std-ref">envoy.filters.http.proto_message_extraction</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#extension-envoy-filters-http-rate-limit-quota"><span class="std std-ref">envoy.filters.http.rate_limit_quota</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/set_filter_state/v3/set_filter_state.proto.html#extension-envoy-filters-http-set-filter-state"><span class="std std-ref">envoy.filters.http.set_filter_state</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/transform/v3/transform.proto.html#extension-envoy-filters-http-transform"><span class="std std-ref">envoy.filters.http.transform</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/wasm/v3/wasm.proto.html#extension-envoy-filters-http-wasm"><span class="std std-ref">envoy.filters.http.wasm</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/listener/set_filter_state/v3/set_filter_state.proto.html#extension-envoy-filters-listener-set-filter-state"><span class="std std-ref">envoy.filters.listener.set_filter_state</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/direct_response/v3/config.proto.html#extension-envoy-filters-network-direct-response"><span class="std std-ref">envoy.filters.network.direct_response</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/echo/v3/echo.proto.html#extension-envoy-filters-network-echo"><span class="std std-ref">envoy.filters.network.echo</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.proto.html#extension-envoy-filters-network-reverse-tunnel"><span class="std std-ref">envoy.filters.network.reverse_tunnel</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/set_filter_state/v3/set_filter_state.proto.html#extension-envoy-filters-network-set-filter-state"><span class="std std-ref">envoy.filters.network.set_filter_state</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/sni_cluster/v3/sni_cluster.proto.html#extension-envoy-filters-network-sni-cluster"><span class="std std-ref">envoy.filters.network.sni_cluster</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/sni_dynamic_forward_proxy/v3/sni_dynamic_forward_proxy.proto.html#extension-envoy-filters-network-sni-dynamic-forward-proxy"><span class="std std-ref">envoy.filters.network.sni_dynamic_forward_proxy</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/tcp_bandwidth_limit/v3/tcp_bandwidth_limit.proto.html#extension-envoy-filters-network-tcp-bandwidth-limit"><span class="std std-ref">envoy.filters.network.tcp_bandwidth_limit</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/network/wasm/v3/wasm.proto.html#extension-envoy-filters-network-wasm"><span class="std std-ref">envoy.filters.network.wasm</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/http/injected_credentials/generic/v3/generic.proto.html#extension-envoy-http-injected-credentials-generic"><span class="std std-ref">envoy.http.injected_credentials.generic</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/http/injected_credentials/oauth2/v3/oauth2.proto.html#extension-envoy-http-injected-credentials-oauth2"><span class="std std-ref">envoy.http.injected_credentials.oauth2</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/http/stateful_session/cookie/v3/cookie.proto.html#extension-envoy-http-stateful-session-cookie"><span class="std std-ref">envoy.http.stateful_session.cookie</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/http/stateful_session/envelope/v3/envelope.proto.html#extension-envoy-http-stateful-session-envelope"><span class="std std-ref">envoy.http.stateful_session.envelope</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/http/stateful_session/header/v3/header.proto.html#extension-envoy-http-stateful-session-header"><span class="std std-ref">envoy.http.stateful_session.header</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.proto.html#extension-envoy-load-balancing-policies-client-side-weighted-round-robin"><span class="std std-ref">envoy.load_balancing_policies.client_side_weighted_round_robin</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/load_balancing_policies/least_request/v3/least_request.proto.html#extension-envoy-load-balancing-policies-least-request"><span class="std std-ref">envoy.load_balancing_policies.least_request</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/load_balancing_policies/override_host/v3/override_host.proto.html#extension-envoy-load-balancing-policies-override-host"><span class="std std-ref">envoy.load_balancing_policies.override_host</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/load_balancing_policies/wrr_locality/v3/wrr_locality.proto.html#extension-envoy-load-balancing-policies-wrr-locality"><span class="std std-ref">envoy.load_balancing_policies.wrr_locality</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../advanced/matching/matching_api.html#extension-envoy-matching-action-transport-socket-name"><span class="std std-ref">envoy.matching.action.transport_socket.name</span></a></p></li>
+<li><p><a class="reference internal" href="../advanced/matching/matching_api.html#extension-envoy-matching-actions-format-string"><span class="std std-ref">envoy.matching.actions.format_string</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/actions/transform_stat/v3/transform_stat.proto.html#extension-envoy-matching-actions-transform-stat"><span class="std std-ref">envoy.matching.actions.transform_stat</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../advanced/matching/matching_api.html#extension-envoy-matching-custom-matchers-domain-matcher"><span class="std std-ref">envoy.matching.custom_matchers.domain_matcher</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../advanced/matching/matching_api.html#extension-envoy-matching-custom-matchers-ip-range-matcher"><span class="std std-ref">envoy.matching.custom_matchers.ip_range_matcher</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-application-protocol"><span class="std std-ref">envoy.matching.inputs.application_protocol</span></a></p></li>
+<li><p><a class="reference internal" href="../advanced/matching/matching_api.html#extension-envoy-matching-inputs-cel-data-input"><span class="std std-ref">envoy.matching.inputs.cel_data_input</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-destination-ip"><span class="std std-ref">envoy.matching.inputs.destination_ip</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-destination-port"><span class="std std-ref">envoy.matching.inputs.destination_port</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-direct-source-ip"><span class="std std-ref">envoy.matching.inputs.direct_source_ip</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto.html#extension-envoy-matching-inputs-dns-san"><span class="std std-ref">envoy.matching.inputs.dns_san</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-dynamic-metadata"><span class="std std-ref">envoy.matching.inputs.dynamic_metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../advanced/matching/matching_api.html#extension-envoy-matching-inputs-endpoint-metadata"><span class="std std-ref">envoy.matching.inputs.endpoint_metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-filter-state"><span class="std std-ref">envoy.matching.inputs.filter_state</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/type/matcher/v3/status_code_input.proto.html#extension-envoy-matching-inputs-local-reply"><span class="std std-ref">envoy.matching.inputs.local_reply</span></a></p></li>
+<li><p><a class="reference internal" href="../advanced/matching/matching_api.html#extension-envoy-matching-inputs-locality-metadata"><span class="std std-ref">envoy.matching.inputs.locality_metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-network-namespace"><span class="std std-ref">envoy.matching.inputs.network_namespace</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/type/matcher/v3/http_inputs.proto.html#extension-envoy-matching-inputs-query-params"><span class="std std-ref">envoy.matching.inputs.query_params</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/type/matcher/v3/http_inputs.proto.html#extension-envoy-matching-inputs-request-headers"><span class="std std-ref">envoy.matching.inputs.request_headers</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/type/matcher/v3/http_inputs.proto.html#extension-envoy-matching-inputs-request-trailers"><span class="std std-ref">envoy.matching.inputs.request_trailers</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/type/matcher/v3/http_inputs.proto.html#extension-envoy-matching-inputs-response-headers"><span class="std std-ref">envoy.matching.inputs.response_headers</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/type/matcher/v3/http_inputs.proto.html#extension-envoy-matching-inputs-response-trailers"><span class="std std-ref">envoy.matching.inputs.response_trailers</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-server-name"><span class="std std-ref">envoy.matching.inputs.server_name</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-source-ip"><span class="std std-ref">envoy.matching.inputs.source_ip</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-source-port"><span class="std std-ref">envoy.matching.inputs.source_port</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-source-type"><span class="std std-ref">envoy.matching.inputs.source_type</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto.html#extension-envoy-matching-inputs-subject"><span class="std std-ref">envoy.matching.inputs.subject</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/network/v3/network_inputs.proto.html#extension-envoy-matching-inputs-transport-protocol"><span class="std std-ref">envoy.matching.inputs.transport_protocol</span></a></p></li>
+<li><p><a class="reference internal" href="../advanced/matching/matching_api.html#extension-envoy-matching-inputs-transport-socket-filter-state"><span class="std std-ref">envoy.matching.inputs.transport_socket_filter_state</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto.html#extension-envoy-matching-inputs-uri-san"><span class="std std-ref">envoy.matching.inputs.uri_san</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/matching/input_matchers/metadata/v3/metadata.proto.html#extension-envoy-matching-matchers-metadata-matcher"><span class="std std-ref">envoy.matching.matchers.metadata_matcher</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/quic/connection_id_generator/quic_lb/v3/quic_lb.proto.html#extension-envoy-quic-connection-id-generator-quic-lb"><span class="std std-ref">envoy.quic.connection_id_generator.quic_lb</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/rate_limit_descriptors/expr/v3/expr.proto.html#extension-envoy-rate-limit-descriptors-expr"><span class="std std-ref">envoy.rate_limit_descriptors.expr</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/rbac/matchers/upstream_ip_port/v3/upstream_ip_port_matcher.proto.html#extension-envoy-rbac-matchers-upstream-ip-port"><span class="std std-ref">envoy.rbac.matchers.upstream_ip_port</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/tls/cert_mappers/sni/v3/config.proto.html#extension-envoy-tls-certificate-mappers-sni"><span class="std std-ref">envoy.tls.certificate_mappers.sni</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/tls/cert_mappers/static_name/v3/config.proto.html#extension-envoy-tls-certificate-mappers-static-name"><span class="std std-ref">envoy.tls.certificate_mappers.static_name</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.proto.html#extension-envoy-tls-certificate-selectors-on-demand-secret"><span class="std std-ref">envoy.tls.certificate_selectors.on_demand_secret</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.proto.html#extension-envoy-tls-upstream-certificate-mappers-filter-state-override"><span class="std std-ref">envoy.tls.upstream_certificate_mappers.filter_state_override</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.proto.html#extension-envoy-transport-sockets-http-11-proxy"><span class="std std-ref">envoy.transport_sockets.http_11_proxy</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/upstream/local_address_selector/v3/default_local_address_selector.proto.html#extension-envoy-upstream-local-address-selector-default-local-address-selector"><span class="std std-ref">envoy.upstream.local_address_selector.default_local_address_selector</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/local_address_selectors/filter_state_override/v3/config.proto.html#extension-envoy-upstream-local-address-selector-filter-state-override"><span class="std std-ref">envoy.upstream.local_address_selector.filter_state_override</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/upstreams/tcp/v3/tcp_protocol_options.proto.html#extension-envoy-upstreams-tcp-tcp-protocol-options"><span class="std std-ref">envoy.upstreams.tcp.tcp_protocol_options</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/wasm/v3/wasm.proto.html#extension-envoy-wasm-runtime-v8"><span class="std std-ref">envoy.wasm.runtime.v8</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/wasm/v3/wasm.proto.html#extension-envoy-wasm-runtime-wamr"><span class="std std-ref">envoy.wasm.runtime.wamr</span></a> (alpha)</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/wasm/v3/wasm.proto.html#extension-envoy-wasm-runtime-wasmtime"><span class="std std-ref">envoy.wasm.runtime.wasmtime</span></a> (alpha)</p></li>
+</ul>
+<p>Envoy currently has two dynamic filter extensions that support loadable code; WASM and Lua. In both
+cases, we assume that the dynamically loaded code is trusted. We expect the runtime for Lua to be
+robust to untrusted data plane traffic with the assumption of a trusted script. WASM is still in
+development, but will eventually have a similar security stance.</p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="rbac_filter.html" class="btn btn-neutral float-left" title="Role Based Access Control" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="external_deps.html" class="btn btn-neutral float-right" title="External dependencies" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Threat model</a><ul>
+<li><a class="reference internal" href="#confidentiality-integrity-and-availability">Confidentiality, integrity and availability</a></li>
+<li><a class="reference internal" href="#build-configurations">Build configurations</a></li>
+<li><a class="reference internal" href="#envoy-configurations">Envoy configurations</a></li>
+<li><a class="reference internal" href="#data-and-control-plane">Data and control plane</a></li>
+<li><a class="reference internal" href="#core-and-extensions">Core and extensions</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#extension-security-robust-to-untrusted-downstream-and-upstream">Extension security: <code class="docutils literal notranslate"><span class="pre">robust_to_untrusted_downstream_and_upstream</span></code></a></li>
+<li><a class="reference internal" href="#extension-security-data-plane-agnostic">Extension security: <code class="docutils literal notranslate"><span class="pre">data_plane_agnostic</span></code></a></li>
+<li><a class="reference internal" href="#extension-security-robust-to-untrusted-downstream">Extension security: <code class="docutils literal notranslate"><span class="pre">robust_to_untrusted_downstream</span></code></a></li>
+<li><a class="reference internal" href="#extension-security-requires-trusted-downstream-and-upstream">Extension security: <code class="docutils literal notranslate"><span class="pre">requires_trusted_downstream_and_upstream</span></code></a></li>
+<li><a class="reference internal" href="#extension-security-unknown">Extension security: <code class="docutils literal notranslate"><span class="pre">unknown</span></code></a></li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

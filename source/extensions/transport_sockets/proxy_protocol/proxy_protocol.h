@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/stats.h"
@@ -28,12 +29,19 @@ struct UpstreamProxyProtocolStats {
   ALL_PROXY_PROTOCOL_TRANSPORT_SOCKET_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+struct TlvFormatter {
+  uint8_t type_;
+  std::vector<uint8_t> static_value_;
+  Formatter::FormatterPtr formatter_;
+};
+
 class UpstreamProxyProtocolSocket : public TransportSockets::PassthroughSocket,
                                     public Logger::Loggable<Logger::Id::connection> {
 public:
   UpstreamProxyProtocolSocket(Network::TransportSocketPtr&& transport_socket,
                               Network::TransportSocketOptionsConstSharedPtr options,
-                              ProxyProtocolConfig config, const UpstreamProxyProtocolStats& stats);
+                              ProxyProtocolConfig config, const UpstreamProxyProtocolStats& stats,
+                              const std::vector<TlvFormatter>& added_tlvs);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
@@ -56,14 +64,14 @@ private:
   const UpstreamProxyProtocolStats& stats_;
   const bool pass_all_tlvs_;
   absl::flat_hash_set<uint8_t> pass_through_tlvs_;
-  std::vector<Envoy::Network::ProxyProtocolTLV> added_tlvs_;
+  const std::vector<TlvFormatter>& added_tlvs_;
 };
 
 class UpstreamProxyProtocolSocketFactory : public PassthroughFactory {
 public:
   UpstreamProxyProtocolSocketFactory(
       Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
-      ProxyProtocolConfig config, Stats::Scope& scope);
+      ProxyProtocolConfig config, Stats::Scope& scope, std::vector<TlvFormatter>&& added_tlvs);
 
   // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr
@@ -80,6 +88,7 @@ public:
 private:
   ProxyProtocolConfig config_;
   UpstreamProxyProtocolStats stats_;
+  std::vector<TlvFormatter> added_tlvs_;
 };
 
 } // namespace ProxyProtocol

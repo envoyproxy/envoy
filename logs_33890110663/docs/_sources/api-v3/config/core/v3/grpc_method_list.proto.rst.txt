@@ -1,0 +1,69 @@
+.. _envoy_v3_api_file_envoy/config/core/v3/grpc_method_list.proto:
+
+gRPC method list (proto)
+========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcMethodList:
+
+config.core.v3.GrpcMethodList
+-----------------------------
+
+
+:repo:`[config.core.v3.GrpcMethodList proto] <api/envoy/config/core/v3/grpc_method_list.proto#L17>`
+
+A list of gRPC methods which can be used as an allowlist, for example.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "services": []
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcMethodList.services:
+
+
+services
+  (**repeated** :ref:`config.core.v3.GrpcMethodList.Service <envoy_v3_api_msg_config.core.v3.GrpcMethodList.Service>`) 
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcMethodList.Service:
+
+config.core.v3.GrpcMethodList.Service
+-------------------------------------
+
+
+:repo:`[config.core.v3.GrpcMethodList.Service proto] <api/envoy/config/core/v3/grpc_method_list.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "method_names": []
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcMethodList.Service.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the gRPC service.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcMethodList.Service.method_names:
+
+
+method_names
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The names of the gRPC methods in this service.
+
+
+

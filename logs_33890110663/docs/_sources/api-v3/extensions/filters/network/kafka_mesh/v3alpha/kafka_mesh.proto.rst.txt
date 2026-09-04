@@ -1,0 +1,222 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.proto:
+
+Kafka Mesh (proto)
+==================
+
+.. _extension_envoy.filters.network.kafka_mesh:
+
+This extension has the qualified name ``envoy.filters.network.kafka_mesh``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+Kafka Mesh :ref:`configuration overview <config_network_filters_kafka_mesh>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh:
+
+extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh proto] <api/contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.proto#L21>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "advertised_host": ...,
+    "advertised_port": ...,
+    "upstream_clusters": [],
+    "forwarding_rules": [],
+    "consumer_proxy_mode": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh.advertised_host:
+
+
+advertised_host
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Envoy's host that's advertised to clients.
+  Has the same meaning as corresponding Kafka broker properties.
+  Usually equal to filter chain's listener config, but needs to be reachable by clients
+  (so 0.0.0.0 will not work).
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh.advertised_port:
+
+
+advertised_port
+  (`int32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Envoy's port that's advertised to clients.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh.upstream_clusters:
+
+
+upstream_clusters
+  (**repeated** :ref:`extensions.filters.network.kafka_mesh.v3alpha.KafkaClusterDefinition <envoy_v3_api_msg_extensions.filters.network.kafka_mesh.v3alpha.KafkaClusterDefinition>`) Upstream clusters this filter will connect to.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh.forwarding_rules:
+
+
+forwarding_rules
+  (**repeated** :ref:`extensions.filters.network.kafka_mesh.v3alpha.ForwardingRule <envoy_v3_api_msg_extensions.filters.network.kafka_mesh.v3alpha.ForwardingRule>`) Rules that will decide which cluster gets which request.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh.consumer_proxy_mode:
+
+
+consumer_proxy_mode
+  (:ref:`extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh.ConsumerProxyMode <envoy_v3_api_enum_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh.ConsumerProxyMode>`) How the consumer proxying should behave - this relates mostly to Fetch request handling.
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh.ConsumerProxyMode:
+
+Enum extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh.ConsumerProxyMode
+------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh.ConsumerProxyMode proto] <api/contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.proto#L22>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh.ConsumerProxyMode.StatefulConsumerProxy:
+
+
+StatefulConsumerProxy
+  *(DEFAULT)* ⁣Records received are going to be distributed amongst downstream consumer connections.
+  In this mode Envoy uses librdkafka consumers pointing at upstream Kafka clusters, what means that these
+  consumers' position is meaningful and affects what records are received from upstream.
+  Users might want to take a look into these consumers' custom configuration to manage their auto-committing
+  capabilities, as it will impact Envoy's behaviour in case of restarts.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.kafka_mesh.v3alpha.KafkaClusterDefinition:
+
+extensions.filters.network.kafka_mesh.v3alpha.KafkaClusterDefinition
+--------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.kafka_mesh.v3alpha.KafkaClusterDefinition proto] <api/contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.proto#L51>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster_name": ...,
+    "bootstrap_servers": ...,
+    "partition_count": ...,
+    "producer_config": {...},
+    "consumer_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_mesh.v3alpha.KafkaClusterDefinition.cluster_name:
+
+
+cluster_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Cluster name.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_mesh.v3alpha.KafkaClusterDefinition.bootstrap_servers:
+
+
+bootstrap_servers
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Kafka cluster address.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_mesh.v3alpha.KafkaClusterDefinition.partition_count:
+
+
+partition_count
+  (`int32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Default number of partitions present in this cluster.
+  This is especially important for clients that do not specify partition in their payloads and depend on this value for hashing.
+  The same number of partitions is going to be used by upstream-pointing Kafka consumers for consumer proxying scenarios.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_mesh.v3alpha.KafkaClusterDefinition.producer_config:
+
+
+producer_config
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_>) Custom configuration passed to Kafka producer.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_mesh.v3alpha.KafkaClusterDefinition.consumer_config:
+
+
+consumer_config
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_>) Custom configuration passed to Kafka consumer.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.kafka_mesh.v3alpha.ForwardingRule:
+
+extensions.filters.network.kafka_mesh.v3alpha.ForwardingRule
+------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.kafka_mesh.v3alpha.ForwardingRule proto] <api/contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.proto#L70>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "target_cluster": ...,
+    "topic_prefix": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_mesh.v3alpha.ForwardingRule.target_cluster:
+
+
+target_cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Cluster name.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_mesh.v3alpha.ForwardingRule.topic_prefix:
+
+
+topic_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Intended place for future types of forwarding rules.
+
+
+  
+

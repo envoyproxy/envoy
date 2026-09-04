@@ -1,0 +1,816 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Life of a Request &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Deployment types" href="deployment_types/deployment_types.html" />
+    <link rel="prev" title="Dynamic modules" href="arch_overview/advanced/dynamic_modules.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../searchindex.js"
+          data-envoy-search-page="../search.html"
+          data-envoy-root="../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="arch_overview/arch_overview.html">Architecture overview</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="intro.html">Introduction</a></li>
+      <li class="breadcrumb-item active">Life of a Request</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/intro/life_of_a_request.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="life-of-a-request">
+<span id="id1"></span><h1>Life of a Request<a class="headerlink" href="#life-of-a-request" title="Link to this heading"></a></h1>
+<p>Below we describe the events in the life of a request passing through an Envoy proxy. We first
+describe how Envoy fits into the request path for a request and then the internal events that take
+place following the arrival of a request at the Envoy proxy from downstream. We follow the request
+until the corresponding dispatch upstream and the response path.</p>
+<section id="terminology">
+<h2>Terminology<a class="headerlink" href="#terminology" title="Link to this heading"></a></h2>
+<p>Envoy uses the following terms through its codebase and documentation:</p>
+<ul class="simple">
+<li><p><em>Cluster</em>: a logical service with a set of endpoints that Envoy forwards requests to.</p></li>
+<li><p><em>Downstream</em>: an entity connecting to Envoy. This may be a local application (in a sidecar model) or
+a network node. In non-sidecar models, this is a remote client.</p></li>
+<li><p><em>Endpoints</em>: network nodes that implement a logical service. They are grouped into clusters.
+Endpoints in a cluster are <em>upstream</em> of an Envoy proxy.</p></li>
+<li><p><em>Filter</em>: a module in the connection or request processing pipeline providing some aspect of
+request handling. An analogy from Unix is the composition of small utilities (filters) with Unix
+pipes (filter chains).</p></li>
+<li><p><em>Filter chain</em>: a series of filters.</p></li>
+<li><p><em>Listeners</em>: Envoy module responsible for binding to an IP/port, accepting new TCP connections (or
+UDP datagrams) and orchestrating the downstream facing aspects of request processing.</p></li>
+<li><p><em>Upstream</em>: an endpoint (network node) that Envoy connects to when forwarding requests for a
+service. This may be a local application (in a sidecar model) or a network node. In non-sidecar
+models, this corresponds with a remote backend.</p></li>
+</ul>
+</section>
+<section id="network-topology">
+<h2>Network topology<a class="headerlink" href="#network-topology" title="Link to this heading"></a></h2>
+<p>How a request flows through the components in a network (including Envoy) depends on the network’s
+topology. Envoy can be used in a wide variety of networking topologies. We focus on the inner
+operation of Envoy below, but briefly we address how Envoy relates to the rest of the network in
+this section.</p>
+<p>Envoy originated as a <a class="reference external" href="https://blog.envoyproxy.io/service-mesh-data-plane-vs-control-plane-2774e720f7fc">service mesh</a> sidecar proxy,
+factoring out load balancing, routing, observability, security and discovery services from
+applications. In the service mesh model, requests flow through Envoys as a gateway to the network.
+Requests arrive at an Envoy via either ingress or egress listeners:</p>
+<ul class="simple">
+<li><p>Ingress listeners take requests from other nodes in the service mesh and forward them to the
+local application. Responses from the local application flow back through Envoy to the downstream.</p></li>
+<li><p>Egress listeners take requests from the local application and forward them to other nodes in the
+network. These receiving nodes will also be typically running Envoy and accepting the request via
+their ingress listeners.</p></li>
+</ul>
+<a class="reference internal image-reference" href="../_images/lor-topology-service-mesh.svg"><img alt="../_images/lor-topology-service-mesh.svg" class="align-center" src="../_images/lor-topology-service-mesh.svg" style="width: 80%;" />
+</a>
+<a class="reference internal image-reference" href="../_images/lor-topology-service-mesh-node.svg"><img alt="../_images/lor-topology-service-mesh-node.svg" class="align-center" src="../_images/lor-topology-service-mesh-node.svg" style="width: 40%;" />
+</a>
+<p>Envoy is used in a variety of configurations beyond the service mesh. For example, it can also act
+as an internal load balancer:</p>
+<a class="reference internal image-reference" href="../_images/lor-topology-ilb.svg"><img alt="../_images/lor-topology-ilb.svg" class="align-center" src="../_images/lor-topology-ilb.svg" style="width: 65%;" />
+</a>
+<p>Or as an ingress/egress proxy on the network edge:</p>
+<a class="reference internal image-reference" href="../_images/lor-topology-edge.svg"><img alt="../_images/lor-topology-edge.svg" class="align-center" src="../_images/lor-topology-edge.svg" style="width: 90%;" />
+</a>
+<p>In practice, a hybrid of these is often used, where Envoy features in a service mesh, on the edge
+and as an internal load balancer. A request path may traverse multiple Envoys.</p>
+<a class="reference internal image-reference" href="../_images/lor-topology-hybrid.svg"><img alt="../_images/lor-topology-hybrid.svg" class="align-center" src="../_images/lor-topology-hybrid.svg" style="width: 90%;" />
+</a>
+<p>Envoy may be configured in multi-tier topologies for scalability and reliability, with a request
+first passing through an edge Envoy prior to passing through a second Envoy tier:</p>
+<a class="reference internal image-reference" href="../_images/lor-topology-tiered.svg"><img alt="../_images/lor-topology-tiered.svg" class="align-center" src="../_images/lor-topology-tiered.svg" style="width: 80%;" />
+</a>
+<p>In all the above cases, a request will arrive at a specific Envoy via TCP, UDP or Unix domain
+sockets from downstream. Envoy will forward requests upstream via TCP, UDP or Unix domain sockets.
+We focus on a single Envoy proxy below.</p>
+</section>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
+<p>Envoy is a very extensible platform. This results in a combinatorial explosion of possible request
+paths, depending on:</p>
+<ul class="simple">
+<li><p>L3/4 protocol, e.g. TCP, UDP, Unix domain sockets.</p></li>
+<li><p>L7 protocol, e.g. HTTP/1, HTTP/2, HTTP/3, gRPC, Thrift, Dubbo, Kafka, Redis and various databases.</p></li>
+<li><p>Transport socket, e.g. plain text, TLS, ALTS.</p></li>
+<li><p>Connection routing, e.g. PROXY protocol, original destination, dynamic forwarding.</p></li>
+<li><p>Authentication and authorization.</p></li>
+<li><p>Circuit breakers and outlier detection configuration and activation state.</p></li>
+<li><p>Many other configurations for networking, HTTP, listener, access logging, health checking, tracing
+and stats extensions.</p></li>
+</ul>
+<p>It’s helpful to focus on one at a time, so this example covers the following:</p>
+<ul class="simple">
+<li><p>An HTTP/2 request with <a class="reference internal" href="arch_overview/security/ssl.html#arch-overview-ssl"><span class="std std-ref">TLS</span></a> over a TCP connection for both downstream
+and upstream.</p></li>
+<li><p>The <a class="reference internal" href="arch_overview/http/http_connection_management.html#arch-overview-http-conn-man"><span class="std std-ref">HTTP connection manager</span></a> as the only <a class="reference internal" href="arch_overview/listeners/listener_filters.html#arch-overview-network-filters"><span class="std std-ref">network filter</span></a>.</p></li>
+<li><p>A hypothetical CustomFilter and the <a class="reference internal" href="arch_overview/http/http_routing.html#arch-overview-http-routing"><span class="std std-ref">router</span></a> filter as the <a class="reference internal" href="arch_overview/http/http_filters.html#arch-overview-http-filters"><span class="std std-ref">HTTP
+filter</span></a> chain.</p></li>
+<li><p><a class="reference internal" href="arch_overview/observability/access_logging.html#arch-overview-access-logs-sinks"><span class="std std-ref">Filesystem access logging</span></a>.</p></li>
+<li><p><a class="reference internal" href="../api-v3/config/metrics/v3/stats.proto.html#envoy-v3-api-msg-config-metrics-v3-statssink"><span class="std std-ref">Statsd sink</span></a>.</p></li>
+<li><p>A single <a class="reference internal" href="arch_overview/upstream/cluster_manager.html#arch-overview-cluster-manager"><span class="std std-ref">cluster</span></a> with static endpoints.</p></li>
+</ul>
+<p>We assume a static bootstrap configuration file for simplicity:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">static_resources</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">listeners</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># There is a single listener bound to port 443.</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">listener_https</span>
+<span class="w">    </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w">        </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0.0.0</span>
+<span class="w">        </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="w">    </span><span class="c1"># A single listener filter exists for TLS inspector.</span>
+<span class="w">    </span><span class="nt">listener_filters</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.filters.listener.tls_inspector&quot;</span>
+<span class="w">      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector</span>
+<span class="w">    </span><span class="c1"># On the listener, there is a single filter chain that matches SNI for acme.com.</span>
+<span class="w">    </span><span class="nt">filter_chains</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filter_chain_match</span><span class="p">:</span>
+<span class="w">        </span><span class="c1"># This will match the SNI extracted by the TLS Inspector filter.</span>
+<span class="w">        </span><span class="nt">server_names</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;acme.com&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="c1"># Downstream TLS configuration.</span>
+<span class="w">      </span><span class="nt">transport_socket</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+<span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext</span>
+<span class="w">          </span><span class="nt">common_tls_context</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">tls_certificates</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">certificate_chain</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;certs/servercert.pem&quot;</span><span class="p p-Indicator">}</span>
+<span class="w">              </span><span class="nt">private_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;certs/serverkey.pem&quot;</span><span class="p p-Indicator">}</span>
+<span class="w">      </span><span class="nt">filters</span><span class="p">:</span>
+<span class="w">      </span><span class="c1"># The HTTP connection manager is the only network filter.</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.network.http_connection_manager</span>
+<span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+<span class="w">          </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress_http</span>
+<span class="w">          </span><span class="nt">use_remote_address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">          </span><span class="nt">http2_protocol_options</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">max_concurrent_streams</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">          </span><span class="c1"># File system based access logging.</span>
+<span class="w">          </span><span class="nt">access_log</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.access_loggers.file</span>
+<span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog</span>
+<span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/var/log/envoy/access.log&quot;</span>
+<span class="w">          </span><span class="c1"># The route table, mapping /foo to some_service.</span>
+<span class="w">          </span><span class="nt">route_config</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_route</span>
+<span class="w">            </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_service</span>
+<span class="w">              </span><span class="nt">domains</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;acme.com&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/foo&quot;</span>
+<span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some_service</span>
+<span class="w">          </span><span class="c1"># CustomFilter and the HTTP router filter are the HTTP filter chain.</span>
+<span class="w">          </span><span class="nt">http_filters</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.router</span>
+<span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span>
+<span class="w">  </span><span class="nt">clusters</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some_service</span>
+<span class="w">    </span><span class="c1"># Upstream TLS configuration.</span>
+<span class="w">    </span><span class="nt">transport_socket</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+<span class="w">      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext</span>
+<span class="w">    </span><span class="nt">load_assignment</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some_service</span>
+<span class="w">      </span><span class="c1"># Static endpoint assignment.</span>
+<span class="w">      </span><span class="nt">endpoints</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">lb_endpoints</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10.1.2.10</span>
+<span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10002</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10.1.2.11</span>
+<span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10002</span>
+<span class="w">    </span><span class="nt">typed_extension_protocol_options</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">envoy.extensions.upstreams.http.v3.HttpProtocolOptions</span><span class="p">:</span>
+<span class="w">        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions</span>
+<span class="w">        </span><span class="nt">explicit_http_config</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">http2_protocol_options</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">max_concurrent_streams</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some_statsd_sink</span>
+<span class="w">  </span><span class="c1"># The rest of the configuration for statsd sink cluster.</span>
+<span class="c1"># statsd sink.</span>
+<span class="nt">stats_sinks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.stat_sinks.statsd</span>
+<span class="w">  </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">    </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.metrics.v3.StatsdSink</span>
+<span class="w">    </span><span class="nt">tcp_cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some_statsd_sink</span>
+</pre></div>
+</div>
+</section>
+<section id="high-level-architecture">
+<h2>High level architecture<a class="headerlink" href="#high-level-architecture" title="Link to this heading"></a></h2>
+<p>The request processing path in Envoy has two main parts:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="arch_overview/listeners/listeners.html#arch-overview-listeners"><span class="std std-ref">Listener subsystem</span></a> which handles <strong>downstream</strong> request
+processing. It is also responsible for managing the downstream request lifecycle and for the
+response path to the client. The downstream HTTP/2 codec lives here.</p></li>
+<li><p><a class="reference internal" href="arch_overview/upstream/cluster_manager.html#arch-overview-cluster-manager"><span class="std std-ref">Cluster subsystem</span></a> which is responsible for selecting and
+configuring the <strong>upstream</strong> connection to an endpoint. This is where knowledge of cluster and
+endpoint health, load balancing and connection pooling exists. The upstream HTTP/2 codec lives
+here.</p></li>
+</ul>
+<p>The two subsystems are bridged with the HTTP router filter, which forwards the HTTP request from
+downstream to upstream.</p>
+<a class="reference internal image-reference" href="../_images/lor-architecture.svg"><img alt="../_images/lor-architecture.svg" class="align-center" src="../_images/lor-architecture.svg" style="width: 80%;" />
+</a>
+<p>We use the terms <a class="reference internal" href="arch_overview/listeners/listeners.html#arch-overview-listeners"><span class="std std-ref">listener subsystem</span></a> and <a class="reference internal" href="arch_overview/upstream/cluster_manager.html#arch-overview-cluster-manager"><span class="std std-ref">cluster subsystem</span></a> above to refer to the group of modules and instance classes that
+are created by the top level <code class="docutils literal notranslate"><span class="pre">ListenerManager</span></code> and <code class="docutils literal notranslate"><span class="pre">ClusterManager</span></code> classes. There are many
+components that we discuss below that are instantiated before and during the course of a request by
+these management systems, for example listeners, filter chains, codecs, connection pools and load
+balancing data structures.</p>
+<p>Envoy has an <a class="reference external" href="https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310">event-based thread model</a>. A main thread is responsible for
+the server lifecycle, configuration processing, stats, etc. and some number of <a class="reference internal" href="arch_overview/intro/threading_model.html#arch-overview-threading"><span class="std std-ref">worker threads</span></a> process requests. All threads operate around an event loop (<a class="reference external" href="https://libevent.org/">libevent</a>) and any given downstream TCP connection (including all the multiplexed
+streams on it) will be handled by exactly one worker thread for its lifetime. Each worker thread
+maintains its own pool of TCP connections to upstream endpoints. <a class="reference internal" href="arch_overview/listeners/listeners.html#arch-overview-listeners-udp"><span class="std std-ref">UDP</span></a> handling makes use of SO_REUSEPORT to have the kernel consistently
+hash the source/destination IP:port tuples to the same worker thread. UDP filter state is shared for
+a given worker thread, with the filter responsible for providing session semantics as needed. This
+is in contrast to the connection oriented TCP filters we discuss below, where filter state exists on
+a per connection and, in the case of HTTP filters, per-request basis.</p>
+<p>Worker threads rarely share state and operate in a trivially parallel fashion. This threading model
+enables scaling to very high core count CPUs.</p>
+</section>
+<section id="request-flow">
+<h2>Request flow<a class="headerlink" href="#request-flow" title="Link to this heading"></a></h2>
+<section id="overview">
+<h3>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h3>
+<p>A brief outline of the life cycle of a request and response using the example configuration above:</p>
+<ol class="arabic simple">
+<li><p>A TCP connection from downstream is accepted by an Envoy <a class="reference internal" href="arch_overview/listeners/listeners.html#arch-overview-listeners"><span class="std std-ref">listener</span></a> running on a <a class="reference internal" href="arch_overview/intro/threading_model.html#arch-overview-threading"><span class="std std-ref">worker thread</span></a>.</p></li>
+<li><p>The <a class="reference internal" href="arch_overview/listeners/listener_filters.html#arch-overview-listener-filters"><span class="std std-ref">listener filter</span></a> chain is created and runs. It can
+provide SNI and other pre-TLS info. Once completed, the listener will match a network filter
+chain. Each listener may have multiple filter chains which match on some combination of
+destination IP CIDR range, SNI, ALPN, source ports, etc. A transport socket, in our case the TLS
+transport socket, is associated with this filter chain.</p></li>
+<li><p>On network reads, the <a class="reference internal" href="arch_overview/security/ssl.html#arch-overview-ssl"><span class="std std-ref">TLS</span></a> transport socket decrypts the data read from
+the TCP connection to a decrypted data stream for further processing.</p></li>
+<li><p>The <a class="reference internal" href="arch_overview/listeners/listener_filters.html#arch-overview-network-filters"><span class="std std-ref">network filter</span></a> chain is created and runs. The most
+important filter for HTTP is the HTTP connection manager, which is the last network filter in the
+chain.</p></li>
+<li><p>The HTTP/2 codec in <a class="reference internal" href="arch_overview/http/http_connection_management.html#arch-overview-http-conn-man"><span class="std std-ref">HTTP connection manager</span></a> deframes and
+demultiplexes the decrypted data stream from the TLS connection to a number of independent
+streams. Each stream handles a single request and response.</p></li>
+<li><p>For each HTTP stream, an <a class="reference internal" href="arch_overview/http/http_filters.html#arch-overview-http-filters"><span class="std std-ref">Downstream HTTP filter</span></a> chain is created and
+runs. The request first passes through CustomFilter which may read and modify the request. The
+most important HTTP filter is the router filter which sits at the end of the HTTP filter chain.
+When <code class="docutils literal notranslate"><span class="pre">decodeHeaders</span></code> is invoked on the router filter, the route is selected and a cluster is
+picked. The request headers on the stream are forwarded to an upstream endpoint in that cluster.
+The <a class="reference internal" href="arch_overview/http/http_routing.html#arch-overview-http-routing"><span class="std std-ref">router</span></a> filter obtains an HTTP <a class="reference internal" href="arch_overview/upstream/connection_pooling.html#arch-overview-conn-pool"><span class="std std-ref">connection pool</span></a> from the cluster manager for the matched cluster to do this.</p></li>
+<li><p>Cluster specific <a class="reference internal" href="arch_overview/upstream/load_balancing/overview.html#arch-overview-load-balancing"><span class="std std-ref">load balancing</span></a> is performed to find an
+endpoint. The cluster’s circuit breakers are checked to determine if a new stream is allowed. A
+new connection to the endpoint is created if the endpoint’s connection pool is empty or lacks
+capacity.</p></li>
+<li><p>For each stream an <a class="reference internal" href="arch_overview/http/http_filters.html#arch-overview-http-filters"><span class="std std-ref">Upstream HTTP filter</span></a> chain is created and
+runs. By default this only includes the CodecFilter, sending data to the appropriate codec, but if
+the cluster is configured with an upstream HTTP filter chain, that filter chain will be created and run
+on each stream, which includes creating and running separate filter chains for retries and shadowed
+requests.</p></li>
+<li><p>The upstream endpoint connection’s HTTP/2 codec multiplexes and frames the request’s stream with
+any other streams going to that upstream over a single TCP connection.</p></li>
+<li><p>The upstream endpoint connection’s TLS transport socket encrypts these bytes and writes them to a
+TCP socket for the upstream connection.</p></li>
+<li><p>The request, consisting of headers, and optional body and trailers, is proxied upstream, and the
+response is proxied downstream. The response passes through the HTTP filters in the
+<a class="reference internal" href="arch_overview/http/http_filters.html#arch-overview-http-filters-ordering"><span class="std std-ref">opposite order</span></a> from the request, starting at the
+codec filter, traversing any upstream HTTP filters, then going through the router filter and passing
+through CustomFilter, before being sent downstream.</p></li>
+<li><p>If independent half-close is enabled the stream is destroyed after both request and response are
+complete (END_STREAM for the HTTP/2 stream is observed in both directions) AND response has success
+(2xx) status code. Otherwise the stream is destroyed when the response is complete, even if the
+request has not yet completed. Post-request processing will update stats, write to the access log
+and finalize trace spans.</p></li>
+</ol>
+<p>We elaborate on each of these steps in the sections below.</p>
+</section>
+<section id="listener-tcp-accept">
+<h3>1. Listener TCP accept<a class="headerlink" href="#listener-tcp-accept" title="Link to this heading"></a></h3>
+<a class="reference internal image-reference" href="../_images/lor-listeners.svg"><img alt="../_images/lor-listeners.svg" class="align-center" src="../_images/lor-listeners.svg" style="width: 90%;" />
+</a>
+<p>The <em>ListenerManager</em> is responsible for taking configuration representing <a class="reference internal" href="arch_overview/listeners/listeners.html#arch-overview-listeners"><span class="std std-ref">listeners</span></a> and instantiating a number of <em>Listener</em> instances bound to their
+respective IP/ports. Listeners may be in one of three states:</p>
+<ul class="simple">
+<li><p><em>Warming</em>: the listener is waiting for configuration dependencies (e.g. route configuration,
+dynamic secrets). The listener is not yet ready to accept TCP connections.</p></li>
+<li><p><em>Active</em>: the listener is bound to its IP/port and accepts TCP connections.</p></li>
+<li><p><em>Draining</em>: the listener no longer accepts new TCP connections while its existing TCP connections
+are allowed to continue for a drain period.</p></li>
+</ul>
+<p>Each <a class="reference internal" href="arch_overview/intro/threading_model.html#arch-overview-threading"><span class="std std-ref">worker thread</span></a> maintains its own <em>Listener</em> instance for each
+of the configured listeners. Each listener may bind to the same port via SO_REUSEPORT or share a
+single socket bound to this port. When a new TCP connection arrives, the kernel decides which
+worker thread will accept the connection and the <em>Listener</em> for this worker thread will have its
+<code class="docutils literal notranslate"><span class="pre">Server::ConnectionHandlerImpl::ActiveTcpListener::onAccept()</span></code> callback invoked.</p>
+</section>
+<section id="listener-filter-chains-and-network-filter-chain-matching">
+<h3>2. Listener filter chains and network filter chain matching<a class="headerlink" href="#listener-filter-chains-and-network-filter-chain-matching" title="Link to this heading"></a></h3>
+<p>The worker thread’s <em>Listener</em> then creates and runs the <a class="reference internal" href="arch_overview/listeners/listener_filters.html#arch-overview-listener-filters"><span class="std std-ref">listener filter</span></a> chain. Filter chains are created by applying each filter’s <em>filter
+factory</em>. The factory is aware of the filter’s configuration and creates a new instance of the
+filter for each connection or stream.</p>
+<p>In the case of our TLS listener configuration, the listener filter chain consists of the <a class="reference internal" href="../configuration/listeners/listener_filters/tls_inspector.html#config-listener-filters-tls-inspector"><span class="std std-ref">TLS
+inspector</span></a> filter
+(<code class="docutils literal notranslate"><span class="pre">envoy.filters.listener.tls_inspector</span></code>). This filter examines the initial TLS handshake and
+extracts the server name (SNI). The SNI is then made available for filter chain matching. While the
+TLS inspector appears explicitly in the listener filter chain configuration, Envoy is also capable
+of inserting this automatically whenever there is a need for SNI (or ALPN) in a listener’s filter
+chain.</p>
+<a class="reference internal image-reference" href="../_images/lor-listener-filters.svg"><img alt="../_images/lor-listener-filters.svg" class="align-center" src="../_images/lor-listener-filters.svg" style="width: 80%;" />
+</a>
+<p>The TLS inspector filter implements the <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/envoy/network/filter.h">ListenerFilter</a>
+interface. All filter interfaces, whether listener or network/HTTP, require that filters implement
+callbacks for specific connection or stream events. In the case of <code class="docutils literal notranslate"><span class="pre">ListenerFilter</span></code>, this is:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">virtual</span><span class="w"> </span><span class="n">FilterStatus</span><span class="w"> </span><span class="nf">onAccept</span><span class="p">(</span><span class="n">ListenerFilterCallbacks</span><span class="o">&amp;</span><span class="w"> </span><span class="n">cb</span><span class="p">)</span><span class="w"> </span><span class="n">PURE</span><span class="p">;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">onAccept()</span></code> allows a filter to run during the TCP accept processing. The <code class="docutils literal notranslate"><span class="pre">FilterStatus</span></code>
+returned by the callback controls how the listener filter chain will continue. Listener filters may
+pause the filter chain and then later resume, e.g. in response to an RPC made to another service.</p>
+<p>Information extracted from the listener filters and connection properties is then used to match a
+filter chain, giving the network filter chain and transport socket that will be used to handle the
+connection.</p>
+<a class="reference internal image-reference" href="../_images/lor-filter-chain-match.svg"><img alt="../_images/lor-filter-chain-match.svg" class="align-center" src="../_images/lor-filter-chain-match.svg" style="width: 50%;" />
+</a>
+</section>
+<section id="tls-transport-socket-decryption">
+<span id="life-of-a-request-tls-decryption"></span><h3>3. TLS transport socket decryption<a class="headerlink" href="#tls-transport-socket-decryption" title="Link to this heading"></a></h3>
+<p>Envoy offers pluggable transport sockets via the
+<a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/envoy/network/transport_socket.h">TransportSocket</a>
+extension interface. Transport sockets follow the lifecycle events of a TCP connection and
+read/write into network buffers. Some key methods that transport sockets must implement are:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">onConnected</span><span class="p">()</span><span class="w"> </span><span class="n">PURE</span><span class="p">;</span>
+<span class="k">virtual</span><span class="w"> </span><span class="n">IoResult</span><span class="w"> </span><span class="nf">doRead</span><span class="p">(</span><span class="n">Buffer</span><span class="o">::</span><span class="n">Instance</span><span class="o">&amp;</span><span class="w"> </span><span class="n">buffer</span><span class="p">)</span><span class="w"> </span><span class="n">PURE</span><span class="p">;</span>
+<span class="k">virtual</span><span class="w"> </span><span class="n">IoResult</span><span class="w"> </span><span class="nf">doWrite</span><span class="p">(</span><span class="n">Buffer</span><span class="o">::</span><span class="n">Instance</span><span class="o">&amp;</span><span class="w"> </span><span class="n">buffer</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">end_stream</span><span class="p">)</span><span class="w"> </span><span class="n">PURE</span><span class="p">;</span>
+<span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">closeSocket</span><span class="p">(</span><span class="n">Network</span><span class="o">::</span><span class="n">ConnectionEvent</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="n">PURE</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>When data is available on a TCP connection, <code class="docutils literal notranslate"><span class="pre">Network::ConnectionImpl::onReadReady()</span></code> invokes the
+<a class="reference internal" href="arch_overview/security/ssl.html#arch-overview-ssl"><span class="std std-ref">TLS</span></a> transport socket via <code class="docutils literal notranslate"><span class="pre">SslSocket::doRead()</span></code>. The transport socket
+then performs a TLS handshake on the TCP connection. When the handshake completes,
+<code class="docutils literal notranslate"><span class="pre">SslSocket::doRead()</span></code> provides a decrypted byte stream to an instance of
+<code class="docutils literal notranslate"><span class="pre">Network::FilterManagerImpl</span></code>, responsible for managing the network filter chain.</p>
+<a class="reference internal image-reference" href="../_images/lor-transport-socket.svg"><img alt="../_images/lor-transport-socket.svg" class="align-center" src="../_images/lor-transport-socket.svg" style="width: 80%;" />
+</a>
+<p>It’s important to note that no operation, whether it’s a TLS handshake or a pause of a filter
+pipeline is truly blocking. Since Envoy is event-based, any situation in which processing requires
+additional data will lead to early event completion and yielding of the CPU to another event. When
+the network makes more data available to read, a read event will trigger the resumption of a TLS
+handshake.</p>
+</section>
+<section id="network-filter-chain-processing">
+<h3>4. Network filter chain processing<a class="headerlink" href="#network-filter-chain-processing" title="Link to this heading"></a></h3>
+<p>As with the listener filter chain, Envoy, via <code class="docutils literal notranslate"><span class="pre">Network::FilterManagerImpl</span></code>, will instantiate a
+series of <a class="reference internal" href="arch_overview/listeners/listener_filters.html#arch-overview-network-filters"><span class="std std-ref">network filters</span></a> from their filter factories. The
+instance is fresh for each new connection. Network filters, like transport sockets, follow TCP
+lifecycle events and are invoked as data becomes available from the transport socket.</p>
+<a class="reference internal image-reference" href="../_images/lor-network-filters.svg"><img alt="../_images/lor-network-filters.svg" class="align-center" src="../_images/lor-network-filters.svg" style="width: 80%;" />
+</a>
+<p>Network filters are composed as a pipeline, unlike transport sockets which are one-per-connection.
+Network filters come in three varieties:</p>
+<ul class="simple">
+<li><p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/envoy/network/filter.h">ReadFilter</a> implementing <code class="docutils literal notranslate"><span class="pre">onData()</span></code>, called when data is
+available from the connection (due to some request).</p></li>
+<li><p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/envoy/network/filter.h">WriteFilter</a> implementing <code class="docutils literal notranslate"><span class="pre">onWrite()</span></code>, called when data
+is about to be written to the connection (due to some response).</p></li>
+<li><p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/envoy/network/filter.h">Filter</a> implementing both <em>ReadFilter</em> and <em>WriteFilter</em>.</p></li>
+</ul>
+<p>The method signatures for the key filter methods are:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">virtual</span><span class="w"> </span><span class="n">FilterStatus</span><span class="w"> </span><span class="nf">onNewConnection</span><span class="p">()</span><span class="w"> </span><span class="n">PURE</span><span class="p">;</span>
+<span class="k">virtual</span><span class="w"> </span><span class="n">FilterStatus</span><span class="w"> </span><span class="nf">onData</span><span class="p">(</span><span class="n">Buffer</span><span class="o">::</span><span class="n">Instance</span><span class="o">&amp;</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">end_stream</span><span class="p">)</span><span class="w"> </span><span class="n">PURE</span><span class="p">;</span>
+<span class="k">virtual</span><span class="w"> </span><span class="n">FilterStatus</span><span class="w"> </span><span class="nf">onWrite</span><span class="p">(</span><span class="n">Buffer</span><span class="o">::</span><span class="n">Instance</span><span class="o">&amp;</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">end_stream</span><span class="p">)</span><span class="w"> </span><span class="n">PURE</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>As with the listener filter, the <code class="docutils literal notranslate"><span class="pre">FilterStatus</span></code> allows filters to pause execution of the filter
+chain. For example, if a rate limiting service needs to be queried, a rate limiting network filter
+would return <code class="docutils literal notranslate"><span class="pre">Network::FilterStatus::StopIteration</span></code> from <code class="docutils literal notranslate"><span class="pre">onData()</span></code> and later invoke
+<code class="docutils literal notranslate"><span class="pre">continueReading()</span></code> when the query completes.</p>
+<p>The last network filter for a listener dealing with HTTP is <a class="reference internal" href="arch_overview/http/http_connection_management.html#arch-overview-http-conn-man"><span class="std std-ref">HTTP connection manager</span></a> (HCM). This is responsible for creating the HTTP/2 codec and managing
+the HTTP filter chain. In our example, this is the only network filter. An example network filter
+chain making use of multiple network filters would look like:</p>
+<a class="reference internal image-reference" href="../_images/lor-network-read.svg"><img alt="../_images/lor-network-read.svg" class="align-center" src="../_images/lor-network-read.svg" style="width: 80%;" />
+</a>
+<p>On the response path, the network filter chain is executed in the reverse order to the request path.</p>
+<a class="reference internal image-reference" href="../_images/lor-network-write.svg"><img alt="../_images/lor-network-write.svg" class="align-center" src="../_images/lor-network-write.svg" style="width: 80%;" />
+</a>
+</section>
+<section id="http-2-codec-decoding">
+<span id="life-of-a-request-http2-decoding"></span><h3>5. HTTP/2 codec decoding<a class="headerlink" href="#http-2-codec-decoding" title="Link to this heading"></a></h3>
+<p>The HTTP/2 codec in Envoy is based on <a class="reference external" href="https://nghttp2.org/">nghttp2</a>. It is invoked by the HCM
+with plaintext bytes from the TCP connection (after network filter chain transformation). The codec
+decodes the byte stream as a series of HTTP/2 frames and demultiplexes the connection into a number
+of independent HTTP streams. Stream multiplexing is a key feature in HTTP/2, providing significant
+performance advantages over HTTP/1. Each HTTP stream handles a single request and response.</p>
+<p>The codec is also responsible for handling HTTP/2 setting frames and both stream and connection
+level <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/source/docs/flow_control.md">flow control</a>.</p>
+<p>The codecs are responsible for abstracting the specifics of the HTTP connection, presenting a
+standard view to the HTTP connection manager and HTTP filter chain of a connection split into
+streams, each with request/response headers/body/trailers. This is true regardless of whether the
+protocol is HTTP/1, HTTP/2 or HTTP/3.</p>
+</section>
+<section id="http-filter-chain-processing">
+<h3>6. HTTP filter chain processing<a class="headerlink" href="#http-filter-chain-processing" title="Link to this heading"></a></h3>
+<p>For each HTTP stream, the HCM instantiates an <a class="reference internal" href="arch_overview/http/http_filters.html#arch-overview-http-filters"><span class="std std-ref">Downstream HTTP filter</span></a> chain,
+following the pattern established above for listener and network filter chains.</p>
+<a class="reference internal image-reference" href="../_images/lor-http-filters.svg"><img alt="../_images/lor-http-filters.svg" class="align-center" src="../_images/lor-http-filters.svg" style="width: 80%;" />
+</a>
+<p>There are three kinds of HTTP filter interfaces:</p>
+<ul class="simple">
+<li><p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/envoy/http/filter.h">StreamDecoderFilter</a> with callbacks for request processing.</p></li>
+<li><p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/envoy/http/filter.h">StreamEncoderFilter</a> with callbacks for response processing.</p></li>
+<li><p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/envoy/http/filter.h">StreamFilter</a> implementing both <code class="docutils literal notranslate"><span class="pre">StreamDecoderFilter</span></code> and
+<code class="docutils literal notranslate"><span class="pre">StreamEncoderFilter</span></code>.</p></li>
+</ul>
+<p>Looking at the decoder filter interface:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">virtual</span><span class="w"> </span><span class="n">FilterHeadersStatus</span><span class="w"> </span><span class="nf">decodeHeaders</span><span class="p">(</span><span class="n">RequestHeaderMap</span><span class="o">&amp;</span><span class="w"> </span><span class="n">headers</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">end_stream</span><span class="p">)</span><span class="w"> </span><span class="n">PURE</span><span class="p">;</span>
+<span class="k">virtual</span><span class="w"> </span><span class="n">FilterDataStatus</span><span class="w"> </span><span class="nf">decodeData</span><span class="p">(</span><span class="n">Buffer</span><span class="o">::</span><span class="n">Instance</span><span class="o">&amp;</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">end_stream</span><span class="p">)</span><span class="w"> </span><span class="n">PURE</span><span class="p">;</span>
+<span class="k">virtual</span><span class="w"> </span><span class="n">FilterTrailersStatus</span><span class="w"> </span><span class="nf">decodeTrailers</span><span class="p">(</span><span class="n">RequestTrailerMap</span><span class="o">&amp;</span><span class="w"> </span><span class="n">trailers</span><span class="p">)</span><span class="w"> </span><span class="n">PURE</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Rather than operating on connection buffers and events, HTTP filters follow the lifecycle of an HTTP
+request, e.g. <code class="docutils literal notranslate"><span class="pre">decodeHeaders()</span></code> takes HTTP headers as an argument rather than a byte buffer. The
+returned <code class="docutils literal notranslate"><span class="pre">FilterStatus</span></code> provides, as with network and listener filters, the ability to manage filter
+chain control flow.</p>
+<p>When the HTTP/2 codec makes available the HTTP requests headers, these are first passed to
+<code class="docutils literal notranslate"><span class="pre">decodeHeaders()</span></code> in CustomFilter. If the returned <code class="docutils literal notranslate"><span class="pre">FilterHeadersStatus</span></code> is <code class="docutils literal notranslate"><span class="pre">Continue</span></code>, HCM
+then passes the headers (possibly mutated by CustomFilter) to the router filter.</p>
+<p>Decoder and encoder-decoder filters are executed on the request path. Encoder and encoder-decoder
+filters are executed on the response path, in <a class="reference internal" href="arch_overview/http/http_filters.html#arch-overview-http-filters-ordering"><span class="std std-ref">reverse direction</span></a>. Consider the following example filter chain:</p>
+<a class="reference internal image-reference" href="../_images/lor-http.svg"><img alt="../_images/lor-http.svg" class="align-center" src="../_images/lor-http.svg" style="width: 80%;" />
+</a>
+<p>The request path will look like:</p>
+<a class="reference internal image-reference" href="../_images/lor-http-decode.svg"><img alt="../_images/lor-http-decode.svg" class="align-center" src="../_images/lor-http-decode.svg" style="width: 80%;" />
+</a>
+<p>While the response path will look like:</p>
+<a class="reference internal image-reference" href="../_images/lor-http-encode.svg"><img alt="../_images/lor-http-encode.svg" class="align-center" src="../_images/lor-http-encode.svg" style="width: 80%;" />
+</a>
+<p>When <code class="docutils literal notranslate"><span class="pre">decodeHeaders()</span></code> is invoked on the <a class="reference internal" href="arch_overview/http/http_routing.html#arch-overview-http-routing"><span class="std std-ref">router</span></a> filter, the
+route selection is finalized and a cluster is picked. The HCM selects a route from its
+<code class="docutils literal notranslate"><span class="pre">RouteConfiguration</span></code> at the start of HTTP filter chain execution. This is referred to as the
+<em>cached route</em>. Filters may modify headers and cause a new route to be selected, by asking HCM to
+clear the route cache and requesting HCM to reevaluate the route selection. Filters may also
+directly set this cached route selection via a <code class="docutils literal notranslate"><span class="pre">setRoute</span></code> callback. When the router filter is
+invoked, the route is finalized. The selected route’s configuration will point at an upstream
+cluster name. The router filter then asks the <code class="docutils literal notranslate"><span class="pre">ClusterManager</span></code> for an HTTP <a class="reference internal" href="arch_overview/upstream/connection_pooling.html#arch-overview-conn-pool"><span class="std std-ref">connection pool</span></a> for the cluster. This involves load balancing and the connection pool,
+discussed in the next section.</p>
+<a class="reference internal image-reference" href="../_images/lor-route-config.svg"><img alt="../_images/lor-route-config.svg" class="align-center" src="../_images/lor-route-config.svg" style="width: 70%;" />
+</a>
+<p>The resulting HTTP connection pool is used to build an <code class="docutils literal notranslate"><span class="pre">UpstreamRequest</span></code> object in the router, which
+encapsulates the HTTP encoding and decoding callback methods for the upstream HTTP request. Once a
+stream is allocated on a connection in the HTTP connection pool, the request headers are forwarded
+to the upstream endpoint by the invocation of <code class="docutils literal notranslate"><span class="pre">UpstreamRequest::encodeHeaders</span></code>.</p>
+<p>The router filter is responsible for all aspects of upstream request lifecycle management on the
+stream allocated from the HTTP connection pool. It also is responsible for request timeouts, retries
+and affinity.</p>
+<p>The router filter is also responsible for the creation and running of the <a class="reference internal" href="arch_overview/http/http_filters.html#arch-overview-http-filters"><span class="std std-ref">Upstream HTTP filter</span></a>
+chain. By default, upstream HTTP filters will start running immediately after headers arrive at the router
+filter, however C++ filters can pause until the upstream connection is established if they need to
+inspect the upstream stream or connection. Upstream HTTP filter chains are by default configured via cluster
+configuration, so for example a shadowed request can have a separate upstream HTTP filter chain for the primary
+and shadowed clusters. Also as the upstream HTTP filter chain is upstream of the router filter, it is run per each
+retry attempt allowing header manipulation per retry and including information about the upstream stream and
+connection. Unlike downstream HTTP filters, upstream HTTP filters can not alter the route.</p>
+</section>
+<section id="load-balancing">
+<h3>7. Load balancing<a class="headerlink" href="#load-balancing" title="Link to this heading"></a></h3>
+<p>Each cluster has a <a class="reference internal" href="arch_overview/upstream/load_balancing/overview.html#arch-overview-load-balancing"><span class="std std-ref">load balancer</span></a> which picks an endpoint when
+a new request arrives. Envoy supports a variety of load balancing algorithms, e.g. weighted
+round-robin, Maglev, least-loaded, random. Load balancers obtain their effective assignments from a
+combination of static bootstrap configuration, DNS, dynamic xDS (the CDS and EDS discovery services)
+and active/passive health checks. Further details on how load balancing works in Envoy are provided
+in the <a class="reference internal" href="arch_overview/upstream/load_balancing/overview.html#arch-overview-load-balancing"><span class="std std-ref">load balancing documentation</span></a>.</p>
+<p>Once an endpoint is selected, the <a class="reference internal" href="arch_overview/upstream/connection_pooling.html#arch-overview-conn-pool"><span class="std std-ref">connection pool</span></a> for this endpoint
+is used to find a connection to forward the request on. If no connection to the host exists, or all
+connections are at their maximum concurrent stream limit, a new connection is established and placed
+in the connection pool, unless the circuit breaker for maximum connections for the cluster has
+tripped. If a maximum lifetime stream limit for a connection is configured and reached, a new
+connection is allocated in the pool and the affected HTTP/2 connection is drained. Other circuit
+breakers, e.g. maximum concurrent requests to a cluster are also checked. See <a class="reference internal" href="arch_overview/upstream/circuit_breaking.html#arch-overview-circuit-break"><span class="std std-ref">circuit
+breakers</span></a> and <a class="reference internal" href="arch_overview/upstream/connection_pooling.html#arch-overview-conn-pool"><span class="std std-ref">connection pools</span></a> for
+further details.</p>
+<a class="reference internal image-reference" href="../_images/lor-lb.svg"><img alt="../_images/lor-lb.svg" class="align-center" src="../_images/lor-lb.svg" style="width: 80%;" />
+</a>
+</section>
+<section id="http-2-codec-encoding">
+<h3>8. HTTP/2 codec encoding<a class="headerlink" href="#http-2-codec-encoding" title="Link to this heading"></a></h3>
+<p>The selected connection’s HTTP/2 codec multiplexes the request stream with any other streams going
+to the same upstream over a single TCP connection. This is the reverse of <a class="reference internal" href="#life-of-a-request-http2-decoding"><span class="std std-ref">HTTP/2 codec
+decoding</span></a>.</p>
+<p>As with the downstream HTTP/2 codec, the upstream codec is responsible for taking Envoy’s standard
+abstraction of HTTP, i.e. multiple streams multiplexed on a single connection with request/response
+headers/body/trailers, and mapping this to the specifics of HTTP/2 by generating a series of HTTP/2
+frames.</p>
+</section>
+<section id="tls-transport-socket-encryption">
+<h3>9. TLS transport socket encryption<a class="headerlink" href="#tls-transport-socket-encryption" title="Link to this heading"></a></h3>
+<p>The upstream endpoint connection’s TLS transport socket encrypts the bytes from the HTTP/2 codec
+output and writes them to a TCP socket for the upstream connection. As with <a class="reference internal" href="#life-of-a-request-tls-decryption"><span class="std std-ref">TLS transport
+socket decryption</span></a>, in our example the cluster has a transport
+socket configured that provides TLS transport security. The same interfaces exist for upstream and
+downstream transport socket extensions.</p>
+<a class="reference internal image-reference" href="../_images/lor-client.svg"><img alt="../_images/lor-client.svg" class="align-center" src="../_images/lor-client.svg" style="width: 70%;" />
+</a>
+</section>
+<section id="response-path-and-http-lifecycle">
+<h3>10. Response path and HTTP lifecycle<a class="headerlink" href="#response-path-and-http-lifecycle" title="Link to this heading"></a></h3>
+<p>The request, consisting of headers, and optional body and trailers, is proxied upstream, and the
+response is proxied downstream. The response passes through the HTTP and network filters in the
+<a class="reference internal" href="arch_overview/http/http_filters.html#arch-overview-http-filters-ordering"><span class="std std-ref">opposite order</span></a> from the request.</p>
+<p>Various callbacks for decoder/encoder request lifecycle events will be invoked in HTTP filters, e.g.
+when response trailers are being forwarded or the request body is streamed. Similarly, read/write
+network filters will also have their respective callbacks invoked as data continues to flow in both
+directions during a request.</p>
+<p><a class="reference internal" href="arch_overview/upstream/outlier.html#arch-overview-outlier-detection"><span class="std std-ref">Outlier detection</span></a> status for the endpoint is revised as the
+request progresses.</p>
+<p>The point at which the proxying completes and the stream is destroyed for HTTP/2 and HTTP/3 protocols
+is determined by the independent half-close option. If independent half-close is enabled the stream
+is destroyed after both request and response are complete i.e. reach their respective end-of-stream,
+by receiving trailers or the header/body with end-stream set in both directions AND response has
+success (2xx) status code. This is handled in <code class="docutils literal notranslate"><span class="pre">FilterManager::checkAndCloseStreamIfFullyClosed()</span></code>.</p>
+<p>For HTTP/1 protocol or if independent half-close is disabled the stream is destroyed when the response
+is complete and reaches its end-of-stream, i.e. when trailers or the response header/body with
+end-stream set are received, even if the request has not yet completed. This is handled in
+<code class="docutils literal notranslate"><span class="pre">Router::Filter::onUpstreamComplete()</span></code>.</p>
+<p>It is possible for a request to terminate early. This may be due to (but not limited to):</p>
+<ul class="simple">
+<li><p>Request timeout.</p></li>
+<li><p>Upstream endpoint stream reset.</p></li>
+<li><p>HTTP filter stream reset.</p></li>
+<li><p>Circuit breaking.</p></li>
+<li><p>Unavailability of upstream resources, e.g. missing a cluster for a route.</p></li>
+<li><p>No healthy endpoints.</p></li>
+<li><p>DoS protection.</p></li>
+<li><p>HTTP protocol violations.</p></li>
+<li><p>Local reply from either the HCM or an HTTP filter. E.g. a rate limit HTTP filter returning a 429
+response.</p></li>
+</ul>
+<p>If any of these occur, Envoy may either send an internally generated response, if upstream response
+headers have not yet been sent, or will reset the stream, if response headers have already been
+forwarded downstream. The Envoy <a class="reference internal" href="../faq/overview.html#faq-overview-debug"><span class="std std-ref">debugging FAQ</span></a> has further information on
+interpreting these early stream terminations.</p>
+</section>
+<section id="post-request-processing">
+<h3>11. Post-request processing<a class="headerlink" href="#post-request-processing" title="Link to this heading"></a></h3>
+<p>Once a request completes, the stream is destroyed. The following also takes places:</p>
+<ul class="simple">
+<li><p>The post-request <a class="reference internal" href="arch_overview/observability/statistics.html#arch-overview-statistics"><span class="std std-ref">statistics</span></a> are updated (e.g. timing, active
+requests, upgrades, health checks). Some statistics are updated earlier however, during request
+processing. Stats are not written to the stats <a class="reference internal" href="../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-stats-sinks"><span class="std std-ref">sink</span></a> at this point, they are batched
+and written by the main thread periodically. In our example this is a statsd sink.</p></li>
+<li><p><a class="reference internal" href="arch_overview/observability/access_logging.html#arch-overview-access-logs"><span class="std std-ref">Access logs</span></a> are written to the access log <a class="reference internal" href="arch_overview/observability/access_logging.html#arch-overview-access-logs-sinks"><span class="std std-ref">sinks</span></a>. In our example this is a file access log.</p></li>
+<li><p><a class="reference internal" href="arch_overview/observability/tracing.html#arch-overview-tracing"><span class="std std-ref">Trace</span></a> spans are finalized. If our example request was traced, a
+trace span, describing the duration and details of the request would be created by the HCM when
+processing request headers and then finalized by the HCM during post-request processing.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="arch_overview/advanced/dynamic_modules.html" class="btn btn-neutral float-left" title="Dynamic modules" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="deployment_types/deployment_types.html" class="btn btn-neutral float-right" title="Deployment types" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Life of a Request</a><ul>
+<li><a class="reference internal" href="#terminology">Terminology</a></li>
+<li><a class="reference internal" href="#network-topology">Network topology</a></li>
+<li><a class="reference internal" href="#configuration">Configuration</a></li>
+<li><a class="reference internal" href="#high-level-architecture">High level architecture</a></li>
+<li><a class="reference internal" href="#request-flow">Request flow</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#listener-tcp-accept">1. Listener TCP accept</a></li>
+<li><a class="reference internal" href="#listener-filter-chains-and-network-filter-chain-matching">2. Listener filter chains and network filter chain matching</a></li>
+<li><a class="reference internal" href="#tls-transport-socket-decryption">3. TLS transport socket decryption</a></li>
+<li><a class="reference internal" href="#network-filter-chain-processing">4. Network filter chain processing</a></li>
+<li><a class="reference internal" href="#http-2-codec-decoding">5. HTTP/2 codec decoding</a></li>
+<li><a class="reference internal" href="#http-filter-chain-processing">6. HTTP filter chain processing</a></li>
+<li><a class="reference internal" href="#load-balancing">7. Load balancing</a></li>
+<li><a class="reference internal" href="#http-2-codec-encoding">8. HTTP/2 codec encoding</a></li>
+<li><a class="reference internal" href="#tls-transport-socket-encryption">9. TLS transport socket encryption</a></li>
+<li><a class="reference internal" href="#response-path-and-http-lifecycle">10. Response path and HTTP lifecycle</a></li>
+<li><a class="reference internal" href="#post-request-processing">11. Post-request processing</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

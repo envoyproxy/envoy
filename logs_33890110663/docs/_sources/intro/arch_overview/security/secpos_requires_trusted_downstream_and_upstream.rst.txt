@@ -1,0 +1,76 @@
+Extension security: ``requires_trusted_downstream_and_upstream``
+================================================================
+
+* :ref:`envoy.access_loggers.dynamic_modules <extension_envoy.access_loggers.dynamic_modules>` (alpha)
+* :ref:`envoy.bootstrap.dynamic_modules <extension_envoy.bootstrap.dynamic_modules>` (alpha)
+* :ref:`envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service <extension_envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.bootstrap.vcl <extension_envoy.bootstrap.vcl>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.clusters.aggregate <extension_envoy.clusters.aggregate>`
+* :ref:`envoy.clusters.composite <extension_envoy.clusters.composite>`
+* :ref:`envoy.clusters.dynamic_modules <extension_envoy.clusters.dynamic_modules>` (alpha)
+* :ref:`envoy.clusters.mcp_multicluster <extension_envoy.clusters.mcp_multicluster>` (alpha)
+* :ref:`envoy.clusters.redis <extension_envoy.clusters.redis>`
+* :ref:`envoy.compression.zstd.decompressor <extension_envoy.compression.zstd.decompressor>`
+* :ref:`envoy.filters.generic.router <extension_envoy.filters.generic.router>` (alpha)
+* :ref:`envoy.filters.http.alpn <extension_envoy.filters.http.alpn>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.http.aws_lambda <extension_envoy.filters.http.aws_lambda>`
+* :ref:`envoy.filters.http.aws_request_signing <extension_envoy.filters.http.aws_request_signing>`
+* :ref:`envoy.filters.http.checksum <extension_envoy.filters.http.checksum>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.http.dynamic_modules <extension_envoy.filters.http.dynamic_modules>`
+* :ref:`envoy.filters.http.dynamo <extension_envoy.filters.http.dynamo>` (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.http.golang <extension_envoy.filters.http.golang>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.http.istio_stats <extension_envoy.filters.http.istio_stats>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.http.language <extension_envoy.filters.http.language>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.http.peak_ewma <extension_envoy.filters.http.peak_ewma>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.http.peer_metadata <extension_envoy.filters.http.peer_metadata>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.http.stateful_session <extension_envoy.filters.http.stateful_session>`
+* :ref:`envoy.filters.http.tap <extension_envoy.filters.http.tap>` (alpha)
+* :ref:`envoy.filters.listener.dynamic_modules <extension_envoy.filters.listener.dynamic_modules>` (alpha)
+* :ref:`envoy.filters.listener.http_inspector <extension_envoy.filters.listener.http_inspector>`
+* :ref:`envoy.filters.network.dubbo_proxy <extension_envoy.filters.network.dubbo_proxy>` (alpha)
+* :ref:`envoy.filters.network.dynamic_modules <extension_envoy.filters.network.dynamic_modules>` (alpha)
+* :ref:`envoy.filters.network.generic_proxy <extension_envoy.filters.network.generic_proxy>` (alpha)
+* :ref:`envoy.filters.network.golang <extension_envoy.filters.network.golang>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.network.metadata_exchange <extension_envoy.filters.network.metadata_exchange>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.network.mongo_proxy <extension_envoy.filters.network.mongo_proxy>`
+* :ref:`envoy.filters.network.mysql_proxy <extension_envoy.filters.network.mysql_proxy>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.network.peer_metadata <extension_envoy.filters.network.peer_metadata>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.network.postgres_proxy <extension_envoy.filters.network.postgres_proxy>` (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.network.redis_proxy <extension_envoy.filters.network.redis_proxy>`
+* :ref:`envoy.filters.network.rocketmq_proxy <extension_envoy.filters.network.rocketmq_proxy>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.network.sip_proxy <extension_envoy.filters.network.sip_proxy>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.network.thrift_proxy <extension_envoy.filters.network.thrift_proxy>`
+* :ref:`envoy.filters.network.zookeeper_proxy <extension_envoy.filters.network.zookeeper_proxy>` (alpha)
+* :ref:`envoy.filters.sip.router <extension_envoy.filters.sip.router>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.thrift.header_to_metadata <extension_envoy.filters.thrift.header_to_metadata>` (alpha)
+* :ref:`envoy.filters.thrift.payload_to_metadata <extension_envoy.filters.thrift.payload_to_metadata>` (alpha)
+* :ref:`envoy.filters.thrift.rate_limit <extension_envoy.filters.thrift.rate_limit>` (alpha)
+* :ref:`envoy.filters.thrift.router <extension_envoy.filters.thrift.router>`
+* :ref:`envoy.filters.udp_listener.dynamic_modules <extension_envoy.filters.udp_listener.dynamic_modules>` (alpha)
+* :ref:`envoy.formatter.dynamic_modules <extension_envoy.formatter.dynamic_modules>` (alpha)
+* :ref:`envoy.generic_proxy.codecs.dubbo <extension_envoy.generic_proxy.codecs.dubbo>` (alpha)
+* :ref:`envoy.generic_proxy.codecs.http1 <extension_envoy.generic_proxy.codecs.http1>` (alpha)
+* :ref:`envoy.health_checkers.dynamic_modules <extension_envoy.health_checkers.dynamic_modules>` (alpha)
+* :ref:`envoy.health_checkers.redis <extension_envoy.health_checkers.redis>`
+* :ref:`envoy.health_checkers.thrift <extension_envoy.health_checkers.thrift>` (alpha)
+* :ref:`envoy.load_balancing_policies.dynamic_modules <extension_envoy.load_balancing_policies.dynamic_modules>` (alpha)
+* :ref:`envoy.load_balancing_policies.peak_ewma <extension_envoy.load_balancing_policies.peak_ewma>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.matching.input_matchers.hyperscan <extension_envoy.matching.input_matchers.hyperscan>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.matching.inputs.dynamic_module_data_input <extension_envoy.matching.inputs.dynamic_module_data_input>` (alpha)
+* :ref:`envoy.matching.inputs.dynamic_module_string_data_input <extension_envoy.matching.inputs.dynamic_module_string_data_input>` (alpha)
+* :ref:`envoy.matching.matchers.dynamic_modules <extension_envoy.matching.matchers.dynamic_modules>` (alpha)
+* :ref:`envoy.quic.connection_debug_visitor.basic <extension_envoy.quic.connection_debug_visitor.basic>`
+* :ref:`envoy.rate_limit_descriptors.jwt_claim <extension_envoy.rate_limit_descriptors.jwt_claim>` (alpha)
+* :ref:`envoy.regex_engines.hyperscan <extension_envoy.regex_engines.hyperscan>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.router.cluster_specifier_plugin.dynamic_modules <extension_envoy.router.cluster_specifier_plugin.dynamic_modules>` (alpha)
+* :ref:`envoy.router.cluster_specifier_plugin.golang <extension_envoy.router.cluster_specifier_plugin.golang>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.stat_sinks.dynamic_modules <extension_envoy.stat_sinks.dynamic_modules>` (alpha)
+* :ref:`envoy.tap_sinks.udp_sink <extension_envoy.tap_sinks.udp_sink>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.tls.cert_validator.dynamic_modules <extension_envoy.tls.cert_validator.dynamic_modules>` (alpha)
+* :ref:`envoy.tls.cert_validator.spiffe <extension_envoy.tls.cert_validator.spiffe>` (alpha)
+* :ref:`envoy.tracers.dynamic_modules <extension_envoy.tracers.dynamic_modules>` (alpha)
+* :ref:`envoy.transport_sockets.dynamic_modules <extension_envoy.transport_sockets.dynamic_modules>` (alpha)
+* :ref:`envoy.transport_sockets.tap <extension_envoy.transport_sockets.tap>` (alpha)
+* :ref:`envoy.upstreams.http.dynamic_modules <extension_envoy.upstreams.http.dynamic_modules>` (alpha)
+* :ref:`envoy.upstreams.http.reverse_tunnel <extension_envoy.upstreams.http.reverse_tunnel>` (alpha)
+* :ref:`envoy.upstreams.http.tcp.golang <extension_envoy.upstreams.http.tcp.golang>` (alpha) (:ref:`contrib builds <install_contrib>` only)

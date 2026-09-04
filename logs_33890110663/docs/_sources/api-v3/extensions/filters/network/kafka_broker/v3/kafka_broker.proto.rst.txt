@@ -1,0 +1,175 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.proto:
+
+contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.proto (proto)
+===================================================================================
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.kafka_broker.v3.KafkaBroker:
+
+extensions.filters.network.kafka_broker.v3.KafkaBroker
+------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.kafka_broker.v3.KafkaBroker proto] <api/contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.proto#L18>`
+
+Kafka Broker :ref:`configuration overview <config_network_filters_kafka_broker>`.
+
+.. _extension_envoy.filters.network.kafka_broker:
+
+This extension has the qualified name ``envoy.filters.network.kafka_broker``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "force_response_rewrite": ...,
+    "id_based_broker_address_rewrite_spec": {...},
+    "api_keys_allowed": [],
+    "api_keys_denied": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_broker.v3.KafkaBroker.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The prefix to use when emitting :ref:`statistics <config_network_filters_kafka_broker_stats>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_broker.v3.KafkaBroker.force_response_rewrite:
+
+
+force_response_rewrite
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Set to true if broker filter should attempt to serialize the received responses from the
+  upstream broker instead of passing received bytes as is.
+  Disabled by default.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_broker.v3.KafkaBroker.id_based_broker_address_rewrite_spec:
+
+
+id_based_broker_address_rewrite_spec
+  (:ref:`extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteSpec <envoy_v3_api_msg_extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteSpec>`) Broker address rewrite rules that match by broker ID.
+
+
+  Optional broker address rewrite specification.
+  Allows the broker filter to rewrite Kafka responses so that all connections established by
+  the Kafka clients point to Envoy.
+  This allows Kafka cluster not to configure its 'advertised.listeners' property
+  (as the necessary re-pointing will be done by this filter).
+  This collection of rules should cover all brokers in the cluster that is being proxied,
+  otherwise some nodes' addresses might leak to the downstream clients.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_broker.v3.KafkaBroker.api_keys_allowed:
+
+
+api_keys_allowed
+  (**repeated** `uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional list of allowed Kafka API keys. Only requests with provided API keys will be
+  routed, otherwise the connection will be closed. No effect if empty.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_broker.v3.KafkaBroker.api_keys_denied:
+
+
+api_keys_denied
+  (**repeated** `uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional list of denied Kafka API keys. Requests with API keys matching this list will have
+  the connection closed. No effect if empty.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteSpec:
+
+extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteSpec
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteSpec proto] <api/contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.proto#L54>`
+
+Collection of rules matching by broker ID.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "rules": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteSpec.rules:
+
+
+rules
+  (**repeated** :ref:`extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteRule <envoy_v3_api_msg_extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteRule>`) 
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteRule:
+
+extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteRule
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteRule proto] <api/contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.proto#L59>`
+
+Defines a rule to rewrite broker address data.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "id": ...,
+    "host": ...,
+    "port": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteRule.id:
+
+
+id
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Broker ID to match.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteRule.host:
+
+
+host
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The host value to use (resembling the host part of Kafka's advertised.listeners).
+  The value should point to the Envoy (not Kafka) listener, so that all client traffic goes
+  through Envoy.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.kafka_broker.v3.IdBasedBrokerRewriteRule.port:
+
+
+port
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The port value to use (resembling the port part of Kafka's advertised.listeners).
+  The value should point to the Envoy (not Kafka) listener, so that all client traffic goes
+  through Envoy.
+
+

@@ -1,0 +1,322 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.proto:
+
+Json-To-Metadata Filter (proto)
+===============================
+
+.. _extension_envoy.filters.http.json_to_metadata:
+
+This extension has the qualified name ``envoy.filters.http.json_to_metadata``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.json_to_metadata.v3.JsonToMetadata <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata>`
+
+
+
+
+The configuration for transforming json body into metadata. This is useful
+for matching load balancer subsets, logging, etc.
+
+Json to Metadata :ref:`configuration overview <config_http_filters_json_to_metadata>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata:
+
+extensions.filters.http.json_to_metadata.v3.JsonToMetadata
+----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.json_to_metadata.v3.JsonToMetadata proto] <api/envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.proto#L25>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_rules": {...},
+    "response_rules": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.request_rules:
+
+
+request_rules
+  (:ref:`extensions.filters.http.json_to_metadata.v3.JsonToMetadata.MatchRules <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.MatchRules>`) At least one of request_rules and response_rules must be provided.
+  Rules to match json body of requests.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.response_rules:
+
+
+response_rules
+  (:ref:`extensions.filters.http.json_to_metadata.v3.JsonToMetadata.MatchRules <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.MatchRules>`) Rules to match json body of responses.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair:
+
+extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair
+-----------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair proto] <api/envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.proto#L37>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "metadata_namespace": ...,
+    "key": ...,
+    "value": {...},
+    "type": ...,
+    "preserve_existing_metadata_value": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair.metadata_namespace:
+
+
+metadata_namespace
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The namespace — if this is empty, the filter's namespace will be used.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The key to use within the namespace.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair.value:
+
+
+value
+  (`Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#value>`_) The value to pair with the given key.
+
+  When used for on_present case, if value is non-empty it'll be used instead
+  of the the value of the JSON key. If both are empty, the the value of the
+  JSON key is used as-is.
+
+  When used for on_missing/on_error case, a non-empty value
+  must be provided.
+
+  It ignores ValueType, i.e., not type casting.
+
+
+  
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair.type:
+
+
+type
+  (:ref:`extensions.filters.http.json_to_metadata.v3.JsonToMetadata.ValueType <envoy_v3_api_enum_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.ValueType>`) The value's type — defaults to protobuf.Value.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair.preserve_existing_metadata_value:
+
+
+preserve_existing_metadata_value
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) False if we want to overwrite the existing metadata value. Default to false.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Selector:
+
+extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Selector
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Selector proto] <api/envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.proto#L65>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "key": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Selector.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) key to match
+
+
+  
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule:
+
+extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule
+---------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule proto] <api/envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.proto#L74>`
+
+A Rule defines what metadata to apply when a key-value is present, missing in the json
+or fail to parse the payload.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "selectors": [],
+    "on_present": {...},
+    "on_missing": {...},
+    "on_error": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule.selectors:
+
+
+selectors
+  (**repeated** :ref:`extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Selector <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Selector>`, *REQUIRED*) Specifies that a match will be performed on the value of a property.
+  Here's an example to match on 1 in {"foo": {"bar": 1}, "bar": 2}
+
+  selectors:
+  - key: foo
+  - key: bar
+
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule.on_present:
+
+
+on_present
+  (:ref:`extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair>`) If the attribute is present, apply this metadata KeyValuePair.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule.on_missing:
+
+
+on_missing
+  (:ref:`extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair>`) If the attribute is missing, apply this metadata KeyValuePair.
+
+  The value in the KeyValuePair must be set.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule.on_error:
+
+
+on_error
+  (:ref:`extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair>`) If the body is too large or fail to parse or content-type is mismatched, apply this metadata KeyValuePair.
+
+  The value in the KeyValuePair must be set.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.MatchRules:
+
+extensions.filters.http.json_to_metadata.v3.JsonToMetadata.MatchRules
+---------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.json_to_metadata.v3.JsonToMetadata.MatchRules proto] <api/envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.proto#L97>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "rules": [],
+    "allow_content_types": [],
+    "allow_empty_content_type": ...,
+    "allow_content_types_regex": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.MatchRules.rules:
+
+
+rules
+  (**repeated** :ref:`extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule>`, *REQUIRED*) The list of rules to apply.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.MatchRules.allow_content_types:
+
+
+allow_content_types
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Allowed content-type for json to metadata transformation.
+  Default to ``{"application/json"}``.
+
+  Set ``allow_empty_content_type`` if empty/missing content-type header
+  is allowed.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.MatchRules.allow_empty_content_type:
+
+
+allow_empty_content_type
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Allowed empty content-type for json to metadata transformation.
+  Default to false.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.MatchRules.allow_content_types_regex:
+
+
+allow_content_types_regex
+  (:ref:`type.matcher.v3.RegexMatcher <envoy_v3_api_msg_type.matcher.v3.RegexMatcher>`) Allowed content-type by regex match for json to metadata transformation.
+  This can be used in parallel with ``allow_content_types``.
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.ValueType:
+
+Enum extensions.filters.http.json_to_metadata.v3.JsonToMetadata.ValueType
+-------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.json_to_metadata.v3.JsonToMetadata.ValueType proto] <api/envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.proto#L26>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.ValueType.PROTOBUF_VALUE:
+
+
+PROTOBUF_VALUE
+  *(DEFAULT)* ⁣The value is a serialized `protobuf.Value
+  <https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/struct.proto#L62>`_.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.ValueType.STRING:
+
+
+STRING
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.ValueType.NUMBER:
+
+
+NUMBER
+  ⁣
+
+

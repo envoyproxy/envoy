@@ -1,0 +1,328 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>What is Envoy &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Architecture overview" href="arch_overview/arch_overview.html" />
+    <link rel="prev" title="Introduction" href="intro.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../searchindex.js"
+          data-envoy-search-page="../search.html"
+          data-envoy-root="../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">What is Envoy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="arch_overview/arch_overview.html">Architecture overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="intro.html">Introduction</a></li>
+      <li class="breadcrumb-item active">What is Envoy</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/intro/what_is_envoy.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="what-is-envoy">
+<h1>What is Envoy<a class="headerlink" href="#what-is-envoy" title="Link to this heading"></a></h1>
+<p>Envoy is an L7 proxy and communication bus designed for large modern service oriented architectures.
+The project was born out of the belief that:</p>
+<blockquote>
+<div><p><em>The network should be transparent to applications. When network and application problems do occur
+it should be easy to determine the source of the problem.</em></p>
+</div></blockquote>
+<p>In practice, achieving the previously stated goal is incredibly difficult. Envoy attempts to do so
+by providing the following high level features:</p>
+<p><strong>Out of process architecture:</strong> Envoy is a self contained process that is designed to run
+alongside every application server. All of the Envoys form a transparent communication mesh in which
+each application sends and receives messages to and from localhost and is unaware of the network
+topology. The out of process architecture has two substantial benefits over the traditional library
+approach to service to service communication:</p>
+<ul class="simple">
+<li><p>Envoy works with any application language. A single Envoy deployment can form a mesh between
+Java, C++, Go, PHP, Python, etc. It is becoming increasingly common for service oriented
+architectures to use multiple application frameworks and languages. Envoy transparently bridges
+the gap.</p></li>
+<li><p>As anyone that has worked with a large service oriented architecture knows, deploying library
+upgrades can be incredibly painful. Envoy can be deployed and upgraded quickly across an
+entire infrastructure transparently.</p></li>
+</ul>
+<p><strong>L3/L4 filter architecture:</strong> At its core, Envoy is an L3/L4 network proxy. A pluggable
+<a class="reference internal" href="arch_overview/listeners/listener_filters.html#arch-overview-network-filters"><span class="std std-ref">filter</span></a> chain mechanism allows filters to be written to
+perform different TCP/UDP proxy tasks and inserted into the main server. Filters have already been
+written to support various tasks such as raw <a class="reference internal" href="arch_overview/listeners/listener_filters.html#arch-overview-tcp-proxy"><span class="std std-ref">TCP proxy</span></a>, <a class="reference internal" href="arch_overview/listeners/listener_filters.html#arch-overview-udp-proxy"><span class="std std-ref">UDP
+proxy</span></a>, <a class="reference internal" href="arch_overview/http/http_connection_management.html#arch-overview-http-conn-man"><span class="std std-ref">HTTP proxy</span></a>, <a class="reference internal" href="arch_overview/security/ssl.html#arch-overview-ssl-auth-filter"><span class="std std-ref">TLS client
+certificate authentication</span></a>, <a class="reference internal" href="arch_overview/other_protocols/redis.html#arch-overview-redis"><span class="std std-ref">Redis</span></a>,
+<a class="reference internal" href="arch_overview/other_protocols/mongo.html#arch-overview-mongo"><span class="std std-ref">MongoDB</span></a>, <a class="reference internal" href="arch_overview/other_protocols/postgres.html#arch-overview-postgres"><span class="std std-ref">Postgres</span></a>, etc.</p>
+<p><strong>HTTP L7 filter architecture:</strong> HTTP is such a critical component of modern application
+architectures that Envoy <a class="reference internal" href="arch_overview/http/http_filters.html#arch-overview-http-filters"><span class="std std-ref">supports</span></a> an additional HTTP L7 filter
+layer. HTTP filters can be plugged into the HTTP connection management subsystem that perform
+different tasks such as <a class="reference internal" href="../configuration/http/http_filters/buffer_filter.html#config-http-filters-buffer"><span class="std std-ref">buffering</span></a>, <a class="reference internal" href="arch_overview/other_features/global_rate_limiting.html#arch-overview-global-rate-limit"><span class="std std-ref">rate limiting</span></a>, <a class="reference internal" href="arch_overview/http/http_routing.html#arch-overview-http-routing"><span class="std std-ref">routing/forwarding</span></a>, sniffing
+Amazon’s <a class="reference internal" href="arch_overview/other_protocols/dynamo.html#arch-overview-dynamo"><span class="std std-ref">DynamoDB</span></a>, etc.</p>
+<p><strong>First class HTTP/2 support:</strong> When operating in HTTP mode, Envoy <a class="reference internal" href="arch_overview/http/http_connection_management.html#arch-overview-http-protocols"><span class="std std-ref">supports</span></a> both HTTP/1.1 and HTTP/2. Envoy can operate as a transparent
+HTTP/1.1 to HTTP/2 proxy in both directions. This means that any combination of HTTP/1.1 and HTTP/2
+clients and target servers can be bridged. The recommended service to service configuration uses
+HTTP/2 between all Envoys to create a mesh of persistent connections that requests and responses can
+be multiplexed over.</p>
+<p><strong>HTTP/3 support (currently in alpha):</strong> As of 1.19.0, Envoy now supports HTTP/3 upstream and downstream,
+and translating between any combination of HTTP/1.1, HTTP/2 and HTTP/3 in either direction.</p>
+<p><strong>HTTP L7 routing:</strong> When operating in HTTP mode, Envoy supports a
+<a class="reference internal" href="arch_overview/http/http_routing.html#arch-overview-http-routing"><span class="std std-ref">routing</span></a> subsystem that is capable of routing and redirecting
+requests based on path, authority, content type, <a class="reference internal" href="arch_overview/operations/runtime.html#arch-overview-runtime"><span class="std std-ref">runtime</span></a> values, etc.
+This functionality is most useful when using Envoy as a front/edge proxy but is also leveraged when
+building a service to service mesh.</p>
+<p><strong>gRPC support:</strong> <a class="reference external" href="https://www.grpc.io/">gRPC</a> is an RPC framework from Google that uses HTTP/2 or above
+as the underlying multiplexed transport. Envoy <a class="reference internal" href="arch_overview/other_protocols/grpc.html#arch-overview-grpc"><span class="std std-ref">supports</span></a> all of the
+HTTP/2 features required to be used as the routing and load balancing substrate for gRPC requests
+and responses. The two systems are very complementary.</p>
+<p><strong>Service discovery and dynamic configuration:</strong> Envoy optionally consumes a layered set of
+<a class="reference internal" href="arch_overview/operations/dynamic_configuration.html#arch-overview-dynamic-config"><span class="std std-ref">dynamic configuration APIs</span></a> for centralized management.
+The layers provide an Envoy with dynamic updates about: hosts within a backend cluster, the
+backend clusters themselves, HTTP routing, listening sockets, and cryptographic material.
+For a simpler deployment, backend host discovery can be
+<a class="reference internal" href="arch_overview/upstream/service_discovery.html#arch-overview-service-discovery-types-strict-dns"><span class="std std-ref">done through DNS resolution</span></a>
+(or even
+<a class="reference internal" href="arch_overview/upstream/service_discovery.html#arch-overview-service-discovery-types-static"><span class="std std-ref">skipped entirely</span></a>),
+with the further layers replaced by static config files.</p>
+<p><strong>Health checking:</strong> The <a class="reference internal" href="arch_overview/upstream/service_discovery.html#arch-overview-service-discovery-eventually-consistent"><span class="std std-ref">recommended</span></a>
+way of building an Envoy mesh is to treat service discovery as an eventually consistent process.
+Envoy includes a <a class="reference internal" href="arch_overview/upstream/health_checking.html#arch-overview-health-checking"><span class="std std-ref">health checking</span></a> subsystem which can
+optionally perform active health checking of upstream service clusters. Envoy then uses the union of
+service discovery and health checking information to determine healthy load balancing targets. Envoy
+also supports passive health checking via an <a class="reference internal" href="arch_overview/upstream/outlier.html#arch-overview-outlier-detection"><span class="std std-ref">outlier detection</span></a> subsystem.</p>
+<p><strong>Advanced load balancing:</strong> <a class="reference internal" href="arch_overview/upstream/load_balancing/overview.html#arch-overview-load-balancing"><span class="std std-ref">Load balancing</span></a> among different
+components in a distributed system is a complex problem. Because Envoy is a self contained proxy
+instead of a library, it is able to implement advanced load balancing techniques in a single place
+and have them be accessible to any application. Currently Envoy includes support for <a class="reference internal" href="arch_overview/http/http_routing.html#arch-overview-http-routing-retry"><span class="std std-ref">automatic
+retries</span></a>, <a class="reference internal" href="arch_overview/upstream/circuit_breaking.html#arch-overview-circuit-break"><span class="std std-ref">circuit breaking</span></a>,
+<a class="reference internal" href="arch_overview/other_features/global_rate_limiting.html#arch-overview-global-rate-limit"><span class="std std-ref">global rate limiting</span></a> via an external rate limiting service,
+<a class="reference internal" href="../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-routeaction-requestmirrorpolicy"><span class="std std-ref">request shadowing</span></a>, and
+<a class="reference internal" href="arch_overview/upstream/outlier.html#arch-overview-outlier-detection"><span class="std std-ref">outlier detection</span></a>. Future support is planned for request
+racing.</p>
+<p><strong>Front/edge proxy support:</strong> There is substantial benefit in using the same software at the edge
+(observability, management, identical service discovery and load balancing algorithms, etc.). Envoy
+has a feature set that makes it well suited as an edge proxy for most modern web application use
+cases. This includes <a class="reference internal" href="arch_overview/security/ssl.html#arch-overview-ssl"><span class="std std-ref">TLS</span></a> termination, HTTP/1.1 HTTP/2 and HTTP/3 <a class="reference internal" href="arch_overview/http/http_connection_management.html#arch-overview-http-protocols"><span class="std std-ref">support</span></a>, as well as HTTP L7 <a class="reference internal" href="arch_overview/http/http_routing.html#arch-overview-http-routing"><span class="std std-ref">routing</span></a>.</p>
+<p><strong>Best in class observability:</strong> As stated above, the primary goal of Envoy is to make the network
+transparent. However, problems occur both at the network level and at the application level. Envoy
+includes robust <a class="reference internal" href="arch_overview/observability/statistics.html#arch-overview-statistics"><span class="std std-ref">statistics</span></a> support for all subsystems. <a class="reference external" href="https://github.com/etsy/statsd">statsd</a> (and compatible providers) is the currently supported statistics
+sink, though plugging in a different one would not be difficult. Statistics are also viewable via
+the <a class="reference internal" href="../operations/admin.html#operations-admin-interface"><span class="std std-ref">administration</span></a> port. Envoy also supports distributed
+<a class="reference internal" href="arch_overview/observability/tracing.html#arch-overview-tracing"><span class="std std-ref">tracing</span></a> via thirdparty providers.</p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="intro.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="arch_overview/arch_overview.html" class="btn btn-neutral float-right" title="Architecture overview" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">What is Envoy</a></li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

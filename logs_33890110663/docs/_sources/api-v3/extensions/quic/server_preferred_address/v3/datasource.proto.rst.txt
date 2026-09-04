@@ -1,0 +1,122 @@
+.. _envoy_v3_api_file_envoy/extensions/quic/server_preferred_address/v3/datasource.proto:
+
+QUIC DataSource server preferred address config (proto)
+=======================================================
+
+.. _extension_envoy.quic.server_preferred_address.datasource:
+
+This extension has the qualified name ``envoy.quic.server_preferred_address.datasource``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.quic.server_preferred_address <extension_category_envoy.quic.server_preferred_address>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig <envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig:
+
+extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig
+----------------------------------------------------------------------------------
+
+
+:repo:`[extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig proto] <api/envoy/extensions/quic/server_preferred_address/v3/datasource.proto#L19>`
+
+Configuration for DataSourceServerPreferredAddressConfig.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ipv4_config": {...},
+    "ipv6_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.ipv4_config:
+
+
+ipv4_config
+  (:ref:`extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.AddressFamilyConfig <envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.AddressFamilyConfig>`) The IPv4 address to advertise to clients for Server Preferred Address.
+
+
+.. _envoy_v3_api_field_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.ipv6_config:
+
+
+ipv6_config
+  (:ref:`extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.AddressFamilyConfig <envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.AddressFamilyConfig>`) The IPv6 address to advertise to clients for Server Preferred Address.
+
+
+.. _envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.AddressFamilyConfig:
+
+extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.AddressFamilyConfig
+------------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.AddressFamilyConfig proto] <api/envoy/extensions/quic/server_preferred_address/v3/datasource.proto#L21>`
+
+Addresses for server preferred address for a single address family (IPv4 or IPv6).
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "address": {...},
+    "port": {...},
+    "dnat_address": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.AddressFamilyConfig.address:
+
+
+address
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`, *REQUIRED*) The server preferred address sent to clients. The data must contain an IP address string.
+
+
+.. _envoy_v3_api_field_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.AddressFamilyConfig.port:
+
+
+port
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) The server preferred address port sent to clients. The data must contain a integer port value.
+
+  If this is not specified, the listener's port is used.
+
+  Note: Envoy currently must receive all packets for a QUIC connection on the same port, so unless
+  :ref:`dnat_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.AddressFamilyConfig.dnat_address>`
+  is configured, this must be left unset.
+
+
+.. _envoy_v3_api_field_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig.AddressFamilyConfig.dnat_address:
+
+
+dnat_address
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) If there is a DNAT between the client and Envoy, the address that Envoy will observe
+  server preferred address packets being sent to. If this is not specified, it is assumed
+  there is no DNAT and the server preferred address packets will be sent to the address advertised
+  to clients for server preferred address.
+
+
+

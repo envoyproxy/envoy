@@ -1,0 +1,127 @@
+.. _envoy_v3_api_file_envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.proto:
+
+Upstream reverse connection socket interface (proto)
+====================================================
+
+.. _extension_envoy.bootstrap.reverse_tunnel.upstream_socket_interface:
+
+This extension has the qualified name ``envoy.bootstrap.reverse_tunnel.upstream_socket_interface``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.bootstrap <extension_category_envoy.bootstrap>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface <envoy_v3_api_msg_extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface:
+
+extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+---------------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface proto] <api/envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.proto#L23>`
+
+Configuration for the upstream reverse connection socket interface.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "ping_failure_threshold": {...},
+    "enable_detailed_stats": ...,
+    "reporter_config": {...},
+    "enable_tenant_isolation": {...},
+    "access_log": [],
+    "max_connections_per_node": ...
+  }
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Stat prefix for upstream reverse connection socket interface stats.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface.ping_failure_threshold:
+
+
+ping_failure_threshold
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Number of consecutive ping failures before an idle reverse connection socket is marked dead.
+  Defaults to 3 if unset. Must be at least 1.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface.enable_detailed_stats:
+
+
+enable_detailed_stats
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Enable detailed per-node and per-cluster statistics.
+  When enabled, emits hidden statistics for individual nodes and clusters.
+  Defaults to false.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface.reporter_config:
+
+
+reporter_config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Optional configuration for a tunnel reporting extension. When provided,
+  the socket interface instantiates a reporter via the configured factory.
+  If unset, no reporting is done.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface.enable_tenant_isolation:
+
+
+enable_tenant_isolation
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Enables tenant-aware isolation for reverse connections. When set to ``true``, the socket
+  interface requires tenant identifiers in addition to node and cluster identifiers and derives
+  composite ``tenant:node`` and ``tenant:cluster`` keys for socket tracking. Identifiers
+  containing the ``:`` delimiter are rejected to avoid ambiguity.
+  Defaults to ``false`` for backwards compatibility.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface.access_log:
+
+
+access_log
+  (**repeated** :ref:`config.accesslog.v3.AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`) Access logs emitted for reverse tunnel lifecycle events. Entries are generated for tunnel setup,
+  socket handoff, tunnel close, and post-handoff HTTP/2 keepalive timeout observations.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface.max_connections_per_node:
+
+
+max_connections_per_node
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Maximum number of concurrently accepted reverse connections per node (and per tenant
+  when tenant isolation is enabled). The cap is only consulted for reverse tunnel network
+  filters that opt in via ``enable_connection_limit``; filters that leave it disabled ignore it.
+  The cap is enforced per worker thread, so the effective ceiling is roughly this value
+  multiplied by the number of workers; it is also only approximate when rebalancing is enabled.
+  Defaults to 0; combined with ``enable_connection_limit: true`` a value of 0 rejects all
+  connections, so set a non-zero value whenever a filter enables the limit.
+
+

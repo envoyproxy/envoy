@@ -1,0 +1,1380 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JWT Authentication (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../../../_static/favicon.ico"/>
+      <script src="../../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+    <link rel="next" title="Kill Request (proto)" href="../../kill_request/v3/kill_request.proto.html" />
+    <link rel="prev" title="Json-To-Metadata Filter (proto)" href="../../json_to_metadata/v3/json_to_metadata.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../../../searchindex.js"
+          data-envoy-search-page="../../../../../../search.html"
+          data-envoy-root="../../../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../../config/config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../../config/filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/filter.html">Filters</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/http/http.html">HTTP filters</a></li>
+      <li class="breadcrumb-item active">JWT Authentication (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../../_sources/api-v3/extensions/filters/http/jwt_authn/v3/config.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="jwt-authentication-proto">
+<span id="envoy-v3-api-file-envoy-extensions-filters-http-jwt-authn-v3-config-proto"></span><h1>JWT Authentication (proto)<a class="headerlink" href="#jwt-authentication-proto" title="Link to this heading"></a></h1>
+<p id="extension-envoy-filters-http-jwt-authn">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.filters.http.jwt_authn</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension is intended to be robust against untrusted downstream traffic. It
+assumes that the upstream is trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension category:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../filter_chain/v3/filter_chain.proto.html#extension-category-envoy-filters-http"><span class="std std-ref">envoy.filters.http</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtauthentication"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication</span></a></p></li>
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-perrouteconfig"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.PerRouteConfig</span></a></p></li>
+</ul>
+</div>
+<p>JWT Authentication <a class="reference internal" href="../../../../../../configuration/http/http_filters/jwt_authn_filter.html#config-http-filters-jwt-authn"><span class="std std-ref">configuration overview</span></a>.</p>
+<section id="extensions-filters-http-jwt-authn-v3-jwtprovider">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtprovider"></span><h2>extensions.filters.http.jwt_authn.v3.JwtProvider<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-jwtprovider" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L57">[extensions.filters.http.jwt_authn.v3.JwtProvider proto]</a></p>
+<p>Please see following for JWT authentication flow:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://tools.ietf.org/html/rfc7519">JSON Web Token (JWT)</a></p></li>
+<li><p><a class="reference external" href="https://tools.ietf.org/html/rfc6749">The OAuth 2.0 Authorization Framework</a></p></li>
+<li><p><a class="reference external" href="http://openid.net/connect">OpenID Connect</a></p></li>
+</ul>
+<p>A JwtProvider message specifies how a JSON Web Token (JWT) can be verified. It specifies:</p>
+<ul class="simple">
+<li><p>issuer: the principal that issues the JWT. If specified, it has to match the <code class="docutils literal notranslate"><span class="pre">iss</span></code> field in JWT.</p></li>
+<li><p>allowed audiences: the ones in the token have to be listed here.</p></li>
+<li><p>how to fetch public key JWKS to verify the token signature.</p></li>
+<li><p>how to extract the JWT in the request.</p></li>
+<li><p>how to pass successfully verified token payload.</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">issuer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com</span>
+<span class="nt">audiences</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bookstore_android.apps.googleusercontent.com</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bookstore_web.apps.googleusercontent.com</span>
+<span class="nt">remote_jwks</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">http_uri</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com/.well-known/jwks.json</span>
+<span class="w">    </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example_jwks_cluster</span>
+<span class="w">    </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1s</span>
+<span class="w">  </span><span class="nt">cache_duration</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">300</span>
+</pre></div>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;issuer&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;audiences&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;subjects&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;require_expiration&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max_lifetime&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;remote_jwks&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;local_jwks&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;forward&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;from_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;from_params&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;from_cookies&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;forward_payload_header&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;pad_forward_payload_header&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;payload_in_metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;normalize_payload_in_metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;header_in_metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;failed_status_in_metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;clock_skew_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;jwt_cache_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;claim_to_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;clear_route_cache&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-issuer">
+<dt>issuer</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Specify the <a class="reference external" href="https://tools.ietf.org/html/rfc7519#section-4.1.1">principal</a> that issued
+the JWT, usually a URL or an email address.</p>
+<p>It is optional. If specified, it has to match the <code class="docutils literal notranslate"><span class="pre">iss</span></code> field in JWT,
+otherwise the JWT <code class="docutils literal notranslate"><span class="pre">iss</span></code> field is not checked.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">JwtRequirement</span></code> <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing"><span class="std std-ref">allow_missing</span></a>
+and <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing-or-failed"><span class="std std-ref">allow_missing_or_failed</span></a>
+are implemented differently than other <code class="docutils literal notranslate"><span class="pre">JwtRequirements</span></code>. Hence the usage of this field
+is different as follows if <code class="docutils literal notranslate"><span class="pre">allow_missing</span></code> or <code class="docutils literal notranslate"><span class="pre">allow_missing_or_failed</span></code> is used:</p>
+<ul class="simple">
+<li><p>If a JWT has <code class="docutils literal notranslate"><span class="pre">iss</span></code> field, it needs to be specified by this field in one of <code class="docutils literal notranslate"><span class="pre">JwtProviders</span></code>.</p></li>
+<li><p>If a JWT doesn’t have <code class="docutils literal notranslate"><span class="pre">iss</span></code> field, one of <code class="docutils literal notranslate"><span class="pre">JwtProviders</span></code> should fill this field empty.</p></li>
+<li><p>Multiple <code class="docutils literal notranslate"><span class="pre">JwtProviders</span></code> should not have same value in this field.</p></li>
+</ul>
+</div>
+<p>Examples:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://securetoken.google.com">https://securetoken.google.com</a></p></li>
+<li><p>Example: <a class="reference external" href="mailto:1234567-compute&#37;&#52;&#48;developer&#46;gserviceaccount&#46;com">1234567-compute<span>&#64;</span>developer<span>&#46;</span>gserviceaccount<span>&#46;</span>com</a></p></li>
+</ul>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-audiences">
+<dt>audiences</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The list of JWT <a class="reference external" href="https://tools.ietf.org/html/rfc7519#section-4.1.3">audiences</a> are
+allowed to access. A JWT containing any of these audiences will be accepted. If not specified,
+will not check audiences in the token.</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">audiences</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bookstore_android.apps.googleusercontent.com</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bookstore_web.apps.googleusercontent.com</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-subjects">
+<dt>subjects</dt><dd><p>(<a class="reference internal" href="../../../../../type/matcher/v3/string.proto.html#envoy-v3-api-msg-type-matcher-v3-stringmatcher"><span class="std std-ref">type.matcher.v3.StringMatcher</span></a>) Restrict the <a class="reference external" href="https://tools.ietf.org/html/rfc7519#section-4.1.2">subjects</a>
+that the JwtProvider can assert. For instance, this could implement JWT-SVID
+<a class="reference external" href="https://github.com/spiffe/spiffe/blob/main/standards/JWT-SVID.md#31-subject">subject restrictions</a>.
+If not specified, will not check subjects in the token.</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">subjects</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">spiffe://spiffe.example.com/</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-require-expiration">
+<dt>require_expiration</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Requires that the credential contains an <a class="reference external" href="https://tools.ietf.org/html/rfc7519#section-4.1.4">expiration</a>.
+For instance, this could implement JWT-SVID
+<a class="reference external" href="https://github.com/spiffe/spiffe/blob/main/standards/JWT-SVID.md#33-expiration-time">expiration restrictions</a>.
+Unlike <code class="docutils literal notranslate"><span class="pre">max_lifetime</span></code>, this only requires that expiration is present, where <code class="docutils literal notranslate"><span class="pre">max_lifetime</span></code> also checks the value.</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">require_expiration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-max-lifetime">
+<dt>max_lifetime</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Restrict the maximum remaining lifetime of a credential from the JwtProvider. Credential lifetime
+is the difference between the current time and the expiration of the credential. For instance,
+the following example will reject credentials that have a lifetime longer than 24 hours. If not set,
+expiration checking still occurs, but there is no limit on credential lifetime. If set, takes precedence
+over <code class="docutils literal notranslate"><span class="pre">require_expiration</span></code>.</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">max_lifetime</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">86400</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-remote-jwks">
+<dt>remote_jwks</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-remotejwks"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.RemoteJwks</span></a>) JWKS can be fetched from remote server via HTTP/HTTPS. This field specifies the remote HTTP
+URI and how the fetched JWKS should be cached.</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">remote_jwks</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">http_uri</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://www.googleapis.com/oauth2/v1/certs</span>
+<span class="w">    </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jwt.www.googleapis.com|443</span>
+<span class="w">    </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1s</span>
+<span class="w">  </span><span class="nt">cache_duration</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">300</span>
+</pre></div>
+</div>
+<p><a class="reference external" href="https://tools.ietf.org/html/rfc7517#appendix-A">JSON Web Key Set (JWKS)</a> is needed to
+validate signature of a JWT. This field specifies where to fetch JWKS.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-remote-jwks"><span class="std std-ref">remote_jwks</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-local-jwks"><span class="std std-ref">local_jwks</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-local-jwks">
+<dt>local_jwks</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-datasource"><span class="std std-ref">config.core.v3.DataSource</span></a>) JWKS is in local data source. It could be either in a local file or embedded in the
+inline_string.</p>
+<p>Example: local file</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">local_jwks</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/etc/envoy/jwks/jwks1.txt</span>
+</pre></div>
+</div>
+<p>Example: inline_string</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">local_jwks</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">inline_string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ACADADADADA</span>
+</pre></div>
+</div>
+<p><a class="reference external" href="https://tools.ietf.org/html/rfc7517#appendix-A">JSON Web Key Set (JWKS)</a> is needed to
+validate signature of a JWT. This field specifies where to fetch JWKS.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-remote-jwks"><span class="std std-ref">remote_jwks</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-local-jwks"><span class="std std-ref">local_jwks</span></a> must be set.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-forward">
+<dt>forward</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If false, the JWT is removed in the request after a success verification. If true, the JWT is
+not removed in the request. Default value is false.
+caveat: only works for from_header/from_params &amp; has no effect for JWTs extracted through from_cookies.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-from-headers">
+<dt>from_headers</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtheader"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtHeader</span></a>) Two fields below define where to extract the JWT from an HTTP request.</p>
+<p>If no explicit location is specified, the following default locations are tried in order:</p>
+<p>1. The Authorization header using the <a class="reference external" href="https://tools.ietf.org/html/rfc6750#section-2.1">Bearer schema</a>. Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Authorization</span><span class="p">:</span> <span class="n">Bearer</span> <span class="o">&lt;</span><span class="n">token</span><span class="o">&gt;.</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p><a class="reference external" href="https://tools.ietf.org/html/rfc6750#section-2.3">access_token</a> query parameter.</p></li>
+</ol>
+<p>Multiple JWTs can be verified for a request. Each JWT has to be extracted from the locations
+its provider specified or from the default locations.</p>
+<p>Specify the HTTP headers to extract the JWT. For examples, following config:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">from_headers</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-goog-iap-jwt-assertion</span>
+</pre></div>
+</div>
+<p>can be used to extract token from header:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>``x-goog-iap-jwt-assertion: &lt;JWT&gt;``.
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-from-params">
+<dt>from_params</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) JWT is sent in a query parameter. <code class="docutils literal notranslate"><span class="pre">jwt_params</span></code> represents the query parameter names.</p>
+<p>For example, if config is:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">from_params</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jwt_token</span>
+</pre></div>
+</div>
+<p>The JWT format in query parameter is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>/path?jwt_token=&lt;JWT&gt;
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-from-cookies">
+<dt>from_cookies</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) JWT is sent in a cookie. <code class="docutils literal notranslate"><span class="pre">from_cookies</span></code> represents the cookie names to extract from.</p>
+<p>For example, if config is:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">from_cookies</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auth-token</span>
+</pre></div>
+</div>
+<p>Then JWT will be extracted from <code class="docutils literal notranslate"><span class="pre">auth-token</span></code> cookie in the request.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-forward-payload-header">
+<dt>forward_payload_header</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) This field specifies the header name to forward a successfully verified JWT payload to the
+backend. The forwarded data is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">base64url_encoded</span><span class="p">(</span><span class="n">jwt_payload_in_JSON</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>If it is not specified, the payload will not be forwarded.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-pad-forward-payload-header">
+<dt>pad_forward_payload_header</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) When <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-forward-payload-header"><span class="std std-ref">forward_payload_header</span></a>
+is specified, the base64 encoded payload will be added to the headers.
+Normally JWT based64 encode doesn’t add padding. If this field is true,
+the header will be padded.</p>
+<p>This field is only relevant if <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-forward-payload-header"><span class="std std-ref">forward_payload_header</span></a>
+is specified.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-payload-in-metadata">
+<dt>payload_in_metadata</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) If non empty, successfully verified JWT payloads will be written to StreamInfo DynamicMetadata
+in the format as: <code class="docutils literal notranslate"><span class="pre">namespace</span></code> is the jwt_authn filter name as <code class="docutils literal notranslate"><span class="pre">``envoy.filters.http.jwt_authn``</span></code>
+The value is the <code class="docutils literal notranslate"><span class="pre">protobuf::Struct</span></code>. The value of this field will be the key for its <code class="docutils literal notranslate"><span class="pre">fields</span></code>
+and the value is the <code class="docutils literal notranslate"><span class="pre">protobuf::Struct</span></code> converted from JWT JSON payload.</p>
+<p>For example, if payload_in_metadata is <code class="docutils literal notranslate"><span class="pre">my_payload</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">envoy.filters.http.jwt_authn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">my_payload</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">iss</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com</span>
+<span class="w">    </span><span class="nt">sub</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test@example.com</span>
+<span class="w">    </span><span class="nt">aud</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com</span>
+<span class="w">    </span><span class="nt">exp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1501281058</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-normalize-payload-in-metadata">
+<dt>normalize_payload_in_metadata</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtprovider-normalizepayload"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtProvider.NormalizePayload</span></a>) Normalizes the payload representation in the request metadata.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-header-in-metadata">
+<dt>header_in_metadata</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) If not empty, similar to <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-payload-in-metadata"><span class="std std-ref">payload_in_metadata</span></a>,
+a successfully verified JWT header will be written to <a class="reference internal" href="../../../../../../intro/arch_overview/advanced/data_sharing_between_filters.html#arch-overview-data-sharing-between-filters"><span class="std std-ref">Dynamic State</span></a>
+as an entry (<code class="docutils literal notranslate"><span class="pre">protobuf::Struct</span></code>) in <code class="docutils literal notranslate"><span class="pre">envoy.filters.http.jwt_authn</span></code> <code class="docutils literal notranslate"><span class="pre">namespace</span></code> with the
+value of this field as the key.</p>
+<p>For example, if <code class="docutils literal notranslate"><span class="pre">header_in_metadata</span></code> is <code class="docutils literal notranslate"><span class="pre">my_header</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">envoy.filters.http.jwt_authn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">my_header</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">alg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">JWT</span>
+<span class="w">    </span><span class="nt">kid</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EF71iSaosbC5C4tC6Syq1Gm647M</span>
+<span class="w">    </span><span class="nt">alg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PS256</span>
+</pre></div>
+</div>
+<p>When the metadata has <code class="docutils literal notranslate"><span class="pre">envoy.filters.http.jwt_authn</span></code> entry already (for example if
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-payload-in-metadata"><span class="std std-ref">payload_in_metadata</span></a>
+is not empty), it will be inserted as a new entry in the same <code class="docutils literal notranslate"><span class="pre">namespace</span></code> as shown below:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">envoy.filters.http.jwt_authn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">my_payload</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">iss</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com</span>
+<span class="w">    </span><span class="nt">sub</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test@example.com</span>
+<span class="w">    </span><span class="nt">aud</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com</span>
+<span class="w">    </span><span class="nt">exp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1501281058</span>
+<span class="w">  </span><span class="nt">my_header</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">alg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">JWT</span>
+<span class="w">    </span><span class="nt">kid</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EF71iSaosbC5C4tC6Syq1Gm647M</span>
+<span class="w">    </span><span class="nt">alg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PS256</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Using the same key name for <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-payload-in-metadata"><span class="std std-ref">header_in_metadata</span></a>
+and <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-payload-in-metadata"><span class="std std-ref">payload_in_metadata</span></a>
+is not suggested due to potential override of existing entry, while it is not enforced during
+config validation.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-failed-status-in-metadata">
+<dt>failed_status_in_metadata</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) If non empty, the failure status <code class="docutils literal notranslate"><span class="pre">::google::jwt_verify::Status</span></code> for a non verified JWT will be written to StreamInfo DynamicMetadata
+in the format as: <code class="docutils literal notranslate"><span class="pre">namespace</span></code> is the jwt_authn filter name as <code class="docutils literal notranslate"><span class="pre">envoy.filters.http.jwt_authn</span></code>
+The value is the <code class="docutils literal notranslate"><span class="pre">protobuf::Struct</span></code>. The values of this field will be <code class="docutils literal notranslate"><span class="pre">code</span></code> and <code class="docutils literal notranslate"><span class="pre">message</span></code>
+and they will contain the JWT authentication failure status code and a message describing the failure.</p>
+<p>For example, if failed_status_in_metadata is <code class="docutils literal notranslate"><span class="pre">my_auth_failure_status</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">envoy.filters.http.jwt_authn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">my_auth_failure_status</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">    </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Jwt expired</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-clock-skew-seconds">
+<dt>clock_skew_seconds</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) Specify the clock skew in seconds when verifying JWT time constraint,
+such as <code class="docutils literal notranslate"><span class="pre">exp</span></code>, and <code class="docutils literal notranslate"><span class="pre">nbf</span></code>. If not specified, default is 60 seconds.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-jwt-cache-config">
+<dt>jwt_cache_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtcacheconfig"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtCacheConfig</span></a>) Enables JWT cache, its size is specified by <code class="docutils literal notranslate"><span class="pre">jwt_cache_size</span></code>.
+Only valid JWTs are cached.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-claim-to-headers">
+<dt>claim_to_headers</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtclaimtoheader"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtClaimToHeader</span></a>) Add JWT claim to HTTP Header
+Specify the claim name you want to copy in which HTTP header. For examples, following config:
+Claims of type string, int, double and bool are copied verbatim. Claims of type array or
+object are serialized to JSON and copied base64-encoded.</p>
+<div class="literal-block-wrapper docutils container" id="id38">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../../../../_downloads/5fd2f1306101a0259cdaf2e83e054919/jwt_authn.yaml"><code class="xref download docutils literal notranslate"><span class="pre">jwt_authn.yaml</span></code></a></span><a class="headerlink" href="#id38" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">44</span><span class="w">                  </span><span class="nt">claim_to_headers</span><span class="p">:</span>
+<span class="linenos">45</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">claim_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user_id</span>
+<span class="linenos">46</span><span class="w">                    </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-firebase-uid</span>
+<span class="linenos">47</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">claim_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">firebase.sign_in_provider</span>
+<span class="linenos">48</span><span class="w">                    </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-firebase-provider</span>
+<span class="linenos">49</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-firebase-tenant</span>
+<span class="linenos">50</span><span class="w">                    </span><span class="nt">claim_path</span><span class="p">:</span>
+<span class="linenos">51</span><span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com/tenant</span>
+</pre></div>
+</div>
+</div>
+<p>This header is only reserved for jwt claim; any other value will be overwritten.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-clear-route-cache">
+<dt>clear_route_cache</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Clears route cache in order to allow the JWT to correctly affect
+routing decisions. Filter clears all cached routes when:</p>
+<ol class="arabic simple">
+<li><p>The field is set to <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p></li>
+<li><p>At least one <code class="docutils literal notranslate"><span class="pre">claim_to_headers</span></code> header is added to the request OR
+if <code class="docutils literal notranslate"><span class="pre">payload_in_metadata</span></code> is set.</p></li>
+</ol>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-jwtprovider-normalizepayload">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtprovider-normalizepayload"></span><h2>extensions.filters.http.jwt_authn.v3.JwtProvider.NormalizePayload<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-jwtprovider-normalizepayload" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L62">[extensions.filters.http.jwt_authn.v3.JwtProvider.NormalizePayload proto]</a></p>
+<p>Alters the payload representation in the request dynamic metadata to facilitate its use in matching.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;space_delimited_claims&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-normalizepayload-space-delimited-claims">
+<dt>space_delimited_claims</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Each claim in this list will be interpreted as a space-delimited string
+and converted to a list of strings based on the delimited values.
+Example: a token with a claim <code class="docutils literal notranslate"><span class="pre">scope:</span> <span class="pre">&quot;email</span> <span class="pre">profile&quot;</span></code> is translated
+to dynamic metadata  <code class="docutils literal notranslate"><span class="pre">scope:</span> <span class="pre">[&quot;email&quot;,</span> <span class="pre">&quot;profile&quot;]</span></code> if this field is
+set value <code class="docutils literal notranslate"><span class="pre">[&quot;scope&quot;]</span></code>. This special handling of <code class="docutils literal notranslate"><span class="pre">scope</span></code> is
+recommended by <a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc8693#name-scope-scopes-claim">RFC8693</a>.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-jwtcacheconfig">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtcacheconfig"></span><h2>extensions.filters.http.jwt_authn.v3.JwtCacheConfig<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-jwtcacheconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L385">[extensions.filters.http.jwt_authn.v3.JwtCacheConfig proto]</a></p>
+<p>This message specifies JWT Cache configuration.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;jwt_cache_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;jwt_max_token_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtcacheconfig-jwt-cache-size">
+<dt>jwt_cache_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) The unit is number of JWTs, default to 100.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtcacheconfig-jwt-max-token-size">
+<dt>jwt_max_token_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) The maximum size of a single cached token in bytes.
+If this field is not set or is set to 0, then the default value 4096 bytes is used.
+The maximum value for a token is inclusive.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-remotejwks">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-remotejwks"></span><h2>extensions.filters.http.jwt_authn.v3.RemoteJwks<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-remotejwks" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L396">[extensions.filters.http.jwt_authn.v3.RemoteJwks proto]</a></p>
+<p>This message specifies how to fetch JWKS from remote and how to cache it.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;http_uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;cache_duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;async_fetch&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;retry_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-remotejwks-http-uri">
+<dt>http_uri</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/http_uri.proto.html#envoy-v3-api-msg-config-core-v3-httpuri"><span class="std std-ref">config.core.v3.HttpUri</span></a>, <em>REQUIRED</em>) The HTTP URI to fetch the JWKS. For example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">http_uri</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://www.googleapis.com/oauth2/v1/certs</span>
+<span class="w">  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jwt.www.googleapis.com|443</span>
+<span class="w">  </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1s</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-remotejwks-cache-duration">
+<dt>cache_duration</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Duration after which the cached JWKS should be expired. If not specified, default cache
+duration is 10 minutes.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-remotejwks-async-fetch">
+<dt>async_fetch</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwksasyncfetch"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwksAsyncFetch</span></a>) Fetch Jwks asynchronously in the main thread before the listener is activated.
+Fetched Jwks can be used by all worker threads.</p>
+<p>If this feature is not enabled:</p>
+<ul class="simple">
+<li><p>The Jwks is fetched on-demand when the requests come. During the fetching, first
+few requests are paused until the Jwks is fetched.</p></li>
+<li><p>Each worker thread fetches its own Jwks since Jwks cache is per worker thread.</p></li>
+</ul>
+<p>If this feature is enabled:</p>
+<ul class="simple">
+<li><p>Fetched Jwks is done in the main thread before the listener is activated. Its fetched
+Jwks can be used by all worker threads. Each worker thread doesn’t need to fetch its own.</p></li>
+<li><p>Jwks is ready when the requests come, not need to wait for the Jwks fetching.</p></li>
+</ul>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-remotejwks-retry-policy">
+<dt>retry_policy</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-retrypolicy"><span class="std std-ref">config.core.v3.RetryPolicy</span></a>) Retry policy for fetching Jwks. optional. turned off by default.</p>
+<p>For example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">retry_policy</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">retry_back_off</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">base_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01s</span>
+<span class="w">    </span><span class="nt">max_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20s</span>
+<span class="w">  </span><span class="nt">num_retries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+</pre></div>
+</div>
+<p>will yield a randomized truncated exponential backoff policy with an initial delay of 10ms
+10 maximum attempts spaced at most 20s seconds.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">retry_policy</span><span class="p">:</span>
+<span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">num_retries:1</span>
+</pre></div>
+</div>
+<p>uses the default <a class="reference internal" href="../../../../../config/core/v3/backoff.proto.html#envoy-v3-api-msg-config-core-v3-backoffstrategy"><span class="std std-ref">retry backoff strategy</span></a>.
+with the default base interval is 1000 milliseconds. and the default maximum interval of 10 times the base interval.</p>
+<p>if num_retries is omitted, the default is to allow only one retry.</p>
+<p>If enabled, the retry policy will apply to all Jwks fetching approaches, e.g. on demand or asynchronously in background.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-jwksasyncfetch">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwksasyncfetch"></span><h2>extensions.filters.http.jwt_authn.v3.JwksAsyncFetch<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-jwksasyncfetch" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L471">[extensions.filters.http.jwt_authn.v3.JwksAsyncFetch proto]</a></p>
+<p>Fetch Jwks asynchronously in the main thread when the filter config is parsed.
+The listener is activated only after the Jwks is fetched.
+When the Jwks is expired in the cache, it is fetched again in the main thread.
+The fetched Jwks from the main thread can be used by all worker threads.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;fast_listener&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;failed_refetch_duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwksasyncfetch-fast-listener">
+<dt>fast_listener</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If false, the listener is activated after the initial fetch is completed.
+The initial fetch result can be either successful or failed.
+If true, it is activated without waiting for the initial fetch to complete.
+Default is false.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwksasyncfetch-failed-refetch-duration">
+<dt>failed_refetch_duration</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The duration to refetch after a failed fetch. If not specified, default is 1 second.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-jwtheader">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtheader"></span><h2>extensions.filters.http.jwt_authn.v3.JwtHeader<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-jwtheader" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L483">[extensions.filters.http.jwt_authn.v3.JwtHeader proto]</a></p>
+<p>This message specifies a header location to extract the JWT.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;value_prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtheader-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The HTTP header name.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtheader-value-prefix">
+<dt>value_prefix</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The value prefix. The value format is “value_prefix&lt;token&gt;”
+For example, for “Authorization: Bearer &lt;token&gt;”, value_prefix=”Bearer “ with a space at the
+end.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-providerwithaudiences">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-providerwithaudiences"></span><h2>extensions.filters.http.jwt_authn.v3.ProviderWithAudiences<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-providerwithaudiences" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L499">[extensions.filters.http.jwt_authn.v3.ProviderWithAudiences proto]</a></p>
+<p>Specify a required provider with audiences.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;provider_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;audiences&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-providerwithaudiences-provider-name">
+<dt>provider_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Specify a required provider name.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-providerwithaudiences-audiences">
+<dt>audiences</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) This field overrides the one specified in the JwtProvider.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-jwtrequirement">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtrequirement"></span><h2>extensions.filters.http.jwt_authn.v3.JwtRequirement<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-jwtrequirement" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L567">[extensions.filters.http.jwt_authn.v3.JwtRequirement proto]</a></p>
+<p>This message specifies a Jwt requirement. An empty message means JWT verification is not
+required. Here are some config examples:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example 1: not required with an empty message</span>
+
+<span class="c1"># Example 2: require A</span>
+<span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-A</span>
+
+<span class="c1"># Example 3: require A or B</span>
+<span class="nt">requires_any</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-A</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-B</span>
+
+<span class="c1"># Example 4: require A and B</span>
+<span class="nt">requires_all</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-A</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-B</span>
+
+<span class="c1"># Example 5: require A and (B or C)</span>
+<span class="nt">requires_all</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-A</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">requires_any</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-B</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-C</span>
+
+<span class="c1"># Example 6: require A or (B and C)</span>
+<span class="nt">requires_any</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-A</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">requires_all</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-B</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-C</span>
+
+<span class="c1"># Example 7: A is optional (if token from A is provided, it must be valid, but also allows</span>
+<span class="l l-Scalar l-Scalar-Plain">missing token.)</span>
+<span class="nt">requires_any</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-A</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">allow_missing</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+
+<span class="c1"># Example 8: A is optional and B is required.</span>
+<span class="nt">requires_all</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">requires_any</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-A</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">allow_missing</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider-B</span>
+</pre></div>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;provider_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;provider_and_audiences&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;requires_any&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;requires_all&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;allow_missing_or_failed&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;allow_missing&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;extract_only_without_validation&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-name">
+<dt>provider_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Specify a required provider name.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-name"><span class="std std-ref">provider_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-and-audiences"><span class="std std-ref">provider_and_audiences</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-any"><span class="std std-ref">requires_any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-all"><span class="std std-ref">requires_all</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing-or-failed"><span class="std std-ref">allow_missing_or_failed</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing"><span class="std std-ref">allow_missing</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-extract-only-without-validation"><span class="std std-ref">extract_only_without_validation</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-and-audiences">
+<dt>provider_and_audiences</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-providerwithaudiences"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.ProviderWithAudiences</span></a>) Specify a required provider with audiences.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-name"><span class="std std-ref">provider_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-and-audiences"><span class="std std-ref">provider_and_audiences</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-any"><span class="std std-ref">requires_any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-all"><span class="std std-ref">requires_all</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing-or-failed"><span class="std std-ref">allow_missing_or_failed</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing"><span class="std std-ref">allow_missing</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-extract-only-without-validation"><span class="std std-ref">extract_only_without_validation</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-any">
+<dt>requires_any</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtrequirementorlist"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtRequirementOrList</span></a>) Specify list of JwtRequirement. Their results are OR-ed.
+If any one of them passes, the result is passed.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-name"><span class="std std-ref">provider_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-and-audiences"><span class="std std-ref">provider_and_audiences</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-any"><span class="std std-ref">requires_any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-all"><span class="std std-ref">requires_all</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing-or-failed"><span class="std std-ref">allow_missing_or_failed</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing"><span class="std std-ref">allow_missing</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-extract-only-without-validation"><span class="std std-ref">extract_only_without_validation</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-all">
+<dt>requires_all</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtrequirementandlist"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtRequirementAndList</span></a>) Specify list of JwtRequirement. Their results are AND-ed.
+All of them must pass, if one of them fails or missing, it fails.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-name"><span class="std std-ref">provider_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-and-audiences"><span class="std std-ref">provider_and_audiences</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-any"><span class="std std-ref">requires_any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-all"><span class="std std-ref">requires_all</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing-or-failed"><span class="std std-ref">allow_missing_or_failed</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing"><span class="std std-ref">allow_missing</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-extract-only-without-validation"><span class="std std-ref">extract_only_without_validation</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing-or-failed">
+<dt>allow_missing_or_failed</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#empty">Empty</a>) The requirement is always satisfied even if JWT is missing or the JWT
+verification fails. A typical usage is: this filter is used to only verify
+JWTs and pass the verified JWT payloads to another filter, the other filter
+will make decision. In this mode, all JWTs will be verified.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-name"><span class="std std-ref">provider_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-and-audiences"><span class="std std-ref">provider_and_audiences</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-any"><span class="std std-ref">requires_any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-all"><span class="std std-ref">requires_all</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing-or-failed"><span class="std std-ref">allow_missing_or_failed</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing"><span class="std std-ref">allow_missing</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-extract-only-without-validation"><span class="std std-ref">extract_only_without_validation</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing">
+<dt>allow_missing</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#empty">Empty</a>) The requirement is satisfied if JWT is missing, but failed if JWT is
+presented but invalid. Similar to allow_missing_or_failed, this is used
+to only verify JWTs and pass the verified payload to another filter. The
+different is this mode will reject requests with invalid tokens.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-name"><span class="std std-ref">provider_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-and-audiences"><span class="std std-ref">provider_and_audiences</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-any"><span class="std std-ref">requires_any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-all"><span class="std std-ref">requires_all</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing-or-failed"><span class="std std-ref">allow_missing_or_failed</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing"><span class="std std-ref">allow_missing</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-extract-only-without-validation"><span class="std std-ref">extract_only_without_validation</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-extract-only-without-validation">
+<dt>extract_only_without_validation</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-extractonlywithoutvalidation"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.ExtractOnlyWithoutValidation</span></a>)
+.. warning:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>SECURITY WARNING: This mode does NOT verify JWT signatures. Any party
+can forge a JWT with arbitrary claims, and those claims will be extracted
+and forwarded as HTTP headers. Headers set by this mode are
+INDISTINGUISHABLE from headers set by fully validated JWTs unless the
+``verification_status_header`` is checked by downstream filters
+(set to ``false`` by default on all extract-only requests).
+
+DO NOT use this mode if:
+  - RBAC policies match on JWT-derived headers
+  - ext_authz services trust JWT-derived headers
+  - Backend services use JWT-derived headers for authorization
+  - The JWT source is not cryptographically authenticated by other means
+
+Use only when signature verification is PROVABLY performed elsewhere
+in the request path (e.g., by an upstream mTLS-authenticated service).
+</pre></div>
+</div>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-name"><span class="std std-ref">provider_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-and-audiences"><span class="std std-ref">provider_and_audiences</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-any"><span class="std std-ref">requires_any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-requires-all"><span class="std std-ref">requires_all</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing-or-failed"><span class="std std-ref">allow_missing_or_failed</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-allow-missing"><span class="std std-ref">allow_missing</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-extract-only-without-validation"><span class="std std-ref">extract_only_without_validation</span></a> may be set.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-extractonlywithoutvalidation">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-extractonlywithoutvalidation"></span><h2>extensions.filters.http.jwt_authn.v3.ExtractOnlyWithoutValidation<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-extractonlywithoutvalidation" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L630">[extensions.filters.http.jwt_authn.v3.ExtractOnlyWithoutValidation proto]</a></p>
+<p>Configuration for extract-only mode without JWT signature validation.</p>
+<p>When this mode is active and a JWT is present in the request but fails
+signature verification, a verification status header is set on the request
+to signal to downstream filters (RBAC, ext_authz) that the JWT claims were
+NOT cryptographically verified. The header is not set when the JWT is valid
+or when no JWT is present.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;verification_status_header&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-extractonlywithoutvalidation-verification-status-header">
+<dt>verification_status_header</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Name of the HTTP header set to “false” when a JWT is present but fails
+signature verification. The header is NOT set when:</p>
+<ul class="simple">
+<li><p>The JWT is valid (verification succeeded), or</p></li>
+<li><p>No JWT is present in the request.</p></li>
+</ul>
+<p>This means the header’s presence is a meaningful signal to downstream
+filters: if set, the JWT was present but could not be verified, and any
+extracted claim headers should not be trusted for authorization.</p>
+<p>Downstream filters (RBAC, ext_authz) SHOULD check for the absence of this
+header (or its non-“false” value) before trusting JWT-derived claim headers
+for authorization decisions.</p>
+<p>Default (unset or empty): <code class="docutils literal notranslate"><span class="pre">x-jwt-signature-verified</span></code>.</p>
+<p>Custom value: uses the specified header name.</p>
+<p>The header-setting behavior is guarded by the
+<code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.jwt_authn_add_verification_status_header</span></code>
+runtime flag (default on). If removal is needed downstream, use header
+mutation in a subsequent filter.</p>
+<p>Example: when a JWT is present in the request but fails signature
+verification, the request will carry:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">x-jwt-signature-verified</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-jwtrequirementorlist">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtrequirementorlist"></span><h2>extensions.filters.http.jwt_authn.v3.JwtRequirementOrList<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-jwtrequirementorlist" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L666">[extensions.filters.http.jwt_authn.v3.JwtRequirementOrList proto]</a></p>
+<p>This message specifies a list of RequiredProvider.
+Their results are OR-ed; if any one of them passes, the result is passed</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;requirements&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirementorlist-requirements">
+<dt>requirements</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtrequirement"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtRequirement</span></a>, <em>REQUIRED</em>) Specify a list of JwtRequirement.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-jwtrequirementandlist">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtrequirementandlist"></span><h2>extensions.filters.http.jwt_authn.v3.JwtRequirementAndList<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-jwtrequirementandlist" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L676">[extensions.filters.http.jwt_authn.v3.JwtRequirementAndList proto]</a></p>
+<p>This message specifies a list of RequiredProvider.
+Their results are AND-ed; all of them must pass, if one of them fails or missing, it fails.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;requirements&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirementandlist-requirements">
+<dt>requirements</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtrequirement"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtRequirement</span></a>, <em>REQUIRED</em>) Specify a list of JwtRequirement.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-requirementrule">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-requirementrule"></span><h2>extensions.filters.http.jwt_authn.v3.RequirementRule<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-requirementrule" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L705">[extensions.filters.http.jwt_authn.v3.RequirementRule proto]</a></p>
+<p>This message specifies a Jwt requirement for a specific Route condition.
+Example 1:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/healthz</span>
+</pre></div>
+</div>
+<p>In above example, “requires” field is empty for /healthz prefix match,
+it means that requests matching the path prefix don’t require JWT authentication.</p>
+<p>Example 2:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/</span>
+<span class="w">  </span><span class="nt">requires</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> provider_name</span><span class="p">:</span><span class="w"> </span><span class="nv">provider-A</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</pre></div>
+</div>
+<p>In above example, all requests matched the path prefix require jwt authentication
+from “provider-A”.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;requires&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;requirement_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-requirementrule-match">
+<dt>match</dt><dd><p>(<a class="reference internal" href="../../../../../config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-routematch"><span class="std std-ref">config.route.v3.RouteMatch</span></a>, <em>REQUIRED</em>) The route matching parameter. Only when the match is satisfied, the “requires” field will
+apply.</p>
+<p>For example: following match will match all requests.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">match</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-requirementrule-requires">
+<dt>requires</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtrequirement"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtRequirement</span></a>) Specify a Jwt requirement. Please see detail comment in message JwtRequirement.</p>
+<p>Specify a Jwt requirement.
+If not specified, Jwt verification is disabled.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-requirementrule-requires"><span class="std std-ref">requires</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-requirementrule-requirement-name"><span class="std std-ref">requirement_name</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-requirementrule-requirement-name">
+<dt>requirement_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Use requirement_name to specify a Jwt requirement.
+This requirement_name MUST be specified at the
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtauthentication-requirement-map"><span class="std std-ref">requirement_map</span></a>
+in <code class="docutils literal notranslate"><span class="pre">JwtAuthentication</span></code>.</p>
+<p>Specify a Jwt requirement.
+If not specified, Jwt verification is disabled.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-requirementrule-requires"><span class="std std-ref">requires</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-requirementrule-requirement-name"><span class="std std-ref">requirement_name</span></a> may be set.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-filterstaterule">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-filterstaterule"></span><h2>extensions.filters.http.jwt_authn.v3.FilterStateRule<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-filterstaterule" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L752">[extensions.filters.http.jwt_authn.v3.FilterStateRule proto]</a></p>
+<p>This message specifies Jwt requirements based on stream_info.filterState.
+This FilterState should use <code class="docutils literal notranslate"><span class="pre">Router::StringAccessor</span></code> object to set a string value.
+Other HTTP filters can use it to specify Jwt requirements dynamically.</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jwt_selector</span>
+<span class="nt">requires</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">issuer_1</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">issuer1</span>
+<span class="w">  </span><span class="nt">issuer_2</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">issuer2</span>
+</pre></div>
+</div>
+<p>If a filter set “jwt_selector” with “issuer_1” to FilterState for a request,
+jwt_authn filter will use JwtRequirement{“provider_name”: “issuer1”} to verify.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;requires&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-filterstaterule-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The filter state name to retrieve the <code class="docutils literal notranslate"><span class="pre">Router::StringAccessor</span></code> object.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-filterstaterule-requires">
+<dt>requires</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtrequirement"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtRequirement</span></a>&gt;) A map of string keys to requirements. The string key is the string value
+in the FilterState with the name specified in the <code class="docutils literal notranslate"><span class="pre">name</span></code> field above.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-jwtauthentication">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtauthentication"></span><h2>extensions.filters.http.jwt_authn.v3.JwtAuthentication<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-jwtauthentication" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L807">[extensions.filters.http.jwt_authn.v3.JwtAuthentication proto]</a></p>
+<p>This is the Envoy HTTP filter config for JWT authentication.</p>
+<p>For example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">providers</span><span class="p">:</span>
+<span class="w">   </span><span class="nt">provider1</span><span class="p">:</span>
+<span class="w">     </span><span class="nt">issuer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">issuer1</span>
+<span class="w">     </span><span class="nt">audiences</span><span class="p">:</span>
+<span class="w">     </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">audience1</span>
+<span class="w">     </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">audience2</span>
+<span class="w">     </span><span class="nt">remote_jwks</span><span class="p">:</span>
+<span class="w">       </span><span class="nt">http_uri</span><span class="p">:</span>
+<span class="w">         </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com/.well-known/jwks.json</span>
+<span class="w">         </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example_jwks_cluster</span>
+<span class="w">         </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1s</span>
+<span class="w">   </span><span class="nt">provider2</span><span class="p">:</span>
+<span class="w">     </span><span class="nt">issuer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">issuer2</span>
+<span class="w">     </span><span class="nt">local_jwks</span><span class="p">:</span>
+<span class="w">       </span><span class="nt">inline_string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jwks_string</span>
+
+<span class="nt">rules</span><span class="p">:</span>
+<span class="w">   </span><span class="c1"># Not jwt verification is required for /health path</span>
+<span class="w">   </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">       </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/health</span>
+
+<span class="w">   </span><span class="c1"># Jwt verification for provider1 is required for path prefixed with &quot;prefix&quot;</span>
+<span class="w">   </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">       </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/prefix</span>
+<span class="w">     </span><span class="nt">requires</span><span class="p">:</span>
+<span class="w">       </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider1</span>
+
+<span class="w">   </span><span class="c1"># Jwt verification for either provider1 or provider2 is required for all other requests.</span>
+<span class="w">   </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">       </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/</span>
+<span class="w">     </span><span class="nt">requires</span><span class="p">:</span>
+<span class="w">       </span><span class="nt">requires_any</span><span class="p">:</span>
+<span class="w">         </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="w">           </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider1</span>
+<span class="w">           </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider2</span>
+</pre></div>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;rules&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;filter_state_rules&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;bypass_cors_preflight&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;requirement_map&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;strip_failure_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;stat_prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtauthentication-providers">
+<dt>providers</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtprovider"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtProvider</span></a>&gt;) Map of provider names to JwtProviders.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">providers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">provider1</span><span class="p">:</span>
+<span class="w">     </span><span class="nt">issuer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">issuer1</span>
+<span class="w">     </span><span class="nt">audiences</span><span class="p">:</span>
+<span class="w">     </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">audience1</span>
+<span class="w">     </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">audience2</span>
+<span class="w">     </span><span class="nt">remote_jwks</span><span class="p">:</span>
+<span class="w">       </span><span class="nt">http_uri</span><span class="p">:</span>
+<span class="w">         </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com/.well-known/jwks.json</span>
+<span class="w">         </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example_jwks_cluster</span>
+<span class="w">         </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1s</span>
+<span class="w">  </span><span class="w w-Error"> </span><span class="nt">provider2</span><span class="p">:</span>
+<span class="w">     </span><span class="nt">issuer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider2</span>
+<span class="w">     </span><span class="nt">local_jwks</span><span class="p">:</span>
+<span class="w">       </span><span class="nt">inline_string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jwks_string</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtauthentication-rules">
+<dt>rules</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-requirementrule"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.RequirementRule</span></a>) Specifies requirements based on the route matches. The first matched requirement will be
+applied. If there are overlapped match conditions, please put the most specific match first.</p>
+<p>Examples</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">rules</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/healthz</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/baz</span>
+<span class="w">    </span><span class="nt">requires</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider1</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/foo</span>
+<span class="w">    </span><span class="nt">requires</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">requires_any</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider1</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider2</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/bar</span>
+<span class="w">    </span><span class="nt">requires</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">requires_all</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider1</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider2</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtauthentication-filter-state-rules">
+<dt>filter_state_rules</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-filterstaterule"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.FilterStateRule</span></a>) This message specifies Jwt requirements based on stream_info.filterState.
+Other HTTP filters can use it to specify Jwt requirements dynamically.
+The <code class="docutils literal notranslate"><span class="pre">rules</span></code> field above is checked first, if it could not find any matches,
+check this one.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtauthentication-bypass-cors-preflight">
+<dt>bypass_cors_preflight</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) When set to true, bypass the <a class="reference external" href="http://www.w3.org/TR/cors/#cross-origin-request-with-preflight">CORS preflight request</a> regardless of JWT
+requirements specified in the rules.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtauthentication-requirement-map">
+<dt>requirement_map</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtrequirement"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtRequirement</span></a>&gt;) A map of unique requirement_names to JwtRequirements.
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-perrouteconfig-requirement-name"><span class="std std-ref">requirement_name</span></a>
+in <code class="docutils literal notranslate"><span class="pre">PerRouteConfig</span></code> uses this map to specify a JwtRequirement.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtauthentication-strip-failure-response">
+<dt>strip_failure_response</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) A request failing the verification process will receive a 401 downstream with the failure response details
+in the body along with WWWAuthenticate header value set with “invalid token”. If this value is set to true,
+the response details will be stripped and only a 401 response code will be returned. Default value is false</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtauthentication-stat-prefix">
+<dt>stat_prefix</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional additional prefix to use when emitting statistics.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-perrouteconfig">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-perrouteconfig"></span><h2>extensions.filters.http.jwt_authn.v3.PerRouteConfig<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-perrouteconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L890">[extensions.filters.http.jwt_authn.v3.PerRouteConfig proto]</a></p>
+<p>Specify per-route config.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;disabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;requirement_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-perrouteconfig-disabled">
+<dt>disabled</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Disable Jwt Authentication for this route.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-perrouteconfig-disabled"><span class="std std-ref">disabled</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-perrouteconfig-requirement-name"><span class="std std-ref">requirement_name</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-perrouteconfig-requirement-name">
+<dt>requirement_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Use requirement_name to specify a JwtRequirement.
+This requirement_name MUST be specified at the
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtauthentication-requirement-map"><span class="std std-ref">requirement_map</span></a>
+in <code class="docutils literal notranslate"><span class="pre">JwtAuthentication</span></code>. If no, the requests using this route will be rejected with 403.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-perrouteconfig-disabled"><span class="std std-ref">disabled</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-perrouteconfig-requirement-name"><span class="std std-ref">requirement_name</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-jwtclaimtoheader">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtclaimtoheader"></span><h2>extensions.filters.http.jwt_authn.v3.JwtClaimToHeader<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-jwtclaimtoheader" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L906">[extensions.filters.http.jwt_authn.v3.JwtClaimToHeader proto]</a></p>
+<p>This message specifies a combination of header name and claim name.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;header_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;claim_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;claim_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtclaimtoheader-header-name">
+<dt>header_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The HTTP header name to copy the claim to.
+The header name is sanitized from the request for every provider configured on the filter
+(including on paths that bypass JWT verification) and then replaced with the claim value when
+verification succeeds.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtclaimtoheader-claim-name">
+<dt>claim_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The name of the claim to copy, split on “.” to address nested claims: <code class="docutils literal notranslate"><span class="pre">sub</span></code> selects the
+top-level <code class="docutils literal notranslate"><span class="pre">sub</span></code> claim, and <code class="docutils literal notranslate"><span class="pre">nested.claim.key</span></code> selects <code class="docutils literal notranslate"><span class="pre">key</span></code> inside <code class="docutils literal notranslate"><span class="pre">claim</span></code> inside
+<code class="docutils literal notranslate"><span class="pre">nested</span></code>.</p>
+<p>Because the name is always split, a claim whose own name contains a dot – a URL-namespaced
+claim such as <code class="docutils literal notranslate"><span class="pre">http://example.org/parent_token</span></code> – is not addressable this way. Use
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtclaimtoheader-claim-path"><span class="std std-ref">claim_path</span></a> for
+those.</p>
+<p>Exactly one of <code class="docutils literal notranslate"><span class="pre">claim_name</span></code> and <code class="docutils literal notranslate"><span class="pre">claim_path</span></code> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtclaimtoheader-claim-path">
+<dt>claim_path</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtclaimtoheader-pathsegment"><span class="std std-ref">extensions.filters.http.jwt_authn.v3.JwtClaimToHeader.PathSegment</span></a>) The path to the claim to copy, given as an explicit list of segments. Each segment is matched
+in full against a key of the enclosing JSON object, so claim names containing dots are
+addressable. For the payload <code class="docutils literal notranslate"><span class="pre">{&quot;a.b&quot;:</span> <span class="pre">{&quot;c.d&quot;:</span> <span class="pre">&quot;x.y.z&quot;}}</span></code>, the value <code class="docutils literal notranslate"><span class="pre">x.y.z</span></code> is selected
+by:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">claim_to_headers</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-jwt-claim</span>
+<span class="w">  </span><span class="nt">claim_path</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">a.b</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">c.d</span>
+</pre></div>
+</div>
+<p>and a URL-namespaced top-level claim by:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">claim_to_headers</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-jwt-claim</span>
+<span class="w">  </span><span class="nt">claim_path</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://example.org/parent_token</span>
+</pre></div>
+</div>
+<p>Exactly one of <code class="docutils literal notranslate"><span class="pre">claim_name</span></code> and <code class="docutils literal notranslate"><span class="pre">claim_path</span></code> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-jwt-authn-v3-jwtclaimtoheader-pathsegment">
+<span id="envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtclaimtoheader-pathsegment"></span><h2>extensions.filters.http.jwt_authn.v3.JwtClaimToHeader.PathSegment<a class="headerlink" href="#extensions-filters-http-jwt-authn-v3-jwtclaimtoheader-pathsegment" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto#L908">[extensions.filters.http.jwt_authn.v3.JwtClaimToHeader.PathSegment proto]</a></p>
+<p>Specifies a segment in a path for retrieving a claim from the JWT payload.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtclaimtoheader-pathsegment-key">
+<dt>key</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The key to retrieve the value with in the enclosing JSON object. The key is matched in
+full, so it may itself contain dots.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../json_to_metadata/v3/json_to_metadata.proto.html" class="btn btn-neutral float-left" title="Json-To-Metadata Filter (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../kill_request/v3/kill_request.proto.html" class="btn btn-neutral float-right" title="Kill Request (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">JWT Authentication (proto)</a><ul>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-jwtprovider">extensions.filters.http.jwt_authn.v3.JwtProvider</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-jwtprovider-normalizepayload">extensions.filters.http.jwt_authn.v3.JwtProvider.NormalizePayload</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-jwtcacheconfig">extensions.filters.http.jwt_authn.v3.JwtCacheConfig</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-remotejwks">extensions.filters.http.jwt_authn.v3.RemoteJwks</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-jwksasyncfetch">extensions.filters.http.jwt_authn.v3.JwksAsyncFetch</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-jwtheader">extensions.filters.http.jwt_authn.v3.JwtHeader</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-providerwithaudiences">extensions.filters.http.jwt_authn.v3.ProviderWithAudiences</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-jwtrequirement">extensions.filters.http.jwt_authn.v3.JwtRequirement</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-extractonlywithoutvalidation">extensions.filters.http.jwt_authn.v3.ExtractOnlyWithoutValidation</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-jwtrequirementorlist">extensions.filters.http.jwt_authn.v3.JwtRequirementOrList</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-jwtrequirementandlist">extensions.filters.http.jwt_authn.v3.JwtRequirementAndList</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-requirementrule">extensions.filters.http.jwt_authn.v3.RequirementRule</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-filterstaterule">extensions.filters.http.jwt_authn.v3.FilterStateRule</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-jwtauthentication">extensions.filters.http.jwt_authn.v3.JwtAuthentication</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-perrouteconfig">extensions.filters.http.jwt_authn.v3.PerRouteConfig</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-jwtclaimtoheader">extensions.filters.http.jwt_authn.v3.JwtClaimToHeader</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-jwt-authn-v3-jwtclaimtoheader-pathsegment">extensions.filters.http.jwt_authn.v3.JwtClaimToHeader.PathSegment</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

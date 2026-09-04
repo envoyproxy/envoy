@@ -1,0 +1,23 @@
+.. _version_history_1.34.1:
+
+1.34.1 (May 7, 2025)
+=====================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **eds**: Fixed crash when creating an EDS cluster with invalid configuration.
+* **url_template**: Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
+  This behavioral change can be temporarily reverted by setting runtime guard
+  ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
+

@@ -1,0 +1,57 @@
+.. _envoy_v3_api_file_envoy/extensions/clusters/common/dns/v3/dns.proto:
+
+DNS configuration for clusters (proto)
+======================================
+
+
+
+
+
+
+.. _envoy_v3_api_enum_extensions.clusters.common.dns.v3.DnsLookupFamily:
+
+Enum extensions.clusters.common.dns.v3.DnsLookupFamily
+------------------------------------------------------
+
+
+:repo:`[extensions.clusters.common.dns.v3.DnsLookupFamily proto] <api/envoy/extensions/clusters/common/dns/v3/dns.proto#L14>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.clusters.common.dns.v3.DnsLookupFamily.UNSPECIFIED:
+
+
+UNSPECIFIED
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.clusters.common.dns.v3.DnsLookupFamily.AUTO:
+
+
+AUTO
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.clusters.common.dns.v3.DnsLookupFamily.V4_ONLY:
+
+
+V4_ONLY
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.clusters.common.dns.v3.DnsLookupFamily.V6_ONLY:
+
+
+V6_ONLY
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.clusters.common.dns.v3.DnsLookupFamily.V4_PREFERRED:
+
+
+V4_PREFERRED
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.clusters.common.dns.v3.DnsLookupFamily.ALL:
+
+
+ALL
+  ⁣
+

@@ -1,0 +1,801 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JWT Authentication &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Kill Request" href="kill_request_filter.html" />
+    <link rel="prev" title="Envoy Json-To-Metadata Filter" href="json_to_metadata_filter.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../http.html">HTTP</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../http_conn_man/http_conn_man.html">HTTP connection manager</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="http_filters.html">HTTP filters</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="a2a_filter.html">A2A</a></li>
+<li class="toctree-l4"><a class="reference internal" href="adaptive_concurrency_filter.html">Adaptive Concurrency</a></li>
+<li class="toctree-l4"><a class="reference internal" href="admission_control_filter.html">Admission Control</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aws_eventstream_parser_filter.html">AWS-EventStream-Parser Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ai_protocol_manager_filter.html">AI Protocol Manager</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aws_lambda_filter.html">AWS Lambda</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api_key_auth_filter.html">API key auth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aws_request_signing_filter.html">AWS Request Signing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="bandwidth_limit_filter.html">Bandwidth limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="bandwidth_share_filter.html">Bandwidth share</a></li>
+<li class="toctree-l4"><a class="reference internal" href="basic_auth_filter.html">Basic Auth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="buffer_filter.html">Buffer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cache_filter.html">Cache filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cache_v2_filter.html">CacheV2 filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cdn_loop_filter.html">CDN-Loop header</a></li>
+<li class="toctree-l4"><a class="reference internal" href="checksum_filter.html">Checksum</a></li>
+<li class="toctree-l4"><a class="reference internal" href="compressor_filter.html">Compressor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="composite_filter.html">Composite Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="connect_grpc_bridge_filter.html">Connect-gRPC Bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cors_filter.html">CORS</a></li>
+<li class="toctree-l4"><a class="reference internal" href="credential_injector_filter.html">Credential injector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="csrf_filter.html">CSRF</a></li>
+<li class="toctree-l4"><a class="reference internal" href="custom_response_filter.html">Custom Response Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="decompressor_filter.html">Decompressor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dynamic_forward_proxy_filter.html">Dynamic forward proxy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dynamodb_filter.html">DynamoDB</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ext_authz_filter.html">External Authorization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ext_proc_filter.html">External Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="fault_filter.html">Fault Injection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="file_server_filter.html">File Server</a></li>
+<li class="toctree-l4"><a class="reference internal" href="file_system_buffer_filter.html">File System Buffer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="filter_chain_filter.html">Filter Chain</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gcp_authn_filter.html">GCP Authentication Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="geoip_filter.html">IP Geolocation Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="golang_filter.html">Golang</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_field_extraction_filter.html">gRPC Field Extraction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_http1_bridge_filter.html">gRPC HTTP/1.1 bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_http1_reverse_bridge_filter.html">gRPC HTTP/1.1 reverse bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_json_reverse_transcoder_filter.html">gRPC-JSON reverse transcoder</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_json_transcoder_filter.html">gRPC-JSON transcoder</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_stats_filter.html">gRPC Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_web_filter.html">gRPC-Web</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_mutation_filter.html">Header Mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="health_check_filter.html">Health check</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_to_metadata_filter.html">Envoy Header-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ip_tagging_filter.html">IP Tagging</a></li>
+<li class="toctree-l4"><a class="reference internal" href="json_to_metadata_filter.html">Envoy Json-To-Metadata Filter</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">JWT Authentication</a></li>
+<li class="toctree-l4"><a class="reference internal" href="kill_request_filter.html">Kill Request</a></li>
+<li class="toctree-l4"><a class="reference internal" href="language_filter.html">Language</a></li>
+<li class="toctree-l4"><a class="reference internal" href="local_rate_limit_filter.html">Local rate limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lua_filter.html">Lua</a></li>
+<li class="toctree-l4"><a class="reference internal" href="mcp_filter.html">Model Context Protocol (MCP)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="mcp_router_filter.html">MCP Router</a></li>
+<li class="toctree-l4"><a class="reference internal" href="oauth2_filter.html">OAuth2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="on_demand_updates_filter.html">On-demand VHDS, S/RDS and CDS Updates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="original_src_filter.html">Original Source</a></li>
+<li class="toctree-l4"><a class="reference internal" href="proto_api_scrubber_filter.html">Proto API Scrubber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="proto_message_extraction_filter.html">Proto Message Extraction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rate_limit_filter.html">Rate limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rate_limit_quota_filter.html">Rate Limit Quota</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rbac_filter.html">Role Based Access Control (RBAC) Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="router_filter.html">Router</a></li>
+<li class="toctree-l4"><a class="reference internal" href="set_filter_state.html">Set-Filter-State HTTP Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="set_metadata_filter.html">Set Metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="body_size_limit_filter.html">Body Size Limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sse_to_metadata_filter.html">SSE-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="stateful_session_filter.html">Stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sxg_filter.html">SXG</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tap_filter.html">Tap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="thrift_to_metadata_filter.html">Envoy Thrift-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="upstream_codec_filter.html">Upstream Codec</a></li>
+<li class="toctree-l4"><a class="reference internal" href="upstream_rbac_filter.html">Upstream Role Based Access Control (RBAC) Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wasm_filter.html">Wasm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="transform_filter.html">Transform</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../caches/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../caches_v2/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../cluster_specifier/cluster_specifier.html">HTTP cluster specifier</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tcp_bridge/tcp_bridge.html">HTTP TCP bridge</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../http.html">HTTP</a></li>
+          <li class="breadcrumb-item"><a href="http_filters.html">HTTP filters</a></li>
+      <li class="breadcrumb-item active">JWT Authentication</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/http/http_filters/jwt_authn_filter.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="jwt-authentication">
+<span id="config-http-filters-jwt-authn"></span><h1>JWT Authentication<a class="headerlink" href="#jwt-authentication" title="Link to this heading"></a></h1>
+<p>This HTTP filter can be used to verify JSON Web Token (JWT). It will verify its signature, audiences and issuer. It will also check its time restrictions, such as expiration and nbf (not before) time. If the JWT verification fails, its request will be rejected. If the JWT verification succeeds, its payload can be forwarded to the upstream for further authorization if desired.</p>
+<p>JWKS is needed to verify JWT signatures. They can be specified in the filter config or can be fetched remotely from a JWKS server.</p>
+<p>Following are supported JWT alg:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ES256</span><span class="p">,</span> <span class="n">ES384</span><span class="p">,</span> <span class="n">ES512</span><span class="p">,</span>
+<span class="n">HS256</span><span class="p">,</span> <span class="n">HS384</span><span class="p">,</span> <span class="n">HS512</span><span class="p">,</span>
+<span class="n">RS256</span><span class="p">,</span> <span class="n">RS384</span><span class="p">,</span> <span class="n">RS512</span><span class="p">,</span>
+<span class="n">PS256</span><span class="p">,</span> <span class="n">PS384</span><span class="p">,</span> <span class="n">PS512</span><span class="p">,</span>
+<span class="n">EdDSA</span>
+</pre></div>
+</div>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>This filter should be configured with the type URL <code class="docutils literal notranslate"><span class="pre">type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication</span></code>.</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtauthentication"><span class="std std-ref">v3 API reference</span></a></p></li>
+</ul>
+<p>This HTTP <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtauthentication"><span class="std std-ref">filter config</span></a> has two fields:</p>
+<ul class="simple">
+<li><p>Field <code class="docutils literal notranslate"><span class="pre">providers</span></code> specifies how a JWT should be verified, such as where to extract the token, where to fetch the public key (JWKS) and where to output its payload.</p></li>
+<li><p>Field <code class="docutils literal notranslate"><span class="pre">rules</span></code> specifies matching rules and their requirements. If a request matches a rule, its requirement applies. The requirement specifies which JWT providers should be used.</p></li>
+</ul>
+<section id="jwtprovider">
+<h3>JwtProvider<a class="headerlink" href="#jwtprovider" title="Link to this heading"></a></h3>
+<p><a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtprovider"><span class="std std-ref">JwtProvider</span></a> specifies how a JWT should be verified. It has the following fields:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">issuer</span></code>: the principal that issued the JWT, usually a URL or an email address.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">audiences</span></code>: a list of JWT audiences allowed to access. A JWT containing any of these audiences will be accepted.
+If not specified, the audiences in JWT will not be checked.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">local_jwks</span></code>: fetch JWKS in local data source, either in a local file or embedded in the inline string.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">remote_jwks</span></code>: fetch JWKS from a remote HTTP server, also specify cache duration.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">forward</span></code>: if true, JWT will be forwarded to the upstream.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">from_headers</span></code>: extract JWT from HTTP headers.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">from_params</span></code>: extract JWT from query parameters.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">from_cookies</span></code>: extract JWT from HTTP request cookies.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">forward_payload_header</span></code>: forward the JWT payload in the specified HTTP header.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">claim_to_headers</span></code>: copy JWT claim to HTTP header.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">jwt_cache_config</span></code>: Enables JWT cache, its size can be specified by <code class="docutils literal notranslate"><span class="pre">jwt_cache_size</span></code>. Only valid JWTs are cached.</p></li>
+</ul>
+</section>
+<section id="default-extract-location">
+<h3>Default Extract Location<a class="headerlink" href="#default-extract-location" title="Link to this heading"></a></h3>
+<p>If <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-from-headers"><span class="std std-ref">from_headers</span></a> and
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-from-params"><span class="std std-ref">from_params</span></a> is empty, the default location to extract JWT is from HTTP header:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Authorization</span><span class="p">:</span> <span class="n">Bearer</span> <span class="o">&lt;</span><span class="n">token</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>and query parameter key <code class="docutils literal notranslate"><span class="pre">access_token</span></code> as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>/path?access_token=&lt;JWT&gt;
+</pre></div>
+</div>
+<p>If a request has two tokens, one from the header and the other from the query parameter, all of them must be valid.</p>
+<p>The <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtauthentication-providers"><span class="std std-ref">providers</span></a> field is a map, to map <code class="docutils literal notranslate"><span class="pre">provider_name</span></code> to a <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtprovider"><span class="std std-ref">JwtProvider</span></a>. The <code class="docutils literal notranslate"><span class="pre">provider_name</span></code> must be unique, it is referred by the fields <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtrequirement-provider-name"><span class="std std-ref">provider_name</span></a> and <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-providerwithaudiences-provider-name"><span class="std std-ref">provider_name</span></a>.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>If <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-remote-jwks"><span class="std std-ref">remote_jwks</span></a> is used, a <code class="docutils literal notranslate"><span class="pre">jwks_cluster</span></code> cluster is required to be specified in the field
+<a class="reference internal" href="../../../api-v3/config/core/v3/http_uri.proto.html#envoy-v3-api-field-config-core-v3-httpuri-cluster"><span class="std std-ref">cluster</span></a>.</p>
+</div>
+<p>Due to above requirement, <a class="reference external" href="https://openid.net/specs/openid-connect-discovery-1_0.html">OpenID Connect Discovery</a> is not supported since the URL to fetch JWKS is in the response of the discovery. It is not easy to setup a cluster config for a dynamic URL.</p>
+</section>
+<section id="token-extraction-from-custom-http-headers">
+<h3>Token Extraction from Custom HTTP Headers<a class="headerlink" href="#token-extraction-from-custom-http-headers" title="Link to this heading"></a></h3>
+<p>If the JWT needs to be extracted in other HTTP header, use <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-from-headers"><span class="std std-ref">from_headers</span></a> to specify the header name.
+In addition to the <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtheader-name"><span class="std std-ref">name</span></a> field, which specifies the HTTP header name, the section can specify an optional <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtheader-value-prefix"><span class="std std-ref">value_prefix</span></a> value, as in:</p>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/fac5bb1c87358ae825525992e962a766/jwt-authn-headers-filter.yaml"><code class="xref download docutils literal notranslate"><span class="pre">jwt-authn-headers-filter.yaml</span></code></a></span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">41</span><span class="w">                  </span><span class="nt">from_headers</span><span class="p">:</span>
+<span class="linenos">42</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-jwt-header</span>
+<span class="linenos">43</span><span class="w">                    </span><span class="nt">value_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jwt_value</span>
+</pre></div>
+</div>
+</div>
+<p>The above will cause the jwt_authn filter to look for the JWT in the <code class="docutils literal notranslate"><span class="pre">x-jwt-header</span></code> header, following the tag <code class="docutils literal notranslate"><span class="pre">jwt_value</span></code>.
+Any non-JWT characters (i.e., anything other than alphanumerics, <cite>_</cite>, <cite>-</cite>, and <cite>.</cite>) will be skipped,
+and all following, contiguous, JWT-legal chars will be taken as the JWT.</p>
+<p>This means all of the following will return a JWT of <code class="docutils literal notranslate"><span class="pre">eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">x-jwt-header</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jwt_value=eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk</span>
+
+<span class="nt">x-jwt-header</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="s">&quot;jwt_value&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk&quot;</span><span class="p p-Indicator">}</span>
+
+<span class="nt">x-jwt-header</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">beta:true,jwt_value:&quot;eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk&quot;,trace=1234</span>
+</pre></div>
+</div>
+<p>The header <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtheader-name"><span class="std std-ref">name</span></a> may be <code class="docutils literal notranslate"><span class="pre">Authorization</span></code>.</p>
+<p>The <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtheader-value-prefix"><span class="std std-ref">value_prefix</span></a> must match exactly, i.e., case-sensitively.
+If the <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtheader-value-prefix"><span class="std std-ref">value_prefix</span></a> is not found, the header is skipped, not considered as a source for a JWT.</p>
+<p>If there are no JWT-legal characters after the <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtheader-value-prefix"><span class="std std-ref">value_prefix</span></a>, the entire string after it
+is taken to be the JWT. This is unlikely to succeed; the error will reported by the JWT parser.</p>
+</section>
+<section id="remote-jwks-config-example">
+<h3>Remote JWKS config example<a class="headerlink" href="#remote-jwks-config-example" title="Link to this heading"></a></h3>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/1b720e94f9cad2279eb8719bf31eaa85/jwt-authn-filter.yaml"><code class="xref download docutils literal notranslate"><span class="pre">jwt-authn-filter.yaml</span></code></a></span><a class="headerlink" href="#id2" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">38</span><span class="w">              </span><span class="nt">providers</span><span class="p">:</span>
+<span class="linenos">39</span><span class="w">                </span><span class="nt">provider_name1</span><span class="p">:</span>
+<span class="linenos">40</span><span class="w">                  </span><span class="nt">issuer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com</span>
+<span class="linenos">41</span><span class="w">                  </span><span class="nt">audiences</span><span class="p">:</span>
+<span class="linenos">42</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bookstore_android.apps.googleusercontent.com</span>
+<span class="linenos">43</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bookstore_web.apps.googleusercontent.com</span>
+<span class="linenos">44</span><span class="w">                  </span><span class="nt">remote_jwks</span><span class="p">:</span>
+<span class="linenos">45</span><span class="w">                    </span><span class="nt">http_uri</span><span class="p">:</span>
+<span class="linenos">46</span><span class="w">                      </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com/jwks.json</span>
+<span class="linenos">47</span><span class="w">                      </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example_jwks_cluster</span>
+<span class="linenos">48</span><span class="w">                      </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1s</span>
+<span class="linenos">49</span><span class="w">                    </span><span class="nt">cache_duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">300s</span>
+</pre></div>
+</div>
+</div>
+<p>Above example fetches JWKS from a remote server with URL <a class="reference external" href="https://example.com/jwks.json">https://example.com/jwks.json</a>. The token will be extracted from the default extract locations. The token will not be forwarded to upstream. JWT payload will not be added to the request header.</p>
+<p>Following cluster <strong>example_jwks_cluster</strong> is needed to fetch JWKS.</p>
+<div class="literal-block-wrapper docutils container" id="id3">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/1b720e94f9cad2279eb8719bf31eaa85/jwt-authn-filter.yaml"><code class="xref download docutils literal notranslate"><span class="pre">jwt-authn-filter.yaml</span></code></a></span><a class="headerlink" href="#id3" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">54</span><span class="w">  </span><span class="nt">clusters</span><span class="p">:</span>
+<span class="linenos">55</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example_jwks_cluster</span>
+<span class="linenos">56</span><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">STRICT_DNS</span>
+<span class="linenos">57</span><span class="w">    </span><span class="nt">lb_policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ROUND_ROBIN</span>
+<span class="linenos">58</span><span class="w">    </span><span class="nt">load_assignment</span><span class="p">:</span>
+<span class="linenos">59</span><span class="w">      </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example_jwks_cluster</span>
+<span class="linenos">60</span><span class="w">      </span><span class="nt">endpoints</span><span class="p">:</span>
+<span class="linenos">61</span><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">lb_endpoints</span><span class="p">:</span>
+<span class="linenos">62</span><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="linenos">63</span><span class="w">            </span><span class="nt">address</span><span class="p">:</span>
+<span class="linenos">64</span><span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="linenos">65</span><span class="w">                </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example_jwks_cluster.example.com</span>
+<span class="linenos">66</span><span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="linenos">67</span><span class="w">    </span><span class="nt">transport_socket</span><span class="p">:</span>
+<span class="linenos">68</span><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+<span class="linenos">69</span><span class="w">      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">70</span><span class="w">        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext</span>
+<span class="linenos">71</span><span class="w">        </span><span class="nt">sni</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example_jwks_cluster.example.com</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="inline-jwks-config-example">
+<h3>Inline JWKS config example<a class="headerlink" href="#inline-jwks-config-example" title="Link to this heading"></a></h3>
+<p>Another config example using inline JWKS:</p>
+<div class="literal-block-wrapper docutils container" id="id4">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/0eccbc4aa0f11980df504bc45fbad43e/jwt-authn-inline-filter.yaml"><code class="xref download docutils literal notranslate"><span class="pre">jwt-authn-inline-filter.yaml</span></code></a></span><a class="headerlink" href="#id4" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">32</span><span class="w">              </span><span class="nt">providers</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">                </span><span class="nt">provider_name2</span><span class="p">:</span>
+<span class="linenos">34</span><span class="w">                  </span><span class="nt">issuer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example2.com</span>
+<span class="linenos">35</span><span class="w">                  </span><span class="nt">local_jwks</span><span class="p">:</span>
+<span class="linenos">36</span><span class="w">                    </span><span class="nt">inline_string</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
+<span class="linenos">37</span><span class="w">                      </span><span class="no">{&quot;keys&quot;: [</span>
+<span class="linenos">38</span><span class="w">                        </span><span class="no">{&quot;kty&quot;:&quot;RSA&quot;,</span>
+<span class="linenos">39</span><span class="w">                         </span><span class="no">&quot;n&quot;: &quot;0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86z</span>
+<span class="linenos">40</span><span class="w">                              </span><span class="no">wu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc</span>
+<span class="linenos">41</span><span class="w">                              </span><span class="no">5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8K</span>
+<span class="linenos">42</span><span class="w">                              </span><span class="no">JZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh</span>
+<span class="linenos">43</span><span class="w">                              </span><span class="no">6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKn</span>
+<span class="linenos">44</span><span class="w">                              </span><span class="no">qDKgw&quot;,</span>
+<span class="linenos">45</span><span class="w">                         </span><span class="no">&quot;e&quot;:&quot;AQAB&quot;,</span>
+<span class="linenos">46</span><span class="w">                         </span><span class="no">&quot;alg&quot;:&quot;RS256&quot;,</span>
+<span class="linenos">47</span><span class="w">                         </span><span class="no">&quot;kid&quot;:&quot;2011-04-29&quot;}]}</span>
+<span class="linenos">48</span><span class="w">                  </span><span class="nt">from_headers</span><span class="p">:</span>
+<span class="linenos">49</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jwt-assertion</span>
+<span class="linenos">50</span><span class="w">                  </span><span class="nt">forward</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="linenos">51</span><span class="w">                  </span><span class="nt">forward_payload_header</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-jwt-payload</span>
+</pre></div>
+</div>
+</div>
+<p>Above example uses config inline string to specify JWKS. The JWT will be extracted from HTTP headers as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jwt</span><span class="o">-</span><span class="n">assertion</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">JWT</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>JWT payload will be added to the request header as following format:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">x</span><span class="o">-</span><span class="n">jwt</span><span class="o">-</span><span class="n">payload</span><span class="p">:</span> <span class="n">base64url_encoded</span><span class="p">(</span><span class="n">jwt_payload_in_JSON</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="requirementrule">
+<h3>RequirementRule<a class="headerlink" href="#requirementrule" title="Link to this heading"></a></h3>
+<p><a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-requirementrule"><span class="std std-ref">RequirementRule</span></a> has two fields:</p>
+<ul class="simple">
+<li><p>Field <code class="docutils literal notranslate"><span class="pre">match</span></code> specifies how a request can be matched; e.g. by HTTP headers, or by query parameters, or by path prefixes.</p></li>
+<li><p>Field <code class="docutils literal notranslate"><span class="pre">requires</span></code> specifies the JWT requirement, e.g. which provider is required.</p></li>
+</ul>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<ul class="simple">
+<li><p><strong>If a request matches multiple rules, the first matched rule will apply</strong>.</p></li>
+<li><p>If the matched rule has empty <code class="docutils literal notranslate"><span class="pre">requires</span></code> field, <strong>JWT verification is not required</strong>.</p></li>
+<li><p>If a request doesn’t match any rules, <strong>JWT verification is not required</strong>.</p></li>
+</ul>
+</div>
+</section>
+<section id="single-requirement-config-example">
+<h3>Single requirement config example<a class="headerlink" href="#single-requirement-config-example" title="Link to this heading"></a></h3>
+<div class="literal-block-wrapper docutils container" id="id5">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/2f22948cd2e958b6bed18ec2549b50e4/jwt-authn-single-filter.yaml"><code class="xref download docutils literal notranslate"><span class="pre">jwt-authn-single-filter.yaml</span></code></a></span><a class="headerlink" href="#id5" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">32</span><span class="w">              </span><span class="nt">providers</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">                </span><span class="nt">jwt_provider1</span><span class="p">:</span>
+<span class="linenos">34</span><span class="w">                  </span><span class="nt">issuer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com</span>
+<span class="linenos">35</span><span class="w">                  </span><span class="nt">audiences</span><span class="p">:</span>
+<span class="linenos">36</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">audience1</span>
+<span class="linenos">37</span><span class="w">                  </span><span class="nt">local_jwks</span><span class="p">:</span>
+<span class="linenos">38</span><span class="w">                    </span><span class="nt">inline_string</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
+<span class="linenos">39</span><span class="w">                      </span><span class="no">{&quot;keys&quot;: [</span>
+<span class="linenos">40</span><span class="w">                        </span><span class="no">{&quot;kty&quot;:&quot;RSA&quot;,</span>
+<span class="linenos">41</span><span class="w">                         </span><span class="no">&quot;n&quot;: &quot;0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86z</span>
+<span class="linenos">42</span><span class="w">                              </span><span class="no">wu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc</span>
+<span class="linenos">43</span><span class="w">                              </span><span class="no">5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8K</span>
+<span class="linenos">44</span><span class="w">                              </span><span class="no">JZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh</span>
+<span class="linenos">45</span><span class="w">                              </span><span class="no">6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKn</span>
+<span class="linenos">46</span><span class="w">                              </span><span class="no">qDKgw&quot;,</span>
+<span class="linenos">47</span><span class="w">                         </span><span class="no">&quot;e&quot;:&quot;AQAB&quot;,</span>
+<span class="linenos">48</span><span class="w">                         </span><span class="no">&quot;alg&quot;:&quot;RS256&quot;,</span>
+<span class="linenos">49</span><span class="w">                         </span><span class="no">&quot;kid&quot;:&quot;2011-04-29&quot;}]}</span>
+<span class="linenos">50</span><span class="w">              </span><span class="nt">rules</span><span class="p">:</span>
+<span class="linenos">51</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">52</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/health</span>
+<span class="linenos">53</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">54</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/api</span>
+<span class="linenos">55</span><span class="w">                </span><span class="nt">requires</span><span class="p">:</span>
+<span class="linenos">56</span><span class="w">                  </span><span class="nt">provider_and_audiences</span><span class="p">:</span>
+<span class="linenos">57</span><span class="w">                    </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jwt_provider1</span>
+<span class="linenos">58</span><span class="w">                    </span><span class="nt">audiences</span><span class="p">:</span>
+<span class="linenos">59</span><span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api_audience</span>
+<span class="linenos">60</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">61</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/</span>
+<span class="linenos">62</span><span class="w">                </span><span class="nt">requires</span><span class="p">:</span>
+<span class="linenos">63</span><span class="w">                  </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jwt_provider1</span>
+</pre></div>
+</div>
+</div>
+<p>Above config uses single requirement rule, each rule may have either an empty requirement or a single requirement with one provider name.</p>
+</section>
+<section id="group-requirement-config-example">
+<h3>Group requirement config example<a class="headerlink" href="#group-requirement-config-example" title="Link to this heading"></a></h3>
+<div class="literal-block-wrapper docutils container" id="id6">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/18a86e24485fa0b5a1db4349bfc8e461/jwt-authn-group-filter.yaml"><code class="xref download docutils literal notranslate"><span class="pre">jwt-authn-group-filter.yaml</span></code></a></span><a class="headerlink" href="#id6" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">32</span><span class="w">              </span><span class="nt">providers</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">                </span><span class="nt">provider1</span><span class="p">:</span>
+<span class="linenos">34</span><span class="w">                  </span><span class="nt">issuer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://provider1.com</span>
+<span class="linenos">35</span><span class="w">                  </span><span class="nt">local_jwks</span><span class="p">:</span>
+<span class="linenos">36</span><span class="w">                    </span><span class="nt">inline_string</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
+<span class="linenos">37</span><span class="w">                      </span><span class="no">{&quot;keys&quot;: [</span>
+<span class="linenos">38</span><span class="w">                        </span><span class="no">{&quot;kty&quot;:&quot;RSA&quot;,</span>
+<span class="linenos">39</span><span class="w">                         </span><span class="no">&quot;n&quot;: &quot;0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86z</span>
+<span class="linenos">40</span><span class="w">                              </span><span class="no">wu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc</span>
+<span class="linenos">41</span><span class="w">                              </span><span class="no">5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8K</span>
+<span class="linenos">42</span><span class="w">                              </span><span class="no">JZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh</span>
+<span class="linenos">43</span><span class="w">                              </span><span class="no">6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKn</span>
+<span class="linenos">44</span><span class="w">                              </span><span class="no">qDKgw&quot;,</span>
+<span class="linenos">45</span><span class="w">                         </span><span class="no">&quot;e&quot;:&quot;AQAB&quot;,</span>
+<span class="linenos">46</span><span class="w">                         </span><span class="no">&quot;alg&quot;:&quot;RS256&quot;,</span>
+<span class="linenos">47</span><span class="w">                         </span><span class="no">&quot;kid&quot;:&quot;2011-04-29&quot;}]}</span>
+<span class="linenos">48</span><span class="w">                </span><span class="nt">provider2</span><span class="p">:</span>
+<span class="linenos">49</span><span class="w">                  </span><span class="nt">issuer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://provider2.com</span>
+<span class="linenos">50</span><span class="w">                  </span><span class="nt">local_jwks</span><span class="p">:</span>
+<span class="linenos">51</span><span class="w">                    </span><span class="nt">inline_string</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
+<span class="linenos">52</span><span class="w">                      </span><span class="no">{&quot;keys&quot;: [</span>
+<span class="linenos">53</span><span class="w">                        </span><span class="no">{&quot;kty&quot;:&quot;RSA&quot;,</span>
+<span class="linenos">54</span><span class="w">                         </span><span class="no">&quot;n&quot;: &quot;0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86z</span>
+<span class="linenos">55</span><span class="w">                              </span><span class="no">wu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc</span>
+<span class="linenos">56</span><span class="w">                              </span><span class="no">5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8K</span>
+<span class="linenos">57</span><span class="w">                              </span><span class="no">JZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh</span>
+<span class="linenos">58</span><span class="w">                              </span><span class="no">6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKn</span>
+<span class="linenos">59</span><span class="w">                              </span><span class="no">qDKgw&quot;,</span>
+<span class="linenos">60</span><span class="w">                         </span><span class="no">&quot;e&quot;:&quot;AQAB&quot;,</span>
+<span class="linenos">61</span><span class="w">                         </span><span class="no">&quot;alg&quot;:&quot;RS256&quot;,</span>
+<span class="linenos">62</span><span class="w">                         </span><span class="no">&quot;kid&quot;:&quot;2011-04-29&quot;}]}</span>
+<span class="linenos">63</span><span class="w">              </span><span class="nt">rules</span><span class="p">:</span>
+<span class="linenos">64</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">65</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/any</span>
+<span class="linenos">66</span><span class="w">                </span><span class="nt">requires</span><span class="p">:</span>
+<span class="linenos">67</span><span class="w">                  </span><span class="nt">requires_any</span><span class="p">:</span>
+<span class="linenos">68</span><span class="w">                    </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="linenos">69</span><span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider1</span>
+<span class="linenos">70</span><span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider2</span>
+<span class="linenos">71</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">72</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/all</span>
+<span class="linenos">73</span><span class="w">                </span><span class="nt">requires</span><span class="p">:</span>
+<span class="linenos">74</span><span class="w">                  </span><span class="nt">requires_all</span><span class="p">:</span>
+<span class="linenos">75</span><span class="w">                    </span><span class="nt">requirements</span><span class="p">:</span>
+<span class="linenos">76</span><span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider1</span>
+<span class="linenos">77</span><span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">provider_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provider2</span>
+</pre></div>
+</div>
+</div>
+<p>Above config uses more complex <em>group</em> requirements:</p>
+<ul class="simple">
+<li><p>The first <em>rule</em> specifies <code class="docutils literal notranslate"><span class="pre">requires_any</span></code>; if any of <code class="docutils literal notranslate"><span class="pre">provider1</span></code> or <code class="docutils literal notranslate"><span class="pre">provider2</span></code> requirement is satisfied, the request is OK to proceed.</p></li>
+<li><p>The second <em>rule</em> specifies <code class="docutils literal notranslate"><span class="pre">requires_all</span></code>; only if both <code class="docutils literal notranslate"><span class="pre">provider1</span></code> and <code class="docutils literal notranslate"><span class="pre">provider2</span></code> requirements are satisfied, the request is OK to proceed.</p></li>
+</ul>
+</section>
+<section id="copy-validated-jwt-claims-to-http-request-headers-example">
+<h3>Copy validated JWT claims to HTTP request headers example<a class="headerlink" href="#copy-validated-jwt-claims-to-http-request-headers-example" title="Link to this heading"></a></h3>
+<p>If a JWT is valid, you can add some of its claims of type (string, integer, boolean) to a new HTTP header to pass to the upstream. You can specify claims and headers in
+<cite>claim_to_headers</cite> field. Nested claims are also supported.</p>
+<p>The field <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-claim-to-headers"><span class="std std-ref">claim_to_headers</span></a> is a repeat of message <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-msg-extensions-filters-http-jwt-authn-v3-jwtclaimtoheader"><span class="std std-ref">JWTClaimToHeader</span></a> which has these fields:</p>
+<ul class="simple">
+<li><p>Field <code class="docutils literal notranslate"><span class="pre">header_name</span></code> specifies the name of new http header reserved for jwt claim. If this header is already present with some other value then it will be replaced with the claim value. If the claim value doesn’t exist then this header wouldn’t be available for any other value. The filter strips every configured <code class="docutils literal notranslate"><span class="pre">forward_payload_header</span></code> and <code class="docutils literal notranslate"><span class="pre">claim_to_headers</span></code> header name from the request before applying rules, including on paths that bypass JWT verification (empty <code class="docutils literal notranslate"><span class="pre">requires</span></code>, per-route <code class="docutils literal notranslate"><span class="pre">disabled</span></code>, or CORS preflight bypass), so client-supplied values cannot be forwarded as authenticated identity.</p></li>
+<li><p>Field <code class="docutils literal notranslate"><span class="pre">claim_name</span></code> specifies the claim from the verified JWT, split on <code class="docutils literal notranslate"><span class="pre">.</span></code> to address nested
+claims: <code class="docutils literal notranslate"><span class="pre">nested.claim.key</span></code> resolves to <code class="docutils literal notranslate"><span class="pre">key</span></code> inside <code class="docutils literal notranslate"><span class="pre">claim</span></code> inside <code class="docutils literal notranslate"><span class="pre">nested</span></code>.</p></li>
+<li><p>Field <code class="docutils literal notranslate"><span class="pre">claim_path</span></code> specifies the same thing as an explicit list of segments, for claims whose
+own names contain dots. Exactly one of <code class="docutils literal notranslate"><span class="pre">claim_name</span></code> and <code class="docutils literal notranslate"><span class="pre">claim_path</span></code> must be set.</p></li>
+</ul>
+<div class="literal-block-wrapper docutils container" id="id7">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/e9f2324fc853188f51e0342800ee0166/jwt-authn-claim-filter.yaml"><code class="xref download docutils literal notranslate"><span class="pre">jwt-authn-claim-filter.yaml</span></code></a></span><a class="headerlink" href="#id7" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">32</span><span class="w">              </span><span class="nt">providers</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">                </span><span class="nt">provider_name2</span><span class="p">:</span>
+<span class="linenos">34</span><span class="w">                  </span><span class="nt">issuer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example2.com</span>
+<span class="linenos">35</span><span class="w">                  </span><span class="nt">claim_to_headers</span><span class="p">:</span>
+<span class="linenos">36</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-jwt-claim-sub</span>
+<span class="linenos">37</span><span class="w">                    </span><span class="nt">claim_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sub</span>
+<span class="linenos">38</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-jwt-claim-nested-key</span>
+<span class="linenos">39</span><span class="w">                    </span><span class="nt">claim_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nested.claim.key</span>
+<span class="linenos">40</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-jwt-tenants</span>
+<span class="linenos">41</span><span class="w">                    </span><span class="nt">claim_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tenants</span>
+</pre></div>
+</div>
+</div>
+<p>In this example the <cite>tenants</cite> claim is an object, therefore the JWT claim (“sub”, “nested.claim.key” and “tenants”) will be added to HTTP headers as following format:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">x</span><span class="o">-</span><span class="n">jwt</span><span class="o">-</span><span class="n">claim</span><span class="o">-</span><span class="n">sub</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">JWT</span> <span class="n">Claim</span><span class="o">&gt;</span>
+<span class="n">x</span><span class="o">-</span><span class="n">jwt</span><span class="o">-</span><span class="n">claim</span><span class="o">-</span><span class="n">nested</span><span class="o">-</span><span class="n">key</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">JWT</span> <span class="n">Claim</span><span class="o">&gt;</span>
+<span class="n">x</span><span class="o">-</span><span class="n">jwt</span><span class="o">-</span><span class="n">tenants</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">Base64</span> <span class="n">encoded</span> <span class="n">JSON</span> <span class="n">JWT</span> <span class="n">Claim</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+</section>
+<section id="claim-names-which-contain-dots">
+<h3>Claim names which contain dots<a class="headerlink" href="#claim-names-which-contain-dots" title="Link to this heading"></a></h3>
+<p>Because <code class="docutils literal notranslate"><span class="pre">claim_name</span></code> is always split on <code class="docutils literal notranslate"><span class="pre">.</span></code>, a claim whose own name contains a dot is not
+addressable through it. Use <a class="reference internal" href="../../../api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtclaimtoheader-claim-path"><span class="std std-ref">claim_path</span></a> instead,
+which takes the path one segment at a time and matches each segment in full. Given the payload:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;a.b&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;c.d&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;x.y.z&quot;</span><span class="p">}}</span>
+</pre></div>
+</div>
+<p>the value <code class="docutils literal notranslate"><span class="pre">x.y.z</span></code> is copied to a header by:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">claim_to_headers</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-jwt-claim-c-d</span>
+<span class="w">  </span><span class="nt">claim_path</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">a.b</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">c.d</span>
+</pre></div>
+</div>
+<p>The single-segment case covers the URL-namespaced claims issued by many OIDC providers:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">claim_to_headers</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">x-jwt-claim-parent-token</span>
+<span class="w">  </span><span class="nt">claim_path</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://example.org/parent_token</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="statistics">
+<h2>Statistics<a class="headerlink" href="#statistics" title="Link to this heading"></a></h2>
+<p>The JWT authentication filter outputs statistics in the <code class="docutils literal notranslate"><span class="pre">http.&lt;stat_prefix&gt;.jwt_authn.</span></code> namespace.
+The <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-stat-prefix"><span class="std std-ref">stat prefix</span></a>
+comes from the owning HTTP connection manager.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>allowed</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that passed JWT authentication</p></td>
+</tr>
+<tr class="row-odd"><td><p>denied</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that failed JWT authentication</p></td>
+</tr>
+<tr class="row-even"><td><p>cors_preflight_bypassed</p></td>
+<td><p>Counter</p></td>
+<td><p>Total CORS preflight requests that bypassed JWT authentication</p></td>
+</tr>
+<tr class="row-odd"><td><p>jwks_fetch_success</p></td>
+<td><p>Counter</p></td>
+<td><p>Total successful JWKS (JSON Web Key Set) remote fetches</p></td>
+</tr>
+<tr class="row-even"><td><p>jwks_fetch_failed</p></td>
+<td><p>Counter</p></td>
+<td><p>Total failed JWKS remote fetch attempts</p></td>
+</tr>
+<tr class="row-odd"><td><p>jwt_cache_hit</p></td>
+<td><p>Counter</p></td>
+<td><p>Total JWT cache hits where a previously validated token was reused</p></td>
+</tr>
+<tr class="row-even"><td><p>jwt_cache_miss</p></td>
+<td><p>Counter</p></td>
+<td><p>Total JWT cache misses requiring full token validation</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="extract-only-mode-security-considerations">
+<span id="config-jwt-authn-extract-only-security"></span><h2>Extract-Only Mode Security Considerations<a class="headerlink" href="#extract-only-mode-security-considerations" title="Link to this heading"></a></h2>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>SECURITY WARNING</strong>: The <code class="docutils literal notranslate"><span class="pre">extract_only_without_validation</span></code>
+requirement type does <strong>NOT</strong> verify JWT signatures. Any party can craft
+a JWT with arbitrary claims, and those claims will be extracted and
+forwarded as HTTP headers.</p>
+<p><strong>Verification status header (default on):</strong></p>
+<p>When this mode is active, Envoy sets a verification status header on
+requests whose JWT is present but fails signature verification:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">x-jwt-signature-verified</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</pre></div>
+</div>
+<p>The header is NOT set when the JWT is valid or when no JWT is present.
+This means the header’s presence is a meaningful signal: if set, the
+JWT failed verification and downstream filters should not trust any
+JWT-derived claim headers.</p>
+<p><strong>RBAC integration:</strong></p>
+<p>If RBAC policies match on JWT-derived claim headers (e.g.,
+<code class="docutils literal notranslate"><span class="pre">x-jwt-claim-role</span></code>), add a corresponding principal check for the
+verification status header. Example RBAC policy that only allows
+verified admin claims:</p>
+<div class="literal-block-wrapper docutils container" id="id8">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/9092ba68a0d7b7f9c7bf212dca57f412/jwt-authn-extract-only-rbac.yaml"><code class="xref download docutils literal notranslate"><span class="pre">jwt-authn-extract-only-rbac.yaml</span></code></a></span><a class="headerlink" href="#id8" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">58</span><span class="w">                              </span><span class="l l-Scalar l-Scalar-Plain">6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKn</span>
+<span class="linenos">59</span><span class="w">                              </span><span class="l l-Scalar l-Scalar-Plain">qDKgw&quot;,</span>
+<span class="linenos">60</span><span class="w">                         </span><span class="l l-Scalar l-Scalar-Plain">&quot;e&quot;:&quot;AQAB&quot;,</span>
+<span class="linenos">61</span><span class="w">                         </span><span class="l l-Scalar l-Scalar-Plain">&quot;alg&quot;:&quot;RS256&quot;,</span>
+<span class="linenos">62</span><span class="w">                         </span><span class="l l-Scalar l-Scalar-Plain">&quot;kid&quot;:&quot;dummy&quot;}]}</span>
+<span class="linenos">63</span><span class="w">              </span><span class="l l-Scalar l-Scalar-Plain">rules</span><span class="p p-Indicator">:</span>
+<span class="linenos">64</span><span class="w">             </span><span class="w w-Error"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">65</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/admin&quot;</span>
+<span class="linenos">66</span><span class="w">                </span><span class="nt">requires</span><span class="p">:</span>
+<span class="linenos">67</span><span class="w">                  </span><span class="nt">extract_only_without_validation</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+<span class="linenos">68</span><span class="w">         </span><span class="w w-Error"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.rbac</span>
+<span class="linenos">69</span><span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">70</span><span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC</span>
+<span class="linenos">71</span><span class="w">              </span><span class="nt">rules</span><span class="p">:</span>
+<span class="linenos">72</span><span class="w">                </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ALLOW</span>
+<span class="linenos">73</span><span class="w">                </span><span class="nt">policies</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<p><strong>Configuration:</strong></p>
+<p>The header name is configurable via <code class="docutils literal notranslate"><span class="pre">verification_status_header</span></code> in
+<code class="docutils literal notranslate"><span class="pre">ExtractOnlyWithoutValidation</span></code>. The header is set by default, but this behavior can be
+disabled via the <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.jwt_authn_add_verification_status_header</span></code>
+runtime flag.</p>
+<p><strong>Recommended alternative:</strong> Use <code class="docutils literal notranslate"><span class="pre">provider_name</span></code> with <code class="docutils literal notranslate"><span class="pre">remote_jwks</span></code>
+or <code class="docutils literal notranslate"><span class="pre">local_jwks</span></code> for full signature verification.</p>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="json_to_metadata_filter.html" class="btn btn-neutral float-left" title="Envoy Json-To-Metadata Filter" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="kill_request_filter.html" class="btn btn-neutral float-right" title="Kill Request" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">JWT Authentication</a><ul>
+<li><a class="reference internal" href="#configuration">Configuration</a><ul>
+<li><a class="reference internal" href="#jwtprovider">JwtProvider</a></li>
+<li><a class="reference internal" href="#default-extract-location">Default Extract Location</a></li>
+<li><a class="reference internal" href="#token-extraction-from-custom-http-headers">Token Extraction from Custom HTTP Headers</a></li>
+<li><a class="reference internal" href="#remote-jwks-config-example">Remote JWKS config example</a></li>
+<li><a class="reference internal" href="#inline-jwks-config-example">Inline JWKS config example</a></li>
+<li><a class="reference internal" href="#requirementrule">RequirementRule</a></li>
+<li><a class="reference internal" href="#single-requirement-config-example">Single requirement config example</a></li>
+<li><a class="reference internal" href="#group-requirement-config-example">Group requirement config example</a></li>
+<li><a class="reference internal" href="#copy-validated-jwt-claims-to-http-request-headers-example">Copy validated JWT claims to HTTP request headers example</a></li>
+<li><a class="reference internal" href="#claim-names-which-contain-dots">Claim names which contain dots</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#statistics">Statistics</a></li>
+<li><a class="reference internal" href="#extract-only-mode-security-considerations">Extract-Only Mode Security Considerations</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

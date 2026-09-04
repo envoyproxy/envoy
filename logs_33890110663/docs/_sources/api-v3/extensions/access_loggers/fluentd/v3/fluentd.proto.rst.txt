@@ -1,0 +1,211 @@
+.. _envoy_v3_api_file_envoy/extensions/access_loggers/fluentd/v3/fluentd.proto:
+
+Fluentd access log (proto)
+==========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig:
+
+extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig
+-----------------------------------------------------------
+
+
+:repo:`[extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig proto] <api/envoy/extensions/access_loggers/fluentd/v3/fluentd.proto#L28>`
+
+Configuration for the *envoy.access_loggers.fluentd* :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`.
+This access log extension will send the emitted access logs over a TCP connection to an upstream that is accepting
+the Fluentd Forward Protocol as described in: `Fluentd Forward Protocol Specification
+<https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
+
+.. _extension_envoy.access_loggers.fluentd:
+
+This extension has the qualified name ``envoy.access_loggers.fluentd``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.access_loggers <extension_category_envoy.access_loggers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster": ...,
+    "tag": ...,
+    "stat_prefix": ...,
+    "buffer_flush_interval": {...},
+    "buffer_size_bytes": {...},
+    "record": {...},
+    "retry_options": {...},
+    "formatters": []
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The upstream cluster to connect to for streaming the Fluentd messages.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.tag:
+
+
+tag
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) A tag is a string separated with '.' (e.g. log.type) to categorize events.
+  See: https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#message-modes
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The prefix to use when emitting :ref:`statistics <config_access_log_stats>`.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.buffer_flush_interval:
+
+
+buffer_flush_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Interval for flushing access logs to the TCP stream. Logger will flush requests every time
+  this interval is elapsed, or when batch size limit is hit, whichever comes first. Defaults to
+  1 second.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.buffer_size_bytes:
+
+
+buffer_size_bytes
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Soft size limit in bytes for access log entries buffer. The logger will buffer requests until
+  this limit it hit, or every time flush interval is elapsed, whichever comes first. When the buffer
+  limit is hit, the logger will immediately flush the buffer contents. Setting it to zero effectively
+  disables the batching. Defaults to 16384.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.record:
+
+
+record
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_, *REQUIRED*) A struct that represents the record that is sent for each log entry.
+  https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#entry
+  Values are rendered as strings, numbers, or boolean values as appropriate.
+  Nested JSON objects may be produced by some command operators (e.g. FILTER_STATE or DYNAMIC_METADATA).
+  See :ref:`format string<config_access_log_format_strings>` documentation for a specific command operator details.
+
+  .. validated-code-block:: yaml
+    :type-name: envoy.extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig
+
+    record:
+      status: "%RESPONSE_CODE%"
+      message: "%LOCAL_REPLY_BODY%"
+
+  The following msgpack record would be created:
+
+  .. code-block:: json
+
+   {
+     "status": 500,
+     "message": "My error message"
+   }
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.retry_options:
+
+
+retry_options
+  (:ref:`extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions>`) Optional retry, in case upstream connection has failed. If this field is not set, the default values will be applied,
+  as specified in the :ref:`RetryOptions <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions>`
+  configuration.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.formatters:
+
+
+formatters
+  (**repeated** :ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Specifies a collection of Formatter plugins that can be called from the access log configuration.
+  See the formatters extensions documentation for details.
+
+
+  .. _extension_category_envoy.formatter:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.formatter.cel <extension_envoy.formatter.cel>`
+
+    - :ref:`envoy.formatter.dynamic_modules <extension_envoy.formatter.dynamic_modules>`
+
+    - :ref:`envoy.formatter.file_content <extension_envoy.formatter.file_content>`
+
+    - :ref:`envoy.formatter.generic_secret <extension_envoy.formatter.generic_secret>`
+
+    - :ref:`envoy.formatter.metadata <extension_envoy.formatter.metadata>`
+
+    - :ref:`envoy.formatter.req_without_query <extension_envoy.formatter.req_without_query>`
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions:
+
+extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions
+------------------------------------------------------------------------
+
+
+:repo:`[extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions proto] <api/envoy/extensions/access_loggers/fluentd/v3/fluentd.proto#L29>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_connect_attempts": {...},
+    "backoff_options": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions.max_connect_attempts:
+
+
+max_connect_attempts
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The number of times the logger will attempt to connect to the upstream during reconnects.
+  By default, there is no limit. The logger will attempt to reconnect to the upstream each time
+  connecting to the upstream failed or the upstream connection had been closed for any reason.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions.backoff_options:
+
+
+backoff_options
+  (:ref:`config.core.v3.BackoffStrategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`) Sets the backoff strategy. If this value is not set, the default base backoff interval is 500
+  milliseconds and the default max backoff interval is 5 seconds (10 times the base interval).
+
+
+

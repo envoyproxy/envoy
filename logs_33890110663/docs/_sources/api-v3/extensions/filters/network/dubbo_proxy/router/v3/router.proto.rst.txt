@@ -1,0 +1,23 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/dubbo_proxy/router/v3/router.proto:
+
+Router (proto)
+==============
+
+
+Dubbo router :ref:`configuration overview <config_dubbo_filters_router>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.router.v3.Router:
+
+extensions.filters.network.dubbo_proxy.router.v3.Router
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.router.v3.Router proto] <api/envoy/extensions/filters/network/dubbo_proxy/router/v3/router.proto#L16>`
+
+
+
+
+

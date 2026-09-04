@@ -1,0 +1,617 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HTTP upgrades &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="HTTP dynamic forward proxy" href="http_proxy.html" />
+    <link rel="prev" title="HTTP routing" href="http_routing.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="http.html">HTTP</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="http_connection_management.html">HTTP connection management</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http_filters.html">HTTP filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http_routing.html">HTTP routing</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">HTTP upgrades</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http_proxy.html">HTTP dynamic forward proxy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http3.html">HTTP/3 overview</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../observability/observability.html">Observability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../security/security.html">Security</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced/advanced.html">Advanced</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="http.html">HTTP</a></li>
+      <li class="breadcrumb-item active">HTTP upgrades</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/intro/arch_overview/http/upgrades.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="http-upgrades">
+<span id="arch-overview-upgrades"></span><h1>HTTP upgrades<a class="headerlink" href="#http-upgrades" title="Link to this heading"></a></h1>
+<p>Envoy Upgrade support is intended mainly for WebSocket and <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> support, but may be used for
+arbitrary upgrades as well.</p>
+<p>Upgrades pass both the HTTP headers and the upgrade payload through an HTTP filter chain.</p>
+<p>One may configure the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-upgrade-configs"><span class="std std-ref">upgrade_configs</span></a>
+with or without custom filter chains.</p>
+<p>If only the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-upgradeconfig-upgrade-type"><span class="std std-ref">upgrade_type</span></a>
+is specified, both the upgrade headers, any request and response body, and HTTP data payload will
+pass through the default HTTP filter chain.</p>
+<p>To avoid the use of HTTP-only filters for an upgrade payload, one can set custom
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-upgradeconfig-filters"><span class="std std-ref">filters</span></a>
+for the given upgrade type, up to and including only using the router filter to send the HTTP
+data upstream.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Buffering is generally not compatible with upgrades, so if the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/buffer/v3/buffer.proto.html#envoy-v3-api-msg-extensions-filters-http-buffer-v3-buffer"><span class="std std-ref">Buffer filter</span></a> is configured in
+the default HTTP filter chain it should probably be excluded for upgrades by using
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-upgradeconfig-filters"><span class="std std-ref">upgrade filters</span></a>
+and not including the buffer filter in that list.</p>
+</div>
+<p>Upgrades can be enabled or disabled on a <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-upgrade-configs"><span class="std std-ref">per-route</span></a> basis.</p>
+<p>Any per-route enabling/disabling automatically overrides HttpConnectionManager configuration as
+laid out below, but custom filter chains can only be configured on a per-HttpConnectionManager basis.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p><em>HCM Upgrade Enabled</em></p></th>
+<th class="head"><p><em>Route Upgrade Enabled</em></p></th>
+<th class="head"><p><em>Upgrade Enabled</em></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>T (Default)</p></td>
+<td><p>T (Default)</p></td>
+<td><p>T</p></td>
+</tr>
+<tr class="row-odd"><td><p>T (Default)</p></td>
+<td><p>F</p></td>
+<td><p>F</p></td>
+</tr>
+<tr class="row-even"><td><p>F</p></td>
+<td><p>T (Default)</p></td>
+<td><p>T</p></td>
+</tr>
+<tr class="row-odd"><td><p>F</p></td>
+<td><p>F</p></td>
+<td><p>F</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>The statistics for upgrades are all bundled together so WebSocket and other upgrades
+<a class="reference internal" href="../../../configuration/http/http_conn_man/stats.html#config-http-conn-man-stats"><span class="std std-ref">statistics</span></a> are tracked by stats such as
+<code class="docutils literal notranslate"><span class="pre">downstream_cx_upgrades_total</span></code> and <code class="docutils literal notranslate"><span class="pre">downstream_cx_upgrades_active</span></code>.</p>
+</div>
+<section id="websocket-over-http-2-or-http-3-hops">
+<h2>Websocket over HTTP/2 or HTTP/3 hops<a class="headerlink" href="#websocket-over-http-2-or-http-3-hops" title="Link to this heading"></a></h2>
+<p>While HTTP/2 and HTTP/3 support for WebSockets is off by default, Envoy does support tunneling WebSockets over
+HTTP/2 and above for deployments that prefer a uniform HTTP/2+ mesh throughout; this enables, for example,
+a deployment of the form:</p>
+<p>[<code class="docutils literal notranslate"><span class="pre">Client</span></code>] —-&gt; <code class="docutils literal notranslate"><span class="pre">HTTP/1.1</span></code> &gt;—- [<code class="docutils literal notranslate"><span class="pre">Front</span> <span class="pre">Envoy</span></code>] —-&gt; <code class="docutils literal notranslate"><span class="pre">HTTP/2</span></code> &gt;—- [<code class="docutils literal notranslate"><span class="pre">Sidecar</span> <span class="pre">Envoy</span></code> —-&gt; <code class="docutils literal notranslate"><span class="pre">HTTP/1</span></code>  &gt;—- <code class="docutils literal notranslate"><span class="pre">App</span></code>]</p>
+<p>In this case, if a client is for example using WebSocket, we want the Websocket to arrive at the
+upstream server functionally intact, which means it needs to traverse the HTTP/2+ hop.</p>
+<p>This is accomplished for HTTP/2 via <a class="reference external" href="https://www.rfc-editor.org/rfc/rfc8441">Extended CONNECT (RFC 8441)</a> support,
+turned on by setting <a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-http2protocoloptions-allow-connect"><span class="std std-ref">allow_connect</span></a>
+to <code class="docutils literal notranslate"><span class="pre">true</span></code> at the second layer Envoy.</p>
+<p>For HTTP/3 there is parallel support configured by the alpha option
+<a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-http3protocoloptions-allow-extended-connect"><span class="std std-ref">allow_extended_connect</span></a> as
+there is no formal RFC yet.</p>
+<p>The WebSocket request will be transformed into an HTTP/2+ <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> stream, with <code class="docutils literal notranslate"><span class="pre">:protocol</span></code> header
+indicating the original upgrade, traverse the HTTP/2+ hop, and be downgraded back into an HTTP/1
+WebSocket Upgrade.</p>
+<p>This same upgrade-<code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>-upgrade transformation will be performed on any
+HTTP/2+ hop, with the documented flaw that the HTTP/1.1 method is always assumed to be <code class="docutils literal notranslate"><span class="pre">GET</span></code>.</p>
+<p>Non-WebSocket upgrades are allowed to use any valid HTTP method (i.e. <code class="docutils literal notranslate"><span class="pre">POST</span></code>) and the current
+upgrade/downgrade mechanism will drop the original method and transform the upgrade request to
+a <code class="docutils literal notranslate"><span class="pre">GET</span></code> method on the final Envoy-Upstream hop.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The  HTTP/2+ upgrade path has very strict HTTP/1.1 compliance, so will not proxy WebSocket
+upgrade requests or responses with bodies.</p>
+</div>
+</section>
+<section id="connect-support">
+<h2><code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> support<a class="headerlink" href="#connect-support" title="Link to this heading"></a></h2>
+<p>Envoy <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> support is off by default (Envoy will send an internally generated 403 in response to
+<code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> requests).</p>
+<p><code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> support can be enabled via the upgrade options described above, setting
+the upgrade value to the special keyword <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>.</p>
+<p>While for HTTP/2 and above, <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> request may have a path, in general and for HTTP/1.1 <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> requests do
+not have a path, and can only be matched using a
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-routematch-connectmatcher"><span class="std std-ref">connect_matcher</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When doing non-wildcard domain matching for <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> requests, the <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> target is matched
+rather than the <code class="docutils literal notranslate"><span class="pre">Host</span></code>/<code class="docutils literal notranslate"><span class="pre">Authority</span></code> header. You may need to include the port (e.g. <code class="docutils literal notranslate"><span class="pre">hostname:port</span></code>) to
+successfully match.</p>
+</div>
+<p>Envoy can handle <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> in one of two ways, either proxying the <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> headers through as if they
+were any other request, and letting the upstream terminate the <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> request, or by terminating the
+<code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> request, and forwarding the payload as raw TCP data.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> upgrade configuration is set up, the default behavior is to proxy the <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>
+request, treating it like any other request using the upgrade path.</p>
+<p>If termination is desired, this can be accomplished by setting
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-upgradeconfig-connect-config"><span class="std std-ref">connect_config</span></a></p>
+<p>If that message is present for <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> requests, the router filter will strip the request headers,
+and forward the HTTP payload upstream. On receipt of initial TCP data from upstream, the router
+will synthesize 200 response headers, and then forward the TCP data as the HTTP response body.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This mode of <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> support can create major security holes if not configured correctly, as the upstream
+will be forwarded <strong>unsanitized headers</strong> if they are in the body payload.</p>
+<p>Please use with caution!</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>For an example of proxying connect, please see <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/configs/proxy_connect.yaml">configs/proxy_connect.yaml</a></p>
+<p>For an example of terminating connect, please see <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/configs/terminate_http1_connect.yaml">configs/terminate_http1_connect.yaml</a>
+and <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/configs/terminate_http2_connect.yaml">configs/terminate_http2_connect.yaml</a></p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>-over-TLS, Envoy can not currently be configured to do the <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> request in the clear
+and encrypt previously unencrypted payload in one hop.</p>
+<p>To send <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> in plaintext and encrypt the payload, one must first forward the HTTP payload over an
+“upstream” TLS loopback connection to encrypt it, then have a TCP listener take the encrypted payload and
+send the <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> upstream.</p>
+</div>
+</section>
+<section id="tunneling-tcp-over-http">
+<span id="id1"></span><h2>Tunneling TCP over HTTP<a class="headerlink" href="#tunneling-tcp-over-http" title="Link to this heading"></a></h2>
+<p>Envoy also has support for tunneling raw TCP over HTTP <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> or HTTP <code class="docutils literal notranslate"><span class="pre">POST</span></code> requests. Find
+below some usage scenarios.</p>
+<p>HTTP/2+ <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> can be used to proxy multiplexed TCP over pre-warmed secure connections and amortize
+the cost of any TLS handshake.</p>
+<p>An example set up proxying SMTP would look something like this:</p>
+<p>[<code class="docutils literal notranslate"><span class="pre">SMTP</span> <span class="pre">Upstream</span></code>] —&gt; <code class="docutils literal notranslate"><span class="pre">raw</span> <span class="pre">SMTP</span></code> &gt;— [<code class="docutils literal notranslate"><span class="pre">L2</span> <span class="pre">Envoy</span></code>]  —&gt; <code class="docutils literal notranslate"><span class="pre">SMTP</span> <span class="pre">tunneled</span> <span class="pre">over</span> <span class="pre">HTTP/2</span> <span class="pre">CONNECT</span></code> &gt;— [<code class="docutils literal notranslate"><span class="pre">L1</span> <span class="pre">Envoy</span></code>]  —&gt; <code class="docutils literal notranslate"><span class="pre">raw</span> <span class="pre">SMTP</span></code>  &gt;— [<code class="docutils literal notranslate"><span class="pre">Client</span></code>]</p>
+<p>HTTP/1.1 CONNECT can be used to have TCP client connecting to its own
+destination passing through an HTTP proxy server (e.g. corporate proxy not
+supporting HTTP/2):</p>
+<p>[<code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">Server</span></code>] —&gt; <code class="docutils literal notranslate"><span class="pre">raw</span> <span class="pre">HTTP</span></code> &gt;— [<code class="docutils literal notranslate"><span class="pre">L2</span> <span class="pre">Envoy</span></code>]  —&gt; <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">tunneled</span> <span class="pre">over</span> <span class="pre">HTTP/1.1</span> <span class="pre">CONNECT</span></code> &gt;— [<code class="docutils literal notranslate"><span class="pre">L1</span> <span class="pre">Envoy</span></code>]  —&gt; <code class="docutils literal notranslate"><span class="pre">raw</span> <span class="pre">HTTP</span></code> &gt;— [<code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">Client</span></code>]</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When using HTTP/1 <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> you will end up having a TCP connection
+between L1 and L2 Envoy for each TCP client connection, it is preferable to use
+HTTP/2 or above when you have the choice.</p>
+</div>
+<p>HTTP <code class="docutils literal notranslate"><span class="pre">POST</span></code> can also be used to proxy multiplexed TCP when intermediate proxies that don’t support
+<code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>.</p>
+<p>An example set up proxying HTTP would look something like this:</p>
+<p>[<code class="docutils literal notranslate"><span class="pre">TCP</span> <span class="pre">Server</span></code>] —&gt; <code class="docutils literal notranslate"><span class="pre">raw</span> <span class="pre">TCP</span></code> &gt;— [<code class="docutils literal notranslate"><span class="pre">L2</span> <span class="pre">Envoy</span></code>]  —&gt; <code class="docutils literal notranslate"><span class="pre">TCP</span> <span class="pre">tunneled</span> <span class="pre">over</span> <span class="pre">HTTP/2</span> <span class="pre">or</span> <span class="pre">HTTP/1.1</span> <span class="pre">POST</span></code> &gt;— [<code class="docutils literal notranslate"><span class="pre">Intermediate</span> <span class="pre">Proxies</span></code>] —&gt; <code class="docutils literal notranslate"><span class="pre">HTTP/2</span> <span class="pre">or</span> <span class="pre">HTTP/1.1</span> <span class="pre">POST</span></code> &gt;— [<code class="docutils literal notranslate"><span class="pre">L1</span> <span class="pre">Envoy</span></code>]  —&gt; <code class="docutils literal notranslate"><span class="pre">raw</span> <span class="pre">TCP</span></code>  &gt;— [<code class="docutils literal notranslate"><span class="pre">TCP</span> <span class="pre">Client</span></code>]</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Examples of such a set up can be found in the Envoy example config <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/configs/">directory</a>.</p>
+<p>For HTTP/1.1 <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>, try either:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>envoy<span class="w"> </span>-c<span class="w"> </span>configs/encapsulate_in_http1_connect.yaml<span class="w"> </span>--base-id<span class="w"> </span><span class="m">1</span>
+<span class="gp">$ </span>envoy<span class="w"> </span>-c<span class="w"> </span>configs/terminate_http1_connect.yaml<span class="w"> </span>--base-id<span class="w"> </span><span class="m">1</span>
+</pre></div>
+</div>
+<p>For HTTP/2 <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>, try either:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>envoy<span class="w"> </span>-c<span class="w"> </span>configs/encapsulate_in_http2_connect.yaml<span class="w"> </span>--base-id<span class="w"> </span><span class="m">1</span>
+<span class="gp">$ </span>envoy<span class="w"> </span>-c<span class="w"> </span>configs/terminate_http2_connect.yaml<span class="w"> </span>--base-id<span class="w"> </span><span class="m">1</span>
+</pre></div>
+</div>
+<p>For HTTP/2 <code class="docutils literal notranslate"><span class="pre">POST</span></code>, try either:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>envoy<span class="w"> </span>-c<span class="w"> </span>configs/encapsulate_in_http2_post.yaml<span class="w"> </span>--base-id<span class="w"> </span><span class="m">1</span>
+<span class="gp">$ </span>envoy<span class="w"> </span>-c<span class="w"> </span>configs/terminate_http2_post.yaml<span class="w"> </span>--base-id<span class="w"> </span><span class="m">1</span>
+</pre></div>
+</div>
+<p>In all cases you will be running a first Envoy listening for TCP traffic on port 10000 and
+encapsulating it in an HTTP <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> or HTTP <code class="docutils literal notranslate"><span class="pre">POST</span></code> request, and a second one listening on 10001,
+stripping the <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> headers (not needed for <code class="docutils literal notranslate"><span class="pre">POST</span></code> request), and forwarding the original TCP
+upstream, in this case to google.com.</p>
+</div>
+<p>Envoy waits for the HTTP tunnel to be established (i.e. a successful response to the <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> request is received),
+before starting to stream the downstream TCP data to the upstream.</p>
+<p>If you want to decapsulate a <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> request and also do HTTP processing on the decapsulated payload, the easiest way
+to accomplish it is to use <a class="reference internal" href="../../../configuration/other_features/internal_listener.html#config-internal-listener"><span class="std std-ref">internal listeners</span></a>.</p>
+</section>
+<section id="connect-udp-support">
+<h2><code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code> support<a class="headerlink" href="#connect-udp-support" title="Link to this heading"></a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code> is in an alpha status and may not be stable enough for use in production.
+We recommend to use this feature with caution.</p>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code> (<a class="reference external" href="https://www.rfc-editor.org/rfc/rfc9298">RFC 9298</a>) allows HTTP clients
+to create UDP tunnels through an HTTP proxy server. Unlike <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>, which is limited to
+tunneling TCP, <code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code> can be used to proxy UDP-based protocols such as HTTP/3.</p>
+<p><code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code> support is disabled by default in Envoy. Similar to <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>, it can be enabled
+through the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-upgrade-configs"><span class="std std-ref">upgrade_configs</span></a>
+by setting the value to the special keyword <code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code>. Like <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>, <code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code> requests
+are forwarded to the upstream by default.
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-upgradeconfig-connect-config"><span class="std std-ref">connect_config</span></a>
+must be set to terminate the requests and forward the payload as UDP datagrams to the target.</p>
+<section id="example-configuration">
+<h3>Example Configuration<a class="headerlink" href="#example-configuration" title="Link to this heading"></a></h3>
+<p>The following example configuration makes Envoy forward <code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code> requests to the upstream. Note
+that the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-upgrade-configs"><span class="std std-ref">upgrade_configs</span></a>
+is set to <code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code>.</p>
+<div class="literal-block-wrapper docutils container" id="id4">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/f623917f467541efc447cc5c00b0dcd7/proxy_connect_udp_http3_downstream.yaml"><code class="xref download docutils literal notranslate"><span class="pre">proxy_connect_udp_http3_downstream.yaml</span></code></a></span><a class="headerlink" href="#id4" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">27</span><span class="w">      </span><span class="nt">filters</span><span class="p">:</span>
+<span class="linenos">28</span><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.network.http_connection_manager</span>
+<span class="linenos">29</span><span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">30</span><span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+<span class="linenos">31</span><span class="w">          </span><span class="nt">codec_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HTTP3</span>
+<span class="linenos">32</span><span class="w">          </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress_http</span>
+<span class="linenos">33</span><span class="w">          </span><span class="nt">route_config</span><span class="p">:</span>
+<span class="linenos">34</span><span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_route</span>
+<span class="linenos">35</span><span class="w">            </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="linenos">36</span><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_service</span>
+<span class="linenos">37</span><span class="w">              </span><span class="nt">domains</span><span class="p">:</span>
+<span class="linenos">38</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;*&quot;</span>
+<span class="linenos">39</span><span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="linenos">40</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="hll"><span class="linenos">41</span><span class="w">                  </span><span class="nt">connect_matcher</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">42</span><span class="w">                    </span><span class="p p-Indicator">{}</span>
+</span><span class="linenos">43</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">44</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_0</span>
+<span class="linenos">45</span><span class="w">                  </span><span class="nt">upgrade_configs</span><span class="p">:</span>
+<span class="linenos">46</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">upgrade_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CONNECT-UDP</span>
+<span class="linenos">47</span><span class="w">          </span><span class="nt">http_filters</span><span class="p">:</span>
+<span class="linenos">48</span><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.router</span>
+<span class="linenos">49</span><span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">50</span><span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span>
+<span class="hll"><span class="linenos">51</span><span class="w">          </span><span class="nt">http3_protocol_options</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">52</span><span class="w">            </span><span class="nt">allow_extended_connect</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span class="linenos">53</span><span class="w"> </span><span class="w w-Error"> </span><span class="nt">clusters</span><span class="p">:</span>
+<span class="linenos">54</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_0</span>
+</pre></div>
+</div>
+</div>
+<p>The following example configuration makes Envoy terminate <code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code> requests and send UDP payloads
+to the target. As in this example, the
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-upgradeconfig-connect-config"><span class="std std-ref">connect_config</span></a>
+must be set to terminate <code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code> requests.</p>
+<div class="literal-block-wrapper docutils container" id="id5">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/a2eeb79fccd8c55ae6a46f1042c348dd/terminate_http3_connect_udp.yaml"><code class="xref download docutils literal notranslate"><span class="pre">terminate_http3_connect_udp.yaml</span></code></a></span><a class="headerlink" href="#id5" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">26</span><span class="w">      </span><span class="nt">filters</span><span class="p">:</span>
+<span class="linenos">27</span><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.network.http_connection_manager</span>
+<span class="linenos">28</span><span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">29</span><span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+<span class="linenos">30</span><span class="w">          </span><span class="nt">codec_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HTTP3</span>
+<span class="linenos">31</span><span class="w">          </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress_http</span>
+<span class="linenos">32</span><span class="w">          </span><span class="nt">route_config</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_route</span>
+<span class="linenos">34</span><span class="w">            </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="linenos">35</span><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_service</span>
+<span class="linenos">36</span><span class="w">              </span><span class="nt">domains</span><span class="p">:</span>
+<span class="linenos">37</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;*&quot;</span>
+<span class="linenos">38</span><span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="linenos">39</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="hll"><span class="linenos">40</span><span class="w">                  </span><span class="nt">connect_matcher</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">41</span><span class="w">                    </span><span class="p p-Indicator">{}</span>
+</span><span class="linenos">42</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">43</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_google</span>
+<span class="hll"><span class="linenos">44</span><span class="w">                  </span><span class="nt">upgrade_configs</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">45</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">upgrade_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CONNECT-UDP</span>
+</span><span class="hll"><span class="linenos">46</span><span class="w">                    </span><span class="nt">connect_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">47</span><span class="w">                      </span><span class="p p-Indicator">{}</span>
+</span><span class="linenos">48</span><span class="w">          </span><span class="nt">http_filters</span><span class="p">:</span>
+<span class="linenos">49</span><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.router</span>
+<span class="linenos">50</span><span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">51</span><span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span>
+<span class="linenos">52</span><span class="w">          </span><span class="nt">http3_protocol_options</span><span class="p">:</span>
+<span class="linenos">53</span><span class="w">            </span><span class="nt">allow_extended_connect</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="hll"><span class="linenos">54</span><span class="w"> </span><span class="w w-Error"> </span><span class="nt">clusters</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">55</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_google</span>
+</span><span class="linenos">56</span><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LOGICAL_DNS</span>
+<span class="linenos">57</span><span class="w">    </span><span class="c1"># Comment out the following line to test on v6 networks</span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+<section id="tunneling-udp-over-http">
+<span id="id2"></span><h2>Tunneling UDP over HTTP<a class="headerlink" href="#tunneling-udp-over-http" title="Link to this heading"></a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Raw UDP tunneling is in an alpha status and may not be stable enough for use in production.
+We recommend to use this feature with caution.</p>
+</div>
+<p>Apart from <code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code> termination, as described in the section above, Envoy also has support for tunneling raw UDP over HTTP
+<code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> or HTTP <code class="docutils literal notranslate"><span class="pre">POST</span></code> requests, by utilizing the UDP Proxy listener filter. By default, UDP tunneling is disabled, and can be
+enabled by setting the configuration for <a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.html#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-tunneling-config"><span class="std std-ref">tunneling_config</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Currently, Envoy only supports UDP tunneling over HTTP/2 streams.</p>
+</div>
+<p>By default, the <code class="docutils literal notranslate"><span class="pre">tunneling_config</span></code> will upgrade the connection to create HTTP/2 streams for each UDP session (a UDP session is identified by the datagrams 5-tuple), according
+to the <a class="reference external" href="https://www.rfc-editor.org/rfc/rfc9298.html">Proxying UDP in HTTP RFC</a>. Since this upgrade protocol requires an encapsulation mechanism to preserve the boundaries of the original datagram,
+it’s required to apply the <a class="reference internal" href="../../../configuration/listeners/udp_filters/session_filters/http_capsule.html#config-udp-session-filters-http-capsule"><span class="std std-ref">HTTP Capsule</span></a> session filter.
+The HTTP/2 streams will be multiplexed over the upstream connection.</p>
+<p>As opposed to TCP tunneling, where downstream flow control can be applied by alternately disabling the read from the connection socket, for UDP datagrams, this mechanism is not supported.
+Therefore, when tunneling UDP and a new datagram is received from the downstream, it is either streamed upstream, if the upstream is ready or halted by the UDP Proxy.
+In case the upstream is not ready (for example, when waiting for HTTP response headers), the datagram can either be dropped or buffered until the upstream is ready.
+In such cases, by default, downstream datagrams will be dropped, unless <a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.html#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-buffer-options"><span class="std std-ref">buffer_options</span></a>
+is set by the <code class="docutils literal notranslate"><span class="pre">tunneling_config</span></code>. The default buffer limits are modest to try and prevent a lot of unwanted buffered memory, but can and should be adjusted per the required use-case.
+When the upstream becomes ready, the UDP Proxy will first flush all the previously buffered datagrams.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">POST</span></code> is set, the upstream stream does not comply with the connect-udp RFC, and instead it will be a POST request.
+The path used in the headers will be set from the post_path field, and the headers will not contain the target host and
+target port, as required by the connect-udp protocol. This option should be used carefully.</p>
+</div>
+<section id="id3">
+<h3>Example Configuration<a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p>The following example configuration makes Envoy tunnel raw UDP datagrams over an upgraded <code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code> requests to the upstream.</p>
+<div class="literal-block-wrapper docutils container" id="id6">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/67a360ca4aff08fa633b6d9cdf84371c/raw_udp_tunneling_http2.yaml"><code class="xref download docutils literal notranslate"><span class="pre">raw_udp_tunneling_http2.yaml</span></code></a></span><a class="headerlink" href="#id6" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">32</span><span class="w">        </span><span class="nt">session_filters</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.udp.session.http_capsule</span>
+<span class="linenos">34</span><span class="w">          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="hll"><span class="linenos">35</span><span class="w">            </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig</span>
+</span><span class="linenos">36</span><span class="w">        </span><span class="nt">tunneling_config</span><span class="p">:</span>
+<span class="linenos">37</span><span class="w">          </span><span class="c1"># note: proxy_host supports string substitution, for example setting &quot;%FILTER_STATE(proxy.host.key:PLAIN)%&quot;</span>
+<span class="linenos">38</span><span class="w">          </span><span class="c1"># will take the target host value from the session&#39;s filter state.</span>
+<span class="linenos">39</span><span class="w">          </span><span class="nt">proxy_host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proxy.host.com</span>
+<span class="linenos">40</span><span class="w">          </span><span class="c1"># note: target_host supports string substitution, for example setting &quot;%FILTER_STATE(target.host.key:PLAIN)%&quot;</span>
+<span class="linenos">41</span><span class="w">          </span><span class="c1"># will take the target host value from the session&#39;s filter state.</span>
+<span class="linenos">42</span><span class="w">          </span><span class="nt">target_host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">target.host.com</span>
+<span class="linenos">43</span><span class="w">          </span><span class="c1"># note: The target port value can be overridden per-session by setting the required port value for</span>
+<span class="linenos">44</span><span class="w">          </span><span class="c1"># the filter state key ``udp.connect.target_port``.</span>
+<span class="linenos">45</span><span class="w">          </span><span class="nt">default_target_port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="hll"><span class="linenos">46</span><span class="w">          </span><span class="nt">retry_options</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">47</span><span class="w">            </span><span class="nt">max_connect_attempts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</span><span class="hll"><span class="linenos">48</span><span class="w">          </span><span class="nt">buffer_options</span><span class="p">:</span>
+</span><span class="linenos">49</span><span class="w">            </span><span class="nt">max_buffered_datagrams</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1024</span>
+<span class="linenos">50</span><span class="w">            </span><span class="nt">max_buffered_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">16384</span>
+<span class="linenos">51</span><span class="w">          </span><span class="nt">headers_to_add</span><span class="p">:</span>
+<span class="linenos">52</span><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header</span><span class="p">:</span>
+<span class="linenos">53</span><span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">original_dst_port</span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="http_routing.html" class="btn btn-neutral float-left" title="HTTP routing" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="http_proxy.html" class="btn btn-neutral float-right" title="HTTP dynamic forward proxy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">HTTP upgrades</a><ul>
+<li><a class="reference internal" href="#websocket-over-http-2-or-http-3-hops">Websocket over HTTP/2 or HTTP/3 hops</a></li>
+<li><a class="reference internal" href="#connect-support"><code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> support</a></li>
+<li><a class="reference internal" href="#tunneling-tcp-over-http">Tunneling TCP over HTTP</a></li>
+<li><a class="reference internal" href="#connect-udp-support"><code class="docutils literal notranslate"><span class="pre">CONNECT-UDP</span></code> support</a><ul>
+<li><a class="reference internal" href="#example-configuration">Example Configuration</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#tunneling-udp-over-http">Tunneling UDP over HTTP</a><ul>
+<li><a class="reference internal" href="#id3">Example Configuration</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

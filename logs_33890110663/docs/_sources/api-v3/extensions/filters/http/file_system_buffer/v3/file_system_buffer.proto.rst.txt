@@ -1,0 +1,330 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.proto:
+
+FileSystemBufferFilterConfig (proto)
+====================================
+
+.. _extension_envoy.filters.http.file_system_buffer:
+
+This extension has the qualified name ``envoy.filters.http.file_system_buffer``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig <envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.BufferBehavior:
+
+extensions.filters.http.file_system_buffer.v3.BufferBehavior
+------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.file_system_buffer.v3.BufferBehavior proto] <api/envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.proto#L25>`
+
+The behavior of the filter for a stream.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stream_when_possible": {...},
+    "bypass": {...},
+    "inject_content_length_if_necessary": {...},
+    "fully_buffer_and_always_inject_content_length": {...},
+    "fully_buffer": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.stream_when_possible:
+
+
+stream_when_possible
+  (:ref:`extensions.filters.http.file_system_buffer.v3.BufferBehavior.StreamWhenPossible <envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.BufferBehavior.StreamWhenPossible>`) Don't inject ``content-length`` header.
+  Output immediately, buffer only if output is slower than input.
+
+
+  
+
+  Precisely one of :ref:`stream_when_possible <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.stream_when_possible>`, :ref:`bypass <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.bypass>`, :ref:`inject_content_length_if_necessary <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.inject_content_length_if_necessary>`, :ref:`fully_buffer_and_always_inject_content_length <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.fully_buffer_and_always_inject_content_length>`, :ref:`fully_buffer <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.fully_buffer>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.bypass:
+
+
+bypass
+  (:ref:`extensions.filters.http.file_system_buffer.v3.BufferBehavior.Bypass <envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.BufferBehavior.Bypass>`) Never buffer, do nothing.
+
+
+  
+
+  Precisely one of :ref:`stream_when_possible <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.stream_when_possible>`, :ref:`bypass <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.bypass>`, :ref:`inject_content_length_if_necessary <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.inject_content_length_if_necessary>`, :ref:`fully_buffer_and_always_inject_content_length <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.fully_buffer_and_always_inject_content_length>`, :ref:`fully_buffer <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.fully_buffer>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.inject_content_length_if_necessary:
+
+
+inject_content_length_if_necessary
+  (:ref:`extensions.filters.http.file_system_buffer.v3.BufferBehavior.InjectContentLengthIfNecessary <envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.BufferBehavior.InjectContentLengthIfNecessary>`) If ``content-length`` is not present, buffer the entire input,
+  inject ``content-length`` header, then output.
+  If ``content-length`` is already present, act like ``stream_when_possible``.
+
+
+  
+
+  Precisely one of :ref:`stream_when_possible <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.stream_when_possible>`, :ref:`bypass <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.bypass>`, :ref:`inject_content_length_if_necessary <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.inject_content_length_if_necessary>`, :ref:`fully_buffer_and_always_inject_content_length <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.fully_buffer_and_always_inject_content_length>`, :ref:`fully_buffer <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.fully_buffer>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.fully_buffer_and_always_inject_content_length:
+
+
+fully_buffer_and_always_inject_content_length
+  (:ref:`extensions.filters.http.file_system_buffer.v3.BufferBehavior.FullyBufferAndAlwaysInjectContentLength <envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.BufferBehavior.FullyBufferAndAlwaysInjectContentLength>`) Always buffer the entire input, and inject ``content-length``,
+  overwriting any provided content-length header.
+
+
+  
+
+  Precisely one of :ref:`stream_when_possible <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.stream_when_possible>`, :ref:`bypass <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.bypass>`, :ref:`inject_content_length_if_necessary <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.inject_content_length_if_necessary>`, :ref:`fully_buffer_and_always_inject_content_length <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.fully_buffer_and_always_inject_content_length>`, :ref:`fully_buffer <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.fully_buffer>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.fully_buffer:
+
+
+fully_buffer
+  (:ref:`extensions.filters.http.file_system_buffer.v3.BufferBehavior.FullyBuffer <envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.BufferBehavior.FullyBuffer>`) Always buffer the entire input, do not modify ``content-length``.
+
+
+  
+
+  Precisely one of :ref:`stream_when_possible <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.stream_when_possible>`, :ref:`bypass <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.bypass>`, :ref:`inject_content_length_if_necessary <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.inject_content_length_if_necessary>`, :ref:`fully_buffer_and_always_inject_content_length <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.fully_buffer_and_always_inject_content_length>`, :ref:`fully_buffer <envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.BufferBehavior.fully_buffer>` must be set.
+
+.. _envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.BufferBehavior.StreamWhenPossible:
+
+extensions.filters.http.file_system_buffer.v3.BufferBehavior.StreamWhenPossible
+-------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.file_system_buffer.v3.BufferBehavior.StreamWhenPossible proto] <api/envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.proto#L26>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.BufferBehavior.Bypass:
+
+extensions.filters.http.file_system_buffer.v3.BufferBehavior.Bypass
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.file_system_buffer.v3.BufferBehavior.Bypass proto] <api/envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.proto#L29>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.BufferBehavior.InjectContentLengthIfNecessary:
+
+extensions.filters.http.file_system_buffer.v3.BufferBehavior.InjectContentLengthIfNecessary
+-------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.file_system_buffer.v3.BufferBehavior.InjectContentLengthIfNecessary proto] <api/envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.proto#L32>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.BufferBehavior.FullyBufferAndAlwaysInjectContentLength:
+
+extensions.filters.http.file_system_buffer.v3.BufferBehavior.FullyBufferAndAlwaysInjectContentLength
+----------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.file_system_buffer.v3.BufferBehavior.FullyBufferAndAlwaysInjectContentLength proto] <api/envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.proto#L35>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.BufferBehavior.FullyBuffer:
+
+extensions.filters.http.file_system_buffer.v3.BufferBehavior.FullyBuffer
+------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.file_system_buffer.v3.BufferBehavior.FullyBuffer proto] <api/envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.proto#L38>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.StreamConfig:
+
+extensions.filters.http.file_system_buffer.v3.StreamConfig
+----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.file_system_buffer.v3.StreamConfig proto] <api/envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.proto#L66>`
+
+The configuration for one direction of the filter behavior.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "behavior": {...},
+    "memory_buffer_bytes_limit": {...},
+    "storage_buffer_bytes_limit": {...},
+    "storage_buffer_queue_high_watermark_bytes": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.StreamConfig.behavior:
+
+
+behavior
+  (:ref:`extensions.filters.http.file_system_buffer.v3.BufferBehavior <envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.BufferBehavior>`) Whether to bypass / stream / fully buffer / etc.
+  If unset in route, vhost and listener config, the default is ``stream_when_possible``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.StreamConfig.memory_buffer_bytes_limit:
+
+
+memory_buffer_bytes_limit
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) The amount stored in the memory buffer before buffering to disk.
+  If unset in route, vhost and listener config, defaults to a hardcoded value of 1MiB
+
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.StreamConfig.storage_buffer_bytes_limit:
+
+
+storage_buffer_bytes_limit
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) The maximum storage (excluding memory) to be buffered in this filter.
+  If unset in route, vhost and listener config, defaults to a hardcoded value of 32MiB
+
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.StreamConfig.storage_buffer_queue_high_watermark_bytes:
+
+
+storage_buffer_queue_high_watermark_bytes
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) The maximum amount that can be queued for writing to storage, above which the
+  source is requested to pause. If unset, defaults to the same value as
+  ``memory_buffer_bytes_limit``.
+
+  For example, assuming the recipient is not consuming data at all, if
+  ``memory_buffer_bytes_limit`` was 32MiB, and ``storage_buffer_queue_high_watermark_bytes``
+  was 64MiB, and the filesystem is backed up so writes are not occurring promptly,
+  then:
+
+  * Any request less than 32MiB will eventually pass through without ever attempting
+    to write to disk.
+  * Any request with over 32MiB buffered will start trying to write to disk.
+    If it reaches (32+64)MiB buffered in memory (write to disk isn't keeping up), a high
+    watermark signal is sent to the source.
+  * Any stream whose total size exceeds
+    ``memory_buffer_bytes_limit + storage_buffer_bytes_limit`` will provoke an error.
+    (Note, if the recipient *is* consuming data then it is possible for such an
+    oversized request to pass through the buffer filter, provided the recipient
+    isn't consuming data too slowly.)
+
+  The low watermark signal is sent when the memory buffer is at size
+  ``memory_buffer_bytes_limit + (storage_buffer_queue_high_watermark_bytes / 2)``.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig:
+
+extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig
+--------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig proto] <api/envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.proto#L109>`
+
+A :ref:`file system buffer <config_http_filters_file_system_buffer>` filter configuration.
+
+Route-specific configs override only the fields they explicitly include; unset
+fields inherit from the vhost or listener-level config, or, if never set,
+and not required, use a default value.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "manager_config": {...},
+    "storage_buffer_path": {...},
+    "request": {...},
+    "response": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig.manager_config:
+
+
+manager_config
+  (:ref:`extensions.common.async_files.v3.AsyncFileManagerConfig <envoy_v3_api_msg_extensions.common.async_files.v3.AsyncFileManagerConfig>`) A configuration for an AsyncFileManager.
+
+  If unset in route, vhost and listener, and the behavior is not ``bypass``
+  in both directions, an Internal Server Error response will be sent.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig.storage_buffer_path:
+
+
+storage_buffer_path
+  (`StringValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#stringvalue>`_) An optional path to which the unlinked files should be written - this may
+  determine which physical storage device will be used.
+
+  If unset in route, vhost and listener, will use the environment variable
+  ``TMPDIR``, or, if that's also unset, will use ``/tmp``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig.request:
+
+
+request
+  (:ref:`extensions.filters.http.file_system_buffer.v3.StreamConfig <envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.StreamConfig>`) Optional configuration for how to buffer (or not) requests.
+  If unset in route, vhost and listener, ``StreamConfig`` default values will be used
+  (with behavior ``stream_when_possible``)
+
+
+.. _envoy_v3_api_field_extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig.response:
+
+
+response
+  (:ref:`extensions.filters.http.file_system_buffer.v3.StreamConfig <envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.StreamConfig>`) Optional configuration for how to buffer (or not) responses.
+  If unset in route, vhost and listener, ``StreamConfig`` default values will be used
+  (with behavior ``stream_when_possible``)
+
+

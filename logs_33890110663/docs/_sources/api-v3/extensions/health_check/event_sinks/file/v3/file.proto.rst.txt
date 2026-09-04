@@ -1,0 +1,63 @@
+.. _envoy_v3_api_file_envoy/extensions/health_check/event_sinks/file/v3/file.proto:
+
+Health Check Log File Sink (proto)
+==================================
+
+.. _extension_envoy.health_check.event_sinks.file:
+
+This extension has the qualified name ``envoy.health_check.event_sinks.file``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.health_check.event_sinks <extension_category_envoy.health_check.event_sinks>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink <envoy_v3_api_msg_extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink:
+
+extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink
+--------------------------------------------------------------------
+
+
+:repo:`[extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink proto] <api/envoy/extensions/health_check/event_sinks/file/v3/file.proto#L18>`
+
+Health check event file sink.
+The health check event will be converted to JSON.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "event_log_path": ...
+  }
+
+.. _envoy_v3_api_field_extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink.event_log_path:
+
+
+event_log_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Specifies the path to the health check event log.
+
+

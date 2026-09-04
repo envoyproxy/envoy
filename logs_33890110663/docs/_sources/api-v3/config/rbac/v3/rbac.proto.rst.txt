@@ -1,0 +1,958 @@
+.. _envoy_v3_api_file_envoy/config/rbac/v3/rbac.proto:
+
+Role Based Access Control (RBAC) (proto)
+========================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.rbac.v3.RBAC:
+
+config.rbac.v3.RBAC
+-------------------
+
+
+:repo:`[config.rbac.v3.RBAC proto] <api/envoy/config/rbac/v3/rbac.proto#L88>`
+
+Role Based Access Control (RBAC) provides service-level and method-level access control for a
+service. Requests are allowed or denied based on the ``action`` and whether a matching policy is
+found. For instance, if the action is ALLOW and a matching policy is found the request should be
+allowed.
+
+RBAC can also be used to make access logging decisions by communicating with access loggers
+through dynamic metadata. When the action is LOG and at least one policy matches, the
+``access_log_hint`` value in the shared key namespace 'envoy.common' is set to ``true`` indicating
+the request should be logged.
+
+Here is an example of RBAC configuration. It has two policies:
+
+* Service account ``cluster.local/ns/default/sa/admin`` has full access to the service, and so
+  does "cluster.local/ns/default/sa/superuser".
+
+* Any user can read (``GET``) the service at paths with prefix ``/products``, so long as the
+  destination port is either 80 or 443.
+
+ .. code-block:: yaml
+
+  action: ALLOW
+  policies:
+    "service-admin":
+      permissions:
+        - any: true
+      principals:
+        - authenticated:
+            principal_name:
+              exact: "cluster.local/ns/default/sa/admin"
+        - authenticated:
+            principal_name:
+              exact: "cluster.local/ns/default/sa/superuser"
+    "product-viewer":
+      permissions:
+          - and_rules:
+              rules:
+                - header:
+                    name: ":method"
+                    string_match:
+                      exact: "GET"
+                - url_path:
+                    path: { prefix: "/products" }
+                - or_rules:
+                    rules:
+                      - destination_port: 80
+                      - destination_port: 443
+      principals:
+        - any: true
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "action": ...,
+    "policies": {...}
+  }
+
+.. _envoy_v3_api_field_config.rbac.v3.RBAC.action:
+
+
+action
+  (:ref:`config.rbac.v3.RBAC.Action <envoy_v3_api_enum_config.rbac.v3.RBAC.Action>`) The action to take if a policy matches. Every action either allows or denies a request,
+  and can also carry out action-specific operations.
+
+  Actions:
+
+   * ``ALLOW``: Allows the request if and only if there is a policy that matches
+     the request.
+   * ``DENY``: Allows the request if and only if there are no policies that
+     match the request.
+   * ``LOG``: Allows all requests. If at least one policy matches, the dynamic
+     metadata key ``access_log_hint`` is set to the value ``true`` under the shared
+     key namespace ``envoy.common``. If no policies match, it is set to ``false``.
+     Other actions do not modify this key.
+
+
+
+.. _envoy_v3_api_field_config.rbac.v3.RBAC.policies:
+
+
+policies
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`config.rbac.v3.Policy <envoy_v3_api_msg_config.rbac.v3.Policy>`>) Maps from policy name to policy. A match occurs when at least one policy matches the request.
+  The policies are evaluated in lexicographic order of the policy name.
+
+
+.. _envoy_v3_api_msg_config.rbac.v3.RBAC.AuditLoggingOptions:
+
+config.rbac.v3.RBAC.AuditLoggingOptions
+---------------------------------------
+
+
+:repo:`[config.rbac.v3.RBAC.AuditLoggingOptions proto] <api/envoy/config/rbac/v3/rbac.proto#L106>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_enum_config.rbac.v3.RBAC.AuditLoggingOptions.AuditCondition:
+
+Enum config.rbac.v3.RBAC.AuditLoggingOptions.AuditCondition
+-----------------------------------------------------------
+
+
+:repo:`[config.rbac.v3.RBAC.AuditLoggingOptions.AuditCondition proto] <api/envoy/config/rbac/v3/rbac.proto#L108>`
+
+Deny and allow here refer to RBAC decisions, not actions.
+
+
+
+.. _envoy_v3_api_enum_value_config.rbac.v3.RBAC.AuditLoggingOptions.AuditCondition.NONE:
+
+
+NONE
+  *(DEFAULT)* ⁣Never audit.
+
+
+.. _envoy_v3_api_enum_value_config.rbac.v3.RBAC.AuditLoggingOptions.AuditCondition.ON_DENY:
+
+
+ON_DENY
+  ⁣Audit when RBAC denies the request.
+
+
+.. _envoy_v3_api_enum_value_config.rbac.v3.RBAC.AuditLoggingOptions.AuditCondition.ON_ALLOW:
+
+
+ON_ALLOW
+  ⁣Audit when RBAC allows the request.
+
+
+.. _envoy_v3_api_enum_value_config.rbac.v3.RBAC.AuditLoggingOptions.AuditCondition.ON_DENY_AND_ALLOW:
+
+
+ON_DENY_AND_ALLOW
+  ⁣Audit whether RBAC allows or denies the request.
+
+
+
+
+
+
+.. _envoy_v3_api_enum_config.rbac.v3.RBAC.Action:
+
+Enum config.rbac.v3.RBAC.Action
+-------------------------------
+
+
+:repo:`[config.rbac.v3.RBAC.Action proto] <api/envoy/config/rbac/v3/rbac.proto#L92>`
+
+Should we do safe-list or block-list style access control?
+
+
+
+.. _envoy_v3_api_enum_value_config.rbac.v3.RBAC.Action.ALLOW:
+
+
+ALLOW
+  *(DEFAULT)* ⁣The policies grant access to principals. The rest are denied. This is safe-list style
+  access control. This is the default type.
+
+
+.. _envoy_v3_api_enum_value_config.rbac.v3.RBAC.Action.DENY:
+
+
+DENY
+  ⁣The policies deny access to principals. The rest are allowed. This is block-list style
+  access control.
+
+
+.. _envoy_v3_api_enum_value_config.rbac.v3.RBAC.Action.LOG:
+
+
+LOG
+  ⁣The policies set the ``access_log_hint`` dynamic metadata key based on if requests match.
+  All requests are allowed.
+
+
+
+
+.. _envoy_v3_api_msg_config.rbac.v3.Policy:
+
+config.rbac.v3.Policy
+---------------------
+
+
+:repo:`[config.rbac.v3.Policy proto] <api/envoy/config/rbac/v3/rbac.proto#L177>`
+
+Policy specifies a role and the principals that are assigned/denied the role.
+A policy matches if and only if at least one of its permissions match the
+action taking place AND at least one of its principals match the downstream
+AND the condition is true if specified.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "permissions": [],
+    "principals": [],
+    "condition": {...},
+    "cel_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.rbac.v3.Policy.permissions:
+
+
+permissions
+  (**repeated** :ref:`config.rbac.v3.Permission <envoy_v3_api_msg_config.rbac.v3.Permission>`, *REQUIRED*) Required. The set of permissions that define a role. Each permission is
+  matched with OR semantics. To match all actions for this policy, a single
+  Permission with the ``any`` field set to true should be used.
+
+
+.. _envoy_v3_api_field_config.rbac.v3.Policy.principals:
+
+
+principals
+  (**repeated** :ref:`config.rbac.v3.Principal <envoy_v3_api_msg_config.rbac.v3.Principal>`, *REQUIRED*) Required. The set of principals that are assigned/denied the role based on
+  “action”. Each principal is matched with OR semantics. To match all
+  downstreams for this policy, a single Principal with the ``any`` field set to
+  true should be used.
+
+
+.. _envoy_v3_api_field_config.rbac.v3.Policy.condition:
+
+
+condition
+  (.google.api.expr.v1alpha1.Expr) An optional symbolic expression specifying an access control
+  :ref:`condition <arch_overview_condition>`. The condition is combined
+  with the permissions and the principals as a clause with AND semantics.
+  Only be used when checked_condition is not used.
+
+
+.. _envoy_v3_api_field_config.rbac.v3.Policy.cel_config:
+
+
+cel_config
+  (:ref:`config.core.v3.CelExpressionConfig <envoy_v3_api_msg_config.core.v3.CelExpressionConfig>`) CEL expression configuration that modifies the evaluation behavior of the ``condition`` field.
+  If specified, string conversion, concatenation, and manipulation functions may be enabled
+  for the CEL expression. See :ref:`CelExpressionConfig <envoy_v3_api_msg_config.core.v3.CelExpressionConfig>`
+  for more details.
+
+
+
+.. _envoy_v3_api_msg_config.rbac.v3.SourcedMetadata:
+
+config.rbac.v3.SourcedMetadata
+------------------------------
+
+
+:repo:`[config.rbac.v3.SourcedMetadata proto] <api/envoy/config/rbac/v3/rbac.proto#L220>`
+
+SourcedMetadata enables matching against metadata from different sources in the request processing
+pipeline. It extends the base MetadataMatcher functionality by allowing specification of where the
+metadata should be sourced from, rather than only matching against dynamic metadata.
+
+The matcher can be configured to look up metadata from:
+
+* Dynamic metadata: Runtime metadata added by filters during request processing
+* Route metadata: Static metadata configured on the route entry
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "metadata_matcher": {...},
+    "metadata_source": ...
+  }
+
+.. _envoy_v3_api_field_config.rbac.v3.SourcedMetadata.metadata_matcher:
+
+
+metadata_matcher
+  (:ref:`type.matcher.v3.MetadataMatcher <envoy_v3_api_msg_type.matcher.v3.MetadataMatcher>`, *REQUIRED*) Metadata matcher configuration that defines what metadata to match against. This includes the filter name,
+  metadata key path, and expected value.
+
+
+.. _envoy_v3_api_field_config.rbac.v3.SourcedMetadata.metadata_source:
+
+
+metadata_source
+  (:ref:`config.rbac.v3.MetadataSource <envoy_v3_api_enum_config.rbac.v3.MetadataSource>`) Specifies which metadata source should be used for matching. If not set,
+  defaults to DYNAMIC (dynamic metadata). Set to ROUTE to match against
+  static metadata configured on the route entry.
+
+
+
+.. _envoy_v3_api_msg_config.rbac.v3.Permission:
+
+config.rbac.v3.Permission
+-------------------------
+
+
+:repo:`[config.rbac.v3.Permission proto] <api/envoy/config/rbac/v3/rbac.proto#L234>`
+
+Permission defines an action (or actions) that a principal can take.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "and_rules": {...},
+    "or_rules": {...},
+    "any": ...,
+    "header": {...},
+    "url_path": {...},
+    "destination_ip": {...},
+    "destination_port": ...,
+    "destination_port_range": {...},
+    "metadata": {...},
+    "not_rule": {...},
+    "requested_server_name": {...},
+    "matcher": {...},
+    "uri_template": {...},
+    "sourced_metadata": {...}
+  }
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.and_rules:
+
+
+and_rules
+  (:ref:`config.rbac.v3.Permission.Set <envoy_v3_api_msg_config.rbac.v3.Permission.Set>`) A set of rules that all must match in order to define the action.
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.or_rules:
+
+
+or_rules
+  (:ref:`config.rbac.v3.Permission.Set <envoy_v3_api_msg_config.rbac.v3.Permission.Set>`) A set of rules where at least one must match in order to define the action.
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.any:
+
+
+any
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When any is set, it matches any action.
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.header:
+
+
+header
+  (:ref:`config.route.v3.HeaderMatcher <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`) A header (or pseudo-header such as ``:path`` or ``:method``) on the incoming HTTP request. Only available
+  for HTTP request.
+
+  .. note::
+
+    The pseudo-header ``:path`` includes the query and fragment string. Use the ``url_path`` field if you
+    want to match the URL path without the query and fragment string.
+
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.url_path:
+
+
+url_path
+  (:ref:`type.matcher.v3.PathMatcher <envoy_v3_api_msg_type.matcher.v3.PathMatcher>`) A URL path on the incoming HTTP request. Only available for HTTP.
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.destination_ip:
+
+
+destination_ip
+  (:ref:`config.core.v3.CidrRange <envoy_v3_api_msg_config.core.v3.CidrRange>`) A CIDR block that describes the destination IP.
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.destination_port:
+
+
+destination_port
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) A port number that describes the destination port connecting to.
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range:
+
+
+destination_port_range
+  (:ref:`type.v3.Int32Range <envoy_v3_api_msg_type.v3.Int32Range>`) A port number range that describes a range of destination ports connecting to.
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.metadata:
+
+
+metadata
+  (:ref:`type.matcher.v3.MetadataMatcher <envoy_v3_api_msg_type.matcher.v3.MetadataMatcher>`) Metadata that describes additional information about the action. This field is deprecated; please use
+  :ref:`sourced_metadata<envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` instead.
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.not_rule:
+
+
+not_rule
+  (:ref:`config.rbac.v3.Permission <envoy_v3_api_msg_config.rbac.v3.Permission>`) Negates matching the provided permission. For instance, if the value of
+  ``not_rule`` would match, this permission would not match. Conversely, if
+  the value of ``not_rule`` would not match, this permission would match.
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name:
+
+
+requested_server_name
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) The request server from the client's connection request. This is typically TLS SNI.
+
+  .. attention::
+
+    The behavior of this field may be affected by how Envoy is configured
+    as explained below.
+
+    * If the :ref:`TLS Inspector <config_listener_filters_tls_inspector>`
+      filter is not added, and if a ``FilterChainMatch`` is not defined for
+      the :ref:`server name
+      <envoy_v3_api_field_config.listener.v3.FilterChainMatch.server_names>`,
+      a TLS connection's requested SNI server name will be treated as if it
+      wasn't present.
+
+    * A :ref:`listener filter <arch_overview_listener_filters>` may
+      overwrite a connection's requested server name within Envoy.
+
+  Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn how to setup SNI.
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.matcher:
+
+
+matcher
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Extension for configuring custom matchers for RBAC.
+
+
+  .. _extension_category_envoy.rbac.matchers:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.rbac.matchers.upstream_ip_port <extension_envoy.rbac.matchers.upstream_ip_port>`
+
+
+
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.uri_template:
+
+
+uri_template
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) URI template path matching.
+
+
+  .. _extension_category_envoy.path.match:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.path.match.uri_template.uri_template_matcher <extension_envoy.path.match.uri_template.uri_template_matcher>`
+
+
+
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata:
+
+
+sourced_metadata
+  (:ref:`config.rbac.v3.SourcedMetadata <envoy_v3_api_msg_config.rbac.v3.SourcedMetadata>`) Matches against metadata from either dynamic state or route configuration. Preferred over the
+  ``metadata`` field as it provides more flexibility in metadata source selection.
+
+
+  
+
+  Precisely one of :ref:`and_rules <envoy_v3_api_field_config.rbac.v3.Permission.and_rules>`, :ref:`or_rules <envoy_v3_api_field_config.rbac.v3.Permission.or_rules>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Permission.any>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Permission.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Permission.url_path>`, :ref:`destination_ip <envoy_v3_api_field_config.rbac.v3.Permission.destination_ip>`, :ref:`destination_port <envoy_v3_api_field_config.rbac.v3.Permission.destination_port>`, :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>`, :ref:`not_rule <envoy_v3_api_field_config.rbac.v3.Permission.not_rule>`, :ref:`requested_server_name <envoy_v3_api_field_config.rbac.v3.Permission.requested_server_name>`, :ref:`matcher <envoy_v3_api_field_config.rbac.v3.Permission.matcher>`, :ref:`uri_template <envoy_v3_api_field_config.rbac.v3.Permission.uri_template>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` must be set.
+
+.. _envoy_v3_api_msg_config.rbac.v3.Permission.Set:
+
+config.rbac.v3.Permission.Set
+-----------------------------
+
+
+:repo:`[config.rbac.v3.Permission.Set proto] <api/envoy/config/rbac/v3/rbac.proto#L239>`
+
+Used in the ``and_rules`` and ``or_rules`` fields in the ``rule`` oneof. Depending on the context,
+each are applied with the associated behavior.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "rules": []
+  }
+
+.. _envoy_v3_api_field_config.rbac.v3.Permission.Set.rules:
+
+
+rules
+  (**repeated** :ref:`config.rbac.v3.Permission <envoy_v3_api_msg_config.rbac.v3.Permission>`, *REQUIRED*) 
+
+
+
+.. _envoy_v3_api_msg_config.rbac.v3.Principal:
+
+config.rbac.v3.Principal
+------------------------
+
+
+:repo:`[config.rbac.v3.Principal proto] <api/envoy/config/rbac/v3/rbac.proto#L327>`
+
+Principal defines an identity or a group of identities for a downstream
+subject.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "and_ids": {...},
+    "or_ids": {...},
+    "any": ...,
+    "authenticated": {...},
+    "source_ip": {...},
+    "direct_remote_ip": {...},
+    "remote_ip": {...},
+    "header": {...},
+    "url_path": {...},
+    "metadata": {...},
+    "filter_state": {...},
+    "not_id": {...},
+    "sourced_metadata": {...},
+    "custom": {...}
+  }
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.and_ids:
+
+
+and_ids
+  (:ref:`config.rbac.v3.Principal.Set <envoy_v3_api_msg_config.rbac.v3.Principal.Set>`) A set of identifiers that all must match in order to define the downstream.
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.or_ids:
+
+
+or_ids
+  (:ref:`config.rbac.v3.Principal.Set <envoy_v3_api_msg_config.rbac.v3.Principal.Set>`) A set of identifiers at least one must match in order to define the downstream.
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.any:
+
+
+any
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When any is set, it matches any downstream.
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.authenticated:
+
+
+authenticated
+  (:ref:`config.rbac.v3.Principal.Authenticated <envoy_v3_api_msg_config.rbac.v3.Principal.Authenticated>`) Authenticated attributes that identify the downstream.
+  It is recommended to NOT use this field, but instead use
+  :ref:`MTlsAuthenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`,
+  configured via :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>`,
+  which should be used for most use cases due to its improved security.
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.source_ip:
+
+
+source_ip
+  (:ref:`config.core.v3.CidrRange <envoy_v3_api_msg_config.core.v3.CidrRange>`) A CIDR block that describes the downstream IP.
+  This address will honor proxy protocol, but will not honor XFF.
+
+  This field is deprecated; either use :ref:`remote_ip
+  <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>` for the same
+  behavior, or use
+  :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`.
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip:
+
+
+direct_remote_ip
+  (:ref:`config.core.v3.CidrRange <envoy_v3_api_msg_config.core.v3.CidrRange>`) A CIDR block that describes the downstream remote/origin address.
+
+  .. note::
+
+    This is always the physical peer even if the
+    :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>` is inferred from the
+    x-forwarder-for header, the proxy protocol, etc.
+
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.remote_ip:
+
+
+remote_ip
+  (:ref:`config.core.v3.CidrRange <envoy_v3_api_msg_config.core.v3.CidrRange>`) A CIDR block that describes the downstream remote/origin address.
+
+  .. note::
+
+    This may not be the physical peer and could be different from the :ref:`direct_remote_ip
+    <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`. E.g, if the remote ip is inferred from
+    the x-forwarder-for header, the proxy protocol, etc.
+
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.header:
+
+
+header
+  (:ref:`config.route.v3.HeaderMatcher <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`) A header (or pseudo-header such as ``:path`` or ``:method``) on the incoming HTTP request. Only available
+  for HTTP request.
+
+  .. note::
+
+    The pseudo-header ``:path`` includes the query and fragment string. Use the ``url_path`` field if you
+    want to match the URL path without the query and fragment string.
+
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.url_path:
+
+
+url_path
+  (:ref:`type.matcher.v3.PathMatcher <envoy_v3_api_msg_type.matcher.v3.PathMatcher>`) A URL path on the incoming HTTP request. Only available for HTTP.
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.metadata:
+
+
+metadata
+  (:ref:`type.matcher.v3.MetadataMatcher <envoy_v3_api_msg_type.matcher.v3.MetadataMatcher>`) Metadata that describes additional information about the principal. This field is deprecated; please use
+  :ref:`sourced_metadata<envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>` instead.
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.filter_state:
+
+
+filter_state
+  (:ref:`type.matcher.v3.FilterStateMatcher <envoy_v3_api_msg_type.matcher.v3.FilterStateMatcher>`) Identifies the principal using a filter state object.
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.not_id:
+
+
+not_id
+  (:ref:`config.rbac.v3.Principal <envoy_v3_api_msg_config.rbac.v3.Principal>`) Negates matching the provided principal. For instance, if the value of
+  ``not_id`` would match, this principal would not match. Conversely, if the
+  value of ``not_id`` would not match, this principal would match.
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata:
+
+
+sourced_metadata
+  (:ref:`config.rbac.v3.SourcedMetadata <envoy_v3_api_msg_config.rbac.v3.SourcedMetadata>`) Matches against metadata from either dynamic state or route configuration. Preferred over the
+  ``metadata`` field as it provides more flexibility in metadata source selection.
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.custom:
+
+
+custom
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Extension for configuring custom principals for RBAC.
+
+
+  .. _extension_category_envoy.rbac.principals:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.rbac.principals.mtls_authenticated <extension_envoy.rbac.principals.mtls_authenticated>`
+
+
+
+
+
+  
+
+  Precisely one of :ref:`and_ids <envoy_v3_api_field_config.rbac.v3.Principal.and_ids>`, :ref:`or_ids <envoy_v3_api_field_config.rbac.v3.Principal.or_ids>`, :ref:`any <envoy_v3_api_field_config.rbac.v3.Principal.any>`, :ref:`authenticated <envoy_v3_api_field_config.rbac.v3.Principal.authenticated>`, :ref:`source_ip <envoy_v3_api_field_config.rbac.v3.Principal.source_ip>`, :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`, :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>`, :ref:`header <envoy_v3_api_field_config.rbac.v3.Principal.header>`, :ref:`url_path <envoy_v3_api_field_config.rbac.v3.Principal.url_path>`, :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Principal.metadata>`, :ref:`filter_state <envoy_v3_api_field_config.rbac.v3.Principal.filter_state>`, :ref:`not_id <envoy_v3_api_field_config.rbac.v3.Principal.not_id>`, :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>`, :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` must be set.
+
+.. _envoy_v3_api_msg_config.rbac.v3.Principal.Set:
+
+config.rbac.v3.Principal.Set
+----------------------------
+
+
+:repo:`[config.rbac.v3.Principal.Set proto] <api/envoy/config/rbac/v3/rbac.proto#L332>`
+
+Used in the ``and_ids`` and ``or_ids`` fields in the ``identifier`` oneof.
+Depending on the context, each are applied with the associated behavior.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ids": []
+  }
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.Set.ids:
+
+
+ids
+  (**repeated** :ref:`config.rbac.v3.Principal <envoy_v3_api_msg_config.rbac.v3.Principal>`, *REQUIRED*) 
+
+
+.. _envoy_v3_api_msg_config.rbac.v3.Principal.Authenticated:
+
+config.rbac.v3.Principal.Authenticated
+--------------------------------------
+
+
+:repo:`[config.rbac.v3.Principal.Authenticated proto] <api/envoy/config/rbac/v3/rbac.proto#L344>`
+
+Authentication attributes for a downstream.
+It is recommended to NOT use this type, but instead use
+:ref:`MTlsAuthenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`,
+configured via :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>`,
+which should be used for most use cases due to its improved security.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "principal_name": {...}
+  }
+
+.. _envoy_v3_api_field_config.rbac.v3.Principal.Authenticated.principal_name:
+
+
+principal_name
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) The name of the principal. If set, The URI SAN or DNS SAN in that order
+  is used from the certificate, otherwise the subject field is used. If
+  unset, it applies to any user that is allowed by the downstream TLS configuration.
+  If :ref:`require_client_certificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`
+  is false or :ref:`trust_chain_verification <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trust_chain_verification>`
+  is set to :ref:`ACCEPT_UNTRUSTED <envoy_v3_api_enum_value_extensions.transport_sockets.tls.v3.CertificateValidationContext.TrustChainVerification.ACCEPT_UNTRUSTED>`,
+  then no authentication is required.
+
+
+
+
+.. _envoy_v3_api_msg_config.rbac.v3.Action:
+
+config.rbac.v3.Action
+---------------------
+
+
+:repo:`[config.rbac.v3.Action proto] <api/envoy/config/rbac/v3/rbac.proto#L446>`
+
+Action defines the result of allowance or denial when a request matches the matcher.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "action": ...
+  }
+
+.. _envoy_v3_api_field_config.rbac.v3.Action.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name indicates the policy name.
+
+
+.. _envoy_v3_api_field_config.rbac.v3.Action.action:
+
+
+action
+  (:ref:`config.rbac.v3.RBAC.Action <envoy_v3_api_enum_config.rbac.v3.RBAC.Action>`) The action to take if the matcher matches. Every action either allows or denies a request,
+  and can also carry out action-specific operations.
+
+  **Actions:**
+
+   * ``ALLOW``: If the request gets matched on ALLOW, it is permitted.
+   * ``DENY``: If the request gets matched on DENY, it is not permitted.
+   * ``LOG``: If the request gets matched on LOG, it is permitted. Besides, the
+     dynamic metadata key ``access_log_hint`` under the shared key namespace
+     ``envoy.common`` will be set to the value ``true``.
+   * If the request cannot get matched, it will fallback to ``DENY``.
+
+  **Log behavior:**
+
+   If the RBAC matcher contains at least one LOG action, the dynamic
+   metadata key ``access_log_hint`` will be set based on if the request
+   get matched on the LOG action.
+
+
+
+
+.. _envoy_v3_api_enum_config.rbac.v3.MetadataSource:
+
+Enum config.rbac.v3.MetadataSource
+----------------------------------
+
+
+:repo:`[config.rbac.v3.MetadataSource proto] <api/envoy/config/rbac/v3/rbac.proto#L31>`
+
+
+
+
+.. _envoy_v3_api_enum_value_config.rbac.v3.MetadataSource.DYNAMIC:
+
+
+DYNAMIC
+  *(DEFAULT)* ⁣Query :ref:`dynamic metadata <well_known_dynamic_metadata>`
+
+
+.. _envoy_v3_api_enum_value_config.rbac.v3.MetadataSource.ROUTE:
+
+
+ROUTE
+  ⁣Query :ref:`route metadata <envoy_v3_api_field_config.route.v3.Route.metadata>`
+
+

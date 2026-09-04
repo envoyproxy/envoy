@@ -1,0 +1,20 @@
+.. _version_history_1.29.12:
+
+1.29.12 (December 18, 2024)
+============================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **http/1**: Fixes sending overload crashes when HTTP/1 request is reset.
+

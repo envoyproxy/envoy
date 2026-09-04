@@ -1,0 +1,93 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.proto:
+
+Client TLS authentication (proto)
+=================================
+
+.. _extension_envoy.filters.network.client_ssl_auth:
+
+This extension has the qualified name ``envoy.filters.network.client_ssl_auth``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+
+
+Client TLS authentication
+:ref:`configuration overview <config_network_filters_client_ssl_auth>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth:
+
+extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth
+-----------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth proto] <api/contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.proto#L24>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "auth_api_cluster": ...,
+    "stat_prefix": ...,
+    "refresh_delay": {...},
+    "ip_white_list": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth.auth_api_cluster:
+
+
+auth_api_cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The :ref:`cluster manager <arch_overview_cluster_manager>` cluster that runs
+  the authentication service. The filter will connect to the service every 60s to fetch the list
+  of principals. The service must support the expected :ref:`REST API
+  <config_network_filters_client_ssl_auth_rest_api>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The prefix to use when emitting :ref:`statistics
+  <config_network_filters_client_ssl_auth_stats>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth.refresh_delay:
+
+
+refresh_delay
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Time in milliseconds between principal refreshes from the
+  authentication service. Default is 60000 (60s). The actual fetch time
+  will be this value plus a random jittered value between
+  0-refresh_delay_ms milliseconds.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth.ip_white_list:
+
+
+ip_white_list
+  (**repeated** :ref:`config.core.v3.CidrRange <envoy_v3_api_msg_config.core.v3.CidrRange>`) An optional list of IP address and subnet masks that should be white
+  listed for access by the filter. If no list is provided, there is no
+  IP allowlist.
+
+

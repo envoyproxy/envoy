@@ -1,0 +1,446 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panic threshold &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="Excluded endpoints" href="excluded.html" />
+    <link rel="prev" title="Overprovisioning Factor" href="overprovisioning.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../http/http.html">HTTP</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../upstream.html">Upstream clusters</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../cluster_manager.html">Cluster manager</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../service_discovery.html">Service discovery</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../dns_resolution.html">DNS Resolution</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../health_checking.html">Health checking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../connection_pooling.html">Connection pooling</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="load_balancing.html">Load Balancing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../aggregate_cluster.html">Aggregate Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../composite_cluster.html">Composite cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../mcp_multicluster.html">MCP multi cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../outlier.html">Outlier detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../circuit_breaking.html">Circuit breaking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../upstream_filters.html">Upstream network filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../load_reporting_service.html">Load Reporting Service (LRS)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../load_balancing_policies.html">Load balancing policies</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../../arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="../upstream.html">Upstream clusters</a></li>
+          <li class="breadcrumb-item"><a href="load_balancing.html">Load Balancing</a></li>
+      <li class="breadcrumb-item active">Panic threshold</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/intro/arch_overview/upstream/load_balancing/panic_threshold.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="panic-threshold">
+<span id="arch-overview-load-balancing-panic-threshold"></span><h1>Panic threshold<a class="headerlink" href="#panic-threshold" title="Link to this heading"></a></h1>
+<p>During load balancing, Envoy will generally only consider available (healthy or degraded) hosts in
+an upstream cluster. However, if the percentage of available hosts in the cluster becomes too low,
+Envoy will disregard health status and balance either amongst all hosts or no hosts. This is known
+as the <em>panic threshold</em>. The default panic threshold is 50%. This is
+<a class="reference internal" href="../../../../configuration/upstream/cluster_manager/cluster_runtime.html#config-cluster-manager-cluster-runtime"><span class="std std-ref">configurable</span></a> via runtime as well as in the
+<a class="reference internal" href="../../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-commonlbconfig-healthy-panic-threshold"><span class="std std-ref">cluster configuration</span></a>.
+The panic threshold is used to avoid a situation in which host failures cascade throughout the
+cluster as load increases.</p>
+<p>There are two modes Envoy can choose from when in a panic state: traffic will either be sent to all
+hosts, or will be sent to no hosts (and therefore will always fail). This is configured in the
+<a class="reference internal" href="../../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-commonlbconfig-zoneawarelbconfig-fail-traffic-on-panic"><span class="std std-ref">cluster configuration</span></a>.
+Choosing to fail traffic during panic scenarios can help avoid overwhelming potentially failing
+upstream services, as it will reduce the load on the upstream service before all hosts have been
+determined to be unhealthy. However, it eliminates the possibility of _some_ requests succeeding
+even when many or all hosts in a cluster are unhealthy. This may be a good tradeoff to make if a
+given service is observed to fail in an all-or-nothing pattern, as it will more quickly cut off
+requests to the cluster. Conversely, if a cluster typically continues to successfully service _some_
+requests even when degraded, enabling this option is probably unhelpful.</p>
+<p>Panic thresholds work in conjunction with priorities. If the number of available hosts in a given
+priority goes down, Envoy will try to shift some traffic to lower priorities. If it succeeds in
+finding enough available hosts in lower priorities, Envoy will disregard panic thresholds. In
+mathematical terms, if normalized total availability across all priority levels is 100%, Envoy
+disregards panic thresholds and continues to distribute traffic load across priorities according to
+the algorithm described <a class="reference internal" href="priority.html#arch-overview-load-balancing-priority-levels"><span class="std std-ref">here</span></a>.
+However, when normalized total availability drops below 100%, Envoy assumes that there are not enough
+available hosts across all priority levels. It continues to distribute traffic load across priorities,
+but if a given priority level’s availability is below the panic threshold, traffic will go to all
+(or no) hosts in that priority level regardless of their availability.</p>
+<p>The following examples explain the relationship between normalized total availability and panic threshold.
+It is assumed that the default value of 50% is used for the panic threshold.</p>
+<p>Assume a simple set-up with 2 priority levels, P=1 100% healthy. In this scenario normalized total
+health is always 100%, P=0 never enters panic mode, and Envoy is able to shift as much traffic as
+necessary to P=1.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>P=0 healthy
+endpoints</p></th>
+<th class="head"><dl class="simple">
+<dt>Traffic</dt><dd><p>to P=0</p>
+</dd>
+</dl>
+</th>
+<th class="head"><p>P=0 in panic</p></th>
+<th class="head"><p>Traffic
+to P=1</p></th>
+<th class="head"><p>P=1 in panic</p></th>
+<th class="head"><p>normalized
+total health</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>72%</p></td>
+<td><p>100%</p></td>
+<td><p>NO</p></td>
+<td><p>0%</p></td>
+<td><p>NO</p></td>
+<td><p>100%</p></td>
+</tr>
+<tr class="row-odd"><td><p>71%</p></td>
+<td><p>99%</p></td>
+<td><p>NO</p></td>
+<td><p>1%</p></td>
+<td><p>NO</p></td>
+<td><p>100%</p></td>
+</tr>
+<tr class="row-even"><td><p>50%</p></td>
+<td><p>70%</p></td>
+<td><p>NO</p></td>
+<td><p>30%</p></td>
+<td><p>NO</p></td>
+<td><p>100%</p></td>
+</tr>
+<tr class="row-odd"><td><p>25%</p></td>
+<td><p>35%</p></td>
+<td><p>NO</p></td>
+<td><p>65%</p></td>
+<td><p>NO</p></td>
+<td><p>100%</p></td>
+</tr>
+<tr class="row-even"><td><p>0%</p></td>
+<td><p>0%</p></td>
+<td><p>NO</p></td>
+<td><p>100%</p></td>
+<td><p>NO</p></td>
+<td><p>100%</p></td>
+</tr>
+</tbody>
+</table>
+<p>If P=1 becomes unhealthy, panic threshold continues to be disregarded until the sum of the health
+P=0 + P=1 goes below 100%. At this point Envoy starts checking panic threshold value for each
+priority.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>P=0 healthy
+endpoints</p></th>
+<th class="head"><p>P=1 healthy
+endpoints</p></th>
+<th class="head"><p>Traffic
+to P=0</p></th>
+<th class="head"><p>P=0 in panic</p></th>
+<th class="head"><p>Traffic
+to P=1</p></th>
+<th class="head"><p>P=1 in panic</p></th>
+<th class="head"><p>normalized
+total health</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>72%</p></td>
+<td><p>72%</p></td>
+<td><p>100%</p></td>
+<td><p>NO</p></td>
+<td><p>0%</p></td>
+<td><p>NO</p></td>
+<td><p>100%</p></td>
+</tr>
+<tr class="row-odd"><td><p>71%</p></td>
+<td><p>71%</p></td>
+<td><p>99%</p></td>
+<td><p>NO</p></td>
+<td><p>1%</p></td>
+<td><p>NO</p></td>
+<td><p>100%</p></td>
+</tr>
+<tr class="row-even"><td><p>50%</p></td>
+<td><p>60%</p></td>
+<td><p>70%</p></td>
+<td><p>NO</p></td>
+<td><p>30%</p></td>
+<td><p>NO</p></td>
+<td><p>100%</p></td>
+</tr>
+<tr class="row-odd"><td><p>25%</p></td>
+<td><p>100%</p></td>
+<td><p>35%</p></td>
+<td><p>NO</p></td>
+<td><p>65%</p></td>
+<td><p>NO</p></td>
+<td><p>100%</p></td>
+</tr>
+<tr class="row-even"><td><p>25%</p></td>
+<td><p>25%</p></td>
+<td><p>50%</p></td>
+<td><p>YES</p></td>
+<td><p>50%</p></td>
+<td><p>YES</p></td>
+<td><p>70%</p></td>
+</tr>
+<tr class="row-odd"><td><p>5%</p></td>
+<td><p>65%</p></td>
+<td><p>7%</p></td>
+<td><p>YES</p></td>
+<td><p>93%</p></td>
+<td><p>NO</p></td>
+<td><p>98%</p></td>
+</tr>
+</tbody>
+</table>
+<p>Panic mode can be disabled by setting the panic threshold to 0%.</p>
+<p>Load distribution is calculated as described above as long as there are priority levels not in panic mode.
+When all priority levels enter the panic mode, load calculation algorithm changes.
+In this case each priority level receives traffic relative to the number of hosts in that priority level
+in relation to the number of hosts in all priority levels.
+For example, if there are 2 priorities P=0 and P=1 and each of them consists of 5 hosts, each level will
+receive 50% of the traffic.
+If there are 2 hosts in priority P=0 and 8 hosts in priority P=1, priority P=0 will receive 20% of the
+traffic and priority P=1 will receive 80% of the traffic.</p>
+<p>However, if the panic threshold is 0% for any priority, that priority will never enter panic mode.
+In this case if all hosts are unhealthy, Envoy will fail to select a host and will instead immediately
+return error responses with “503 - no healthy upstream”.</p>
+<p>Note that panic thresholds can be configured <em>per-priority</em>.</p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="overprovisioning.html" class="btn btn-neutral float-left" title="Overprovisioning Factor" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="excluded.html" class="btn btn-neutral float-right" title="Excluded endpoints" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Panic threshold</a></li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,431 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/ratelimit/v3/rate_limit.proto:
+
+Rate limit (proto)
+==================
+
+.. _extension_envoy.filters.http.ratelimit:
+
+This extension has the qualified name ``envoy.filters.http.ratelimit``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimitPerRoute>`
+
+
+
+Rate limit :ref:`configuration overview <config_http_filters_rate_limit>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit:
+
+extensions.filters.http.ratelimit.v3.RateLimit
+----------------------------------------------
+
+
+:repo:`[extensions.filters.http.ratelimit.v3.RateLimit proto] <api/envoy/extensions/filters/http/ratelimit/v3/rate_limit.proto#L26>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "domain": ...,
+    "stage": ...,
+    "request_type": ...,
+    "timeout": {...},
+    "failure_mode_deny": ...,
+    "rate_limited_as_resource_exhausted": ...,
+    "rate_limit_service": {...},
+    "enable_x_ratelimit_headers": ...,
+    "disable_x_envoy_ratelimited_header": ...,
+    "rate_limited_status": {...},
+    "response_headers_to_add": [],
+    "status_on_error": {...},
+    "stat_prefix": ...,
+    "filter_enabled": {...},
+    "filter_enforced": {...},
+    "failure_mode_deny_percent": {...},
+    "rate_limits": [],
+    "metadata_namespace": ...,
+    "enable_retry_after_header": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.domain:
+
+
+domain
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The rate limit domain to use when calling the rate limit service.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.stage:
+
+
+stage
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the rate limit configurations to be applied with the same
+  stage number. If not set, the default stage number is 0.
+
+  .. note::
+
+   The filter supports a range of 0 - 10 inclusively for stage numbers.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.request_type:
+
+
+request_type
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The type of requests the filter should apply to. The supported
+  types are ``internal``, ``external`` or ``both``. A request is considered internal if
+  :ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>` is set to true. If
+  :ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>` is not set or false, a
+  request is considered external. The filter defaults to ``both``, and it will apply to all request
+  types.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.timeout:
+
+
+timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The timeout in milliseconds for the rate limit service RPC. If not
+  set, this defaults to 20ms. A value of 0 disables the timeout (infinite).
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny:
+
+
+failure_mode_deny
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The filter's behaviour in case the rate limiting service does
+  not respond back. When it is set to true, Envoy will not allow traffic in case of
+  communication failure between rate limiting service and the proxy.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limited_as_resource_exhausted:
+
+
+rate_limited_as_resource_exhausted
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies whether a ``RESOURCE_EXHAUSTED`` gRPC code must be returned instead
+  of the default ``UNAVAILABLE`` gRPC code for a rate limited gRPC call. The
+  HTTP code will be 200 for a gRPC response.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limit_service:
+
+
+rate_limit_service
+  (:ref:`config.ratelimit.v3.RateLimitServiceConfig <envoy_v3_api_msg_config.ratelimit.v3.RateLimitServiceConfig>`, *REQUIRED*) Configuration for an external rate limit service provider. If not
+  specified, any calls to the rate limit service will immediately return
+  success.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.enable_x_ratelimit_headers:
+
+
+enable_x_ratelimit_headers
+  (:ref:`extensions.filters.http.ratelimit.v3.RateLimit.XRateLimitHeadersRFCVersion <envoy_v3_api_enum_extensions.filters.http.ratelimit.v3.RateLimit.XRateLimitHeadersRFCVersion>`) Defines the standard version to use for X-RateLimit headers emitted by the filter:
+
+  * ``X-RateLimit-Limit`` - indicates the request-quota associated to the
+    client in the current time-window followed by the description of the
+    quota policy. The values are returned by the rate limiting service in
+    :ref:`current_limit<envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.current_limit>`
+    field. Example: ``10, 10;w=1;name="per-ip", 1000;w=3600``.
+  * ``X-RateLimit-Remaining`` - indicates the remaining requests in the
+    current time-window. The values are returned by the rate limiting service
+    in :ref:`limit_remaining<envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.limit_remaining>`
+    field.
+  * ``X-RateLimit-Reset`` - indicates the number of seconds until reset of
+    the current time-window. The values are returned by the rate limiting service
+    in :ref:`duration_until_reset<envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.duration_until_reset>`
+    field.
+
+  In case rate limiting policy specifies more than one time window, the values
+  above represent the window that is closest to reaching its limit.
+
+  For more information about the headers specification see selected version of
+  the `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
+
+  Disabled by default.
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.disable_x_envoy_ratelimited_header:
+
+
+disable_x_envoy_ratelimited_header
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Disables emitting the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header
+  in case of rate limiting (i.e. 429 responses).
+  Having this header not present potentially makes the request retriable.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limited_status:
+
+
+rate_limited_status
+  (:ref:`type.v3.HttpStatus <envoy_v3_api_msg_type.v3.HttpStatus>`) This field allows for a custom HTTP response status code to the downstream client when
+  the request has been rate limited.
+  Defaults to 429 (TooManyRequests).
+
+  .. note::
+    If this is set to < 400, 429 will be used instead.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.response_headers_to_add:
+
+
+response_headers_to_add
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) Specifies a list of HTTP headers that should be added to each response for requests that
+  have been rate limited.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.status_on_error:
+
+
+status_on_error
+  (:ref:`type.v3.HttpStatus <envoy_v3_api_msg_type.v3.HttpStatus>`) Sets the HTTP status that is returned to the client when the ratelimit server returns an error
+  or cannot be reached. The default status is 500.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional additional prefix to use when emitting statistics. This allows to distinguish
+  emitted statistics between configured ``ratelimit`` filters in an HTTP filter chain.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.filter_enabled:
+
+
+filter_enabled
+  (:ref:`config.core.v3.RuntimeFractionalPercent <envoy_v3_api_msg_config.core.v3.RuntimeFractionalPercent>`) If set, this will enable -- but not necessarily enforce -- the rate limit for the given
+  fraction of requests.
+
+  If not set then ``ratelimit.http_filter_enabled`` runtime key will be used to determine
+  the fraction of requests to enforce rate limits on. And the default percentage of the
+  runtime key is 100% for backwards compatibility.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.filter_enforced:
+
+
+filter_enforced
+  (:ref:`config.core.v3.RuntimeFractionalPercent <envoy_v3_api_msg_config.core.v3.RuntimeFractionalPercent>`) If set, this will enforce the rate limit decisions for the given fraction of requests.
+
+  Note: this only applies to the fraction of enabled requests.
+
+  If not set then ``ratelimit.http_filter_enforcing`` runtime key will be used to determine
+  the fraction of requests to enforce rate limits on. And the default percentage of the
+  runtime key is 100% for backwards compatibility.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny_percent:
+
+
+failure_mode_deny_percent
+  (:ref:`config.core.v3.RuntimeFractionalPercent <envoy_v3_api_msg_config.core.v3.RuntimeFractionalPercent>`) If set, this will override the failure_mode_deny parameter with a runtime fraction.
+  If the runtime key is not specified, the value of failure_mode_deny will be used.
+
+  Example:
+
+  .. code-block:: yaml
+
+    failure_mode_deny: true
+    failure_mode_deny_percent:
+      default_value:
+        numerator: 50
+        denominator: HUNDRED
+      runtime_key: ratelimit.failure_mode_deny_percent
+
+  This means that when the rate limit service is unavailable, 50% of requests will be denied
+  (fail closed) and 50% will be allowed (fail open).
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits:
+
+
+rate_limits
+  (**repeated** :ref:`config.route.v3.RateLimit <envoy_v3_api_msg_config.route.v3.RateLimit>`) Rate limit configuration that is used to generate a list of descriptor entries based on
+  the request context. The generated entries will be sent to the rate limit service.
+  If this is set, then
+  :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
+  :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
+  will be ignored. However, :ref:`RateLimitPerRoute.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
+  will take precedence over this field.
+
+  .. note::
+    Not all configuration fields of
+    :ref:`rate limit config <envoy_v3_api_msg_config.route.v3.RateLimit>` is supported at here.
+    Following fields are not supported:
+
+    1. :ref:`rate limit stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>`.
+    2. :ref:`dynamic metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>`.
+    3. :ref:`disable_key <envoy_v3_api_field_config.route.v3.RateLimit.disable_key>`.
+    4. :ref:`override limit <envoy_v3_api_field_config.route.v3.RateLimit.limit>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.metadata_namespace:
+
+
+metadata_namespace
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The namespace where dynamic metadata from rate limit response is saved.
+  If not set, the default is "envoy.filters.http.ratelimit".
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.enable_retry_after_header:
+
+
+enable_retry_after_header
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies whether the filter emits a ``Retry-After`` header when it enforces an HTTP 429
+  response. This option has no effect on responses with any other status code. The value is the
+  largest ``duration_until_reset`` among the over-limit descriptor statuses returned by the rate
+  limit service, expressed in seconds and clamped to at least 1. The header is not emitted when no
+  over-limit descriptor status is present.
+  If the rate limit service returns a ``Retry-After`` header, the filter does not overwrite it.
+
+  Disabled by default.
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.ratelimit.v3.RateLimit.XRateLimitHeadersRFCVersion:
+
+Enum extensions.filters.http.ratelimit.v3.RateLimit.XRateLimitHeadersRFCVersion
+-------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.ratelimit.v3.RateLimit.XRateLimitHeadersRFCVersion proto] <api/envoy/extensions/filters/http/ratelimit/v3/rate_limit.proto#L33>`
+
+Defines the version of the standard to use for X-RateLimit headers.
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.ratelimit.v3.RateLimit.XRateLimitHeadersRFCVersion.OFF:
+
+
+OFF
+  *(DEFAULT)* ⁣X-RateLimit headers disabled.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.ratelimit.v3.RateLimit.XRateLimitHeadersRFCVersion.DRAFT_VERSION_03:
+
+
+DRAFT_VERSION_03
+  ⁣Use `draft RFC Version 03 <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimitPerRoute:
+
+extensions.filters.http.ratelimit.v3.RateLimitPerRoute
+------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.ratelimit.v3.RateLimitPerRoute proto] <api/envoy/extensions/filters/http/ratelimit/v3/rate_limit.proto#L204>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "vh_rate_limits": ...,
+    "rate_limits": [],
+    "domain": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits:
+
+
+vh_rate_limits
+  (:ref:`extensions.filters.http.ratelimit.v3.RateLimitPerRoute.VhRateLimitsOptions <envoy_v3_api_enum_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.VhRateLimitsOptions>`) Specifies if the rate limit filter should include the virtual host rate limits.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits:
+
+
+rate_limits
+  (**repeated** :ref:`config.route.v3.RateLimit <envoy_v3_api_msg_config.route.v3.RateLimit>`) Rate limit configuration that is used to generate a list of descriptor entries based on
+  the request context. The generated entries will be used to find one or multiple matched rate
+  limit rule from the ``descriptors``.
+  If this is set, then
+  :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`,
+  :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` and
+  :ref:`RateLimit.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits>` fields
+  will be ignored.
+
+  .. note::
+    Not all configuration fields of
+    :ref:`rate limit config <envoy_v3_api_msg_config.route.v3.RateLimit>` is supported at here.
+    Following fields are not supported:
+
+    1. :ref:`rate limit stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>`.
+    2. :ref:`dynamic metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>`.
+    3. :ref:`disable_key <envoy_v3_api_field_config.route.v3.RateLimit.disable_key>`.
+    4. :ref:`override limit <envoy_v3_api_field_config.route.v3.RateLimit.limit>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain:
+
+
+domain
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Overrides the domain. If not set, uses the filter-level domain instead.
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.VhRateLimitsOptions:
+
+Enum extensions.filters.http.ratelimit.v3.RateLimitPerRoute.VhRateLimitsOptions
+-------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.ratelimit.v3.RateLimitPerRoute.VhRateLimitsOptions proto] <api/envoy/extensions/filters/http/ratelimit/v3/rate_limit.proto#L206>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.VhRateLimitsOptions.OVERRIDE:
+
+
+OVERRIDE
+  *(DEFAULT)* ⁣Use the virtual host rate limits unless the route has a rate limit policy.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.VhRateLimitsOptions.INCLUDE:
+
+
+INCLUDE
+  ⁣Use the virtual host rate limits even if the route has a rate limit policy.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.VhRateLimitsOptions.IGNORE:
+
+
+IGNORE
+  ⁣Ignore the virtual host rate limits even if the route does not have a rate limit policy.
+
+
+
+
+

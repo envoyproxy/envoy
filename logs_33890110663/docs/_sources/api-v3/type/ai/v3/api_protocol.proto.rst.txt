@@ -1,0 +1,65 @@
+.. _envoy_v3_api_file_envoy/type/ai/v3/api_protocol.proto:
+
+AI API protocol (proto)
+=======================
+
+
+
+
+
+
+.. _envoy_v3_api_enum_type.ai.v3.ApiProtocol:
+
+Enum type.ai.v3.ApiProtocol
+---------------------------
+
+
+:repo:`[type.ai.v3.ApiProtocol proto] <api/envoy/type/ai/v3/api_protocol.proto#L24>`
+
+Identifies the AI API contract spoken on the wire.
+
+This names request/response schemas and streaming event semantics, not the
+organization operating the backend: OpenAI, Azure OpenAI, vLLM, and any
+other OpenAI-compatible backend all speak ``OPENAI_CHAT_COMPLETIONS``.
+Provider identity, when needed, must come from configuration or routing
+metadata.
+
+Response framing is separate: JSON, SSE, and streamed JSON-array variants
+of the same API share one ``ApiProtocol`` value.
+
+
+
+.. _envoy_v3_api_enum_value_type.ai.v3.ApiProtocol.API_PROTOCOL_UNSPECIFIED:
+
+
+API_PROTOCOL_UNSPECIFIED
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_type.ai.v3.ApiProtocol.OPENAI_CHAT_COMPLETIONS:
+
+
+OPENAI_CHAT_COMPLETIONS
+  ⁣OpenAI-compatible ``/v1/chat/completions`` API.
+
+
+.. _envoy_v3_api_enum_value_type.ai.v3.ApiProtocol.OPENAI_RESPONSES:
+
+
+OPENAI_RESPONSES
+  ⁣OpenAI-compatible ``/v1/responses`` API.
+
+
+.. _envoy_v3_api_enum_value_type.ai.v3.ApiProtocol.ANTHROPIC_MESSAGES:
+
+
+ANTHROPIC_MESSAGES
+  ⁣Anthropic-compatible ``/v1/messages`` API.
+
+
+.. _envoy_v3_api_enum_value_type.ai.v3.ApiProtocol.GEMINI_GENERATE_CONTENT:
+
+
+GEMINI_GENERATE_CONTENT
+  ⁣Gemini ``generateContent`` / ``streamGenerateContent`` APIs.
+
+

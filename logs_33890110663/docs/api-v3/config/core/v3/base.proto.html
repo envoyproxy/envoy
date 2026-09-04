@@ -1,0 +1,1249 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Common types (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="CEL Expression Configuration (proto)" href="cel.proto.html" />
+    <link rel="prev" title="JWT handshake validation (proto)" href="../../../extensions/filters/common/jwks/v3/jwt_handshake.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../config.html">Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../service/service.html">Services</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../common_messages/common_messages.html">Common messages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/common/async_files/v3/async_file_manager.proto.html">AsyncFileManager configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="backoff.proto.html">Backoff strategy (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/discovery/v3/discovery.proto.html">Common discovery API components (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/filters/common/fault/v3/fault.proto.html">Common fault injection types (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/filters/common/jwks/v3/jwks.proto.html">Common JWKS fetch (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/filters/common/jwks/v3/jwt_handshake.proto.html">JWT handshake validation (proto)</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Common types (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cel.proto.html">CEL Expression Configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/filters/common/matcher/action/v3/skip_action.proto.html">Common match actions (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/actions/transform_stat/v3/transform_stat.proto.html">Transform Stat actions (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/common_inputs/network/v3/network_inputs.proto.html">Common network matching inputs (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/common/ratelimit/v3/ratelimit.proto.html">Common rate limit components (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/common_inputs/stats/v3/stats.proto.html">Stats matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto.html">Common SSL matching inputs (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="config_source.proto.html">Configuration sources (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/http/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules HTTP Match Input (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.proto.html">Consistent hashing matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/input_matchers/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Input Matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/network/socket_interface/v3/default_socket_interface.proto.html">Default socket interface configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/common_inputs/environment_variable/v3/input.proto.html">Environment variable input (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="extension.proto.html">Extension configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/common/aws/v3/credential_provider.proto.html">AWS common configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/common/matching/v3/extension_matcher.proto.html">Extension matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/filters/common/dependency/v3/dependency.proto.html">Filter dependency specification (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/regex_engines/v3/google_re2.proto.html">Google RE2 (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_method_list.proto.html">gRPC method list (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http_service.proto.html">HTTP services (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_service.proto.html">gRPC services (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/key_value/file_based/v3/config.proto.html">Key/value file-based store storage plugin (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../common/key_value/v3/config.proto.html">Key/value store storage plugin (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../common/mutation_rules/v3/mutation_rules.proto.html">Header mutation rules (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/early_data/v3/default_early_data_policy.proto.html">HTTP request early data policy (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http_uri.proto.html">HTTP service URI  (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../type/v3/scope.proto.html">Scope (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/input_matchers/ip/v3/ip.proto.html">IP matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/input_matchers/metadata/v3/metadata.proto.html">metadata matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/input_matchers/runtime_fraction/v3/runtime_fraction.proto.html">Runtime matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="address.proto.html">Network addresses (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protocol.proto.html">Protocol options (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="proxy_protocol.proto.html">Proxy protocol (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="resolver.proto.html">Resolver (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="socket_option.proto.html">Socket option (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="substitution_format_string.proto.html">Substitution format string (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="udp_socket_config.proto.html">UDP socket config (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/filters/common/set_filter_state/v3/value.proto.html">Set-Filter-State filter state value (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="socket_cmsg_headers.proto.html">Socket CMSG headers (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Common Configuration (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../common_messages/common_messages.html">Common messages</a></li>
+      <li class="breadcrumb-item active">Common types (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/config/core/v3/base.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="common-types-proto">
+<span id="envoy-v3-api-file-envoy-config-core-v3-base-proto"></span><h1>Common types (proto)<a class="headerlink" href="#common-types-proto" title="Link to this heading"></a></h1>
+<section id="config-core-v3-locality">
+<span id="envoy-v3-api-msg-config-core-v3-locality"></span><h2>config.core.v3.Locality<a class="headerlink" href="#config-core-v3-locality" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L69">[config.core.v3.Locality proto]</a></p>
+<p>Identifies location of where either Envoy runs or where upstream hosts run.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;region&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;zone&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;sub_zone&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-locality-region">
+<dt>region</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Region this <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-locality-zone"><span class="std std-ref">zone</span></a> belongs to.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-locality-zone">
+<dt>zone</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Defines the local service zone where Envoy is running. Though optional, it
+should be set if discovery service routing is used and the discovery
+service exposes <a class="reference internal" href="../../endpoint/v3/endpoint_components.proto.html#envoy-v3-api-field-config-endpoint-v3-localitylbendpoints-locality"><span class="std std-ref">zone data</span></a>,
+either in this message or via <a class="reference internal" href="../../../../operations/cli.html#cmdoption-service-zone"><code class="xref std std-option docutils literal notranslate"><span class="pre">--service-zone</span></code></a>. The meaning of zone
+is context dependent, e.g. <a class="reference external" href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html">Availability Zone (AZ)</a>
+on AWS, <a class="reference external" href="https://cloud.google.com/compute/docs/regions-zones/">Zone</a> on
+GCP, etc.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-locality-sub-zone">
+<dt>sub_zone</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) When used for locality of upstream hosts, this field further splits zone
+into smaller chunks of sub-zones so they can be load balanced
+independently.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-buildversion">
+<span id="envoy-v3-api-msg-config-core-v3-buildversion"></span><h2>config.core.v3.BuildVersion<a class="headerlink" href="#config-core-v3-buildversion" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L93">[config.core.v3.BuildVersion proto]</a></p>
+<p>BuildVersion combines SemVer version of extension with free-form build information
+(i.e. ‘alpha’, ‘private-build’) as a set of strings.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-buildversion-version">
+<dt>version</dt><dd><p>(<a class="reference internal" href="../../../type/v3/semantic_version.proto.html#envoy-v3-api-msg-type-v3-semanticversion"><span class="std std-ref">type.v3.SemanticVersion</span></a>) SemVer version of extension.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-buildversion-metadata">
+<dt>metadata</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct">Struct</a>) Free-form build information.
+Envoy defines several well known keys in the source/common/version/version.h file</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-extension">
+<span id="envoy-v3-api-msg-config-core-v3-extension"></span><h2>config.core.v3.Extension<a class="headerlink" href="#config-core-v3-extension" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L106">[config.core.v3.Extension proto]</a></p>
+<p>Version and identification for an Envoy extension.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;category&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;disabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;type_urls&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-extension-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) This is the name of the Envoy filter as specified in the Envoy
+configuration, e.g. envoy.filters.http.router, com.acme.widget.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-extension-category">
+<dt>category</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Category of the extension.
+Extension category names use reverse DNS notation. For instance “envoy.filters.listener”
+for Envoy’s built-in listener filters or “com.acme.filters.http” for HTTP filters from
+acme.com vendor.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-extension-version">
+<dt>version</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-buildversion"><span class="std std-ref">config.core.v3.BuildVersion</span></a>) The version is a property of the extension and maintained independently
+of other extensions and the Envoy API.
+This field is not set when extension did not provide version information.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-extension-disabled">
+<dt>disabled</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates that the extension is present but was disabled via dynamic configuration.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-extension-type-urls">
+<dt>type_urls</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Type URLs of extension configuration protos.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-node">
+<span id="envoy-v3-api-msg-config-core-v3-node"></span><h2>config.core.v3.Node<a class="headerlink" href="#config-core-v3-node" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L142">[config.core.v3.Node proto]</a></p>
+<p>Identifies a specific Envoy instance. The node identifier is presented to the
+management server, which may use this identifier to distinguish per Envoy
+configuration for serving.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;dynamic_parameters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;locality&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;user_agent_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;user_agent_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;user_agent_build_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;client_features&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;listening_addresses&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-node-id">
+<dt>id</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) An opaque node identifier for the Envoy node. This also provides the local
+service node name. It should be set if any of the following features are
+used: <a class="reference internal" href="../../../../intro/arch_overview/observability/statistics.html#arch-overview-statistics"><span class="std std-ref">statsd</span></a>, <a class="reference internal" href="../../../../configuration/upstream/cluster_manager/cds.html#config-cluster-manager-cds"><span class="std std-ref">CDS</span></a>, and <a class="reference internal" href="../../../../intro/arch_overview/observability/tracing.html#arch-overview-tracing"><span class="std std-ref">HTTP tracing</span></a>, either in this message or via
+<a class="reference internal" href="../../../../operations/cli.html#cmdoption-service-node"><code class="xref std std-option docutils literal notranslate"><span class="pre">--service-node</span></code></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-node-cluster">
+<dt>cluster</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Defines the local service cluster name where Envoy is running. Though
+optional, it should be set if any of the following features are used:
+<a class="reference internal" href="../../../../intro/arch_overview/observability/statistics.html#arch-overview-statistics"><span class="std std-ref">statsd</span></a>, <a class="reference internal" href="health_check.proto.html#envoy-v3-api-field-config-core-v3-healthcheck-httphealthcheck-service-name-matcher"><span class="std std-ref">health check cluster
+verification</span></a>,
+<a class="reference internal" href="../../bootstrap/v3/bootstrap.proto.html#envoy-v3-api-msg-config-bootstrap-v3-runtime"><span class="std std-ref">runtime override directory</span></a>,
+<a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-add-user-agent"><span class="std std-ref">user agent addition</span></a>,
+<a class="reference internal" href="../../../../configuration/http/http_filters/rate_limit_filter.html#config-http-filters-rate-limit"><span class="std std-ref">HTTP global rate limiting</span></a>,
+<a class="reference internal" href="../../../../configuration/upstream/cluster_manager/cds.html#config-cluster-manager-cds"><span class="std std-ref">CDS</span></a>, and <a class="reference internal" href="../../../../intro/arch_overview/observability/tracing.html#arch-overview-tracing"><span class="std std-ref">HTTP tracing</span></a>, either in this message or via
+<a class="reference internal" href="../../../../operations/cli.html#cmdoption-service-cluster"><code class="xref std std-option docutils literal notranslate"><span class="pre">--service-cluster</span></code></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-node-metadata">
+<dt>metadata</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct">Struct</a>) Opaque metadata extending the node identifier. Envoy will pass this
+directly to the management server.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-node-dynamic-parameters">
+<dt>dynamic_parameters</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference internal" href="../../../../xds/core/v3/context_params.proto.html#envoy-v3-api-msg-xds-core-v3-contextparams"><span class="std std-ref">.xds.core.v3.ContextParams</span></a>&gt;) Map from xDS resource type URL to dynamic context parameters. These may vary at runtime (unlike
+other fields in this message). For example, the xDS client may have a shard identifier that
+changes during the lifetime of the xDS client. In Envoy, this would be achieved by updating the
+dynamic context on the Server::Instance’s LocalInfo context provider. The shard ID dynamic
+parameter then appears in this field during future discovery requests.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-node-locality">
+<dt>locality</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-locality"><span class="std std-ref">config.core.v3.Locality</span></a>) Locality specifying where the Envoy instance is running.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-node-user-agent-name">
+<dt>user_agent_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Free-form string that identifies the entity requesting config.
+E.g. “envoy” or “grpc”</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-node-user-agent-version">
+<dt>user_agent_version</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Free-form string that identifies the version of the entity requesting config.
+E.g. “1.12.2” or “abcd1234”, or “SpecialEnvoyBuild”</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-node-user-agent-version"><span class="std std-ref">user_agent_version</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-node-user-agent-build-version"><span class="std std-ref">user_agent_build_version</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-node-user-agent-build-version">
+<dt>user_agent_build_version</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-buildversion"><span class="std std-ref">config.core.v3.BuildVersion</span></a>) Structured version of the entity requesting config.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-node-user-agent-version"><span class="std std-ref">user_agent_version</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-node-user-agent-build-version"><span class="std std-ref">user_agent_build_version</span></a> may be set.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-node-extensions">
+<dt>extensions</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-extension"><span class="std std-ref">config.core.v3.Extension</span></a>) List of extensions and their versions supported by the node.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-node-client-features">
+<dt>client_features</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Client feature support list. These are well known features described
+in the Envoy API repository for a given major version of an API. Client features
+use reverse DNS naming scheme, for example <code class="docutils literal notranslate"><span class="pre">com.acme.feature</span></code>.
+See <a class="reference internal" href="../../../../api/client_features.html#client-features"><span class="std std-ref">the list of features</span></a> that xDS client may
+support.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-node-listening-addresses">
+<dt>listening_addresses</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="address.proto.html#envoy-v3-api-msg-config-core-v3-address"><span class="std std-ref">config.core.v3.Address</span></a>) Known listening ports on the node as a generic hint to the management server
+for filtering <a class="reference internal" href="../../../../configuration/listeners/listeners.html#config-listeners"><span class="std std-ref">listeners</span></a> to be returned. For example,
+if there is a listener bound to port 80, the list can optionally contain the
+SocketAddress <code class="docutils literal notranslate"><span class="pre">(0.0.0.0,80)</span></code>. The field is optional and just a hint.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-metadata">
+<span id="envoy-v3-api-msg-config-core-v3-metadata"></span><h2>config.core.v3.Metadata<a class="headerlink" href="#config-core-v3-metadata" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L238">[config.core.v3.Metadata proto]</a></p>
+<p>Metadata provides additional inputs to filters based on matched listeners,
+filter chains, routes and endpoints. It is structured as a map, usually from
+filter name (in reverse DNS format) to metadata specific to the filter. Metadata
+key-values for a filter are merged as connection and request handling occurs,
+with later values for the same key overriding earlier values.</p>
+<p>An example use of metadata is providing additional values to
+http_connection_manager in the envoy.http_connection_manager.access_log
+namespace.</p>
+<p>Another example use of metadata is to per service config info in cluster metadata, which may get
+consumed by multiple filters.</p>
+<p>For load balancing, Metadata provides a means to subset cluster endpoints.
+Endpoints have a Metadata object associated and routes contain a Metadata
+object to match against. There are some well defined metadata used today for
+this purpose:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">{&quot;envoy.lb&quot;:</span> <span class="pre">{&quot;canary&quot;:</span> <span class="pre">&lt;bool&gt;</span> <span class="pre">}}</span></code> This indicates the canary status of an
+endpoint and is also used during header processing
+(x-envoy-upstream-canary) and for stats purposes.</p></li>
+</ul>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;filter_metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;typed_filter_metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-metadata-filter-metadata">
+<dt>filter_metadata</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct">Struct</a>&gt;) Key is the reverse DNS filter name, e.g. com.acme.widget. The <code class="docutils literal notranslate"><span class="pre">envoy.*</span></code>
+namespace is reserved for Envoy’s built-in filters.
+If both <code class="docutils literal notranslate"><span class="pre">filter_metadata</span></code> and
+<a class="reference internal" href="#envoy-v3-api-field-config-core-v3-metadata-typed-filter-metadata"><span class="std std-ref">typed_filter_metadata</span></a>
+fields are present in the metadata with same keys,
+only <code class="docutils literal notranslate"><span class="pre">typed_filter_metadata</span></code> field will be parsed.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-metadata-typed-filter-metadata">
+<dt>typed_filter_metadata</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any">Any</a>&gt;) Key is the reverse DNS filter name, e.g. com.acme.widget. The <code class="docutils literal notranslate"><span class="pre">envoy.*</span></code>
+namespace is reserved for Envoy’s built-in filters.
+The value is encoded as google.protobuf.Any.
+If both <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-metadata-filter-metadata"><span class="std std-ref">filter_metadata</span></a>
+and <code class="docutils literal notranslate"><span class="pre">typed_filter_metadata</span></code> fields are present in the metadata with same keys,
+only <code class="docutils literal notranslate"><span class="pre">typed_filter_metadata</span></code> field will be parsed.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-runtimeuint32">
+<span id="envoy-v3-api-msg-config-core-v3-runtimeuint32"></span><h2>config.core.v3.RuntimeUInt32<a class="headerlink" href="#config-core-v3-runtimeuint32" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L261">[config.core.v3.RuntimeUInt32 proto]</a></p>
+<p>Runtime derived uint32 with a default when not specified.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;default_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;runtime_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-runtimeuint32-default-value">
+<dt>default_value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) Default value if runtime value is not available.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-runtimeuint32-runtime-key">
+<dt>runtime_key</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Runtime key to get value for comparison. This value is used if defined.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-runtimeuint64">
+<span id="envoy-v3-api-msg-config-core-v3-runtimeuint64"></span><h2>config.core.v3.RuntimeUInt64<a class="headerlink" href="#config-core-v3-runtimeuint64" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L272">[config.core.v3.RuntimeUInt64 proto]</a></p>
+<p>Runtime derived uint64 with a default when not specified.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;default_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;runtime_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-runtimeuint64-default-value">
+<dt>default_value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Default value if runtime value is not available.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-runtimeuint64-runtime-key">
+<dt>runtime_key</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Runtime key to get value for comparison. This value is used if defined.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-runtimepercent">
+<span id="envoy-v3-api-msg-config-core-v3-runtimepercent"></span><h2>config.core.v3.RuntimePercent<a class="headerlink" href="#config-core-v3-runtimepercent" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L281">[config.core.v3.RuntimePercent proto]</a></p>
+<p>Runtime derived percentage with a default when not specified.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;default_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;runtime_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-runtimepercent-default-value">
+<dt>default_value</dt><dd><p>(<a class="reference internal" href="../../../type/v3/percent.proto.html#envoy-v3-api-msg-type-v3-percent"><span class="std std-ref">type.v3.Percent</span></a>) Default value if runtime value is not available.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-runtimepercent-runtime-key">
+<dt>runtime_key</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Runtime key to get value for comparison. This value is used if defined.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-runtimedouble">
+<span id="envoy-v3-api-msg-config-core-v3-runtimedouble"></span><h2>config.core.v3.RuntimeDouble<a class="headerlink" href="#config-core-v3-runtimedouble" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L290">[config.core.v3.RuntimeDouble proto]</a></p>
+<p>Runtime derived double with a default when not specified.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;default_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;runtime_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-runtimedouble-default-value">
+<dt>default_value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">double</a>) Default value if runtime value is not available.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-runtimedouble-runtime-key">
+<dt>runtime_key</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Runtime key to get value for comparison. This value is used if defined.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-runtimefeatureflag">
+<span id="envoy-v3-api-msg-config-core-v3-runtimefeatureflag"></span><h2>config.core.v3.RuntimeFeatureFlag<a class="headerlink" href="#config-core-v3-runtimefeatureflag" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L301">[config.core.v3.RuntimeFeatureFlag proto]</a></p>
+<p>Runtime derived bool with a default when not specified.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;default_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;runtime_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-runtimefeatureflag-default-value">
+<dt>default_value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>, <em>REQUIRED</em>) Default value if runtime value is not available.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-runtimefeatureflag-runtime-key">
+<dt>runtime_key</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Runtime key to get value for comparison. This value is used if defined. The boolean value must
+be represented via its
+<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto3#json">canonical JSON encoding</a>.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-keyvaluepair">
+<span id="envoy-v3-api-msg-config-core-v3-keyvaluepair"></span><h2>config.core.v3.KeyValuePair<a class="headerlink" href="#config-core-v3-keyvaluepair" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L333">[config.core.v3.KeyValuePair proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-keyvaluepair-key">
+<dt>key</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The key of the key/value pair.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-keyvaluepair-value">
+<dt>value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#value">Value</a>) The value of the key/value pair.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-keyvalueappend">
+<span id="envoy-v3-api-msg-config-core-v3-keyvalueappend"></span><h2>config.core.v3.KeyValueAppend<a class="headerlink" href="#config-core-v3-keyvalueappend" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L343">[config.core.v3.KeyValueAppend proto]</a></p>
+<p>Key/value pair plus option to control append behavior. This is used to specify
+key/value pairs that should be appended to a set of existing key/value pairs.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;record&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;action&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-keyvalueappend-record">
+<dt>record</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-keyvaluepair"><span class="std std-ref">config.core.v3.KeyValuePair</span></a>) The single key/value pair record to be appended or overridden. This field must be set.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-keyvalueappend-action">
+<dt>action</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-config-core-v3-keyvalueappend-keyvalueappendaction"><span class="std std-ref">config.core.v3.KeyValueAppend.KeyValueAppendAction</span></a>) Describes the action taken to append/overwrite the given value for an existing
+key or to only add this key if it’s absent.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-config-core-v3-keyvalueappend-keyvalueappendaction">
+<span id="envoy-v3-api-enum-config-core-v3-keyvalueappend-keyvalueappendaction"></span><h2>Enum config.core.v3.KeyValueAppend.KeyValueAppendAction<a class="headerlink" href="#enum-config-core-v3-keyvalueappend-keyvalueappendaction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L345">[config.core.v3.KeyValueAppend.KeyValueAppendAction proto]</a></p>
+<p>Describes the supported actions types for key/value pair append action.</p>
+<dl id="envoy-v3-api-enum-value-config-core-v3-keyvalueappend-keyvalueappendaction-append-if-exists-or-add">
+<dt>APPEND_IF_EXISTS_OR_ADD</dt><dd><p><em>(DEFAULT)</em> ⁣If the key already exists, this action will result in the following behavior:</p>
+<ul class="simple">
+<li><p>Comma-concatenated value if multiple values are not allowed.</p></li>
+<li><p>New value added to the list of values if multiple values are allowed.</p></li>
+</ul>
+<p>If the key doesn’t exist then this will add pair with specified key and value.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-keyvalueappend-keyvalueappendaction-add-if-absent">
+<dt>ADD_IF_ABSENT</dt><dd><p>⁣This action will add the key/value pair if it doesn’t already exist. If the
+key already exists then this will be a no-op.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-keyvalueappend-keyvalueappendaction-overwrite-if-exists-or-add">
+<dt>OVERWRITE_IF_EXISTS_OR_ADD</dt><dd><p>⁣This action will overwrite the specified value by discarding any existing
+values if the key already exists. If the key doesn’t exist then this will add
+the pair with specified key and value.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-keyvalueappend-keyvalueappendaction-overwrite-if-exists">
+<dt>OVERWRITE_IF_EXISTS</dt><dd><p>⁣This action will overwrite the specified value by discarding any existing
+values if the key already exists. If the key doesn’t exist then this will
+be no-op.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-keyvaluemutation">
+<span id="envoy-v3-api-msg-config-core-v3-keyvaluemutation"></span><h2>config.core.v3.KeyValueMutation<a class="headerlink" href="#config-core-v3-keyvaluemutation" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L388">[config.core.v3.KeyValueMutation proto]</a></p>
+<p>Key/value pair to append or remove.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;append&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;remove&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-keyvaluemutation-append">
+<dt>append</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-keyvalueappend"><span class="std std-ref">config.core.v3.KeyValueAppend</span></a>) Key/value pair to append or overwrite. Only one of <code class="docutils literal notranslate"><span class="pre">append</span></code> or <code class="docutils literal notranslate"><span class="pre">remove</span></code> can be set or
+the configuration will be rejected.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-keyvaluemutation-remove">
+<dt>remove</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Key to remove. Only one of <code class="docutils literal notranslate"><span class="pre">append</span></code> or <code class="docutils literal notranslate"><span class="pre">remove</span></code> can be set or the configuration will be
+rejected.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-queryparameter">
+<span id="envoy-v3-api-msg-config-core-v3-queryparameter"></span><h2>config.core.v3.QueryParameter<a class="headerlink" href="#config-core-v3-queryparameter" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L399">[config.core.v3.QueryParameter proto]</a></p>
+<p>Query parameter name/value pair.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-queryparameter-key">
+<dt>key</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The key of the query parameter. Case sensitive.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-queryparameter-value">
+<dt>value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The value of the query parameter.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-headervalue">
+<span id="envoy-v3-api-msg-config-core-v3-headervalue"></span><h2>config.core.v3.HeaderValue<a class="headerlink" href="#config-core-v3-headervalue" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L408">[config.core.v3.HeaderValue proto]</a></p>
+<p>Header name/value pair.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;raw_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-headervalue-key">
+<dt>key</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) Header name.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-headervalue-value">
+<dt>value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Header value.</p>
+<p>The same <a class="reference internal" href="../../../../configuration/observability/access_log/usage.html#config-access-log-format"><span class="std std-ref">format specifier</span></a> as used for
+<a class="reference internal" href="../../../../configuration/observability/access_log/usage.html#config-access-log"><span class="std std-ref">HTTP access logging</span></a> applies here, however
+unknown header values are replaced with the empty string instead of <code class="docutils literal notranslate"><span class="pre">-</span></code>.
+Header value is encoded as string. This does not work for non-utf8 characters.
+Only one of <code class="docutils literal notranslate"><span class="pre">value</span></code> or <code class="docutils literal notranslate"><span class="pre">raw_value</span></code> can be set.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-headervalue-raw-value">
+<dt>raw_value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bytes</a>) Header value is encoded as bytes which can support non-utf8 characters.
+Only one of <code class="docutils literal notranslate"><span class="pre">value</span></code> or <code class="docutils literal notranslate"><span class="pre">raw_value</span></code> can be set.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-headervalueoption">
+<span id="envoy-v3-api-msg-config-core-v3-headervalueoption"></span><h2>config.core.v3.HeaderValueOption<a class="headerlink" href="#config-core-v3-headervalueoption" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L437">[config.core.v3.HeaderValueOption proto]</a></p>
+<p>Header name/value pair plus option to control append behavior.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;header&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;append&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;append_action&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;keep_empty_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-headervalueoption-header">
+<dt>header</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-headervalue"><span class="std std-ref">config.core.v3.HeaderValue</span></a>, <em>REQUIRED</em>) Header name/value pair that this option applies to.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-headervalueoption-append">
+<dt>append</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Should the value be appended? If true (default), the value is appended to
+existing values. Otherwise it replaces any existing values.
+This field is deprecated and please use
+<a class="reference internal" href="#envoy-v3-api-field-config-core-v3-headervalueoption-append-action"><span class="std std-ref">append_action</span></a> as replacement.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <a class="reference internal" href="../../../service/auth/v3/external_auth.proto.html#envoy-v3-api-msg-service-auth-v3-checkresponse"><span class="std std-ref">external authorization service</span></a> and
+<a class="reference internal" href="../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-msg-service-ext-proc-v3-processingresponse"><span class="std std-ref">external processor service</span></a> have
+default value (<code class="docutils literal notranslate"><span class="pre">false</span></code>) for this field.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-headervalueoption-append-action">
+<dt>append_action</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-config-core-v3-headervalueoption-headerappendaction"><span class="std std-ref">config.core.v3.HeaderValueOption.HeaderAppendAction</span></a>) Describes the action taken to append/overwrite the given value for an existing header
+or to only add this header if it’s absent.
+Value defaults to <a class="reference internal" href="#envoy-v3-api-enum-value-config-core-v3-headervalueoption-headerappendaction-append-if-exists-or-add"><span class="std std-ref">APPEND_IF_EXISTS_OR_ADD</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-headervalueoption-keep-empty-value">
+<dt>keep_empty_value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Is the header value allowed to be empty? If false (default), custom headers with empty values are dropped,
+otherwise they are added.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-config-core-v3-headervalueoption-headerappendaction">
+<span id="envoy-v3-api-enum-config-core-v3-headervalueoption-headerappendaction"></span><h2>Enum config.core.v3.HeaderValueOption.HeaderAppendAction<a class="headerlink" href="#enum-config-core-v3-headervalueoption-headerappendaction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L442">[config.core.v3.HeaderValueOption.HeaderAppendAction proto]</a></p>
+<p>Describes the supported actions types for header append action.</p>
+<dl id="envoy-v3-api-enum-value-config-core-v3-headervalueoption-headerappendaction-append-if-exists-or-add">
+<dt>APPEND_IF_EXISTS_OR_ADD</dt><dd><p><em>(DEFAULT)</em> ⁣If the header already exists, this action will result in:</p>
+<ul class="simple">
+<li><p>Comma-concatenated for predefined inline headers.</p></li>
+<li><p>Duplicate header added in the <code class="docutils literal notranslate"><span class="pre">HeaderMap</span></code> for other headers.</p></li>
+</ul>
+<p>If the header doesn’t exist then this will add new header with specified key and value.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-headervalueoption-headerappendaction-add-if-absent">
+<dt>ADD_IF_ABSENT</dt><dd><p>⁣This action will add the header if it doesn’t already exist. If the header
+already exists then this will be a no-op.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-headervalueoption-headerappendaction-overwrite-if-exists-or-add">
+<dt>OVERWRITE_IF_EXISTS_OR_ADD</dt><dd><p>⁣This action will overwrite the specified value by discarding any existing values if
+the header already exists. If the header doesn’t exist then this will add the header
+with specified key and value.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-headervalueoption-headerappendaction-overwrite-if-exists">
+<dt>OVERWRITE_IF_EXISTS</dt><dd><p>⁣This action will overwrite the specified value by discarding any existing values if
+the header already exists. If the header doesn’t exist then this will be no-op.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-headermap">
+<span id="envoy-v3-api-msg-config-core-v3-headermap"></span><h2>config.core.v3.HeaderMap<a class="headerlink" href="#config-core-v3-headermap" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L492">[config.core.v3.HeaderMap proto]</a></p>
+<p>Wrapper for a set of headers.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-headermap-headers">
+<dt>headers</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-headervalue"><span class="std std-ref">config.core.v3.HeaderValue</span></a>) A list of header names and their values.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-watcheddirectory">
+<span id="envoy-v3-api-msg-config-core-v3-watcheddirectory"></span><h2>config.core.v3.WatchedDirectory<a class="headerlink" href="#config-core-v3-watcheddirectory" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L501">[config.core.v3.WatchedDirectory proto]</a></p>
+<p>A directory that is watched for changes, e.g. by inotify on Linux. Move/rename
+events inside this directory trigger the watch.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;watch_modify&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-watcheddirectory-path">
+<dt>path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) Directory path to watch.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-watcheddirectory-watch-modify">
+<dt>watch_modify</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to true, the watcher will also subscribe to file modification events
+(<code class="docutils literal notranslate"><span class="pre">IN_MODIFY</span></code> on Linux) in addition to move events (<code class="docutils literal notranslate"><span class="pre">IN_MOVED_TO</span></code>). This allows
+in-place file writes to trigger reload callbacks. Use this when the writing process
+cannot use atomic rename (e.g. certain secret managers that write certificate files
+directly). By default, only move/rename events are watched, which is the safe choice
+for atomic updates (e.g. Kubernetes ConfigMap symlink swaps).</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-datasource">
+<span id="envoy-v3-api-msg-config-core-v3-datasource"></span><h2>config.core.v3.DataSource<a class="headerlink" href="#config-core-v3-datasource" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L516">[config.core.v3.DataSource proto]</a></p>
+<p>Data source consisting of a file, an inline value, or an environment variable.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;inline_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;inline_string&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;environment_variable&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;watched_directory&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-core-v3-datasource-filename">
+<dt>filename</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Local filesystem data source.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-filename"><span class="std std-ref">filename</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-inline-bytes"><span class="std std-ref">inline_bytes</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-inline-string"><span class="std std-ref">inline_string</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-environment-variable"><span class="std std-ref">environment_variable</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-datasource-inline-bytes">
+<dt>inline_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bytes</a>) Bytes inlined in the configuration.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-filename"><span class="std std-ref">filename</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-inline-bytes"><span class="std std-ref">inline_bytes</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-inline-string"><span class="std std-ref">inline_string</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-environment-variable"><span class="std std-ref">environment_variable</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-datasource-inline-string">
+<dt>inline_string</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) String inlined in the configuration.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-filename"><span class="std std-ref">filename</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-inline-bytes"><span class="std std-ref">inline_bytes</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-inline-string"><span class="std std-ref">inline_string</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-environment-variable"><span class="std std-ref">environment_variable</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-datasource-environment-variable">
+<dt>environment_variable</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Environment variable data source.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-filename"><span class="std std-ref">filename</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-inline-bytes"><span class="std std-ref">inline_bytes</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-inline-string"><span class="std std-ref">inline_string</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-datasource-environment-variable"><span class="std std-ref">environment_variable</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-datasource-watched-directory">
+<dt>watched_directory</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-watcheddirectory"><span class="std std-ref">config.core.v3.WatchedDirectory</span></a>) Watched directory that is watched for file changes. If this is set explicitly, the file
+specified in the <code class="docutils literal notranslate"><span class="pre">filename</span></code> field will be reloaded when relevant file move events occur.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This field only makes sense when the <code class="docutils literal notranslate"><span class="pre">filename</span></code> field is set.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Envoy only updates when the file is replaced by a file move, and not when the file is
+edited in place.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Not all use cases of <code class="docutils literal notranslate"><span class="pre">DataSource</span></code> support watching directories. It depends on the
+specific usage of the <code class="docutils literal notranslate"><span class="pre">DataSource</span></code>. See the documentation of the parent message for
+details.</p>
+</div>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-retrypolicy">
+<span id="envoy-v3-api-msg-config-core-v3-retrypolicy"></span><h2>config.core.v3.RetryPolicy<a class="headerlink" href="#config-core-v3-retrypolicy" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L554">[config.core.v3.RetryPolicy proto]</a></p>
+<p>The message specifies the retry policy of remote data source when fetching fails.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;retry_back_off&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;num_retries&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;retry_on&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;retry_priority&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;retry_host_predicate&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;host_selection_retry_max_attempts&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-retrypolicy-retry-back-off">
+<dt>retry_back_off</dt><dd><p>(<a class="reference internal" href="backoff.proto.html#envoy-v3-api-msg-config-core-v3-backoffstrategy"><span class="std std-ref">config.core.v3.BackoffStrategy</span></a>) Specifies parameters that control <a class="reference internal" href="backoff.proto.html#envoy-v3-api-msg-config-core-v3-backoffstrategy"><span class="std std-ref">retry backoff strategy</span></a>.
+This parameter is optional, in which case the default base interval is 1000 milliseconds. The
+default maximum interval is 10 times the base interval.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-retrypolicy-num-retries">
+<dt>num_retries</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Specifies the allowed number of retries. This parameter is optional and
+defaults to 1.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-retrypolicy-retry-on">
+<dt>retry_on</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) For details, see <a class="reference internal" href="../../route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-retry-on"><span class="std std-ref">retry_on</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-retrypolicy-retry-priority">
+<dt>retry_priority</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-retrypolicy-retrypriority"><span class="std std-ref">config.core.v3.RetryPolicy.RetryPriority</span></a>) For details, see <a class="reference internal" href="../../route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-retry-priority"><span class="std std-ref">retry_priority</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-retrypolicy-retry-host-predicate">
+<dt>retry_host_predicate</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-retrypolicy-retryhostpredicate"><span class="std std-ref">config.core.v3.RetryPolicy.RetryHostPredicate</span></a>) For details, see <a class="reference internal" href="../../route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-retry-host-predicate"><span class="std std-ref">RetryHostPredicate</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-retrypolicy-host-selection-retry-max-attempts">
+<dt>host_selection_retry_max_attempts</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">int64</a>) For details, see <a class="reference internal" href="../../route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-host-selection-retry-max-attempts"><span class="std std-ref">host_selection_retry_max_attempts</span></a>.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-retrypolicy-retrypriority">
+<span id="envoy-v3-api-msg-config-core-v3-retrypolicy-retrypriority"></span><h2>config.core.v3.RetryPolicy.RetryPriority<a class="headerlink" href="#config-core-v3-retrypolicy-retrypriority" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L558">[config.core.v3.RetryPolicy.RetryPriority proto]</a></p>
+<p>See <a class="reference internal" href="../../route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-retry-priority"><span class="std std-ref">RetryPriority</span></a>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;typed_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-retrypolicy-retrypriority-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>)</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-retrypolicy-retrypriority-typed-config">
+<dt>typed_config</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any">Any</a>)</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-retrypolicy-retryhostpredicate">
+<span id="envoy-v3-api-msg-config-core-v3-retrypolicy-retryhostpredicate"></span><h2>config.core.v3.RetryPolicy.RetryHostPredicate<a class="headerlink" href="#config-core-v3-retrypolicy-retryhostpredicate" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L567">[config.core.v3.RetryPolicy.RetryHostPredicate proto]</a></p>
+<p>See <a class="reference internal" href="../../route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-retry-host-predicate"><span class="std std-ref">RetryHostPredicate</span></a>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;typed_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-retrypolicy-retryhostpredicate-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>)</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-retrypolicy-retryhostpredicate-typed-config">
+<dt>typed_config</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any">Any</a>)</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-remotedatasource">
+<span id="envoy-v3-api-msg-config-core-v3-remotedatasource"></span><h2>config.core.v3.RemoteDataSource<a class="headerlink" href="#config-core-v3-remotedatasource" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L599">[config.core.v3.RemoteDataSource proto]</a></p>
+<p>The message specifies how to fetch data from remote and how to verify it.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;http_uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;retry_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-remotedatasource-http-uri">
+<dt>http_uri</dt><dd><p>(<a class="reference internal" href="http_uri.proto.html#envoy-v3-api-msg-config-core-v3-httpuri"><span class="std std-ref">config.core.v3.HttpUri</span></a>, <em>REQUIRED</em>) The HTTP URI to fetch the remote data.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-remotedatasource-sha256">
+<dt>sha256</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) SHA256 string for verifying data.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-remotedatasource-retry-policy">
+<dt>retry_policy</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-retrypolicy"><span class="std std-ref">config.core.v3.RetryPolicy</span></a>) Retry policy for fetching remote data.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-asyncdatasource">
+<span id="envoy-v3-api-msg-config-core-v3-asyncdatasource"></span><h2>config.core.v3.AsyncDataSource<a class="headerlink" href="#config-core-v3-asyncdatasource" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L613">[config.core.v3.AsyncDataSource proto]</a></p>
+<p>Async data source which support async data fetch.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;local&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;remote&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-core-v3-asyncdatasource-local">
+<dt>local</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-datasource"><span class="std std-ref">config.core.v3.DataSource</span></a>) Local async data source.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-asyncdatasource-local"><span class="std std-ref">local</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-asyncdatasource-remote"><span class="std std-ref">remote</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-asyncdatasource-remote">
+<dt>remote</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-remotedatasource"><span class="std std-ref">config.core.v3.RemoteDataSource</span></a>) Remote async data source.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-asyncdatasource-local"><span class="std std-ref">local</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-asyncdatasource-remote"><span class="std std-ref">remote</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-transportsocket">
+<span id="envoy-v3-api-msg-config-core-v3-transportsocket"></span><h2>config.core.v3.TransportSocket<a class="headerlink" href="#config-core-v3-transportsocket" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L631">[config.core.v3.TransportSocket proto]</a></p>
+<p>Configuration for transport socket in <a class="reference internal" href="../../../../configuration/listeners/listeners.html#config-listeners"><span class="std std-ref">listeners</span></a> and
+<a class="reference internal" href="../../cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">clusters</span></a>. If the configuration is
+empty, a default transport socket implementation and configuration will be
+chosen based on the platform and existence of tls_context.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;typed_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-transportsocket-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The name of the transport socket to instantiate. The name must match a supported transport
+socket implementation.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-transportsocket-typed-config">
+<dt>typed_config</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any">Any</a>)
+Implementation specific configuration which depends on the implementation being instantiated.
+See the supported transport socket implementations for further documentation.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-runtimefractionalpercent">
+<span id="envoy-v3-api-msg-config-core-v3-runtimefractionalpercent"></span><h2>config.core.v3.RuntimeFractionalPercent<a class="headerlink" href="#config-core-v3-runtimefractionalpercent" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L659">[config.core.v3.RuntimeFractionalPercent proto]</a></p>
+<p>Runtime derived FractionalPercent with defaults for when the numerator or denominator is not
+specified via a runtime key.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Parsing of the runtime key’s data is implemented such that it may be represented as a
+<a class="reference internal" href="../../../type/v3/percent.proto.html#envoy-v3-api-msg-type-v3-fractionalpercent"><span class="std std-ref">FractionalPercent</span></a> proto represented as JSON/YAML
+and may also be represented as an integer with the assumption that the value is an integral
+percentage out of 100. For instance, a runtime key lookup returning the value “42” would parse
+as a <code class="docutils literal notranslate"><span class="pre">FractionalPercent</span></code> whose numerator is 42 and denominator is HUNDRED.</p>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;default_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;runtime_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-runtimefractionalpercent-default-value">
+<dt>default_value</dt><dd><p>(<a class="reference internal" href="../../../type/v3/percent.proto.html#envoy-v3-api-msg-type-v3-fractionalpercent"><span class="std std-ref">type.v3.FractionalPercent</span></a>, <em>REQUIRED</em>) Default value if the runtime value’s for the numerator/denominator keys are not available.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-runtimefractionalpercent-runtime-key">
+<dt>runtime_key</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Runtime key for a YAML representation of a FractionalPercent.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-controlplane">
+<span id="envoy-v3-api-msg-config-core-v3-controlplane"></span><h2>config.core.v3.ControlPlane<a class="headerlink" href="#config-core-v3-controlplane" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L671">[config.core.v3.ControlPlane proto]</a></p>
+<p>Identifies a specific ControlPlane instance that Envoy is connected to.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;identifier&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-controlplane-identifier">
+<dt>identifier</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) An opaque control plane identifier that uniquely identifies an instance
+of control plane. This can be used to identify which control plane instance,
+the Envoy is connected to.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-config-core-v3-routingpriority">
+<span id="envoy-v3-api-enum-config-core-v3-routingpriority"></span><h2>Enum config.core.v3.RoutingPriority<a class="headerlink" href="#enum-config-core-v3-routingpriority" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L37">[config.core.v3.RoutingPriority proto]</a></p>
+<p>Envoy supports <a class="reference internal" href="../../../../intro/arch_overview/http/http_routing.html#arch-overview-http-routing-priority"><span class="std std-ref">upstream priority routing</span></a> both at the route and the virtual
+cluster level. The current priority implementation uses different connection
+pool and circuit breaking settings for each priority level. This means that
+even for HTTP/2 requests, two physical connections will be used to an
+upstream host. In the future Envoy will likely support true HTTP/2 priority
+over a single upstream connection.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-routingpriority-default">
+<dt>DEFAULT</dt><dd><p><em>(DEFAULT)</em> ⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-routingpriority-high">
+<dt>HIGH</dt><dd><p>⁣</p>
+</dd>
+</dl>
+</section>
+<section id="enum-config-core-v3-requestmethod">
+<span id="envoy-v3-api-enum-config-core-v3-requestmethod"></span><h2>Enum config.core.v3.RequestMethod<a class="headerlink" href="#enum-config-core-v3-requestmethod" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L43">[config.core.v3.RequestMethod proto]</a></p>
+<p>HTTP request method.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-requestmethod-method-unspecified">
+<dt>METHOD_UNSPECIFIED</dt><dd><p><em>(DEFAULT)</em> ⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-requestmethod-get">
+<dt>GET</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-requestmethod-head">
+<dt>HEAD</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-requestmethod-post">
+<dt>POST</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-requestmethod-put">
+<dt>PUT</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-requestmethod-delete">
+<dt>DELETE</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-requestmethod-connect">
+<dt>CONNECT</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-requestmethod-options">
+<dt>OPTIONS</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-requestmethod-trace">
+<dt>TRACE</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-requestmethod-patch">
+<dt>PATCH</dt><dd><p>⁣</p>
+</dd>
+</dl>
+</section>
+<section id="enum-config-core-v3-trafficdirection">
+<span id="envoy-v3-api-enum-config-core-v3-trafficdirection"></span><h2>Enum config.core.v3.TrafficDirection<a class="headerlink" href="#enum-config-core-v3-trafficdirection" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/base.proto#L57">[config.core.v3.TrafficDirection proto]</a></p>
+<p>Identifies the direction of the traffic relative to the local Envoy.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-trafficdirection-unspecified">
+<dt>UNSPECIFIED</dt><dd><p><em>(DEFAULT)</em> ⁣Default option is unspecified.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-trafficdirection-inbound">
+<dt>INBOUND</dt><dd><p>⁣The transport is used for incoming traffic.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-trafficdirection-outbound">
+<dt>OUTBOUND</dt><dd><p>⁣The transport is used for outgoing traffic.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../../extensions/filters/common/jwks/v3/jwt_handshake.proto.html" class="btn btn-neutral float-left" title="JWT handshake validation (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="cel.proto.html" class="btn btn-neutral float-right" title="CEL Expression Configuration (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Common types (proto)</a><ul>
+<li><a class="reference internal" href="#config-core-v3-locality">config.core.v3.Locality</a></li>
+<li><a class="reference internal" href="#config-core-v3-buildversion">config.core.v3.BuildVersion</a></li>
+<li><a class="reference internal" href="#config-core-v3-extension">config.core.v3.Extension</a></li>
+<li><a class="reference internal" href="#config-core-v3-node">config.core.v3.Node</a></li>
+<li><a class="reference internal" href="#config-core-v3-metadata">config.core.v3.Metadata</a></li>
+<li><a class="reference internal" href="#config-core-v3-runtimeuint32">config.core.v3.RuntimeUInt32</a></li>
+<li><a class="reference internal" href="#config-core-v3-runtimeuint64">config.core.v3.RuntimeUInt64</a></li>
+<li><a class="reference internal" href="#config-core-v3-runtimepercent">config.core.v3.RuntimePercent</a></li>
+<li><a class="reference internal" href="#config-core-v3-runtimedouble">config.core.v3.RuntimeDouble</a></li>
+<li><a class="reference internal" href="#config-core-v3-runtimefeatureflag">config.core.v3.RuntimeFeatureFlag</a></li>
+<li><a class="reference internal" href="#config-core-v3-keyvaluepair">config.core.v3.KeyValuePair</a></li>
+<li><a class="reference internal" href="#config-core-v3-keyvalueappend">config.core.v3.KeyValueAppend</a></li>
+<li><a class="reference internal" href="#enum-config-core-v3-keyvalueappend-keyvalueappendaction">Enum config.core.v3.KeyValueAppend.KeyValueAppendAction</a></li>
+<li><a class="reference internal" href="#config-core-v3-keyvaluemutation">config.core.v3.KeyValueMutation</a></li>
+<li><a class="reference internal" href="#config-core-v3-queryparameter">config.core.v3.QueryParameter</a></li>
+<li><a class="reference internal" href="#config-core-v3-headervalue">config.core.v3.HeaderValue</a></li>
+<li><a class="reference internal" href="#config-core-v3-headervalueoption">config.core.v3.HeaderValueOption</a></li>
+<li><a class="reference internal" href="#enum-config-core-v3-headervalueoption-headerappendaction">Enum config.core.v3.HeaderValueOption.HeaderAppendAction</a></li>
+<li><a class="reference internal" href="#config-core-v3-headermap">config.core.v3.HeaderMap</a></li>
+<li><a class="reference internal" href="#config-core-v3-watcheddirectory">config.core.v3.WatchedDirectory</a></li>
+<li><a class="reference internal" href="#config-core-v3-datasource">config.core.v3.DataSource</a></li>
+<li><a class="reference internal" href="#config-core-v3-retrypolicy">config.core.v3.RetryPolicy</a></li>
+<li><a class="reference internal" href="#config-core-v3-retrypolicy-retrypriority">config.core.v3.RetryPolicy.RetryPriority</a></li>
+<li><a class="reference internal" href="#config-core-v3-retrypolicy-retryhostpredicate">config.core.v3.RetryPolicy.RetryHostPredicate</a></li>
+<li><a class="reference internal" href="#config-core-v3-remotedatasource">config.core.v3.RemoteDataSource</a></li>
+<li><a class="reference internal" href="#config-core-v3-asyncdatasource">config.core.v3.AsyncDataSource</a></li>
+<li><a class="reference internal" href="#config-core-v3-transportsocket">config.core.v3.TransportSocket</a></li>
+<li><a class="reference internal" href="#config-core-v3-runtimefractionalpercent">config.core.v3.RuntimeFractionalPercent</a></li>
+<li><a class="reference internal" href="#config-core-v3-controlplane">config.core.v3.ControlPlane</a></li>
+<li><a class="reference internal" href="#enum-config-core-v3-routingpriority">Enum config.core.v3.RoutingPriority</a></li>
+<li><a class="reference internal" href="#enum-config-core-v3-requestmethod">Enum config.core.v3.RequestMethod</a></li>
+<li><a class="reference internal" href="#enum-config-core-v3-trafficdirection">Enum config.core.v3.TrafficDirection</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

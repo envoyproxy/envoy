@@ -1,0 +1,49 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/listener/http_inspector/v3/http_inspector.proto:
+
+HTTP Inspector Filter (proto)
+=============================
+
+.. _extension_envoy.filters.listener.http_inspector:
+
+This extension has the qualified name ``envoy.filters.listener.http_inspector``
+
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.listener <extension_category_envoy.filters.listener>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.listener.http_inspector.v3.HttpInspector <envoy_v3_api_msg_extensions.filters.listener.http_inspector.v3.HttpInspector>`
+
+
+
+Detect whether the application protocol is HTTP.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.listener.http_inspector.v3.HttpInspector:
+
+extensions.filters.listener.http_inspector.v3.HttpInspector
+-----------------------------------------------------------
+
+
+:repo:`[extensions.filters.listener.http_inspector.v3.HttpInspector proto] <api/envoy/extensions/filters/listener/http_inspector/v3/http_inspector.proto#L17>`
+
+
+
+
+

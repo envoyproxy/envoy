@@ -1,0 +1,131 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.proto:
+
+gRPC HTTP/1.1 Reverse Bridge (proto)
+====================================
+
+.. _extension_envoy.filters.http.grpc_http1_reverse_bridge:
+
+This extension has the qualified name ``envoy.filters.http.grpc_http1_reverse_bridge``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig <envoy_v3_api_msg_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfigPerRoute <envoy_v3_api_msg_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfigPerRoute>`
+
+
+
+gRPC HTTP/1.1 Reverse Bridge :ref:`configuration overview
+<config_http_filters_grpc_http1_reverse_bridge>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig:
+
+extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig proto] <api/envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.proto#L20>`
+
+gRPC reverse bridge filter configuration
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "content_type": ...,
+    "withhold_grpc_frames": ...,
+    "response_size_header": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.content_type:
+
+
+content_type
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The content-type to pass to the upstream when the gRPC bridge filter is applied.
+  The filter will also validate that the upstream responds with the same content type.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.withhold_grpc_frames:
+
+
+withhold_grpc_frames
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, Envoy will assume that the upstream doesn't understand gRPC frames and
+  strip the gRPC frame from the request, and add it back in to the response. This will
+  hide the gRPC semantics from the upstream, allowing it to receive and respond with a
+  simple binary encoded protobuf. In order to calculate the ``Content-Length`` header value, Envoy
+  will buffer the upstream response unless :ref:`response_size_header
+  <envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.response_size_header>`
+  is set, in which case Envoy will use the value of an upstream header to calculate the content
+  length.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.response_size_header:
+
+
+response_size_header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When :ref:`withhold_grpc_frames
+  <envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.withhold_grpc_frames>`
+  is true, this option controls how Envoy calculates the ``Content-Length``. When
+  ``response_size_header`` is empty, Envoy will buffer the upstream response to calculate its
+  size. When ``response_size_header`` is set to a non-empty string, Envoy will stream the response
+  to the downstream and it will use the value of the response header with this name to set the
+  ``Content-Length`` header and gRPC frame size. If the header with this name is repeated, only
+  the first value will be used.
+
+  Envoy will treat the upstream response as an error if this option is specified and the header
+  is missing or if the value does not match the actual response body size.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfigPerRoute:
+
+extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfigPerRoute
+-------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfigPerRoute proto] <api/envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.proto#L54>`
+
+gRPC reverse bridge filter configuration per virtualhost/route/weighted-cluster level.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "disabled": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfigPerRoute.disabled:
+
+
+disabled
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, disables gRPC reverse bridge filter for this particular vhost or route.
+  If disabled is specified in multiple per-filter-configs, the most specific one will be used.
+
+

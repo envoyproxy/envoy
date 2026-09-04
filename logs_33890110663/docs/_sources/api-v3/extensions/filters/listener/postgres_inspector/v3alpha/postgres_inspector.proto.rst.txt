@@ -1,0 +1,137 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/listener/postgres_inspector/v3alpha/postgres_inspector.proto:
+
+Postgres Inspector (proto)
+==========================
+
+.. _extension_envoy.filters.listener.postgres_inspector:
+
+This extension has the qualified name ``envoy.filters.listener.postgres_inspector``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.listener <extension_category_envoy.filters.listener>`
+
+
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+Postgres Inspector :ref:`configuration overview <extension_envoy.filters.listener.postgres_inspector>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.listener.postgres_inspector.v3alpha.PostgresInspector:
+
+extensions.filters.listener.postgres_inspector.v3alpha.PostgresInspector
+------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.listener.postgres_inspector.v3alpha.PostgresInspector proto] <api/contrib/envoy/extensions/filters/listener/postgres_inspector/v3alpha/postgres_inspector.proto#L21>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "enable_metadata_extraction": {...},
+    "max_startup_message_size": {...},
+    "startup_timeout": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.listener.postgres_inspector.v3alpha.PostgresInspector.enable_metadata_extraction:
+
+
+enable_metadata_extraction
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Enable extraction of connection metadata (user, database, application name) from
+  the startup message. This metadata is made available for access logging and stats.
+
+  Defaults to ``true``.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.postgres_inspector.v3alpha.PostgresInspector.max_startup_message_size:
+
+
+max_startup_message_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The maximum size of the startup message that the postgres inspector will accept.
+  Messages larger than this will be rejected. If not specified, defaults to 10KB.
+
+  PostgreSQL defines MAX_STARTUP_PACKET_LENGTH as 10KB.
+  Valid range is 256 bytes to 10KB.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.postgres_inspector.v3alpha.PostgresInspector.startup_timeout:
+
+
+startup_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Timeout for the inspector to receive and process the startup message.
+  The timeout starts when the connection is accepted by the listener.
+  If the timeout is reached before the startup message is fully received and processed,
+  the connection will be closed.
+
+  If not specified, defaults to 10 seconds. Minimum is 1 second.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.listener.postgres_inspector.v3alpha.StartupMetadata:
+
+extensions.filters.listener.postgres_inspector.v3alpha.StartupMetadata
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.listener.postgres_inspector.v3alpha.StartupMetadata proto] <api/contrib/envoy/extensions/filters/listener/postgres_inspector/v3alpha/postgres_inspector.proto#L47>`
+
+StartupMetadata stores connection attributes extracted from the PostgreSQL startup message.
+This is attached as typed dynamic metadata under the key ``envoy.postgres_inspector``.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "user": ...,
+    "database": ...,
+    "application_name": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.listener.postgres_inspector.v3alpha.StartupMetadata.user:
+
+
+user
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The username supplied in the startup message.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.postgres_inspector.v3alpha.StartupMetadata.database:
+
+
+database
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The database name supplied in the startup message. If not provided, it may default to the user name.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.postgres_inspector.v3alpha.StartupMetadata.application_name:
+
+
+application_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The application name supplied in the startup message.
+
+

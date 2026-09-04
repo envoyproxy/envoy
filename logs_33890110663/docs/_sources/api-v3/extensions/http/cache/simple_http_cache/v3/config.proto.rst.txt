@@ -1,0 +1,48 @@
+.. _envoy_v3_api_file_envoy/extensions/http/cache/simple_http_cache/v3/config.proto:
+
+SimpleHttpCache CacheFilter storage plugin (proto)
+==================================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig:
+
+extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig
+----------------------------------------------------------------
+
+
+:repo:`[extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig proto] <api/envoy/extensions/http/cache/simple_http_cache/v3/config.proto#L15>`
+
+
+.. _extension_envoy.extensions.http.cache.simple:
+
+This extension has the qualified name ``envoy.extensions.http.cache.simple``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.http.cache <extension_category_envoy.http.cache>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig <envoy_v3_api_msg_extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig>`
+
+
+
+
+

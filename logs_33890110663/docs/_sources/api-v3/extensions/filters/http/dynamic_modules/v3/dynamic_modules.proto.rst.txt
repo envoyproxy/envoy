@@ -1,0 +1,229 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.proto:
+
+Dynamic Modules HTTP Filter (proto)
+===================================
+
+.. _extension_envoy.filters.http.dynamic_modules:
+
+This extension has the qualified name ``envoy.filters.http.dynamic_modules``
+
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+  - :ref:`envoy.filters.http.upstream <extension_category_envoy.filters.http.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter:
+
+extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+--------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter proto] <api/envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.proto#L31>`
+
+Configuration for the Dynamic Modules HTTP filter. This filter allows loading shared object files
+that can be loaded via ``dlopen`` to extend the HTTP filter chain.
+
+A module can be loaded by multiple HTTP filters; the module is loaded only once and shared across
+multiple filters.
+
+A dynamic module HTTP filter can opt into being a terminal filter with no upstream by setting
+:ref:`terminal_filter
+<envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.terminal_filter>`
+to ``true``. A terminal dynamic module can use ``send_`` ABI methods to send response headers,
+body, and trailers to the downstream.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "filter_name": ...,
+    "filter_config": {...},
+    "terminal_filter": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`) Specifies the shared-object level configuration.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.filter_name:
+
+
+filter_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name for this filter configuration.
+
+  This can be used to distinguish between different filter implementations inside a dynamic
+  module. For example, a module can have completely different filter implementations. When Envoy
+  receives this configuration, it passes the ``filter_name`` to the dynamic module's HTTP filter
+  config init function together with the ``filter_config``. That way a module can decide which
+  in-module filter implementation to use based on the name at load time.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.filter_config:
+
+
+filter_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the filter chosen by ``filter_name``.
+
+  This is passed to the module's HTTP filter initialization function. Together with the
+  ``filter_name``, the module can decide which in-module filter implementation to use and
+  fine-tune the behavior of the filter.
+
+  For example, if a module has two filter implementations, one for logging and one for header
+  manipulation, ``filter_name`` is used to choose either logging or header manipulation. The
+  ``filter_config`` can be used to configure the logging level or the header manipulation
+  behavior.
+
+  ``google.protobuf.Struct`` is serialized as JSON before passing it to the plugin.
+  ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly without
+  the wrapper.
+
+  .. code-block:: yaml
+
+   # Passing in a string
+   filter_config:
+     "@type": "type.googleapis.com/google.protobuf.StringValue"
+     value: hello
+
+   # Passing in raw bytes
+   filter_config:
+     "@type": "type.googleapis.com/google.protobuf.BytesValue"
+     value: aGVsbG8= # echo -n "hello" | base64
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.terminal_filter:
+
+
+terminal_filter
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If ``true``, the dynamic module is a terminal filter to use without an upstream.
+
+  The dynamic module is responsible for creating and sending the response to downstream.
+
+  Defaults to ``false``.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilterPerRoute:
+
+extensions.filters.http.dynamic_modules.v3.DynamicModuleFilterPerRoute
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.dynamic_modules.v3.DynamicModuleFilterPerRoute proto] <api/envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.proto#L82>`
+
+Configuration of the HTTP per-route filter for dynamic modules.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "per_route_config_name": ...,
+    "filter_name": ...,
+    "filter_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilterPerRoute.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`) Specifies the shared-object level configuration.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilterPerRoute.per_route_config_name:
+
+
+per_route_config_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name for this filter configuration.
+
+  This can be used to distinguish between different filter implementations inside a dynamic
+  module. For example, a module can have completely different filter implementations. When Envoy
+  receives this configuration, it passes the ``per_route_config_name`` to the dynamic module's
+  HTTP per-route filter config init function together with the ``filter_config``. That way a
+  module can decide which in-module filter implementation to use based on the name at load time.
+
+  .. note::
+    This is deprecated in favor of ``filter_name``. Please use ``filter_name`` instead of
+    ``per_route_config_name`` to specify the name for the filter implementation.
+    If both ``per_route_config_name`` and ``filter_name`` are specified, Envoy uses
+    ``filter_name`` and ignores ``per_route_config_name``.
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilterPerRoute.filter_name:
+
+
+filter_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name for this filter configuration.
+
+  This can be used to distinguish between different filter implementations inside a dynamic
+  module. For example, a module can have completely different filter implementations. When Envoy
+  receives this configuration, it passes the ``filter_name`` to the dynamic module's
+  HTTP per-route filter config init function together with the ``filter_config``. That way a
+  module can decide which in-module filter implementation to use based on the name at load time.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilterPerRoute.filter_config:
+
+
+filter_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the filter chosen by ``filter_name``.
+
+  This is passed to the module's HTTP per-route filter initialization function. Together with
+  the ``filter_name``, the module can decide which in-module filter implementation to use and fine-tune the behavior of the filter on a specific route.
+
+  For example, if a module has two filter implementations, one for logging and one for header
+  manipulation, ``filter_name`` is used to choose either logging or header
+  manipulation. The ``filter_config`` can be used to configure the logging level or the header
+  manipulation behavior.
+
+  ``google.protobuf.Struct`` is serialized as JSON before passing it to the plugin.
+  ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly without
+  the wrapper.
+
+  .. code-block:: yaml
+
+   # Passing in a string
+   filter_config:
+     "@type": "type.googleapis.com/google.protobuf.StringValue"
+     value: hello
+
+   # Passing in raw bytes
+   filter_config:
+     "@type": "type.googleapis.com/google.protobuf.BytesValue"
+     value: aGVsbG8= # echo -n "hello" | base64
+
+
+

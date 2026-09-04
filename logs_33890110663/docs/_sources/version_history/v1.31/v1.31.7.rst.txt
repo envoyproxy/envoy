@@ -1,0 +1,20 @@
+.. _version_history_1.31.7:
+
+1.31.7 (March 25, 2025)
+========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **docker**: Distroless container updated and Ubuntu base image corrected.
+

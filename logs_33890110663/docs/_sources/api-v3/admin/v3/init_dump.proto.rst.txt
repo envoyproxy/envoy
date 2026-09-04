@@ -1,0 +1,75 @@
+.. _envoy_v3_api_file_envoy/admin/v3/init_dump.proto:
+
+InitDump (proto)
+================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.UnreadyTargetsDumps:
+
+admin.v3.UnreadyTargetsDumps
+----------------------------
+
+
+:repo:`[admin.v3.UnreadyTargetsDumps proto] <api/envoy/admin/v3/init_dump.proto#L17>`
+
+Dumps of unready targets of envoy init managers. Envoy's admin fills this message with init managers,
+which provides the information of their unready targets.
+The :ref:`/init_dump <operations_admin_interface_init_dump>` will dump all unready targets information.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "unready_targets_dumps": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.UnreadyTargetsDumps.unready_targets_dumps:
+
+
+unready_targets_dumps
+  (**repeated** :ref:`admin.v3.UnreadyTargetsDumps.UnreadyTargetsDump <envoy_v3_api_msg_admin.v3.UnreadyTargetsDumps.UnreadyTargetsDump>`) You can choose specific component to dump unready targets with mask query parameter.
+  See :ref:`/init_dump?mask={} <operations_admin_interface_init_dump_by_mask>` for more information.
+  The dumps of unready targets of all init managers.
+
+
+.. _envoy_v3_api_msg_admin.v3.UnreadyTargetsDumps.UnreadyTargetsDump:
+
+admin.v3.UnreadyTargetsDumps.UnreadyTargetsDump
+-----------------------------------------------
+
+
+:repo:`[admin.v3.UnreadyTargetsDumps.UnreadyTargetsDump proto] <api/envoy/admin/v3/init_dump.proto#L19>`
+
+Message of unready targets information of an init manager.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "target_names": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.UnreadyTargetsDumps.UnreadyTargetsDump.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Name of the init manager. Example: "init_manager_xxx".
+
+
+.. _envoy_v3_api_field_admin.v3.UnreadyTargetsDumps.UnreadyTargetsDump.target_names:
+
+
+target_names
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Names of unready targets of the init manager. Example: "target_xxx".
+
+
+

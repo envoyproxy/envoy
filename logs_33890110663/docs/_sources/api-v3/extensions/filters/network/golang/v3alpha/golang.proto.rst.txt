@@ -1,0 +1,111 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/network/golang/v3alpha/golang.proto:
+
+Golang network filter (proto)
+=============================
+
+.. _extension_envoy.filters.network.golang:
+
+This extension has the qualified name ``envoy.filters.network.golang``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+Golang network filter :ref:`configuration overview <config_network_filters_golang>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.golang.v3alpha.Config:
+
+extensions.filters.network.golang.v3alpha.Config
+------------------------------------------------
+
+
+:repo:`[extensions.filters.network.golang.v3alpha.Config proto] <api/contrib/envoy/extensions/filters/network/golang/v3alpha/golang.proto#L24>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "is_terminal_filter": ...,
+    "library_id": ...,
+    "library_path": ...,
+    "plugin_name": ...,
+    "plugin_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.golang.v3alpha.Config.is_terminal_filter:
+
+
+is_terminal_filter
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Bool ``true`` if this filter must be the last filter in a filter chain, ``false`` otherwise.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.golang.v3alpha.Config.library_id:
+
+
+library_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Globally unique ID for a dynamic library file.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.golang.v3alpha.Config.library_path:
+
+
+library_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Path to a dynamic library implementing the
+  :repo:`DownstreamFilter API <contrib/golang/common/go/api.DownstreamFilter>`
+  interface.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.golang.v3alpha.Config.plugin_name:
+
+
+plugin_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Globally unique name of the Go plugin.
+
+  This name **must** be consistent with the name registered in ``network::RegisterNetworkFilterConfigFactory``
+
+
+
+.. _envoy_v3_api_field_extensions.filters.network.golang.v3alpha.Config.plugin_config:
+
+
+plugin_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) Configuration for the Go plugin.
+
+  .. note::
+      This configuration is only parsed in the go plugin, and is therefore not validated
+      by Envoy.
+
+      See the :repo:`DownstreamFilter API <contrib/golang/common/go/api/filter.go>`
+      for more information about how the plugin's configuration data can be accessed.
+
+
+

@@ -1,0 +1,30 @@
+.. _version_history_1.22.8:
+
+1.22.8 (February 24, 2023)
+===========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **dependency**: update Kafka to resolve CVE-2023-25194.
+
+
+
+
+New features
+------------
+
+
+* **docker**: unify published images as tag variants. For example, ``envoyproxy/envoy-dev`` is now available
+  as ``envoyproxy/envoy:dev``.
+

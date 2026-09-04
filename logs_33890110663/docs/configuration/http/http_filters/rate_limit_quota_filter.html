@@ -1,0 +1,559 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rate Limit Quota &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Role Based Access Control (RBAC) Filter" href="rbac_filter.html" />
+    <link rel="prev" title="Rate limit" href="rate_limit_filter.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../http.html">HTTP</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../http_conn_man/http_conn_man.html">HTTP connection manager</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="http_filters.html">HTTP filters</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="a2a_filter.html">A2A</a></li>
+<li class="toctree-l4"><a class="reference internal" href="adaptive_concurrency_filter.html">Adaptive Concurrency</a></li>
+<li class="toctree-l4"><a class="reference internal" href="admission_control_filter.html">Admission Control</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aws_eventstream_parser_filter.html">AWS-EventStream-Parser Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ai_protocol_manager_filter.html">AI Protocol Manager</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aws_lambda_filter.html">AWS Lambda</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api_key_auth_filter.html">API key auth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aws_request_signing_filter.html">AWS Request Signing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="bandwidth_limit_filter.html">Bandwidth limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="bandwidth_share_filter.html">Bandwidth share</a></li>
+<li class="toctree-l4"><a class="reference internal" href="basic_auth_filter.html">Basic Auth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="buffer_filter.html">Buffer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cache_filter.html">Cache filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cache_v2_filter.html">CacheV2 filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cdn_loop_filter.html">CDN-Loop header</a></li>
+<li class="toctree-l4"><a class="reference internal" href="checksum_filter.html">Checksum</a></li>
+<li class="toctree-l4"><a class="reference internal" href="compressor_filter.html">Compressor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="composite_filter.html">Composite Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="connect_grpc_bridge_filter.html">Connect-gRPC Bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cors_filter.html">CORS</a></li>
+<li class="toctree-l4"><a class="reference internal" href="credential_injector_filter.html">Credential injector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="csrf_filter.html">CSRF</a></li>
+<li class="toctree-l4"><a class="reference internal" href="custom_response_filter.html">Custom Response Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="decompressor_filter.html">Decompressor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dynamic_forward_proxy_filter.html">Dynamic forward proxy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dynamodb_filter.html">DynamoDB</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ext_authz_filter.html">External Authorization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ext_proc_filter.html">External Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="fault_filter.html">Fault Injection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="file_server_filter.html">File Server</a></li>
+<li class="toctree-l4"><a class="reference internal" href="file_system_buffer_filter.html">File System Buffer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="filter_chain_filter.html">Filter Chain</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gcp_authn_filter.html">GCP Authentication Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="geoip_filter.html">IP Geolocation Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="golang_filter.html">Golang</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_field_extraction_filter.html">gRPC Field Extraction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_http1_bridge_filter.html">gRPC HTTP/1.1 bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_http1_reverse_bridge_filter.html">gRPC HTTP/1.1 reverse bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_json_reverse_transcoder_filter.html">gRPC-JSON reverse transcoder</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_json_transcoder_filter.html">gRPC-JSON transcoder</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_stats_filter.html">gRPC Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_web_filter.html">gRPC-Web</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_mutation_filter.html">Header Mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="health_check_filter.html">Health check</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_to_metadata_filter.html">Envoy Header-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ip_tagging_filter.html">IP Tagging</a></li>
+<li class="toctree-l4"><a class="reference internal" href="json_to_metadata_filter.html">Envoy Json-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="jwt_authn_filter.html">JWT Authentication</a></li>
+<li class="toctree-l4"><a class="reference internal" href="kill_request_filter.html">Kill Request</a></li>
+<li class="toctree-l4"><a class="reference internal" href="language_filter.html">Language</a></li>
+<li class="toctree-l4"><a class="reference internal" href="local_rate_limit_filter.html">Local rate limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lua_filter.html">Lua</a></li>
+<li class="toctree-l4"><a class="reference internal" href="mcp_filter.html">Model Context Protocol (MCP)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="mcp_router_filter.html">MCP Router</a></li>
+<li class="toctree-l4"><a class="reference internal" href="oauth2_filter.html">OAuth2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="on_demand_updates_filter.html">On-demand VHDS, S/RDS and CDS Updates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="original_src_filter.html">Original Source</a></li>
+<li class="toctree-l4"><a class="reference internal" href="proto_api_scrubber_filter.html">Proto API Scrubber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="proto_message_extraction_filter.html">Proto Message Extraction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rate_limit_filter.html">Rate limit</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Rate Limit Quota</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rbac_filter.html">Role Based Access Control (RBAC) Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="router_filter.html">Router</a></li>
+<li class="toctree-l4"><a class="reference internal" href="set_filter_state.html">Set-Filter-State HTTP Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="set_metadata_filter.html">Set Metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="body_size_limit_filter.html">Body Size Limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sse_to_metadata_filter.html">SSE-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="stateful_session_filter.html">Stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sxg_filter.html">SXG</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tap_filter.html">Tap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="thrift_to_metadata_filter.html">Envoy Thrift-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="upstream_codec_filter.html">Upstream Codec</a></li>
+<li class="toctree-l4"><a class="reference internal" href="upstream_rbac_filter.html">Upstream Role Based Access Control (RBAC) Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wasm_filter.html">Wasm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="transform_filter.html">Transform</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../caches/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../caches_v2/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../cluster_specifier/cluster_specifier.html">HTTP cluster specifier</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tcp_bridge/tcp_bridge.html">HTTP TCP bridge</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../http.html">HTTP</a></li>
+          <li class="breadcrumb-item"><a href="http_filters.html">HTTP filters</a></li>
+      <li class="breadcrumb-item active">Rate Limit Quota</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/http/http_filters/rate_limit_quota_filter.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="rate-limit-quota">
+<span id="config-http-filters-rate-limit-quota"></span><h1>Rate Limit Quota<a class="headerlink" href="#rate-limit-quota" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Global rate limiting <a class="reference internal" href="../../../intro/arch_overview/other_features/global_rate_limiting.html#arch-overview-global-rate-limit"><span class="std std-ref">architecture overview</span></a></p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig"><span class="std std-ref">v3 API reference</span></a></p></li>
+</ul>
+<p>This filter provides implementation of the global rate limit quota <a class="reference internal" href="../../../api-v3/service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-file-envoy-service-rate-limit-quota-v3-rlqs-proto"><span class="std std-ref">protocol</span></a>.
+The rate limit quota service (RLQS) provides quota assignments to each Envoy instance connected to the RLQS service. In addition to enforcing rate limit quota assignments,
+this filter periodically reports request rates to the RLQS, allowing the RLQS server to rebalance quota assignments between Envoy instances based on the real-time
+individual load of each Envoy instance. When quota assignments change, the RLQS proactively pushes the new assignment to Envoy.</p>
+<p>The HTTP rate limit quota filter will call the rate limit quota service when it is configured in the HTTP connection manager filter chain. Filter configuration
+defines the RLQS service and definitions of quota buckets that will receive quota assignments from the server. Quota buckets are defined by a set of matchers that determine
+if a request is subject to the rate limit quota assigned to that bucket. Each matcher can contain multiple buckets by the means of the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucket-id-builder"><span class="std std-ref">bucket_id_builder</span></a>. The bucket ID builder allows
+quota buckets to be generated either dynamically based on request attributes, such as request header value or statically based on the configuration.</p>
+<p>If a request does not match any set of matchers then quota assignment for the “catch all” bucket configured by the <code class="docutils literal notranslate"><span class="pre">on_no_match</span></code> field of the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig-bucket-matchers"><span class="std std-ref">bucket_matchers</span></a> is applied. If the <code class="docutils literal notranslate"><span class="pre">on_no_match</span></code>
+configuration is not provided, all unmatched requests are not rate limited (i.e. fail-open).</p>
+<p>Bucket definitions can be overridden by the virtual host or route configurations. The more specific definition completely overrides the less specific definition.</p>
+<p>Initially all Envoy’s quota assignments are empty. The rate limit quota filter requests quota assignment from RLQS when the request matches to a bucket for the first time.
+The behavior of the filter while it waits for the initial assignment is determined by the <code class="docutils literal notranslate"><span class="pre">no_assignment_behavior</span></code> value. In this state, requests can either all be
+immediately allowed, denied until quota assignment is received.</p>
+<p>A quota assignment may have an associated <a class="reference internal" href="../../../api-v3/service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction-assignment-time-to-live"><span class="std std-ref">time to live</span></a>.
+The RLQS is expected to update the assignment before the TTL runs out. If RLQS failed to update the assignment and its TTL
+has expired, the filter can be configured to continue using the last quota assignment or fall back to a value predefined in the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expired-assignment-behavior"><span class="std std-ref">expired assignment configuration</span></a>.</p>
+<p>The rate limit quota filter reports the request load for each bucket to the RLQS with the configured <code class="docutils literal notranslate"><span class="pre">reporting_interval</span></code>. The RLQS may rebalance quota assignments based on the request
+load that each Envoy receives and push new quota assignments to Envoy instances.</p>
+<section id="failure-modes">
+<h2>Failure modes<a class="headerlink" href="#failure-modes" title="Link to this heading"></a></h2>
+<p>In case the connection to RLQS server fails, the filter will fall back to either the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-no-assignment-behavior"><span class="std std-ref">no assignment behavior</span></a>
+if it has not yet received a rate limit quota or to the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expired-assignment-behavior"><span class="std std-ref">expired assignment behavior</span></a> if
+connection could not be re-established by the time the existing quota expired.</p>
+<p>In case the RLQS client doesn’t receive the initial bucket assignment (for any reason, including
+RLQS server connection failures) within predetermined <a class="footnote-reference brackets" href="#id2" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> time, such buckets will eventually be
+purged from memory. Subsequent requests matched into the bucket will re-initialize the bucket
+in the “no assignment” state, restarting the reports. This is explained in more details at
+<a class="reference internal" href="../../../api-v3/service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-file-envoy-service-rate-limit-quota-v3-rlqs-proto"><span class="std std-ref">Rate Limit Quota Service (RLQS)</span></a>.</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id2" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>The exact time to wait for the initial assignment is chosen by the filter, and may vary based on the implementation.</p>
+</aside>
+</aside>
+</section>
+<section id="example-1">
+<h2>Example 1<a class="headerlink" href="#example-1" title="Link to this heading"></a></h2>
+<p>In this example the HTTP connection manager has the following bucket definitions in the rate limit quota filter
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig"><span class="std std-ref">configuration</span></a>. This
+configuration enables a rate limit quota filter with 3 buckets. Note that bucket ID is a map of key-value pairs.</p>
+<ol class="arabic simple">
+<li><p>Bucket id <code class="docutils literal notranslate"><span class="pre">name:</span> <span class="pre">prod-rate-limit-quota</span></code> for all requests with the <code class="docutils literal notranslate"><span class="pre">deployment:</span> <span class="pre">prod</span></code> header present. Until RLQS assigns a quota,
+all requests are allowed.</p></li>
+<li><p>Bucket id <code class="docutils literal notranslate"><span class="pre">name:</span> <span class="pre">staging-rate-limit-quota</span></code> for all requests with the <code class="docutils literal notranslate"><span class="pre">deployment:</span> <span class="pre">staging</span></code> header present. Until RLQS assigns a quota,
+all requests are denied.</p></li>
+<li><p>Bucket id <code class="docutils literal notranslate"><span class="pre">name:</span> <span class="pre">default-rate-limit-quota</span></code> for all other requests. Until RLQS assigns a quota, 1K RPS quota is applied.</p></li>
+</ol>
+<div class="literal-block-wrapper docutils container" id="id3">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/1f55cfa1fc9150d5e67c8bfbe84a5880/rate-limit-quota-filter-configuration.yaml"><code class="xref download docutils literal notranslate"><span class="pre">rate-limit-quota-filter-configuration.yaml</span></code></a></span><a class="headerlink" href="#id3" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">28</span><span class="w">              </span><span class="nt">rlqs_server</span><span class="p">:</span>
+<span class="linenos">29</span><span class="w">                </span><span class="nt">envoy_grpc</span><span class="p">:</span>
+<span class="linenos">30</span><span class="w">                  </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rate_limit_quota_service</span>
+<span class="linenos">31</span><span class="w">              </span><span class="nt">domain</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;acme-services&quot;</span>
+<span class="linenos">32</span><span class="w">              </span><span class="nt">bucket_matchers</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">                </span><span class="nt">matcher_list</span><span class="p">:</span>
+<span class="linenos">34</span><span class="w">                  </span><span class="nt">matchers</span><span class="p">:</span>
+<span class="linenos">35</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">predicate</span><span class="p">:</span>
+<span class="linenos">36</span><span class="w">                      </span><span class="nt">single_predicate</span><span class="p">:</span>
+<span class="linenos">37</span><span class="w">                        </span><span class="nt">input</span><span class="p">:</span>
+<span class="linenos">38</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="linenos">39</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">40</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="linenos">41</span><span class="w">                            </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment</span>
+<span class="linenos">42</span><span class="w">                        </span><span class="nt">value_match</span><span class="p">:</span>
+<span class="linenos">43</span><span class="w">                          </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prod</span>
+<span class="linenos">44</span><span class="w">                    </span><span class="nt">on_match</span><span class="p">:</span>
+<span class="linenos">45</span><span class="w">                      </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">46</span><span class="w">                        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prod-bucket</span>
+<span class="linenos">47</span><span class="w">                        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">48</span><span class="w">                          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings</span>
+<span class="linenos">49</span><span class="w">                          </span><span class="nt">bucket_id_builder</span><span class="p">:</span>
+<span class="linenos">50</span><span class="w">                            </span><span class="nt">bucket_id_builder</span><span class="p">:</span>
+<span class="linenos">51</span><span class="w">                              </span><span class="s">&quot;name&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">52</span><span class="w">                                </span><span class="nt">string_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;prod-rate-limit-quota&quot;</span>
+<span class="linenos">53</span><span class="w">                          </span><span class="nt">reporting_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60s</span>
+<span class="linenos">54</span><span class="w">                          </span><span class="nt">no_assignment_behavior</span><span class="p">:</span>
+<span class="linenos">55</span><span class="w">                            </span><span class="nt">fallback_rate_limit</span><span class="p">:</span>
+<span class="linenos">56</span><span class="w">                              </span><span class="nt">blanket_rule</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ALLOW_ALL</span>
+<span class="linenos">57</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">predicate</span><span class="p">:</span>
+<span class="linenos">58</span><span class="w">                      </span><span class="nt">single_predicate</span><span class="p">:</span>
+<span class="linenos">59</span><span class="w">                        </span><span class="nt">input</span><span class="p">:</span>
+<span class="linenos">60</span><span class="w">                          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request-headers</span>
+<span class="linenos">61</span><span class="w">                          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">62</span><span class="w">                            </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="linenos">63</span><span class="w">                            </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment</span>
+<span class="linenos">64</span><span class="w">                        </span><span class="nt">value_match</span><span class="p">:</span>
+<span class="linenos">65</span><span class="w">                          </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">staging</span>
+<span class="linenos">66</span><span class="w">                    </span><span class="nt">on_match</span><span class="p">:</span>
+<span class="linenos">67</span><span class="w">                      </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">68</span><span class="w">                        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">staging-bucket</span>
+<span class="linenos">69</span><span class="w">                        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">70</span><span class="w">                          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings</span>
+<span class="linenos">71</span><span class="w">                          </span><span class="nt">bucket_id_builder</span><span class="p">:</span>
+<span class="linenos">72</span><span class="w">                            </span><span class="nt">bucket_id_builder</span><span class="p">:</span>
+<span class="linenos">73</span><span class="w">                              </span><span class="s">&quot;name&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">74</span><span class="w">                                </span><span class="nt">string_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;staging-rate-limit-quota&quot;</span>
+<span class="linenos">75</span><span class="w">                          </span><span class="nt">reporting_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60s</span>
+<span class="linenos">76</span><span class="w">                          </span><span class="nt">no_assignment_behavior</span><span class="p">:</span>
+<span class="linenos">77</span><span class="w">                            </span><span class="nt">fallback_rate_limit</span><span class="p">:</span>
+<span class="linenos">78</span><span class="w">                              </span><span class="nt">blanket_rule</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DENY_ALL</span>
+<span class="linenos">79</span><span class="w">                </span><span class="c1"># The &quot;catch all&quot; bucket settings</span>
+<span class="linenos">80</span><span class="w">                </span><span class="nt">on_no_match</span><span class="p">:</span>
+<span class="linenos">81</span><span class="w">                  </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">82</span><span class="w">                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default-bucket</span>
+<span class="linenos">83</span><span class="w">                    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">84</span><span class="w">                      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings</span>
+<span class="linenos">85</span><span class="w">                      </span><span class="nt">bucket_id_builder</span><span class="p">:</span>
+<span class="linenos">86</span><span class="w">                        </span><span class="nt">bucket_id_builder</span><span class="p">:</span>
+<span class="linenos">87</span><span class="w">                          </span><span class="s">&quot;name&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">88</span><span class="w">                            </span><span class="nt">string_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;default-rate-limit-quota&quot;</span>
+<span class="linenos">89</span><span class="w">                      </span><span class="nt">reporting_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60s</span>
+<span class="linenos">90</span><span class="w">                      </span><span class="nt">deny_response_settings</span><span class="p">:</span>
+<span class="linenos">91</span><span class="w">                        </span><span class="nt">http_status</span><span class="p">:</span>
+<span class="linenos">92</span><span class="w">                          </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">429</span>
+<span class="linenos">93</span><span class="w">                      </span><span class="nt">no_assignment_behavior</span><span class="p">:</span>
+<span class="linenos">94</span><span class="w">                        </span><span class="nt">fallback_rate_limit</span><span class="p">:</span>
+<span class="linenos">95</span><span class="w">                          </span><span class="nt">blanket_rule</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ALLOW_ALL</span>
+<span class="linenos">96</span><span class="w">                      </span><span class="nt">expired_assignment_behavior</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<section id="rate-limit-quota-override">
+<h3>Rate Limit Quota Override<a class="headerlink" href="#rate-limit-quota-override" title="Link to this heading"></a></h3>
+<p>Rate limit filter <a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig"><span class="std std-ref">configuration</span></a> can be overridden
+at the virtual host or route levels using the <a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotaoverride"><span class="std std-ref">RateLimitQuotaOverride</span></a>
+configuration. The more specific configuration fully overrides less specific configuration.</p>
+</section>
+<section id="grpc-status-configuration">
+<h3>gRPC Status Configuration<a class="headerlink" href="#grpc-status-configuration" title="Link to this heading"></a></h3>
+<p>The rate limit quota filter supports customizing the response when requests exceed quota limits through the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-deny-response-settings"><span class="std std-ref">deny_response_settings</span></a>
+configuration.</p>
+<p>For HTTP requests, you can configure the HTTP status code via <code class="docutils literal notranslate"><span class="pre">http_status</span></code> (defaults to 429).</p>
+<p>For gRPC requests, you can optionally set <code class="docutils literal notranslate"><span class="pre">grpc_status</span></code> to specify the exact gRPC status code and message.
+If not set, Envoy will derive the gRPC status from the HTTP status code.</p>
+<p><strong>Example: Using default behavior (gRPC status derived from HTTP status)</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">deny_response_settings</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">http_status</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">429</span>
+</pre></div>
+</div>
+<p><strong>Example: Using explicit gRPC status</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">deny_response_settings</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">http_status</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">429</span>
+<span class="w">  </span><span class="nt">grpc_status</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8</span><span class="w">  </span><span class="c1"># RESOURCE_EXHAUSTED</span>
+<span class="w">    </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Quota</span><span class="nv"> </span><span class="s">exhausted&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="matcher-extensions">
+<h3>Matcher extensions<a class="headerlink" href="#matcher-extensions" title="Link to this heading"></a></h3>
+<p>TODO</p>
+</section>
+<section id="statistics">
+<h3>Statistics<a class="headerlink" href="#statistics" title="Link to this heading"></a></h3>
+<p>The rate limit filter outputs statistics in the <code class="docutils literal notranslate"><span class="pre">cluster.&lt;route</span> <span class="pre">target</span> <span class="pre">cluster&gt;.rate_limit_quota.</span></code> namespace.
+429 responses or the configured
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-denyresponsesettings-http-status"><span class="std std-ref">rate limited status</span></a>
+are emitted to the normal cluster <a class="reference internal" href="../../upstream/cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats-dynamic-http"><span class="std std-ref">dynamic HTTP statistics</span></a>.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>buckets</p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of quota buckets created</p></td>
+</tr>
+<tr class="row-odd"><td><p>assignments</p></td>
+<td><p>Counter</p></td>
+<td><p>Total rate limit assignments received from the rate limit quota service</p></td>
+</tr>
+<tr class="row-even"><td><p>error</p></td>
+<td><p>Counter</p></td>
+<td><p>Total errors contacting the rate limit quota service</p></td>
+</tr>
+<tr class="row-odd"><td><p>over_limit</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that exceeded assigned rate limit</p></td>
+</tr>
+<tr class="row-even"><td><p>no_assigment</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that were applied the <a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-no-assignment-behavior"><span class="std std-ref">no_assigment_behavior</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p>expired_assigment</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that were applied the <a class="reference internal" href="../../../api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expired-assignment-behavior"><span class="std std-ref">expired_assignment_behavior</span></a></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="rate_limit_filter.html" class="btn btn-neutral float-left" title="Rate limit" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="rbac_filter.html" class="btn btn-neutral float-right" title="Role Based Access Control (RBAC) Filter" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Rate Limit Quota</a><ul>
+<li><a class="reference internal" href="#failure-modes">Failure modes</a></li>
+<li><a class="reference internal" href="#example-1">Example 1</a><ul>
+<li><a class="reference internal" href="#rate-limit-quota-override">Rate Limit Quota Override</a></li>
+<li><a class="reference internal" href="#grpc-status-configuration">gRPC Status Configuration</a></li>
+<li><a class="reference internal" href="#matcher-extensions">Matcher extensions</a></li>
+<li><a class="reference internal" href="#statistics">Statistics</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,406 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Well Known Filter State Objects &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Metadata configurations" href="metadata_configurations.html" />
+    <link rel="prev" title="Well Known Dynamic Metadata" href="well_known_dynamic_metadata.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../http/http.html">HTTP</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="advanced.html">Advanced</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="well_known_dynamic_metadata.html">Well Known Dynamic Metadata</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Well Known Filter State Objects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="metadata_configurations.html">Metadata configurations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="substitution_formatter.html">Substitution Formatter</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="advanced.html">Advanced</a></li>
+      <li class="breadcrumb-item active">Well Known Filter State Objects</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/configuration/advanced/well_known_filter_state.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="well-known-filter-state-objects">
+<span id="well-known-filter-state"></span><h1>Well Known Filter State Objects<a class="headerlink" href="#well-known-filter-state-objects" title="Link to this heading"></a></h1>
+<p>The following lists the filter state object keys used by the Envoy extensions to programmatically modify their behavior:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.network.upstream_server_name</span></code></dt><dd><p>Sets the transport socket option to override the <a class="reference external" href="https://en.wikipedia.org/wiki/Server_Name_Indication">SNI</a> in
+the upstream connections. Accepts a host name as a constructor, e.g. “lyft.com”.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.network.application_protocols</span></code></dt><dd><p>Sets the transport socket option to override the <a class="reference external" href="https://en.wikipedia.org/wiki/Application-LayerProtocolNegotiation">ALPN</a> list in the upstream connections. This setting takes precedence over the upstream cluster configuration.
+Accepts a comma-separated list of protocols as a constructor, e.g. “h2,http/1.1”.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.network.upstream_subject_alt_names</span></code></dt><dd><p>Enables additional verification of the upstream peer certificate SAN names. Both the
+<a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/common.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-certificatevalidationcontext"><span class="std std-ref">default certificate validator</span></a>
+and the <a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-spiffecertvalidatorconfig"><span class="std std-ref">SPIFFE certificate validator</span></a>
+support this. Accepts a comma-separated list of SAN names as a constructor.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.tcp_proxy.cluster</span></code></dt><dd><p><a class="reference internal" href="../listeners/network_filters/tcp_proxy_filter.html#config-network-filters-tcp-proxy"><span class="std std-ref">TCP proxy</span></a> dynamic cluster name selection on a per-connection basis. Accepts
+a cluster name as a constructor.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.udp_proxy.cluster</span></code></dt><dd><p><a class="reference internal" href="../listeners/udp_filters/udp_proxy.html#config-udp-listener-filters-udp-proxy"><span class="std std-ref">UDP proxy</span></a> dynamic cluster name selection on a per-session basis. Accepts
+a cluster name as a constructor.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.network.transport_socket.original_dst_address</span></code></dt><dd><p><a class="reference internal" href="../../intro/arch_overview/upstream/load_balancing/original_dst.html#arch-overview-load-balancing-types-original-destination"><span class="std std-ref">Original destination cluster</span></a> dynamic address
+selection. Accepts an <cite>IP:PORT</cite> string as a constructor. Fields:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ip</span></code>: IP address value as a string;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">port</span></code>: port value as a number.</p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.filters.listener.original_dst.local_ip</span></code></dt><dd><p><a class="reference internal" href="../listeners/listener_filters/original_dst_filter.html#config-listener-filters-original-dst"><span class="std std-ref">Original destination listener filter</span></a> destination address selection for
+the internal listeners. Accepts an <cite>IP:PORT</cite> string as a constructor. Fields:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ip</span></code>: IP address value as a string;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">port</span></code>: port value as a number.</p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.filters.listener.original_dst.remote_ip</span></code></dt><dd><p><a class="reference internal" href="../listeners/listener_filters/original_dst_filter.html#config-listener-filters-original-dst"><span class="std std-ref">Original destination listener filter</span></a> source address selection for the
+internal listeners. Accepts an <cite>IP:PORT</cite> string as a constructor. Fields:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ip</span></code>: IP address value as a string;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">port</span></code>: port value as a number.</p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.upstream.dynamic_host</span></code></dt><dd><p><a class="reference internal" href="../../api-v3/extensions/clusters/dynamic_forward_proxy/v3/cluster.proto.html#envoy-v3-api-msg-extensions-clusters-dynamic-forward-proxy-v3-clusterconfig"><span class="std std-ref">Dynamic forward proxy</span></a> upstream
+host override on a per-connection basis. Accepts a host string as a constructor.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.upstream.dynamic_port</span></code></dt><dd><p><a class="reference internal" href="../../api-v3/extensions/clusters/dynamic_forward_proxy/v3/cluster.proto.html#envoy-v3-api-msg-extensions-clusters-dynamic-forward-proxy-v3-clusterconfig"><span class="std std-ref">Dynamic forward proxy</span></a> upstream
+port override on a per-connection basis. Accepts a port number string as a constructor.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.tcp_proxy.disable_tunneling</span></code></dt><dd><p><a class="reference internal" href="../../api-v3/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto.html#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunneling-config"><span class="std std-ref">TCP proxy tunneling override</span></a> to disable tunneling on a
+per-connection bases. Accepts values “true” and “false”.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.filters.network.http_connection_manager.local_reply_owner</span></code></dt><dd><p>Shared filter status for logging which filter config name in the HTTP filter chain sent the local reply.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.network.transport_socket.http_11_proxy.info</span></code></dt><dd><p>Sets per-request HTTP/1.1 proxy information for upstream connections. This is used to inform the http_11_proxy
+transport socket of the proxy information for the upstream connection.
+Accepts a constructor string of the form <code class="docutils literal notranslate"><span class="pre">&quot;&lt;target_host:port&gt;,&lt;proxy_ip:port&gt;&quot;</span></code>. If <code class="docutils literal notranslate"><span class="pre">proxy_ip</span></code> is an IPv6
+address, it must use bracket notation (for example, <code class="docutils literal notranslate"><span class="pre">[::1]:15002</span></code>). For example:
+<code class="docutils literal notranslate"><span class="pre">&quot;example.com:443,127.0.0.1:15002&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;example.com:443,[::1]:15002&quot;</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.tcp_proxy.per_connection_idle_timeout_ms</span></code></dt><dd><p><a class="reference internal" href="../../api-v3/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto.html#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-idle-timeout"><span class="std std-ref">TCP proxy idle timeout duration</span></a> override on a per-connection
+basis. Accepts a count of milliseconds number string as a constructor.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.ratelimit.hits_addend</span></code></dt><dd><p><a class="reference internal" href="../../api-v3/service/ratelimit/v3/rls.proto.html#envoy-v3-api-field-service-ratelimit-v3-ratelimitrequest-hits-addend"><span class="std std-ref">Rate Limit Hits Addend</span></a> override on a per-route basis.
+Accepts a number string as a constructor.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.geoip</span></code></dt><dd><p><a class="reference internal" href="../listeners/network_filters/geoip_filter.html#config-network-filters-geoip"><span class="std std-ref">Network GeoIP filter</span></a> stores geolocation lookup results
+in this filter state object. The object contains fields for geographic data such as country,
+city, region, and ASN. Supports serialization for access logging and field-level access. Fields:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">country</span></code>: ISO country code;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">city</span></code>: city name;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">region</span></code>: ISO region code;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">asn</span></code>: autonomous system number;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">anon</span></code>: anonymization network check result (<code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code>);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">anon_vpn</span></code>: VPN check result (<code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code>);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">anon_hosting</span></code>: hosting provider check result (<code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code>);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">anon_tor</span></code>: TOR exit node check result (<code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code>);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">anon_proxy</span></code>: public proxy check result (<code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code>);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">isp</span></code>: ISP name;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">apple_private_relay</span></code>: iCloud Private Relay check result (<code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code>).</p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.filters.http.mcp.request</span></code></dt><dd><p><a class="reference internal" href="../http/http_filters/mcp_filter.html#config-http-filters-mcp"><span class="std std-ref">MCP filter</span></a> stores parsed MCP (Model Context Protocol) JSON-RPC
+request attributes when <code class="docutils literal notranslate"><span class="pre">request_storage_mode</span></code> is set to <code class="docutils literal notranslate"><span class="pre">FILTER_STATE</span></code> or
+<code class="docutils literal notranslate"><span class="pre">DYNAMIC_METADATA_AND_FILTER_STATE</span></code>. The object stores extracted fields from the parsed request.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.network.network_namespace</span></code></dt><dd><p>Contains the value of the downstream connection’s Linux network namespace if it differs from the default.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.network.upstream_bind_override.network_namespace</span></code></dt><dd><p>Allows overriding the network namespace on the upstream connections using the <a class="reference internal" href="../../api-v3/extensions/local_address_selectors/filter_state_override/v3/config.proto.html#envoy-v3-api-msg-extensions-local-address-selectors-filter-state-override-v3-config"><span class="std std-ref">Linux network
+namespace local address selector</span></a>
+extension. The object should serialize to the network namespace filepath, and the empty string
+value clears the network namespace. This object is expected to be shared from the downstream
+filters with the upstream connections.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.tls.certificate_mappers.on_demand_secret</span></code></dt><dd><p>Allows overriding the certificate to use per-connection using the <a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-cert-mappers-filter-state-override-v3-config"><span class="std std-ref">filter state certificate mapper</span></a>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.tls.cert_validator.spiffe.workload_trust_domain</span></code></dt><dd><p>Specifies per-connection workload trust domain to be used in the <a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-spiffecertvalidatorconfig"><span class="std std-ref">SPIFFE certificate validator</span></a>.</p>
+</dd>
+</dl>
+<section id="filter-state-object-factories">
+<h2>Filter state object factories<a class="headerlink" href="#filter-state-object-factories" title="Link to this heading"></a></h2>
+<p>The following generic filter state factories can be used to create filter state objects via
+configuration with a <a class="reference internal" href="../../api-v3/extensions/filters/common/set_filter_state/v3/value.proto.html#envoy-v3-api-field-extensions-filters-common-set-filter-state-v3-filterstatevalue-factory-key"><span class="std std-ref">factory lookup key</span></a>.</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.string</span></code></dt><dd><p>A generic string object factory for creating filter state entries with custom key names.
+Use this as the <a class="reference internal" href="../../api-v3/extensions/filters/common/set_filter_state/v3/value.proto.html#envoy-v3-api-field-extensions-filters-common-set-filter-state-v3-filterstatevalue-factory-key"><span class="std std-ref">factory_key</span></a>
+when your <code class="docutils literal notranslate"><span class="pre">object_key</span></code> is a custom name not listed in this document.</p>
+<p>Example configuration:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">object_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my.custom.key</span>
+<span class="nt">factory_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.string</span>
+<span class="nt">format_string</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">text_format_source</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">inline_string</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my-value&quot;</span>
+</pre></div>
+</div>
+<p>This creates a filter state entry named <code class="docutils literal notranslate"><span class="pre">my.custom.key</span></code> containing the string <code class="docutils literal notranslate"><span class="pre">my-value</span></code>.
+The value can be accessed in access logs using <code class="docutils literal notranslate"><span class="pre">%FILTER_STATE(my.custom.key)%</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.hashable_string</span></code></dt><dd><p>Same as <code class="docutils literal notranslate"><span class="pre">envoy.string</span></code> but supports connection pool hashing when <a class="reference internal" href="../../intro/arch_overview/advanced/data_sharing_between_filters.html#arch-overview-advanced-filter-state-sharing"><span class="std std-ref">shared with the upstream</span></a>. Please use with care as it can lead to significant
+increase in the number of upstream connections when used with HTTP upstreams.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.bool</span></code></dt><dd><p>A generic boolean object factory for creating filter state entries with boolean values.
+Accepts the following case-insensitive values: <code class="docutils literal notranslate"><span class="pre">true</span></code>, <code class="docutils literal notranslate"><span class="pre">t</span></code>, <code class="docutils literal notranslate"><span class="pre">yes</span></code>, <code class="docutils literal notranslate"><span class="pre">y</span></code>, <code class="docutils literal notranslate"><span class="pre">1</span></code> for true;
+<code class="docutils literal notranslate"><span class="pre">false</span></code>, <code class="docutils literal notranslate"><span class="pre">f</span></code>, <code class="docutils literal notranslate"><span class="pre">no</span></code>, <code class="docutils literal notranslate"><span class="pre">n</span></code>, <code class="docutils literal notranslate"><span class="pre">0</span></code> for false. Invalid values are rejected and do not create
+a filter state object.</p>
+<p>Example configuration:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">object_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my.custom.gate</span>
+<span class="nt">factory_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.bool</span>
+<span class="nt">format_string</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">text_format_source</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">inline_string</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">envoy.network.ip</span></code></dt><dd><p>A factory to create IP addresses from <code class="docutils literal notranslate"><span class="pre">IPv4</span></code> and <code class="docutils literal notranslate"><span class="pre">IPv6</span></code> address strings.</p>
+</dd>
+</dl>
+</section>
+<section id="filter-state-object-fields">
+<h2>Filter state object fields<a class="headerlink" href="#filter-state-object-fields" title="Link to this heading"></a></h2>
+<p>The filter state object fields can be used in the format strings. For example,
+the following format string references the port number in the original
+destination cluster filter state object:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%FILTER_STATE(envoy.network.transport_socket.original_dst_address:FIELD:port)%
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="well_known_dynamic_metadata.html" class="btn btn-neutral float-left" title="Well Known Dynamic Metadata" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="metadata_configurations.html" class="btn btn-neutral float-right" title="Metadata configurations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Well Known Filter State Objects</a><ul>
+<li><a class="reference internal" href="#filter-state-object-factories">Filter state object factories</a></li>
+<li><a class="reference internal" href="#filter-state-object-fields">Filter state object fields</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

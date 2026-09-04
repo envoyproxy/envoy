@@ -1,0 +1,1011 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto:
+
+Redis Proxy (proto)
+===================
+
+.. _extension_envoy.filters.network.redis_proxy:
+
+This extension has the qualified name ``envoy.filters.network.redis_proxy``
+
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>`
+
+
+
+Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy:
+
+extensions.filters.network.redis_proxy.v3.RedisProxy
+----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProxy proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L31>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "settings": {...},
+    "latency_in_micros": ...,
+    "prefix_routes": {...},
+    "downstream_auth_password": {...},
+    "downstream_auth_passwords": [],
+    "faults": [],
+    "downstream_auth_username": {...},
+    "external_auth_provider": {...},
+    "custom_commands": [],
+    "protocol_version": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The prefix to use when emitting :ref:`statistics <config_network_filters_redis_proxy_stats>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.settings:
+
+
+settings
+  (:ref:`extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings>`, *REQUIRED*) Network settings for the connection pool to the upstream clusters.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.latency_in_micros:
+
+
+latency_in_micros
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates that latency stat should be computed in microseconds. By default it is computed in
+  milliseconds. This does not apply to upstream command stats currently.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.prefix_routes:
+
+
+prefix_routes
+  (:ref:`extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes>`) List of **unique** prefixes used to separate keys from different workloads to different
+  clusters. Envoy will always favor the longest match first in case of overlap. A catch-all
+  cluster can be used to forward commands when there is no match. Time complexity of the
+  lookups are in O(min(longest key prefix, key length)).
+
+  Example:
+
+  .. code-block:: yaml
+
+     prefix_routes:
+       routes:
+         - prefix: "ab"
+           cluster: "cluster_a"
+         - prefix: "abc"
+           cluster: "cluster_b"
+
+  When using the above routes, the following prefixes would be sent to:
+
+  * ``get abc:users`` would retrieve the key 'abc:users' from cluster_b.
+  * ``get ab:users`` would retrieve the key 'ab:users' from cluster_a.
+  * ``get z:users`` would return a NoUpstreamHost error. A :ref:`catch-all
+    route<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route>`
+    would have retrieved the key from that cluster instead.
+
+  See the :ref:`configuration section
+  <arch_overview_redis_configuration>` of the architecture overview for recommendations on
+  configuring the backing clusters.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_password:
+
+
+downstream_auth_password
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis
+  AUTH command <https://redis.io/commands/auth>`_ with this password before enabling any other
+  command. If an AUTH command's password matches this password, an "OK" response will be returned
+  to the client. If the AUTH command password does not match this password, then an "ERR invalid
+  password" error will be returned. If any other command is received before AUTH when this
+  password is set, then a "NOAUTH Authentication required." error response will be sent to the
+  client. If an AUTH command is received when the password is not set, then an "ERR Client sent
+  AUTH, but no password is set" error will be returned.
+
+  .. attention::
+    This field is deprecated. Use :ref:`downstream_auth_passwords
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_passwords>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_passwords:
+
+
+downstream_auth_passwords
+  (**repeated** :ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis
+  AUTH command <https://redis.io/commands/auth>`_ with one of these passwords before enabling any other
+  command. If an AUTH command's password matches one of these passwords, an "OK" response will be returned
+  to the client. If the AUTH command password does not match, then an "ERR invalid
+  password" error will be returned. If any other command is received before AUTH when the
+  password(s) are set, then a "NOAUTH Authentication required." error response will be sent to the
+  client. If an AUTH command is received when the password is not set, then an "ERR Client sent
+  AUTH, but no password is set" error will be returned.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.faults:
+
+
+faults
+  (**repeated** :ref:`extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault>`) List of faults to inject. Faults currently come in two flavors:
+  - Delay, which delays a request.
+  - Error, which responds to a request with an error. Errors can also have delays attached.
+
+  Example:
+
+  .. code-block:: yaml
+
+     faults:
+     - fault_type: ERROR
+       fault_enabled:
+         default_value:
+           numerator: 10
+           denominator: HUNDRED
+         runtime_key: "bogus_key"
+         commands:
+         - GET
+       - fault_type: DELAY
+         fault_enabled:
+           default_value:
+             numerator: 10
+             denominator: HUNDRED
+           runtime_key: "bogus_key"
+         delay: 2s
+
+  See the :ref:`fault injection section
+  <config_network_filters_redis_proxy_fault_injection>` for more information on how to configure this.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_username:
+
+
+downstream_auth_username
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) If a username is provided an ACL style AUTH command will be required with a username and password.
+  Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis
+  AUTH command <https://redis.io/commands/auth>`_ with this username and the ``downstream_auth_password``
+  before enabling any other command. If an AUTH command's username and password matches this username
+  and the ``downstream_auth_password`` , an "OK" response will be returned to the client. If the AUTH
+  command username or password does not match this username or the ``downstream_auth_password``, then an
+  "WRONGPASS invalid username-password pair" error will be returned. If any other command is received before AUTH when this
+  password is set, then a "NOAUTH Authentication required." error response will be sent to the
+  client. If an AUTH command is received when the password is not set, then an "ERR Client sent
+  AUTH, but no ACL is set" error will be returned.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.external_auth_provider:
+
+
+external_auth_provider
+  (:ref:`extensions.filters.network.redis_proxy.v3.RedisExternalAuthProvider <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisExternalAuthProvider>`) External authentication configuration. If set, instead of validating username and password against ``downstream_auth_username`` and ``downstream_auth_password``,
+  the filter will call an external gRPC service to authenticate the client.
+  A typical usage of this feature is for situations where the password is a one-time token that needs to be validated against a remote service, like a sidecar.
+  Expiration is also supported, which will disable any further commands from the client after the expiration time, unless a new AUTH command is received and the external auth service returns a new expiration time.
+  If the external auth service returns an error, authentication is considered failed.
+  If this setting is set together with ``downstream_auth_username`` and ``downstream_auth_password``, the external auth service will be source of truth, but those fields will still be used for downstream authentication to the cluster.
+  The API is defined by :ref:`RedisProxyExternalAuthRequest <envoy_v3_api_msg_service.redis_auth.v3.RedisProxyExternalAuthRequest>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.custom_commands:
+
+
+custom_commands
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional configure redis custom commands for the proxy, eg -> ["my_custom_cmd1", "my_custom_cmd2"]
+
+  .. note::
+    The is to support redis's feature wherein new commands can be added using redis' modules api:
+    https://redis.io/docs/latest/develop/reference/modules/
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.protocol_version:
+
+
+protocol_version
+  (:ref:`extensions.filters.network.redis_proxy.v3.RedisProxy.ProtocolVersion <envoy_v3_api_enum_extensions.filters.network.redis_proxy.v3.RedisProxy.ProtocolVersion>`) RESP protocol version enforced for both downstream connections and every
+  routed upstream conn pool for this listener. Mismatched negotiation is
+  rejected at HELLO (``HELLO N`` where ``N`` does not match returns
+  ``-NOPROTO``) and, when set to ``RESP3``, at every non-HELLO/AUTH/QUIT
+  command on a connection that has not yet negotiated RESP3 (so clients
+  must perform an explicit ``HELLO 3`` handshake before any data command).
+
+  When ``protocol_version`` is ``RESP3``, every routed upstream
+  Redis-compatible backend must support ``HELLO 3`` / RESP3 (e.g.
+  Redis 6.0+, where RESP3 was introduced). Misconfigured upstreams will
+  fail every connection's HELLO 3 negotiation, surfaced as
+  ``upstream_resp3_hello_failure`` stat increments.
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings:
+
+extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings
+---------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L58>`
+
+Redis connection pool settings.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "op_timeout": {...},
+    "enable_hashtagging": ...,
+    "enable_redirection": ...,
+    "dns_cache_config": {...},
+    "max_buffer_size_before_flush": ...,
+    "buffer_flush_timeout": {...},
+    "max_upstream_unknown_connections": {...},
+    "enable_command_stats": ...,
+    "read_policy": ...,
+    "connection_rate_limit": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.op_timeout:
+
+
+op_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_, *REQUIRED*) Per-operation timeout in milliseconds. The timer starts when the first
+  command of a pipeline is written to the backend connection. Each response received from Redis
+  resets the timer since it signifies that the next command is being processed by the backend.
+  The only exception to this behavior is when a connection to a backend is not yet established.
+  In that case, the connect timeout on the cluster will govern the timeout until the connection
+  is ready.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_hashtagging:
+
+
+enable_hashtagging
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Use hash tagging on every redis key to guarantee that keys with the same hash tag will be
+  forwarded to the same upstream. The hash key used for determining the upstream in a
+  consistent hash ring configuration will be computed from the hash tagged key instead of the
+  whole key. The algorithm used to compute the hash tag is identical to the `redis-cluster
+  implementation <https://redis.io/topics/cluster-spec#keys-hash-tags>`_.
+
+  Examples:
+
+  * '{user1000}.following' and '{user1000}.followers' **will** be sent to the same upstream
+  * '{user1000}.following' and '{user1001}.following' **might** be sent to the same upstream
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_redirection:
+
+
+enable_redirection
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Accept `moved and ask redirection
+  <https://redis.io/topics/cluster-spec#redirection-and-resharding>`_ errors from upstream
+  redis servers, and retry commands to the specified target server. The target server does not
+  need to be known to the cluster manager. If the command cannot be redirected, then the
+  original error is passed downstream unchanged. By default, this support is not enabled.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.dns_cache_config:
+
+
+dns_cache_config
+  (:ref:`extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig <envoy_v3_api_msg_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig>`) If ``enable_redirection`` is set to true this option configures the DNS cache that the
+  connection pool will use to resolve hostnames that are returned with MOVED and ASK responses.
+  If no configuration is provided, DNS lookups will not be performed (and thus the MOVED/ASK errors
+  will be propagated verbatim to the user).
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.max_buffer_size_before_flush:
+
+
+max_buffer_size_before_flush
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Maximum size of encoded request buffer before flush is triggered and encoded requests
+  are sent upstream. If this is unset, the buffer flushes whenever it receives data
+  and performs no batching.
+  This feature makes it possible for multiple clients to send requests to Envoy and have
+  them batched- for example if one is running several worker processes, each with its own
+  Redis connection. There is no benefit to using this with a single downstream process.
+  Recommended size (if enabled) is 1024 bytes.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.buffer_flush_timeout:
+
+
+buffer_flush_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The encoded request buffer is flushed N milliseconds after the first request has been
+  encoded, unless the buffer size has already exceeded ``max_buffer_size_before_flush``.
+  If ``max_buffer_size_before_flush`` is not set, this flush timer is not used. Otherwise,
+  the timer should be set according to the number of clients, overall request rate and
+  desired maximum latency for a single command. For example, if there are many requests
+  being batched together at a high rate, the buffer will likely be filled before the timer
+  fires. Alternatively, if the request rate is lower the buffer will not be filled as often
+  before the timer fires.
+  If ``max_buffer_size_before_flush`` is set, but ``buffer_flush_timeout`` is not, the latter
+  defaults to 3ms.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.max_upstream_unknown_connections:
+
+
+max_upstream_unknown_connections
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) ``max_upstream_unknown_connections`` controls how many upstream connections to unknown hosts
+  can be created at any given time by any given worker thread (see ``enable_redirection`` for
+  more details). If the host is unknown and a connection cannot be created due to enforcing
+  this limit, then redirection will fail and the original redirection error will be passed
+  downstream unchanged. This limit defaults to 100.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_command_stats:
+
+
+enable_command_stats
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Enable per-command statistics per upstream cluster, in addition to the filter level aggregate
+  count. These commands are measured in microseconds.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.read_policy:
+
+
+read_policy
+  (:ref:`extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy <envoy_v3_api_enum_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy>`) Read policy. The default is to read from the primary.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.connection_rate_limit:
+
+
+connection_rate_limit
+  (:ref:`extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit>`) Ops or connection timeout triggers reconnection to redis server which could result in reconnection
+  storm to busy redis server. This config is a protection to rate limit reconnection rate.
+  If not set, there will be no rate limiting on the reconnection.
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy:
+
+Enum extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy
+-------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L66>`
+
+ReadPolicy controls how Envoy routes read commands to Redis nodes. This is currently
+supported for Redis Cluster. All ReadPolicy settings except MASTER may return stale data
+because replication is asynchronous and requires some delay. You need to ensure that your
+application can tolerate stale data.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy.MASTER:
+
+
+MASTER
+  *(DEFAULT)* ⁣Default mode. Read from the current primary node.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy.PREFER_MASTER:
+
+
+PREFER_MASTER
+  ⁣Read from the primary, but if it is unavailable, read from replica nodes.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy.REPLICA:
+
+
+REPLICA
+  ⁣Read from replica nodes. If multiple replica nodes are present within a shard, a random
+  node is selected. Healthy nodes have precedent over unhealthy nodes.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy.PREFER_REPLICA:
+
+
+PREFER_REPLICA
+  ⁣Read from the replica nodes (similar to REPLICA), but if all replicas are unavailable (not
+  present or unhealthy), read from the primary.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy.ANY:
+
+
+ANY
+  ⁣Read from any node of the cluster. A random node is selected among the primary and
+  replicas, healthy nodes have precedent over unhealthy nodes.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy.LOCAL_ZONE_AFFINITY:
+
+
+LOCAL_ZONE_AFFINITY
+  ⁣Read from replicas in the same availability zone as the Envoy proxy. If no replicas
+  are available in the same zone, fall back to any replica. If no replicas are available
+  at all, fall back to the primary.
+
+  Note: Zone discovery currently works with Valkey only. Valkey exposes availability_zone
+  in its INFO response. Standard Redis does not support this field.
+
+  The client zone is determined from Envoy's :ref:`locality zone <envoy_v3_api_field_config.core.v3.Locality.zone>`.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy.LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY:
+
+
+LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY
+  ⁣Similar to LOCAL_ZONE_AFFINITY, but also considers the primary node for same-zone routing.
+  Priority order: replicas in same zone -> primary in same zone -> any replica -> primary.
+  This is useful when reducing cross-zone traffic is more important than read distribution.
+
+  Note: Zone discovery currently works with Valkey only.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes:
+
+extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L177>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "routes": [],
+    "case_insensitive": ...,
+    "catch_all_route": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.routes:
+
+
+routes
+  (**repeated** :ref:`extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route>`) List of prefix routes.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.case_insensitive:
+
+
+case_insensitive
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates that prefix matching should be case insensitive.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route:
+
+
+catch_all_route
+  (:ref:`extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route>`) Optional catch-all route to forward commands that doesn't match any of the routes. The
+  catch-all route becomes required when no routes are specified.
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route:
+
+extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route
+-----------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L182>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "prefix": ...,
+    "remove_prefix": ...,
+    "cluster": ...,
+    "request_mirror_policy": [],
+    "key_formatter": ...,
+    "read_command_policy": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.prefix:
+
+
+prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) String prefix that must match the beginning of the keys. Envoy will always favor the
+  longest match.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.remove_prefix:
+
+
+remove_prefix
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates if the prefix needs to be removed from the key when forwarded.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Upstream cluster to forward the command to.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.request_mirror_policy:
+
+
+request_mirror_policy
+  (**repeated** :ref:`extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.RequestMirrorPolicy <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.RequestMirrorPolicy>`) Indicates that the route has a request mirroring policy.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.key_formatter:
+
+
+key_formatter
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates how redis key should be formatted. To substitute redis key into the formatting
+  expression, use %KEY% as a string replacement command.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.read_command_policy:
+
+
+read_command_policy
+  (:ref:`extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.ReadCommandPolicy <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.ReadCommandPolicy>`) Indicates that the route has a read command policy
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.RequestMirrorPolicy:
+
+extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.RequestMirrorPolicy
+-------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.RequestMirrorPolicy proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L190>`
+
+The router is capable of shadowing traffic from one cluster to another. The current
+implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
+respond before returning the response from the primary cluster. All normal statistics are
+collected for the shadow cluster making this feature useful for testing.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster": ...,
+    "runtime_fraction": {...},
+    "exclude_read_commands": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.RequestMirrorPolicy.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Specifies the cluster that requests will be mirrored to. The cluster must
+  exist in the cluster manager configuration.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.RequestMirrorPolicy.runtime_fraction:
+
+
+runtime_fraction
+  (:ref:`config.core.v3.RuntimeFractionalPercent <envoy_v3_api_msg_config.core.v3.RuntimeFractionalPercent>`) If not specified or the runtime key is not present, all requests to the target cluster
+  will be mirrored.
+
+  If specified, Envoy will lookup the runtime key to get the percentage of requests to the
+  mirror.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.RequestMirrorPolicy.exclude_read_commands:
+
+
+exclude_read_commands
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Set this to TRUE to only mirror write commands, this is effectively replicating the
+  writes in a "fire and forget" manner.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.ReadCommandPolicy:
+
+extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.ReadCommandPolicy
+-----------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.ReadCommandPolicy proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L212>`
+
+ReadCommandPolicy specifies that Envoy should route read commands to another cluster.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.ReadCommandPolicy.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) 
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault:
+
+extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault
+---------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L253>`
+
+RedisFault defines faults used for fault injection.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "fault_type": ...,
+    "fault_enabled": {...},
+    "delay": {...},
+    "commands": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.fault_type:
+
+
+fault_type
+  (:ref:`extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.RedisFaultType <envoy_v3_api_enum_extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.RedisFaultType>`) Fault type.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.fault_enabled:
+
+
+fault_enabled
+  (:ref:`config.core.v3.RuntimeFractionalPercent <envoy_v3_api_msg_config.core.v3.RuntimeFractionalPercent>`, *REQUIRED*) Percentage of requests fault applies to.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.delay:
+
+
+delay
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Delay for all faults. If not set, defaults to zero
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.commands:
+
+
+commands
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Commands fault is restricted to, if any. If not set, fault applies to all commands
+  other than auth and ping (due to special handling of those commands in Envoy).
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.RedisFaultType:
+
+Enum extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.RedisFaultType
+-----------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.RedisFaultType proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L254>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.RedisFaultType.DELAY:
+
+
+DELAY
+  *(DEFAULT)* ⁣Delays requests. This is the base fault; other faults can have delays added.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.RedisFaultType.ERROR:
+
+
+ERROR
+  ⁣Returns errors on requests.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit:
+
+extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit
+------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L279>`
+
+Configuration to limit reconnection rate to redis server to protect redis server
+from client reconnection storm.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "connection_rate_limit_per_sec": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit.connection_rate_limit_per_sec:
+
+
+connection_rate_limit_per_sec
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Reconnection rate per sec. Rate limiting is implemented with TokenBucket.
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.redis_proxy.v3.RedisProxy.ProtocolVersion:
+
+Enum extensions.filters.network.redis_proxy.v3.RedisProxy.ProtocolVersion
+-------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProxy.ProtocolVersion proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L36>`
+
+RESP protocol version supported on this listener.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ProtocolVersion.RESP2:
+
+
+RESP2
+  *(DEFAULT)* ⁣Default. The listener speaks RESP2 on both downstream connections and
+  every routed upstream conn pool: no ``HELLO 3`` is sent upstream and a
+  downstream ``HELLO 3`` is rejected with ``-NOPROTO``. (RESP3-aware
+  handling such as the local ``HELLO`` reply, ``CLIENT SETINFO`` /
+  ``SETNAME`` acceptance, and the RESP3 decoder is always present; this
+  value only controls the negotiated wire version.)
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ProtocolVersion.RESP3:
+
+
+RESP3
+  ⁣The listener speaks RESP3 on both downstream connections and every
+  routed upstream conn pool. Upstream conn pools negotiate ``HELLO 3``
+  (combined with ``AUTH`` when credentials or AWS IAM authentication are
+  configured) on each new connection; ``upstream_resp3_hello_failure``
+  tracks negotiation failures. Downstream clients must perform an
+  explicit ``HELLO 3`` handshake before any data command — bare ``HELLO``
+  on a fresh connection or any non-HELLO/AUTH/QUIT command before
+  ``HELLO 3`` is rejected with ``-NOPROTO``.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions:
+
+extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
+--------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProtocolOptions proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L431>`
+
+RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
+:ref:`typed_extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
+keyed by the name ``envoy.filters.network.redis_proxy``.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "auth_password": {...},
+    "auth_username": {...},
+    "aws_iam": {...},
+    "credentials": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.auth_password:
+
+
+auth_password
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) Upstream server password as defined by the ``requirepass`` directive
+  `<https://redis.io/topics/config>`_ in the server's configuration file.
+  If ``aws_iam`` is set, this field is ignored.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.auth_username:
+
+
+auth_username
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) Upstream server username as defined by the ``user`` directive
+  `<https://redis.io/topics/acl>`_ in the server's configuration file.
+  If ``aws_iam``` is set, this field will be used as the authenticating user for redis IAM authentication.
+  See ``Create a new IAM-enabled user`` under `Setup <https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth-iam.html#auth-iam-setup>`_ for more details.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.aws_iam:
+
+
+aws_iam
+  (:ref:`extensions.filters.network.redis_proxy.v3.AwsIam <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.AwsIam>`) The cluster level configuration for AWS IAM authentication
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.credentials:
+
+
+credentials
+  (**repeated** :ref:`extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.Credential <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.Credential>`) If specified, these credentials are used when connecting to upstream endpoints. Which
+  credential is used is determined by matching the resolved ``address`` field here with each
+  endpoint's resolved ``address`` field. The first entry for a given ``address`` here takes precedence.
+  If no entry in ``credentials`` matches, then the ``auth_password`` and ``auth_username`` fields
+  are used as defaults.
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.Credential:
+
+extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.Credential
+-------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.Credential proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L435>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "address": {...},
+    "auth_password": {...},
+    "auth_username": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.Credential.address:
+
+
+address
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) The address to which this username and password applies.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.Credential.auth_password:
+
+
+auth_password
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) Upstream server password as defined by the ``requirepass`` directive
+  `<https://redis.io/topics/config>`_ in the server's configuration file.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.Credential.auth_username:
+
+
+auth_username
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) Upstream server username as defined by the ``user`` directive
+  `<https://redis.io/topics/acl>`_ in the server's configuration file.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.AwsIam:
+
+extensions.filters.network.redis_proxy.v3.AwsIam
+------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.AwsIam proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L471>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "credential_provider": {...},
+    "cache_name": ...,
+    "service_name": ...,
+    "region": ...,
+    "expiration_time": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.AwsIam.credential_provider:
+
+
+credential_provider
+  (:ref:`extensions.common.aws.v3.AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>`) An AwsCredentialProvider, allowing the use of a specific credential provider chain or specific provider settings
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.AwsIam.cache_name:
+
+
+cache_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the cache, used when generating the authentication token.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.AwsIam.service_name:
+
+
+service_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The optional service name to be used in AWS IAM authentication. If not provided, the service name will be set to ``elasticache``. For Amazon MemoryDB
+  the service name should be set to ``memorydb``.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.AwsIam.region:
+
+
+region
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The optional AWS region that your cache is located in. If not provided, the region will be deduced using the region provider chain
+  as described in :ref:`config_http_filters_aws_request_signing_region`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.AwsIam.expiration_time:
+
+
+expiration_time
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Number of seconds before the IAM authentication token will expire. If not set, defaults to 60s (1 minute). Maximum of 900s (15 minutes)
+  Expiration of the current authentication token will automatically trigger generation of a new token.
+  As envoy will automatically continue to generate new tokens as required, there is no substantial benefit to using a long expiration value here.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisExternalAuthProvider:
+
+extensions.filters.network.redis_proxy.v3.RedisExternalAuthProvider
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.redis_proxy.v3.RedisExternalAuthProvider proto] <api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L502>`
+
+RedisExternalAuthProvider specifies a gRPC service that can be used to authenticate Redis clients.
+This service will be called every time an AUTH command is received from a client.
+If the service returns an error, authentication is considered failed.
+If the service returns a success, the client is considered authenticated.
+The service can also return an expiration timestamp, which will be used to disable any further
+commands from the client after it passes, unless a new AUTH command is received and the
+external auth service returns a new expiration timestamp.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "grpc_service": {...},
+    "enable_auth_expiration": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisExternalAuthProvider.grpc_service:
+
+
+grpc_service
+  (:ref:`config.core.v3.GrpcService <envoy_v3_api_msg_config.core.v3.GrpcService>`) External auth gRPC service configuration.
+  It will be called every time an AUTH command is received from a client.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisExternalAuthProvider.enable_auth_expiration:
+
+
+enable_auth_expiration
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to true, the filter will expect an expiration timestamp in the response from the external
+  auth service. This timestamp will be used to disable any further commands from the client after
+  the expiration time, unless a new AUTH command is received and the external auth service returns
+  a new expiration timestamp.
+
+

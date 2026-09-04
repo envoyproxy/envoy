@@ -1,0 +1,198 @@
+.. _envoy_v3_api_file_envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.proto:
+
+Dynamic forward proxy cluster configuration (proto)
+===================================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig:
+
+extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+----------------------------------------------------------
+
+
+:repo:`[extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig proto] <api/envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.proto#L27>`
+
+Configuration for the dynamic forward proxy cluster. See the :ref:`architecture overview
+<arch_overview_http_dynamic_forward_proxy>` for more information.
+
+.. _extension_envoy.clusters.dynamic_forward_proxy:
+
+This extension has the qualified name ``envoy.clusters.dynamic_forward_proxy``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.clusters <extension_category_envoy.clusters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig <envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dns_cache_config": {...},
+    "sub_clusters_config": {...},
+    "allow_insecure_cluster_options": ...,
+    "allow_coalesced_connections": ...
+  }
+
+.. _envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config:
+
+
+dns_cache_config
+  (:ref:`extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig <envoy_v3_api_msg_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig>`) The DNS cache configuration that the cluster will attach to. Note this configuration must
+  match that of associated :ref:`dynamic forward proxy HTTP filter configuration
+  <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.dns_cache_config>`.
+
+
+  
+
+  Only one of :ref:`dns_cache_config <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`, :ref:`sub_clusters_config <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.sub_clusters_config>` may be set.
+
+.. _envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.sub_clusters_config:
+
+
+sub_clusters_config
+  (:ref:`extensions.clusters.dynamic_forward_proxy.v3.SubClustersConfig <envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.SubClustersConfig>`) Configuration for sub clusters, when this configuration is enabled,
+  Envoy will create an independent sub cluster dynamically for each host:port.
+  Most of the configuration of a sub cluster is inherited from the current cluster,
+  i.e. health_checks, dns_resolvers and etc.
+  And the load_assignment will be set to the only one endpoint, host:port.
+
+  Compared to the dns_cache_config, it has the following advantages:
+
+  1. sub clusters will be created with the STRICT_DNS DiscoveryType,
+     so that Envoy will use all of the IPs resolved from the host.
+
+  2. each sub cluster is full featured cluster, with lb_policy and health check and etc enabled.
+
+
+
+  
+
+  Only one of :ref:`dns_cache_config <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`, :ref:`sub_clusters_config <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.sub_clusters_config>` may be set.
+
+.. _envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_insecure_cluster_options:
+
+
+allow_insecure_cluster_options
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true allow the cluster configuration to disable the auto_sni and auto_san_validation options
+  in the :ref:`cluster's upstream_http_protocol_options
+  <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_http_protocol_options>`
+
+
+.. _envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_coalesced_connections:
+
+
+allow_coalesced_connections
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true allow HTTP/2 and HTTP/3 connections to be reused for requests to different
+  origins than the connection was initially created for. This will only happen when the
+  resolved address for the new connection matches the peer address of the connection and
+  the TLS certificate is also valid for the new hostname. For example, if a connection
+  has previously been established to foo.example.com at IP 1.2.3.4 with a certificate
+  that is valid for ``*.example.com``, then this connection could be used for requests to
+  bar.example.com if that also resolved to 1.2.3.4.
+
+  .. note::
+    By design, this feature will maximize reuse of connections. This means that instead
+    opening a new connection when an existing connection reaches the maximum number of
+    concurrent streams, requests will instead be sent to the existing connection.
+
+  .. note::
+    The coalesced connections might be to upstreams that would not be otherwise
+    selected by Envoy. See the section `Connection Reuse in RFC 7540
+    <https://datatracker.ietf.org/doc/html/rfc7540#section-9.1.1>`_
+
+
+
+
+.. _envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.SubClustersConfig:
+
+extensions.clusters.dynamic_forward_proxy.v3.SubClustersConfig
+--------------------------------------------------------------
+
+
+:repo:`[extensions.clusters.dynamic_forward_proxy.v3.SubClustersConfig proto] <api/envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.proto#L82>`
+
+Configuration for sub clusters. Sub clusters default to the ``STRICT_DNS`` discovery type, or
+use the ``DnsCluster`` extension when ``dns_cluster_config`` is set.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "lb_policy": ...,
+    "max_sub_clusters": {...},
+    "sub_cluster_ttl": {...},
+    "preresolve_clusters": [],
+    "dns_cluster_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.SubClustersConfig.lb_policy:
+
+
+lb_policy
+  (:ref:`config.cluster.v3.Cluster.LbPolicy <envoy_v3_api_enum_config.cluster.v3.Cluster.LbPolicy>`) The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
+  when picking a host in a sub cluster. Note that CLUSTER_PROVIDED is not allowed here.
+
+
+.. _envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.SubClustersConfig.max_sub_clusters:
+
+
+max_sub_clusters
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The maximum number of sub clusters that the DFP cluster will hold. If not specified defaults to 1024.
+
+
+.. _envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.SubClustersConfig.sub_cluster_ttl:
+
+
+sub_cluster_ttl
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The TTL for sub clusters that are unused. Sub clusters that have not been used in the configured time
+  interval will be purged. If not specified defaults to 5m.
+
+
+.. _envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.SubClustersConfig.preresolve_clusters:
+
+
+preresolve_clusters
+  (**repeated** :ref:`config.core.v3.SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`) Sub clusters that should be created & warmed upon creation. This might provide a
+  performance improvement, in the form of cache hits, for sub clusters that are going to be
+  warmed during steady state and are known at config load time.
+
+
+.. _envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.SubClustersConfig.dns_cluster_config:
+
+
+dns_cluster_config
+  (:ref:`extensions.clusters.dns.v3.DnsCluster <envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`) Optional DNS configuration for dynamically created sub clusters. When set, sub clusters
+  are created using the :ref:`DnsCluster <envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`
+  extension (``envoy.cluster.dns``) rather than the legacy ``STRICT_DNS`` discovery type,
+  enabling full DNS configuration including refresh rates, failure backoff, TTL respect,
+  lookup family, and resolver selection.
+
+  When not set, sub clusters inherit DNS settings from the parent cluster configuration.
+
+

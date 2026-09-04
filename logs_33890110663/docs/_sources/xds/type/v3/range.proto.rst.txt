@@ -1,0 +1,117 @@
+.. _envoy_v3_api_file_xds/type/v3/range.proto:
+
+Number range (proto)
+====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_.xds.type.v3.Int64Range:
+
+.xds.type.v3.Int64Range
+-----------------------
+
+
+`[.xds.type.v3.Int64Range proto] <https://github.com/cncf/xds/blob/main/xds/type/v3/range.proto#L13>`_
+
+Specifies the int64 start and end of the range using half-open interval
+semantics [start, end).
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "start": ...,
+    "end": ...
+  }
+
+.. _envoy_v3_api_field_.xds.type.v3.Int64Range.start:
+
+
+start
+  (`int64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) start of the range (inclusive)
+
+
+.. _envoy_v3_api_field_.xds.type.v3.Int64Range.end:
+
+
+end
+  (`int64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) end of the range (exclusive)
+
+
+
+.. _envoy_v3_api_msg_.xds.type.v3.Int32Range:
+
+.xds.type.v3.Int32Range
+-----------------------
+
+
+`[.xds.type.v3.Int32Range proto] <https://github.com/cncf/xds/blob/main/xds/type/v3/range.proto#L23>`_
+
+Specifies the int32 start and end of the range using half-open interval
+semantics [start, end).
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "start": ...,
+    "end": ...
+  }
+
+.. _envoy_v3_api_field_.xds.type.v3.Int32Range.start:
+
+
+start
+  (`int32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) start of the range (inclusive)
+
+
+.. _envoy_v3_api_field_.xds.type.v3.Int32Range.end:
+
+
+end
+  (`int32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) end of the range (exclusive)
+
+
+
+.. _envoy_v3_api_msg_.xds.type.v3.DoubleRange:
+
+.xds.type.v3.DoubleRange
+------------------------
+
+
+`[.xds.type.v3.DoubleRange proto] <https://github.com/cncf/xds/blob/main/xds/type/v3/range.proto#L33>`_
+
+Specifies the double start and end of the range using half-open interval
+semantics [start, end).
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "start": ...,
+    "end": ...
+  }
+
+.. _envoy_v3_api_field_.xds.type.v3.DoubleRange.start:
+
+
+start
+  (`double <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) start of the range (inclusive)
+
+
+.. _envoy_v3_api_field_.xds.type.v3.DoubleRange.end:
+
+
+end
+  (`double <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) end of the range (exclusive)
+
+

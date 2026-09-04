@@ -1,0 +1,434 @@
+/* Content — layout, typography, links, lists, definition lists.
+
+   One continuous surface: the reading column sits directly on the page ground,
+   with hairlines and whitespace doing the work a card used to do. */
+
+.envoy-content-layout {
+  display: grid;
+  gap: 0 48px;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 30px var(--envoy-gutter) 96px;
+}
+
+.envoy-content-layout.envoy-has-page-toc {
+  grid-template-columns: minmax(0, 1fr) var(--envoy-toc-width);
+  max-width: 1320px;
+}
+
+.envoy-content-main {
+  min-width: 0;
+  outline: 0;
+}
+
+.envoy-content-main .rst-content {
+  color: var(--envoy-ink-body);
+  margin: 0;
+  max-width: var(--envoy-measure);
+}
+
+/* generated reference pages are scanned in columns, not read in a measure */
+.envoy-content-main .rst-content.envoy-reference {
+  max-width: 100%;
+}
+
+/* --- breadcrumbs --------------------------------------------------------- */
+
+.envoy-content-main .wy-breadcrumbs {
+  align-items: center;
+  color: var(--envoy-ink-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-family: var(--envoy-font-mono);
+  font-size: 11.5px;
+  gap: 0 4px;
+  margin-bottom: 30px;
+}
+
+.envoy-content-main .wy-breadcrumbs li {
+  display: inline;
+  margin: 0;
+}
+
+.envoy-content-main .wy-breadcrumbs a {
+  border: 0;
+  color: var(--envoy-ink-muted);
+  text-decoration: none;
+}
+
+.envoy-content-main .wy-breadcrumbs a:hover {
+  color: var(--envoy-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.envoy-content-main .wy-breadcrumbs .wy-breadcrumbs-aside {
+  margin-left: auto;
+}
+
+.envoy-content-main .wy-breadcrumbs-aside a {
+  font-family: var(--envoy-font-sans);
+  font-size: 12.5px;
+}
+
+.envoy-content-main .rst-content .wy-breadcrumbs + hr {
+  display: none;
+}
+
+/* --- headings ------------------------------------------------------------ */
+
+.envoy-content-main .rst-content h1,
+.envoy-content-main .rst-content h2,
+.envoy-content-main .rst-content h3,
+.envoy-content-main .rst-content h4,
+.envoy-content-main .rst-content h5,
+.envoy-content-main .rst-content h6,
+.envoy-content-main .rst-content .rubric {
+  color: var(--envoy-ink);
+  font-family: var(--envoy-font-sans);
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  position: relative;
+  text-wrap: balance;
+}
+
+.envoy-content-main .rst-content h1 {
+  font-size: 32px;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  margin: 0 0 20px;
+}
+
+.envoy-content-main .rst-content h2 {
+  font-size: 23px;
+  line-height: 1.25;
+  margin: 52px 0 14px;
+}
+
+.envoy-content-main .rst-content h3 {
+  font-size: 18px;
+  line-height: 1.35;
+  margin: 36px 0 10px;
+}
+
+.envoy-content-main .rst-content h4,
+.envoy-content-main .rst-content h5,
+.envoy-content-main .rst-content h6,
+.envoy-content-main .rst-content .rubric {
+  font-size: 16px;
+  margin: 28px 0 8px;
+}
+
+/* the anchor hangs in the margin, so linking a heading never reflows the line */
+.envoy-content-main .rst-content a.headerlink {
+  color: var(--envoy-rule-strong);
+  font-size: 0.7em;
+  font-weight: 400;
+  left: -1.35em;
+  opacity: 0;
+  position: absolute;
+  text-decoration: none;
+  top: 0.28em;
+  visibility: visible;
+}
+
+.envoy-content-main .rst-content a.headerlink::after {
+  content: "#";
+}
+
+.envoy-content-main .rst-content :hover > a.headerlink,
+.envoy-content-main .rst-content a.headerlink:focus-visible {
+  opacity: 1;
+}
+
+.envoy-content-main .rst-content a.headerlink:hover {
+  color: var(--envoy-ink);
+}
+
+/* --- text ---------------------------------------------------------------- */
+
+.envoy-content-main .rst-content p {
+  margin: 0 0 18px;
+}
+
+.envoy-content-main .rst-content ul,
+.envoy-content-main .rst-content ol {
+  margin-bottom: 18px;
+  padding-left: 22px;
+}
+
+.envoy-content-main .rst-content li {
+  margin-bottom: 6px;
+}
+
+.envoy-content-main .rst-content li > p {
+  margin-bottom: 10px;
+}
+
+.envoy-content-main .rst-content strong {
+  color: var(--envoy-ink);
+  font-weight: 600;
+}
+
+/* Colour and underline, not one or the other. Envoy's prose is dense with
+   inline code and proto references, and a link that is only tinted disappears
+   inside a mono run. The underline sits at 42% of the accent so a paragraph
+   with six links does not turn into six hard rules; hover takes it to full.
+   Browsers without color-mix() fall back to a full-strength underline. */
+.envoy-content-main .rst-content a {
+  color: var(--envoy-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--envoy-accent) 42%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.envoy-content-main .rst-content a:hover {
+  text-decoration-color: var(--envoy-accent);
+}
+
+.envoy-content-main .rst-content a:visited {
+  opacity: 0.78;
+}
+
+.envoy-content-main .rst-content a code.literal,
+.envoy-content-main .rst-content a code.docutils {
+  color: var(--envoy-accent);
+}
+
+.envoy-content-main .rst-content a.reference.external::after {
+  color: var(--envoy-ink-muted);
+  content: " \2197";
+  font-size: 0.8em;
+  text-decoration: none;
+}
+
+.envoy-content-main .rst-content blockquote {
+  border-left: 2px solid var(--envoy-rule-strong);
+  color: var(--envoy-ink-body);
+  margin: 22px 0;
+  padding: 2px 0 2px 18px;
+}
+
+.envoy-content-main .rst-content hr {
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--envoy-rule);
+  margin: 44px 0;
+}
+
+.envoy-content-main .rst-content img {
+  height: auto;
+  max-width: 100%;
+}
+
+/* --- definition lists ----------------------------------------------------
+
+   Generated proto field documentation is emitted as definition lists, so this
+   is the single highest-traffic block on the site. */
+
+.envoy-content-main .rst-content dl > dt {
+  background: transparent;
+  border: 0;
+  border-left: 2px solid var(--envoy-rule);
+  color: var(--envoy-ink);
+  font-family: var(--envoy-font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 22px 0 0;
+  padding: 0 0 0 14px;
+}
+
+.envoy-content-main .rst-content dl > dd {
+  border-left: 2px solid var(--envoy-rule);
+  margin: 0;
+  padding: 4px 0 2px 14px;
+}
+
+.envoy-content-main .rst-content dl > dd > p:last-child {
+  margin-bottom: 0;
+}
+
+.envoy-content-main .rst-content dl > dt .descclassname,
+.envoy-content-main .rst-content dl > dt .property,
+.envoy-content-main .rst-content dl > dt .optional {
+  color: var(--envoy-ink-muted);
+  font-weight: 400;
+}
+
+/* --- inline code --------------------------------------------------------- */
+
+.envoy-content-main .rst-content code.literal,
+.envoy-content-main .rst-content code.docutils {
+  background: var(--envoy-surface);
+  border: 1px solid var(--envoy-rule);
+  border-radius: 3px;
+  color: var(--envoy-ink);
+  font-family: var(--envoy-font-mono);
+  font-size: 0.875em;
+  font-variant-ligatures: none;
+  padding: 1px 5px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.envoy-content-main .rst-content kbd {
+  background: var(--envoy-surface);
+  border: 1px solid var(--envoy-rule-strong);
+  border-radius: 3px;
+  box-shadow: none;
+  color: var(--envoy-ink);
+  font-family: var(--envoy-font-mono);
+  font-size: 0.85em;
+  padding: 1px 5px;
+}
+
+/* --- sidebars ------------------------------------------------------------ */
+
+.envoy-content-main .rst-content .sidebar {
+  background: var(--envoy-surface);
+  border: 1px solid var(--envoy-rule);
+  border-radius: 6px;
+  box-shadow: none;
+  padding: 16px 18px;
+}
+
+.envoy-content-main .rst-content .sidebar .sidebar-title {
+  background: transparent;
+  color: var(--envoy-ink);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+/* --- landing-page toctrees ----------------------------------------------- */
+
+.envoy-content-main .rst-content .toctree-wrapper ul,
+.envoy-content-main .rst-content .toctree-wrapper li {
+  list-style: none;
+}
+
+.envoy-content-main .rst-content .toctree-wrapper > ul {
+  padding-left: 0;
+}
+
+.envoy-content-main .rst-content .toctree-wrapper > ul > li {
+  border-bottom: 1px solid var(--envoy-rule);
+  margin: 0;
+  padding: 12px 0;
+}
+
+.envoy-content-main .rst-content .toctree-wrapper > ul > li > a {
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.envoy-content-main .rst-content .toctree-wrapper > ul > li > a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.envoy-content-main .rst-content .toctree-wrapper ul ul {
+  margin-top: 6px;
+  padding-left: 18px;
+}
+
+.envoy-content-main .rst-content .toctree-wrapper ul ul a {
+  color: var(--envoy-ink-body);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.envoy-content-main .rst-content .toctree-wrapper ul ul a:hover {
+  color: var(--envoy-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.envoy-content-main .rst-content .toctree-wrapper .caption {
+  color: var(--envoy-ink-muted);
+  font-family: var(--envoy-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  margin: 36px 0 6px;
+  text-transform: uppercase;
+}
+
+/* --- sphinx-tabs --------------------------------------------------------- */
+
+.envoy-content-main .rst-content .sphinx-tabs-tab {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--envoy-ink-muted);
+  font-family: var(--envoy-font-sans);
+  font-size: 13.5px;
+  padding: 8px 14px;
+}
+
+.envoy-content-main .rst-content .sphinx-tabs-tab[aria-selected="true"] {
+  border-bottom-color: var(--envoy-accent);
+  color: var(--envoy-accent);
+  font-weight: 600;
+}
+
+.envoy-content-main .rst-content .sphinx-tabs-panel {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--envoy-rule);
+  padding: 16px 0 0;
+}
+
+.envoy-content-main .rst-content .highlighted {
+  background: var(--envoy-code-mark);
+  box-shadow: none;
+  color: var(--envoy-ink);
+  padding: 0 2px;
+}
+
+/* --- footer -------------------------------------------------------------- */
+
+.envoy-content-main .rst-footer-buttons {
+  border-top: 1px solid var(--envoy-rule);
+  display: flex;
+  gap: 12px;
+  margin-top: 56px;
+  padding-top: 20px;
+}
+
+.envoy-content-main .rst-footer-buttons .btn {
+  background: transparent;
+  border: 1px solid var(--envoy-rule);
+  border-radius: 6px;
+  box-shadow: none;
+  color: var(--envoy-ink);
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 10px 14px;
+  text-decoration: none;
+  text-shadow: none;
+}
+
+.envoy-content-main .rst-footer-buttons .btn:hover {
+  background: var(--envoy-surface);
+  border-color: var(--envoy-rule-strong);
+}
+
+.envoy-content-main .rst-footer-buttons .btn-neutral[accesskey="n"] {
+  margin-left: auto;
+}
+
+.envoy-content-main footer,
+.envoy-content-main footer p,
+.envoy-content-main .rst-content footer,
+.envoy-content-main .rst-content footer p {
+  color: var(--envoy-ink-muted);
+  font-size: 12.5px;
+}
+
+.envoy-content-main footer hr {
+  display: none;
+}

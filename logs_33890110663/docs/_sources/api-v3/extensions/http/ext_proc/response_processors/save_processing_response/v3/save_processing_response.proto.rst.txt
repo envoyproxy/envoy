@@ -1,0 +1,170 @@
+.. _envoy_v3_api_file_envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3/save_processing_response.proto:
+
+Save Processing Response from external processor (proto)
+========================================================
+
+.. _extension_envoy.http.ext_proc.response_processors.save_processing_response:
+
+This extension has the qualified name ``envoy.http.ext_proc.response_processors.save_processing_response``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.http.ext_proc.response_processors <extension_category_envoy.http.ext_proc.response_processors>`
+
+
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse:
+
+extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
+-----------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse proto] <api/envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3/save_processing_response.proto#L33>`
+
+Extension to save the
+:ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` from the
+external processor as filter state with name
+``envoy.http.ext_proc.response_processors.save_processing_response``. If
+:ref:`filter_state_name_suffix <envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.filter_state_name_suffix>`
+is defined, it is appended to this name.
+
+This extension supports saving of request and response headers, request and response trailers,
+and immediate response.
+
+.. note::
+
+   Response processors are currently in alpha.
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "filter_state_name_suffix": ...,
+    "save_request_headers": {...},
+    "save_response_headers": {...},
+    "save_request_trailers": {...},
+    "save_response_trailers": {...},
+    "save_immediate_response": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.filter_state_name_suffix:
+
+
+filter_state_name_suffix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The default filter state name is
+  ``envoy.http.ext_proc.response_processors.save_processing_response``.
+  If defined, ``filter_state_name_suffix`` is appended to this name.
+
+  For example, setting ``filter_state_name_suffix`` to ``xyz`` will set the filter state name
+  to ``envoy.http.ext_proc.response_processors.save_processing_response.xyz``.
+
+
+.. _envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.save_request_headers:
+
+
+save_request_headers
+  (:ref:`extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions <envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions>`) Save the response to filter state when
+  :ref:`request_headers <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_headers>`
+  is set.
+
+
+.. _envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.save_response_headers:
+
+
+save_response_headers
+  (:ref:`extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions <envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions>`) Save the response to filter state when
+  :ref:`response_headers <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_headers>`
+  is set.
+
+
+.. _envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.save_request_trailers:
+
+
+save_request_trailers
+  (:ref:`extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions <envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions>`) Save the response to filter state when
+  :ref:`request_trailers <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_trailers>`
+  is set.
+
+
+.. _envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.save_response_trailers:
+
+
+save_response_trailers
+  (:ref:`extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions <envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions>`) Save the response to filter state when
+  :ref:`response_trailers <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_trailers>`
+  is set.
+
+
+.. _envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.save_immediate_response:
+
+
+save_immediate_response
+  (:ref:`extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions <envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions>`) Save the response to filter state when
+  :ref:`immediate_response <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>`
+  is set.
+
+
+.. _envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions:
+
+extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions
+-----------------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions proto] <api/envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3/save_processing_response.proto#L35>`
+
+Options for saving the processing response.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "save_response": ...,
+    "save_on_error": ...
+  }
+
+.. _envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions.save_response:
+
+
+save_response
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When set to ``true``, saves the response for the corresponding response type.
+
+  Defaults to ``false``.
+
+
+.. _envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.SaveOptions.save_on_error:
+
+
+save_on_error
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When set to ``true``, saves the response if there was an error when processing the response
+  from the external processor.
+
+  Defaults to ``false``.
+
+
+

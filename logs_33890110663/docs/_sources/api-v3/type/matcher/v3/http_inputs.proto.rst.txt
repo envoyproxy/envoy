@@ -1,0 +1,293 @@
+.. _envoy_v3_api_file_envoy/type/matcher/v3/http_inputs.proto:
+
+Common HTTP inputs (proto)
+==========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.HttpRequestHeaderMatchInput:
+
+type.matcher.v3.HttpRequestHeaderMatchInput
+-------------------------------------------
+
+
+:repo:`[type.matcher.v3.HttpRequestHeaderMatchInput proto] <api/envoy/type/matcher/v3/http_inputs.proto#L21>`
+
+Match input indicates that matching should be done on a specific request header.
+The resulting input string will be all headers for the given key joined by a comma,
+e.g. if the request contains two 'foo' headers with value 'bar' and 'baz', the input
+string will be 'bar,baz'.
+
+.. _extension_envoy.matching.inputs.request_headers:
+
+This extension has the qualified name ``envoy.matching.inputs.request_headers``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpRequestHeaderMatchInput>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "header_name": ...
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.HttpRequestHeaderMatchInput.header_name:
+
+
+header_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The request header to match on.
+
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.HttpRequestTrailerMatchInput:
+
+type.matcher.v3.HttpRequestTrailerMatchInput
+--------------------------------------------
+
+
+:repo:`[type.matcher.v3.HttpRequestTrailerMatchInput proto] <api/envoy/type/matcher/v3/http_inputs.proto#L33>`
+
+Match input indicates that matching should be done on a specific request trailer.
+The resulting input string will be all headers for the given key joined by a comma,
+e.g. if the request contains two 'foo' headers with value 'bar' and 'baz', the input
+string will be 'bar,baz'.
+
+.. _extension_envoy.matching.inputs.request_trailers:
+
+This extension has the qualified name ``envoy.matching.inputs.request_trailers``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.type.matcher.v3.HttpRequestTrailerMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpRequestTrailerMatchInput>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "header_name": ...
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.HttpRequestTrailerMatchInput.header_name:
+
+
+header_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The request trailer to match on.
+
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.HttpResponseHeaderMatchInput:
+
+type.matcher.v3.HttpResponseHeaderMatchInput
+--------------------------------------------
+
+
+:repo:`[type.matcher.v3.HttpResponseHeaderMatchInput proto] <api/envoy/type/matcher/v3/http_inputs.proto#L45>`
+
+Match input indicating that matching should be done on a specific response header.
+The resulting input string will be all headers for the given key joined by a comma,
+e.g. if the response contains two 'foo' headers with value 'bar' and 'baz', the input
+string will be 'bar,baz'.
+
+.. _extension_envoy.matching.inputs.response_headers:
+
+This extension has the qualified name ``envoy.matching.inputs.response_headers``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpResponseHeaderMatchInput>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "header_name": ...
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.HttpResponseHeaderMatchInput.header_name:
+
+
+header_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The response header to match on.
+
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.HttpResponseTrailerMatchInput:
+
+type.matcher.v3.HttpResponseTrailerMatchInput
+---------------------------------------------
+
+
+:repo:`[type.matcher.v3.HttpResponseTrailerMatchInput proto] <api/envoy/type/matcher/v3/http_inputs.proto#L57>`
+
+Match input indicates that matching should be done on a specific response trailer.
+The resulting input string will be all headers for the given key joined by a comma,
+e.g. if the request contains two 'foo' headers with value 'bar' and 'baz', the input
+string will be 'bar,baz'.
+
+.. _extension_envoy.matching.inputs.response_trailers:
+
+This extension has the qualified name ``envoy.matching.inputs.response_trailers``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.type.matcher.v3.HttpResponseTrailerMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpResponseTrailerMatchInput>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "header_name": ...
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.HttpResponseTrailerMatchInput.header_name:
+
+
+header_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The response trailer to match on.
+
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.HttpRequestQueryParamMatchInput:
+
+type.matcher.v3.HttpRequestQueryParamMatchInput
+-----------------------------------------------
+
+
+:repo:`[type.matcher.v3.HttpRequestQueryParamMatchInput proto] <api/envoy/type/matcher/v3/http_inputs.proto#L67>`
+
+Match input indicates that matching should be done on a specific query parameter.
+The resulting input string will be the first query parameter for the value
+'query_param'.
+
+.. _extension_envoy.matching.inputs.query_params:
+
+This extension has the qualified name ``envoy.matching.inputs.query_params``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.type.matcher.v3.HttpRequestQueryParamMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpRequestQueryParamMatchInput>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "query_param": ...
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.HttpRequestQueryParamMatchInput.query_param:
+
+
+query_param
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The query parameter to match on.
+
+

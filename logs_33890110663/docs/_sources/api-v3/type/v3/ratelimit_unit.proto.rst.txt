@@ -1,0 +1,71 @@
+.. _envoy_v3_api_file_envoy/type/v3/ratelimit_unit.proto:
+
+Ratelimit Time Unit (proto)
+===========================
+
+
+
+
+
+
+.. _envoy_v3_api_enum_type.v3.RateLimitUnit:
+
+Enum type.v3.RateLimitUnit
+--------------------------
+
+
+:repo:`[type.v3.RateLimitUnit proto] <api/envoy/type/v3/ratelimit_unit.proto#L15>`
+
+Identifies the unit of of time for rate limit.
+
+
+
+.. _envoy_v3_api_enum_value_type.v3.RateLimitUnit.UNKNOWN:
+
+
+UNKNOWN
+  *(DEFAULT)* ⁣The time unit is not known.
+
+
+.. _envoy_v3_api_enum_value_type.v3.RateLimitUnit.SECOND:
+
+
+SECOND
+  ⁣The time unit representing a second.
+
+
+.. _envoy_v3_api_enum_value_type.v3.RateLimitUnit.MINUTE:
+
+
+MINUTE
+  ⁣The time unit representing a minute.
+
+
+.. _envoy_v3_api_enum_value_type.v3.RateLimitUnit.HOUR:
+
+
+HOUR
+  ⁣The time unit representing an hour.
+
+
+.. _envoy_v3_api_enum_value_type.v3.RateLimitUnit.DAY:
+
+
+DAY
+  ⁣The time unit representing a day.
+
+
+.. _envoy_v3_api_enum_value_type.v3.RateLimitUnit.MONTH:
+
+
+MONTH
+  ⁣The time unit representing a month.
+
+
+.. _envoy_v3_api_enum_value_type.v3.RateLimitUnit.YEAR:
+
+
+YEAR
+  ⁣The time unit representing a year.
+
+

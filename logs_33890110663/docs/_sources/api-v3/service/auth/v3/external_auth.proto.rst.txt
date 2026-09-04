@@ -1,0 +1,277 @@
+.. _envoy_v3_api_file_envoy/service/auth/v3/external_auth.proto:
+
+Authorization service (proto)
+=============================
+
+
+
+
+The authorization service request messages used by external authorization :ref:`network filter
+<config_network_filters_ext_authz>` and :ref:`HTTP filter <config_http_filters_ext_authz>`.
+
+
+
+
+.. _envoy_v3_api_msg_service.auth.v3.CheckRequest:
+
+service.auth.v3.CheckRequest
+----------------------------
+
+
+:repo:`[service.auth.v3.CheckRequest proto] <api/envoy/service/auth/v3/external_auth.proto#L35>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "attributes": {...}
+  }
+
+.. _envoy_v3_api_field_service.auth.v3.CheckRequest.attributes:
+
+
+attributes
+  (:ref:`service.auth.v3.AttributeContext <envoy_v3_api_msg_service.auth.v3.AttributeContext>`) The request attributes.
+
+
+
+.. _envoy_v3_api_msg_service.auth.v3.DeniedHttpResponse:
+
+service.auth.v3.DeniedHttpResponse
+----------------------------------
+
+
+:repo:`[service.auth.v3.DeniedHttpResponse proto] <api/envoy/service/auth/v3/external_auth.proto#L43>`
+
+HTTP attributes for a denied response.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "status": {...},
+    "headers": [],
+    "body": ...
+  }
+
+.. _envoy_v3_api_field_service.auth.v3.DeniedHttpResponse.status:
+
+
+status
+  (:ref:`type.v3.HttpStatus <envoy_v3_api_msg_type.v3.HttpStatus>`) This field allows the authorization service to send an HTTP response status code to the
+  downstream client. If not set, Envoy sends ``403 Forbidden`` HTTP status code by default.
+
+
+.. _envoy_v3_api_field_service.auth.v3.DeniedHttpResponse.headers:
+
+
+headers
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) This field allows the authorization service to send HTTP response headers
+  to the downstream client. Note that the :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` defaults to
+  false when used in this message.
+
+
+.. _envoy_v3_api_field_service.auth.v3.DeniedHttpResponse.body:
+
+
+body
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This field allows the authorization service to send a response body data
+  to the downstream client.
+
+
+
+.. _envoy_v3_api_msg_service.auth.v3.OkHttpResponse:
+
+service.auth.v3.OkHttpResponse
+------------------------------
+
+
+:repo:`[service.auth.v3.OkHttpResponse proto] <api/envoy/service/auth/v3/external_auth.proto#L63>`
+
+HTTP attributes for an OK response.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "headers": [],
+    "headers_to_remove": [],
+    "dynamic_metadata": {...},
+    "response_headers_to_add": [],
+    "query_parameters_to_set": [],
+    "query_parameters_to_remove": []
+  }
+
+.. _envoy_v3_api_field_service.auth.v3.OkHttpResponse.headers:
+
+
+headers
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) HTTP entity headers in addition to the original request headers. This allows the authorization
+  service to append, to add or to override headers from the original request before
+  dispatching it to the upstream. Note that the :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` defaults to
+  false when used in this message. By setting the ``append`` field to ``true``,
+  the filter will append the correspondent header value to the matched request header.
+  By leaving ``append`` as false, the filter will either add a new header, or override an existing
+  one if there is a match.
+
+
+.. _envoy_v3_api_field_service.auth.v3.OkHttpResponse.headers_to_remove:
+
+
+headers_to_remove
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) HTTP entity headers to remove from the original request before dispatching
+  it to the upstream. This allows the authorization service to act on auth
+  related headers (like ``Authorization``), process them, and consume them.
+  Under this model, the upstream will either receive the request (if it's
+  authorized) or not receive it (if it's not), but will not see headers
+  containing authorization credentials.
+
+  Pseudo headers (such as ``:authority``, ``:method``, ``:path`` etc), as well as
+  the header ``Host``, may not be removed as that would make the request
+  malformed. If mentioned in ``headers_to_remove`` these special headers will
+  be ignored.
+
+  When using the HTTP service this must instead be set by the HTTP
+  authorization service as a comma separated list like so:
+  ``x-envoy-auth-headers-to-remove: one-auth-header, another-auth-header``.
+
+
+.. _envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata:
+
+
+dynamic_metadata
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) This field has been deprecated in favor of :ref:`CheckResponse.dynamic_metadata
+  <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>`. Until it is removed,
+  setting this field overrides :ref:`CheckResponse.dynamic_metadata
+  <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>`.
+
+
+.. _envoy_v3_api_field_service.auth.v3.OkHttpResponse.response_headers_to_add:
+
+
+response_headers_to_add
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) This field allows the authorization service to send HTTP response headers
+  to the downstream client on success. Note that the :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>`
+  defaults to false when used in this message.
+
+
+.. _envoy_v3_api_field_service.auth.v3.OkHttpResponse.query_parameters_to_set:
+
+
+query_parameters_to_set
+  (**repeated** :ref:`config.core.v3.QueryParameter <envoy_v3_api_msg_config.core.v3.QueryParameter>`) This field allows the authorization service to set (and overwrite) query
+  string parameters on the original request before it is sent upstream.
+
+
+.. _envoy_v3_api_field_service.auth.v3.OkHttpResponse.query_parameters_to_remove:
+
+
+query_parameters_to_remove
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This field allows the authorization service to specify which query parameters
+  should be removed from the original request before it is sent upstream. Each
+  element in this list is a case-sensitive query parameter name to be removed.
+
+
+
+.. _envoy_v3_api_msg_service.auth.v3.CheckResponse:
+
+service.auth.v3.CheckResponse
+-----------------------------
+
+
+:repo:`[service.auth.v3.CheckResponse proto] <api/envoy/service/auth/v3/external_auth.proto#L117>`
+
+Intended for gRPC and Network Authorization servers ``only``.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "status": {...},
+    "denied_response": {...},
+    "ok_response": {...},
+    "error_response": {...},
+    "dynamic_metadata": {...}
+  }
+
+.. _envoy_v3_api_field_service.auth.v3.CheckResponse.status:
+
+
+status
+  (`Status <https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#status>`_) Status ``OK`` allows the request. Any other status indicates the request should be denied, and
+  for HTTP filter, if not overridden by :ref:`denied HTTP response status <envoy_v3_api_field_service.auth.v3.DeniedHttpResponse.status>`
+  Envoy sends ``403 Forbidden`` HTTP status code by default.
+
+
+.. _envoy_v3_api_field_service.auth.v3.CheckResponse.denied_response:
+
+
+denied_response
+  (:ref:`service.auth.v3.DeniedHttpResponse <envoy_v3_api_msg_service.auth.v3.DeniedHttpResponse>`) Supplies http attributes for a denied response.
+
+
+  An message that contains HTTP response attributes. This message is
+  used when the authorization service needs to send custom responses to the
+  downstream client or, to modify/add request headers being dispatched to the upstream.
+
+
+  Only one of :ref:`denied_response <envoy_v3_api_field_service.auth.v3.CheckResponse.denied_response>`, :ref:`ok_response <envoy_v3_api_field_service.auth.v3.CheckResponse.ok_response>`, :ref:`error_response <envoy_v3_api_field_service.auth.v3.CheckResponse.error_response>` may be set.
+
+.. _envoy_v3_api_field_service.auth.v3.CheckResponse.ok_response:
+
+
+ok_response
+  (:ref:`service.auth.v3.OkHttpResponse <envoy_v3_api_msg_service.auth.v3.OkHttpResponse>`) Supplies http attributes for an ok response.
+
+
+  An message that contains HTTP response attributes. This message is
+  used when the authorization service needs to send custom responses to the
+  downstream client or, to modify/add request headers being dispatched to the upstream.
+
+
+  Only one of :ref:`denied_response <envoy_v3_api_field_service.auth.v3.CheckResponse.denied_response>`, :ref:`ok_response <envoy_v3_api_field_service.auth.v3.CheckResponse.ok_response>`, :ref:`error_response <envoy_v3_api_field_service.auth.v3.CheckResponse.error_response>` may be set.
+
+.. _envoy_v3_api_field_service.auth.v3.CheckResponse.error_response:
+
+
+error_response
+  (:ref:`service.auth.v3.DeniedHttpResponse <envoy_v3_api_msg_service.auth.v3.DeniedHttpResponse>`) Supplies http attributes for an error response. This is used when the authorization
+  service encounters an internal error and wants to return custom headers and body to the
+  downstream client. When ``error_response`` is set, the ext_authz filter increments the
+  ``ext_authz_error`` stat and respects the :ref:`failure_mode_allow
+  <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>`
+  configuration. The HTTP status code, headers, and body are taken from the
+  :ref:`DeniedHttpResponse <envoy_v3_api_msg_service.auth.v3.DeniedHttpResponse>` message.
+  If the status field is not set, Envoy sends the status code configured via
+  :ref:`status_on_error <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.status_on_error>`,
+  which defaults to ``403 Forbidden``.
+
+
+  An message that contains HTTP response attributes. This message is
+  used when the authorization service needs to send custom responses to the
+  downstream client or, to modify/add request headers being dispatched to the upstream.
+
+
+  Only one of :ref:`denied_response <envoy_v3_api_field_service.auth.v3.CheckResponse.denied_response>`, :ref:`ok_response <envoy_v3_api_field_service.auth.v3.CheckResponse.ok_response>`, :ref:`error_response <envoy_v3_api_field_service.auth.v3.CheckResponse.error_response>` may be set.
+
+.. _envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata:
+
+
+dynamic_metadata
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) Optional response metadata that will be emitted as dynamic metadata to be consumed by the next
+  filter. This metadata lives in a namespace specified by the canonical name of extension filter
+  that requires it:
+
+  - :ref:`envoy.filters.http.ext_authz <config_http_filters_ext_authz_dynamic_metadata>` for HTTP filter.
+  - :ref:`envoy.filters.network.ext_authz <config_network_filters_ext_authz_dynamic_metadata>` for network filter.
+
+

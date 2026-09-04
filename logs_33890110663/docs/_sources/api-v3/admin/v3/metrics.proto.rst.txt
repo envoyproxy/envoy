@@ -1,0 +1,76 @@
+.. _envoy_v3_api_file_envoy/admin/v3/metrics.proto:
+
+Metrics (proto)
+===============
+
+
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.SimpleMetric:
+
+admin.v3.SimpleMetric
+---------------------
+
+
+:repo:`[admin.v3.SimpleMetric proto] <api/envoy/admin/v3/metrics.proto#L16>`
+
+Proto representation of an Envoy Counter or Gauge value.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "type": ...,
+    "value": ...,
+    "name": ...
+  }
+
+.. _envoy_v3_api_field_admin.v3.SimpleMetric.type:
+
+
+type
+  (:ref:`admin.v3.SimpleMetric.Type <envoy_v3_api_enum_admin.v3.SimpleMetric.Type>`) Type of the metric represented.
+
+
+.. _envoy_v3_api_field_admin.v3.SimpleMetric.value:
+
+
+value
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Current metric value.
+
+
+.. _envoy_v3_api_field_admin.v3.SimpleMetric.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Name of the metric.
+
+
+.. _envoy_v3_api_enum_admin.v3.SimpleMetric.Type:
+
+Enum admin.v3.SimpleMetric.Type
+-------------------------------
+
+
+:repo:`[admin.v3.SimpleMetric.Type proto] <api/envoy/admin/v3/metrics.proto#L19>`
+
+
+
+
+.. _envoy_v3_api_enum_value_admin.v3.SimpleMetric.Type.COUNTER:
+
+
+COUNTER
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_admin.v3.SimpleMetric.Type.GAUGE:
+
+
+GAUGE
+  ⁣
+
+

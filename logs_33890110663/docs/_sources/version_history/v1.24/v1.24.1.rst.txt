@@ -1,0 +1,22 @@
+.. _version_history_1.24.1:
+
+1.24.1 (December 3, 2022)
+==========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **ci**: assorted fixes.
+* **dependencies**: update Curl, Kafka, Wasm to mitigate CVEs.
+* **docker**: update Docker images (``distroless`` -> ``4b22ca3c6``) to resolve CVE issues in container packages.
+

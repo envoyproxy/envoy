@@ -1,0 +1,141 @@
+.. _envoy_v3_api_file_xds/type/v3/cel.proto:
+
+Common Expression Language (CEL) (proto)
+========================================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_.xds.type.v3.CelExpression:
+
+.xds.type.v3.CelExpression
+--------------------------
+
+
+`[.xds.type.v3.CelExpression proto] <https://github.com/cncf/xds/blob/main/xds/type/v3/cel.proto#L25>`_
+
+Either parsed or checked representation of the `Common Expression Language
+<https://github.com/google/cel-spec>`_ (CEL) program.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "parsed_expr": {...},
+    "checked_expr": {...},
+    "cel_expr_parsed": {...},
+    "cel_expr_checked": {...},
+    "cel_expr_string": ...
+  }
+
+.. _envoy_v3_api_field_.xds.type.v3.CelExpression.parsed_expr:
+
+
+parsed_expr
+  (.google.api.expr.v1alpha1.ParsedExpr) Parsed expression in abstract syntax tree (AST) form.
+
+  Deprecated -- use ``cel_expr_parsed`` field instead.
+  If ``cel_expr_parsed`` or ``cel_expr_checked`` is set, this field is not used.
+
+
+  
+
+  Only one of :ref:`parsed_expr <envoy_v3_api_field_.xds.type.v3.CelExpression.parsed_expr>`, :ref:`checked_expr <envoy_v3_api_field_.xds.type.v3.CelExpression.checked_expr>` may be set.
+
+.. _envoy_v3_api_field_.xds.type.v3.CelExpression.checked_expr:
+
+
+checked_expr
+  (.google.api.expr.v1alpha1.CheckedExpr) Parsed expression in abstract syntax tree (AST) form that has been successfully type checked.
+
+  Deprecated -- use ``cel_expr_checked`` field instead.
+  If ``cel_expr_parsed`` or ``cel_expr_checked`` is set, this field is not used.
+
+
+  
+
+  Only one of :ref:`parsed_expr <envoy_v3_api_field_.xds.type.v3.CelExpression.parsed_expr>`, :ref:`checked_expr <envoy_v3_api_field_.xds.type.v3.CelExpression.checked_expr>` may be set.
+
+.. _envoy_v3_api_field_.xds.type.v3.CelExpression.cel_expr_parsed:
+
+
+cel_expr_parsed
+  (.cel.expr.ParsedExpr) Parsed expression in abstract syntax tree (AST) form.
+
+  If ``cel_expr_checked`` is set, this field is not used.
+
+
+.. _envoy_v3_api_field_.xds.type.v3.CelExpression.cel_expr_checked:
+
+
+cel_expr_checked
+  (.cel.expr.CheckedExpr) Parsed expression in abstract syntax tree (AST) form that has been successfully type checked.
+
+  If set, takes precedence over ``cel_expr_parsed``.
+
+
+.. _envoy_v3_api_field_.xds.type.v3.CelExpression.cel_expr_string:
+
+
+cel_expr_string
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Unparsed expression in string form. For example, ``request.headers['x-env'] == 'prod'`` will
+  get ``x-env`` header value and compare it with ``prod``.
+  Check the `Common Expression Language <https://github.com/google/cel-spec>`_ for more details.
+
+  If set, takes precedence over ``cel_expr_parsed`` and ``cel_expr_checked``.
+
+
+
+.. _envoy_v3_api_msg_.xds.type.v3.CelExtractString:
+
+.xds.type.v3.CelExtractString
+-----------------------------
+
+
+`[.xds.type.v3.CelExtractString proto] <https://github.com/cncf/xds/blob/main/xds/type/v3/cel.proto#L68>`_
+
+Extracts a string by evaluating a `Common Expression Language
+<https://github.com/google/cel-spec>`_ (CEL) expression against the standardized set of
+:ref:`HTTP attributes <arch_overview_attributes>`.
+
+.. attention::
+
+  Besides CEL evaluation raising an error explicitly, CEL program returning a type other than
+  the ``string``, or not returning anything, are considered an error as well.
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "expr_extract": {...},
+    "default_value": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.type.v3.CelExtractString.expr_extract:
+
+
+expr_extract
+  (:ref:`.xds.type.v3.CelExpression <envoy_v3_api_msg_.xds.type.v3.CelExpression>`, *REQUIRED*) The CEL expression used to extract a string from the CEL environment.
+  the "subject string") that should be replaced.
+
+
+.. _envoy_v3_api_field_.xds.type.v3.CelExtractString.default_value:
+
+
+default_value
+  (`StringValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#stringvalue>`_) If CEL expression evaluates to an error, this value is be returned to the caller.
+  If not set, the error is propagated to the caller.
+
+

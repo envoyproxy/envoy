@@ -1,0 +1,317 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/proto_api_scrubber/v3/config.proto:
+
+Proto API Scrubber (proto)
+==========================
+
+.. _extension_envoy.filters.http.proto_api_scrubber:
+
+This extension has the qualified name ``envoy.filters.http.proto_api_scrubber``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig>`
+
+
+
+
+
+ProtoApiScrubber filter supports filtering of the request and
+response payloads based on the configured field restrictions and actions.
+The field restrictions and actions can be defined using unified matcher API.
+The filter evaluates the configured restriction for each field
+to produce the filtered output using the configured actions.
+The design doc for this filter is available
+`here <https://docs.google.com/document/d/1jgRe5mhucFRgmKYf-Ukk20jW8kusIo53U5bcF74GkK8>`_
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig:
+
+extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig
+--------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig proto] <api/envoy/extensions/filters/http/proto_api_scrubber/v3/config.proto#L27>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "descriptor_set": {...},
+    "restrictions": {...},
+    "filtering_mode": ...,
+    "scrub_unknown_fields": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.descriptor_set:
+
+
+descriptor_set
+  (:ref:`extensions.filters.http.proto_api_scrubber.v3.DescriptorSet <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.DescriptorSet>`) The proto descriptor set for the proto services.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.restrictions:
+
+
+restrictions
+  (:ref:`extensions.filters.http.proto_api_scrubber.v3.Restrictions <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.Restrictions>`) Contains the restrictions for the supported proto elements.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.filtering_mode:
+
+
+filtering_mode
+  (:ref:`extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.FilteringMode <envoy_v3_api_enum_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.FilteringMode>`) Specifies the filtering mode of this filter.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.scrub_unknown_fields:
+
+
+scrub_unknown_fields
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, the filter will scrub unknown fields from the protobuf messages.
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.FilteringMode:
+
+Enum extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.FilteringMode
+---------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.FilteringMode proto] <api/envoy/extensions/filters/http/proto_api_scrubber/v3/config.proto#L29>`
+
+An enum enlisting all the filtering modes supported by this filter.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.FilteringMode.OVERRIDE:
+
+
+OVERRIDE
+  *(DEFAULT)* ⁣Override the original request/response body with the filtered
+  request/response body.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.DescriptorSet:
+
+extensions.filters.http.proto_api_scrubber.v3.DescriptorSet
+-----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.proto_api_scrubber.v3.DescriptorSet proto] <api/envoy/extensions/filters/http/proto_api_scrubber/v3/config.proto#L49>`
+
+Specifies the descriptor set for proto services.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "data_source": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.DescriptorSet.data_source:
+
+
+data_source
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) It could be passed by a local file through ``Datasource.filename`` or
+  embedded in the ``Datasource.inline_bytes``.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.Restrictions:
+
+extensions.filters.http.proto_api_scrubber.v3.Restrictions
+----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.proto_api_scrubber.v3.Restrictions proto] <api/envoy/extensions/filters/http/proto_api_scrubber/v3/config.proto#L56>`
+
+Contains the restrictions for the methods.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "method_restrictions": {...},
+    "message_restrictions": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.Restrictions.method_restrictions:
+
+
+method_restrictions
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.filters.http.proto_api_scrubber.v3.MethodRestrictions <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.MethodRestrictions>`>) Specifies the method restrictions.
+  Key - Fully qualified method name e.g., ``endpoints.examples.bookstore.BookStore/GetShelf``.
+  Value - Method restrictions.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.Restrictions.message_restrictions:
+
+
+message_restrictions
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.filters.http.proto_api_scrubber.v3.MessageRestrictions <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.MessageRestrictions>`>) Specifies the message restrictions.
+  Key - Fully qualified message name e.g., ``endpoints.examples.bookstore.Book``.
+  Value - Message restrictions.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.MethodRestrictions:
+
+extensions.filters.http.proto_api_scrubber.v3.MethodRestrictions
+----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.proto_api_scrubber.v3.MethodRestrictions proto] <api/envoy/extensions/filters/http/proto_api_scrubber/v3/config.proto#L70>`
+
+Contains the method restrictions which include the field level restrictions
+for the request and response fields.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_field_restrictions": {...},
+    "response_field_restrictions": {...},
+    "method_restriction": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.MethodRestrictions.request_field_restrictions:
+
+
+request_field_restrictions
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig>`>) Restrictions that apply to request fields of the method.
+  Key - field mask like path of the field e.g., foo.bar.baz
+  Value - Restrictions map containing the mapping from restriction name to
+  the restriction values.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.MethodRestrictions.response_field_restrictions:
+
+
+response_field_restrictions
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig>`>) Restrictions that apply to response fields of the method.
+  Key - field mask like path of the field e.g., foo.bar.baz
+  Value - Restrictions map containing the mapping from restriction name to
+  the restriction values.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.MethodRestrictions.method_restriction:
+
+
+method_restriction
+  (:ref:`extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig>`) Optional restriction that applies to the entire method. If present, this
+  rule takes precedence for the method itself over field-level or
+  message-level rules. The 'matcher' within RestrictionConfig will determine
+  if the method is denied/scrubbed. If the matcher evaluates to true:
+
+  - The request is **denied**, and further processing is stopped.
+  - The implementation should generate an immediate error response
+    (e.g., an HTTP 403 Forbidden status) and send it to the client.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.MessageRestrictions:
+
+extensions.filters.http.proto_api_scrubber.v3.MessageRestrictions
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.proto_api_scrubber.v3.MessageRestrictions proto] <api/envoy/extensions/filters/http/proto_api_scrubber/v3/config.proto#L95>`
+
+Contains message-level restrictions.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config": {...},
+    "field_restrictions": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.MessageRestrictions.config:
+
+
+config
+  (:ref:`extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig>`) The core restriction to apply to this message type.
+  The 'matcher' within RestrictionConfig will determine if the message is
+  scrubbed/denied/allowed.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.MessageRestrictions.field_restrictions:
+
+
+field_restrictions
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig>`>) Restrictions that apply to specific fields within this message type.
+  Key - field mask (e.g. "social_security_number").
+  Value - The restriction configuration for that field.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig:
+
+extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig
+---------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig proto] <api/envoy/extensions/filters/http/proto_api_scrubber/v3/config.proto#L108>`
+
+The restriction configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "matcher": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.RestrictionConfig.matcher:
+
+
+matcher
+  (:ref:`.xds.type.matcher.v3.Matcher <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`) Matcher tree for matching requests and responses with the configured restrictions.
+
+

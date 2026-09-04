@@ -1,0 +1,65 @@
+.. _envoy_v3_api_file_envoy/extensions/access_loggers/wasm/v3/wasm.proto:
+
+Wasm access log (proto)
+=======================
+
+.. _extension_envoy.access_loggers.wasm:
+
+This extension has the qualified name ``envoy.access_loggers.wasm``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.access_loggers <extension_category_envoy.access_loggers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.access_loggers.wasm.v3.WasmAccessLog <envoy_v3_api_msg_extensions.access_loggers.wasm.v3.WasmAccessLog>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.wasm.v3.WasmAccessLog:
+
+extensions.access_loggers.wasm.v3.WasmAccessLog
+-----------------------------------------------
+
+
+:repo:`[extensions.access_loggers.wasm.v3.WasmAccessLog proto] <api/envoy/extensions/access_loggers/wasm/v3/wasm.proto#L20>`
+
+Custom configuration for an :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
+that calls into a WASM VM. Configures the built-in ``envoy.access_loggers.wasm``
+AccessLog.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.wasm.v3.WasmAccessLog.config:
+
+
+config
+  (:ref:`extensions.wasm.v3.PluginConfig <envoy_v3_api_msg_extensions.wasm.v3.PluginConfig>`) 
+

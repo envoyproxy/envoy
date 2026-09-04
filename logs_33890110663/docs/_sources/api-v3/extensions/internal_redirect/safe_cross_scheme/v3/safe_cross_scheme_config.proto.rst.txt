@@ -1,0 +1,53 @@
+.. _envoy_v3_api_file_envoy/extensions/internal_redirect/safe_cross_scheme/v3/safe_cross_scheme_config.proto:
+
+SafeCrossScheme internal redirect predicate (proto)
+===================================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig:
+
+extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig
+-----------------------------------------------------------------------
+
+
+:repo:`[extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig proto] <api/envoy/extensions/internal_redirect/safe_cross_scheme/v3/safe_cross_scheme_config.proto#L20>`
+
+An internal redirect predicate that checks the scheme between the
+downstream url and the redirect target url and allows a) same scheme
+redirect and b) safe cross scheme redirect, which means if the downstream
+scheme is HTTPS, both HTTPS and HTTP redirect targets are allowed, but if the
+downstream scheme is HTTP, only HTTP redirect targets are allowed.
+
+.. _extension_envoy.internal_redirect_predicates.safe_cross_scheme:
+
+This extension has the qualified name ``envoy.internal_redirect_predicates.safe_cross_scheme``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.internal_redirect_predicates <extension_category_envoy.internal_redirect_predicates>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig <envoy_v3_api_msg_extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig>`
+
+
+
+
+

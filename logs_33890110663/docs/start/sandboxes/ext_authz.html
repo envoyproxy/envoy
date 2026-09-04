@@ -1,0 +1,452 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>External authorization (ext_authz) filter &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Fault injection filter" href="fault-injection.html" />
+    <link rel="prev" title="Dynamic configuration (filesystem)" href="dynamic-config-fs.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../start.html">Getting Started</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Sandboxes</a></li>
+      <li class="breadcrumb-item active">External authorization (ext_authz) filter</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/start/sandboxes/ext_authz.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="external-authorization-ext-authz-filter">
+<span id="install-sandboxes-ext-authz"></span><h1>External authorization (ext_authz) filter<a class="headerlink" href="#external-authorization-ext-authz-filter" title="Link to this heading"></a></h1>
+<aside class="sidebar">
+<p class="sidebar-title">Requirements</p>
+<dl class="simple">
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup"><span class="std std-ref">Sandbox environment</span></a></dt><dd><p>Setup your sandbox environment with Docker and Docker Compose,
+and clone the Envoy repository with Git.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup-curl"><span class="std std-ref">curl</span></a></dt><dd><p>Used to make <code class="docutils literal notranslate"><span class="pre">HTTP</span></code> requests.</p>
+</dd>
+</dl>
+</aside>
+<p>This sandbox demonstrates Envoy’s <a class="reference internal" href="../../configuration/http/http_filters/ext_authz_filter.html#config-http-filters-ext-authz"><span class="std std-ref">ext_authz filter</span></a>
+capability to delegate authorization of incoming requests through Envoy to an external services.</p>
+<p>While ext_authz can also be employed as a network filter, this sandbox is limited to demonstrating the
+ext_authz HTTP filter, which supports calling HTTP or gRPC services.</p>
+<p>The setup of this sandbox is very similar to a front-proxy deployment, however calls to the upstream
+service behind the proxy will be checked by an external HTTP or gRPC service. In this sandbox,
+for every authorized call, the external authorization service adds an additional <code class="docutils literal notranslate"><span class="pre">x-current-user</span></code>
+header to the headers forwarded to the upstream service.</p>
+<section id="step-1-start-all-of-our-containers">
+<h2>Step 1: Start all of our containers<a class="headerlink" href="#step-1-start-all-of-our-containers" title="Link to this heading"></a></h2>
+<p>Change to the <code class="docutils literal notranslate"><span class="pre">ext_authz</span></code> directory.</p>
+<p>To build this sandbox example and start the example services, run the following commands:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">pwd</span>
+<span class="go">examples/ext_authz</span>
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>pull
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>ps
+
+<span class="go">               Name                             Command               State                   Ports</span>
+<span class="go">--------------------------------------------------------------------------------------------------------------------</span>
+<span class="go">ext_authz_ext_authz-grpc-service_1   /app/server -users /etc/us       Up</span>
+<span class="go">ext_authz_ext_authz-http-service_1   docker-entrypoint.sh node        Up</span>
+<span class="go">ext_authz_front-envoy_1              /docker-entrypoint.sh /bin       Up           10000/tcp, 0.0.0.0:8000-&gt;8000/tcp</span>
+<span class="go">ext_authz_upstream-service_1         python3 /code/service.py         Up (healthy)</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This sandbox has multiple configurations set up. The configuration is controlled by thge <code class="docutils literal notranslate"><span class="pre">FRONT_ENVOY_YAML</span></code> environment
+variable when selecting the Envoy configuration to be used. The default value of <code class="docutils literal notranslate"><span class="pre">FRONT_ENVOY_YAML</span></code>
+can be defined in the <code class="docutils literal notranslate"><span class="pre">.env</span></code> file or provided inline when running the <code class="docutils literal notranslate"><span class="pre">docker</span> <span class="pre">compose</span> <span class="pre">up</span></code>
+command.</p>
+<p>For more information, please take a look at
+<a class="reference external" href="https://docs.docker.com/compose/environment-variables">environment variables in Compose documentation</a>.</p>
+</div>
+<p>By default, <code class="docutils literal notranslate"><span class="pre">FRONT_ENVOY_YAML</span></code> points to <a class="reference download internal" download="" href="../../_downloads/5e1c8a47a9568f7eeb931122b5070c1a/v3.yaml"><code class="xref download docutils literal notranslate"><span class="pre">config/grpc-service/v3.yaml</span></code></a>
+file which bootstraps front-envoy with ext_authz HTTP filter with gRPC service <code class="docutils literal notranslate"><span class="pre">V3</span></code> (this is specified by
+<a class="reference internal" href="../../api-v3/extensions/filters/http/ext_authz/v3/ext_authz.proto.html#envoy-v3-api-field-extensions-filters-http-ext-authz-v3-extauthz-transport-api-version"><span class="std std-ref">transport_api_version field</span></a>).</p>
+<p>The possible values of <code class="docutils literal notranslate"><span class="pre">FRONT_ENVOY_YAML</span></code> can be found inside the <code class="docutils literal notranslate"><span class="pre">config</span></code>
+directory.</p>
+<p>For example, to run Envoy with ext_authz HTTP filter with HTTP service will be:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">pwd</span>
+<span class="go">examples/ext_authz</span>
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>pull
+<span class="gp">$ </span><span class="c1"># Tearing down the currently running setup</span>
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>down
+<span class="gp">$ </span><span class="nv">FRONT_ENVOY_YAML</span><span class="o">=</span>config/http-service.yaml<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d
+<span class="gp">$ </span><span class="c1"># Or you can update the .env file with the above FRONT_ENVOY_YAML value, so you don&#39;t have to specify it when running the &quot;up&quot; command.</span>
+</pre></div>
+</div>
+</section>
+<section id="step-4-access-the-upstream-service-behind-the-front-envoy">
+<h2>Step 4: Access the upstream-service behind the Front Envoy<a class="headerlink" href="#step-4-access-the-upstream-service-behind-the-front-envoy" title="Link to this heading"></a></h2>
+<p>You can now try to send a request to upstream-service via the front Envoy as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-v<span class="w"> </span>localhost:8000/service
+<span class="go">*   Trying 127.0.0.1...</span>
+<span class="go">* TCP_NODELAY set</span>
+<span class="go">* Connected to localhost (127.0.0.1) port 8000 (#0)</span>
+<span class="go">&gt; GET /service HTTP/1.1</span>
+<span class="go">&gt; Host: localhost:8000</span>
+<span class="go">&gt; User-Agent: curl/7.58.0</span>
+<span class="go">&gt; Accept: */*</span>
+<span class="go">&gt;</span>
+<span class="go">&lt; HTTP/1.1 403 Forbidden</span>
+<span class="go">&lt; date: Fri, 19 Jun 2020 15:02:24 GMT</span>
+<span class="go">&lt; server: envoy</span>
+<span class="go">&lt; content-length: 0</span>
+</pre></div>
+</div>
+<p>As observed, the request failed with <code class="docutils literal notranslate"><span class="pre">403</span> <span class="pre">Forbidden</span></code> status code. This happened since the ext_authz
+filter employed by Envoy rejected the call. To let the request reach the upstream service, you need
+to provide a <code class="docutils literal notranslate"><span class="pre">Bearer</span></code> token via the <code class="docutils literal notranslate"><span class="pre">Authorization</span></code> header.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A complete list of users is defined in <a class="reference download internal" download="" href="../../_downloads/51d2e325feddc4b71a6eeb88ae4c7fbb/users.json"><code class="xref download docutils literal notranslate"><span class="pre">auth/users.json</span></code></a>
+file. For example, the <code class="docutils literal notranslate"><span class="pre">token1</span></code> used in the below example is corresponding to <code class="docutils literal notranslate"><span class="pre">user1</span></code>.</p>
+</div>
+<p>An example of successful requests can be observed as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-v<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer token1&quot;</span><span class="w"> </span>localhost:8000/service
+<span class="go">*   Trying 127.0.0.1...</span>
+<span class="go">* TCP_NODELAY set</span>
+<span class="go">* Connected to localhost (127.0.0.1) port 8000 (#0)</span>
+<span class="go">&gt; GET /service HTTP/1.1</span>
+<span class="go">&gt; Host: localhost:8000</span>
+<span class="go">&gt; User-Agent: curl/7.58.0</span>
+<span class="go">&gt; Accept: */*</span>
+<span class="go">&gt; Authorization: Bearer token1</span>
+<span class="go">&gt;</span>
+<span class="go">&lt; HTTP/1.1 200 OK</span>
+<span class="go">&lt; content-type: text/html; charset=utf-8</span>
+<span class="go">&lt; content-length: 24</span>
+<span class="go">&lt; server: envoy</span>
+<span class="go">&lt; date: Fri, 19 Jun 2020 15:04:29 GMT</span>
+<span class="go">&lt; x-envoy-upstream-service-time: 2</span>
+<span class="go">&lt;</span>
+<span class="go">* Connection #0 to host localhost left intact</span>
+<span class="go">Hello user1 from behind Envoy!</span>
+</pre></div>
+</div>
+<p>We can also employ <a class="reference external" href="https://www.openpolicyagent.org/">Open Policy Agent</a> server
+(with <a class="reference external" href="https://github.com/open-policy-agent/opa-envoy-plugin">envoy_ext_authz_grpc</a> plugin enabled)
+as the authorization server. To run this example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">pwd</span>
+<span class="go">examples/ext_authz</span>
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>pull
+<span class="gp">$ </span><span class="c1"># Tearing down the currently running setup</span>
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>down
+<span class="gp">$ </span><span class="nv">FRONT_ENVOY_YAML</span><span class="o">=</span>config/opa-service/v3.yaml<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d
+</pre></div>
+</div>
+<p>And sending a request to the upstream service (via the Front Envoy) gives:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>localhost:8000/service<span class="w"> </span>--verbose
+<span class="go">*   Trying ::1...</span>
+<span class="go">* TCP_NODELAY set</span>
+<span class="go">* Connected to localhost (::1) port 8000 (#0)</span>
+<span class="go">&gt; GET /service HTTP/1.1</span>
+<span class="go">&gt; Host: localhost:8000</span>
+<span class="go">&gt; User-Agent: curl/7.64.1</span>
+<span class="go">&gt; Accept: */*</span>
+<span class="go">&gt;</span>
+<span class="go">&lt; HTTP/1.1 200 OK</span>
+<span class="go">&lt; content-type: text/html; charset=utf-8</span>
+<span class="go">&lt; content-length: 28</span>
+<span class="go">&lt; server: envoy</span>
+<span class="go">&lt; date: Thu, 02 Jul 2020 06:29:58 GMT</span>
+<span class="go">&lt; x-envoy-upstream-service-time: 2</span>
+<span class="go">&lt;</span>
+<span class="go">* Connection #0 to host localhost left intact</span>
+<span class="go">Hello OPA from behind Envoy!</span>
+</pre></div>
+</div>
+<p>From the logs, we can observe the policy decision message from the Open Policy Agent (OPA) server (for
+the above request against the defined policy in
+<a class="reference download internal" download="" href="../../_downloads/820c9994319e32174253485940818917/policy.rego"><code class="xref download docutils literal notranslate"><span class="pre">config/opa-service/policy.rego</span></code></a>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>ext_authz-opa-service<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>decision_id<span class="w"> </span>-A<span class="w"> </span><span class="m">30</span>
+<span class="go">ext_authz-opa-service_1   |   &quot;decision_id&quot;: &quot;8143ca68-42d8-43e6-ade6-d1169bf69110&quot;,</span>
+<span class="go">ext_authz-opa-service_1   |   &quot;input&quot;: {</span>
+<span class="go">ext_authz-opa-service_1   |     &quot;attributes&quot;: {</span>
+<span class="go">ext_authz-opa-service_1   |       &quot;destination&quot;: {</span>
+<span class="go">ext_authz-opa-service_1   |         &quot;address&quot;: {</span>
+<span class="go">ext_authz-opa-service_1   |           &quot;Address&quot;: {</span>
+<span class="go">ext_authz-opa-service_1   |             &quot;SocketAddress&quot;: {</span>
+<span class="go">ext_authz-opa-service_1   |               &quot;PortSpecifier&quot;: {</span>
+<span class="go">ext_authz-opa-service_1   |                 &quot;PortValue&quot;: 8000</span>
+<span class="go">ext_authz-opa-service_1   |               },</span>
+<span class="go">ext_authz-opa-service_1   |               &quot;address&quot;: &quot;172.28.0.6&quot;</span>
+<span class="go">ext_authz-opa-service_1   |             }</span>
+<span class="go">ext_authz-opa-service_1   |           }</span>
+<span class="go">ext_authz-opa-service_1   |         }</span>
+<span class="go">ext_authz-opa-service_1   |       },</span>
+<span class="go">ext_authz-opa-service_1   |       &quot;metadata_context&quot;: {},</span>
+<span class="go">ext_authz-opa-service_1   |       &quot;request&quot;: {</span>
+<span class="go">ext_authz-opa-service_1   |         &quot;http&quot;: {</span>
+<span class="go">ext_authz-opa-service_1   |           &quot;headers&quot;: {</span>
+<span class="go">ext_authz-opa-service_1   |             &quot;:authority&quot;: &quot;localhost:8000&quot;,</span>
+<span class="go">ext_authz-opa-service_1   |             &quot;:method&quot;: &quot;GET&quot;,</span>
+<span class="go">ext_authz-opa-service_1   |             &quot;:path&quot;: &quot;/service&quot;,</span>
+<span class="go">ext_authz-opa-service_1   |             &quot;accept&quot;: &quot;*/*&quot;,</span>
+<span class="go">ext_authz-opa-service_1   |             &quot;user-agent&quot;: &quot;curl/7.64.1&quot;,</span>
+<span class="go">ext_authz-opa-service_1   |             &quot;x-forwarded-proto&quot;: &quot;http&quot;,</span>
+<span class="go">ext_authz-opa-service_1   |             &quot;x-request-id&quot;: &quot;b77919c0-f1d4-4b06-b444-5a8b32d5daf4&quot;</span>
+<span class="go">ext_authz-opa-service_1   |           },</span>
+<span class="go">ext_authz-opa-service_1   |           &quot;host&quot;: &quot;localhost:8000&quot;,</span>
+<span class="go">ext_authz-opa-service_1   |           &quot;id&quot;: &quot;16617514055874272263&quot;,</span>
+<span class="go">ext_authz-opa-service_1   |           &quot;method&quot;: &quot;GET&quot;,</span>
+<span class="go">ext_authz-opa-service_1   |           &quot;path&quot;: &quot;/service&quot;,</span>
+</pre></div>
+</div>
+<p>Trying to send a request with method other than <code class="docutils literal notranslate"><span class="pre">GET</span></code> gives a rejection:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>localhost:8000/service<span class="w"> </span>--verbose
+<span class="go">*   Trying ::1...</span>
+<span class="go">* TCP_NODELAY set</span>
+<span class="go">* Connected to localhost (::1) port 8000 (#0)</span>
+<span class="go">&gt; PUT /service HTTP/1.1</span>
+<span class="go">&gt; Host: localhost:8000</span>
+<span class="go">&gt; User-Agent: curl/7.64.1</span>
+<span class="go">&gt; Accept: */*</span>
+<span class="go">&gt;</span>
+<span class="go">&lt; HTTP/1.1 403 Forbidden</span>
+<span class="go">&lt; date: Thu, 02 Jul 2020 06:46:13 GMT</span>
+<span class="go">&lt; server: envoy</span>
+<span class="go">&lt; content-length: 0</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="../../configuration/http/http_filters/ext_authz_filter.html#config-http-filters-ext-authz"><span class="std std-ref">ext_authz filter</span></a></dt><dd><p>Learn more about using Envoy’s ext_authz filter.</p>
+</dd>
+<dt><a class="reference external" href="https://www.openpolicyagent.org/">Open Policy Agent</a></dt><dd><p>Policy-based control for cloud native environments.</p>
+</dd>
+<dt><a class="reference external" href="https://github.com/open-policy-agent/opa-envoy-plugin">envoy_ext_authz_grpc</a></dt><dd><p>Open Policy Agent Envoy plugin.</p>
+</dd>
+<dt><a class="reference external" href="https://docs.docker.com/compose/environment-variables">environment variables in Compose documentation</a>.</dt><dd><p>Further information about using env variables with Docker Compose.</p>
+</dd>
+</dl>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="dynamic-config-fs.html" class="btn btn-neutral float-left" title="Dynamic configuration (filesystem)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="fault-injection.html" class="btn btn-neutral float-right" title="Fault injection filter" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">External authorization (ext_authz) filter</a><ul>
+<li><a class="reference internal" href="#step-1-start-all-of-our-containers">Step 1: Start all of our containers</a></li>
+<li><a class="reference internal" href="#step-4-access-the-upstream-service-behind-the-front-envoy">Step 4: Access the upstream-service behind the Front Envoy</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

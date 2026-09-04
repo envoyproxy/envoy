@@ -1,0 +1,111 @@
+.. _envoy_v3_api_file_xds/core/v3/collection_entry.proto:
+
+xds/core/v3/collection_entry.proto (proto)
+==========================================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+.. _envoy_v3_api_msg_.xds.core.v3.CollectionEntry:
+
+.xds.core.v3.CollectionEntry
+----------------------------
+
+
+`[.xds.core.v3.CollectionEntry proto] <https://github.com/cncf/xds/blob/main/xds/core/v3/collection_entry.proto#L28>`_
+
+xDS collection resource wrapper. This encapsulates a xDS resource when
+appearing inside a list collection resource. List collection resources are
+regular Resource messages of type:
+
+.. code-block:: proto
+
+  message <T>Collection {
+    repeated CollectionEntry resources = 1;
+  }
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "locator": {...},
+    "inline_entry": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.core.v3.CollectionEntry.locator:
+
+
+locator
+  (:ref:`.xds.core.v3.ResourceLocator <envoy_v3_api_msg_.xds.core.v3.ResourceLocator>`) A resource locator describing how the member resource is to be located.
+
+
+  
+
+  Precisely one of :ref:`locator <envoy_v3_api_field_.xds.core.v3.CollectionEntry.locator>`, :ref:`inline_entry <envoy_v3_api_field_.xds.core.v3.CollectionEntry.inline_entry>` must be set.
+
+.. _envoy_v3_api_field_.xds.core.v3.CollectionEntry.inline_entry:
+
+
+inline_entry
+  (:ref:`.xds.core.v3.CollectionEntry.InlineEntry <envoy_v3_api_msg_.xds.core.v3.CollectionEntry.InlineEntry>`) The resource is inlined in the list collection.
+
+
+  
+
+  Precisely one of :ref:`locator <envoy_v3_api_field_.xds.core.v3.CollectionEntry.locator>`, :ref:`inline_entry <envoy_v3_api_field_.xds.core.v3.CollectionEntry.inline_entry>` must be set.
+
+.. _envoy_v3_api_msg_.xds.core.v3.CollectionEntry.InlineEntry:
+
+.xds.core.v3.CollectionEntry.InlineEntry
+----------------------------------------
+
+
+`[.xds.core.v3.CollectionEntry.InlineEntry proto] <https://github.com/cncf/xds/blob/main/xds/core/v3/collection_entry.proto#L30>`_
+
+Inlined resource entry.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "version": ...,
+    "resource": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.core.v3.CollectionEntry.InlineEntry.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional name to describe the inlined resource. Resource names must match
+  ``[a-zA-Z0-9_-\./]+`` (TODO(htuch): turn this into a PGV constraint once
+  finalized, probably should be a RFC3986 pchar). This name allows
+  reference via the #entry directive in ResourceLocator.
+
+
+.. _envoy_v3_api_field_.xds.core.v3.CollectionEntry.InlineEntry.version:
+
+
+version
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The resource's logical version. It is illegal to have the same named xDS
+  resource name at a given version with different resource payloads.
+
+
+.. _envoy_v3_api_field_.xds.core.v3.CollectionEntry.InlineEntry.resource:
+
+
+resource
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The resource payload, including type URL.
+
+
+

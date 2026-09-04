@@ -1,0 +1,114 @@
+static_resources:
+  listeners:
+  - name: outbound
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 15000
+    listener_filters:
+    - name: original_dst
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
+    traffic_direction: OUTBOUND
+    filter_chains:
+    - name: http
+      filters:
+      - name: http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: some_service
+          http_filters:
+          - name: router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    - name: internal
+      filters:
+      - name: tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: internal
+          cluster: some_service
+    - name: tls
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain: {filename: "certs/servercert.pem"}
+              private_key: {filename: "certs/serverkey.pem"}
+      filters:
+      - name: tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tls
+          cluster: some_service
+    # Snippet: 58-102
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: port
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+        exact_match_map:
+          map:
+            "80":
+              action:
+                name: http
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: http
+            "443":
+              matcher:
+                matcher_tree:
+                  input:
+                    name: ip
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
+                  custom_match:
+                    name: ip-matcher
+                    typed_config:
+                      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+                      range_matchers:
+                      - ranges:
+                        - address_prefix: 192.0.0.0
+                          prefix_len: 2
+                        - address_prefix: 10.0.0.0
+                          prefix_len: 24
+                        on_match:
+                          action:
+                            name: internal
+                            typed_config:
+                              "@type": type.googleapis.com/google.protobuf.StringValue
+                              value: internal
+                      - ranges:
+                        - address_prefix: 0.0.0.0
+                        on_match:
+                          action:
+                            name: tls
+                            typed_config:
+                              "@type": type.googleapis.com/google.protobuf.StringValue
+                              value: tls
+
+  clusters:
+  - name: some_service
+    load_assignment:
+      cluster_name: some_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.1.2.10
+                port_value: 10002

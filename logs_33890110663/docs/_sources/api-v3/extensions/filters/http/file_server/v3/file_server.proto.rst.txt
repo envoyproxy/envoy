@@ -1,0 +1,188 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/file_server/v3/file_server.proto:
+
+FileServerConfig (proto)
+========================
+
+.. _extension_envoy.filters.http.file_server:
+
+This extension has the qualified name ``envoy.filters.http.file_server``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.file_server.v3.FileServerConfig <envoy_v3_api_msg_extensions.filters.http.file_server.v3.FileServerConfig>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.file_server.v3.FileServerConfig:
+
+extensions.filters.http.file_server.v3.FileServerConfig
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.file_server.v3.FileServerConfig proto] <api/envoy/extensions/filters/http/file_server/v3/file_server.proto#L23>`
+
+A :ref:`file server <config_http_filters_file_server>` filter configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "manager_config": {...},
+    "path_mappings": [],
+    "content_types": {...},
+    "default_content_type": ...,
+    "directory_behaviors": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.file_server.v3.FileServerConfig.manager_config:
+
+
+manager_config
+  (:ref:`extensions.common.async_files.v3.AsyncFileManagerConfig <envoy_v3_api_msg_extensions.common.async_files.v3.AsyncFileManagerConfig>`, *REQUIRED*) A configuration for the AsyncFileManager to be used to read from the filesystem.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.file_server.v3.FileServerConfig.path_mappings:
+
+
+path_mappings
+  (**repeated** :ref:`extensions.filters.http.file_server.v3.FileServerConfig.PathMapping <envoy_v3_api_msg_extensions.filters.http.file_server.v3.FileServerConfig.PathMapping>`) The longest matching path_mapping takes precedence.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.file_server.v3.FileServerConfig.content_types:
+
+
+content_types
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_>) A map from filename suffix (in lowercase) to content type header.
+  e.g. ``{"txt": "text/plain"}``
+
+  File suffixes may not contain ``.`` as the filename suffix after
+  the last ``.`` is used to perform an O(1) lookup against the keys.
+
+  An empty string suffix will only match files ending with a ``.``.
+
+  Files with no suffix (e.g. ``README``) can be matched as the full string
+  in lowercase. e.g. ``{"readme": "text/plain"}``
+
+
+.. _envoy_v3_api_field_extensions.filters.http.file_server.v3.FileServerConfig.default_content_type:
+
+
+default_content_type
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If ``content_types`` does not contain a match for a file suffix,
+  ``default_content_type`` is used.
+
+  If there is no match and ``default_content_type`` is empty, the
+  ``content-type`` header will be omitted from the response.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.file_server.v3.FileServerConfig.directory_behaviors:
+
+
+directory_behaviors
+  (**repeated** :ref:`extensions.filters.http.file_server.v3.FileServerConfig.DirectoryBehavior <envoy_v3_api_msg_extensions.filters.http.file_server.v3.FileServerConfig.DirectoryBehavior>`) If the requested path refers to a directory, the given behaviors are
+  tried in order until one succeeds. If the end of the list is reached
+  with no success, the result is a 403 Forbidden.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.file_server.v3.FileServerConfig.PathMapping:
+
+extensions.filters.http.file_server.v3.FileServerConfig.PathMapping
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.file_server.v3.FileServerConfig.PathMapping proto] <api/envoy/extensions/filters/http/file_server/v3/file_server.proto#L24>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_path_prefix": ...,
+    "file_path_prefix": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.file_server.v3.FileServerConfig.PathMapping.request_path_prefix:
+
+
+request_path_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) If no ``request_path_prefix`` is matched, the filter does not intercept a request.
+
+  If a ``request_path_prefix`` is matched, that prefix is removed from the request
+  and replaced with ``file_path_prefix`` to form a filesystem path for
+  the request.
+
+  Prefix ``/`` will match all GET requests.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.file_server.v3.FileServerConfig.PathMapping.file_path_prefix:
+
+
+file_path_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Replaces a matched ``request_path_prefix`` to form a filesystem path for a
+  request. May be relative to the working directory of the envoy execution,
+  or an absolute path.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.file_server.v3.FileServerConfig.DirectoryBehavior:
+
+extensions.filters.http.file_server.v3.FileServerConfig.DirectoryBehavior
+-------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.file_server.v3.FileServerConfig.DirectoryBehavior proto] <api/envoy/extensions/filters/http/file_server/v3/file_server.proto#L40>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "default_file": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.file_server.v3.FileServerConfig.DirectoryBehavior.default_file:
+
+
+default_file
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Attempts to serve the given file within the directory, e.g. ``index.html``.
+  Precisely one of ``default_file`` and ``list`` must be set per ``DirectoryBehavior``.
+
+
+
+
+
+
+

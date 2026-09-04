@@ -1,0 +1,572 @@
+.. _envoy_v3_api_file_envoy/config/overload/v3/overload.proto:
+
+Overload Manager (proto)
+========================
+
+
+
+
+The Overload Manager provides an extensible framework to protect Envoy instances
+from overload of various resources (memory, cpu, file descriptors, etc).
+It monitors a configurable set of resources and notifies registered listeners
+when triggers related to those resources fire.
+
+
+
+
+.. _envoy_v3_api_msg_config.overload.v3.ResourceMonitor:
+
+config.overload.v3.ResourceMonitor
+----------------------------------
+
+
+:repo:`[config.overload.v3.ResourceMonitor proto] <api/envoy/config/overload/v3/overload.proto#L27>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "typed_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.overload.v3.ResourceMonitor.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the resource monitor to instantiate. Must match a registered
+  resource monitor type.
+  See the :ref:`extensions listed in typed_config below <extension_category_envoy.resource_monitors>` for the default list of available resource monitor.
+
+
+.. _envoy_v3_api_field_config.overload.v3.ResourceMonitor.typed_config:
+
+
+typed_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) 
+  Configuration for the resource monitor being instantiated.
+
+
+  .. _extension_category_envoy.resource_monitors:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.resource_monitors.cgroup_memory <extension_envoy.resource_monitors.cgroup_memory>`
+
+    - :ref:`envoy.resource_monitors.cpu_utilization <extension_envoy.resource_monitors.cpu_utilization>`
+
+    - :ref:`envoy.resource_monitors.fixed_heap <extension_envoy.resource_monitors.fixed_heap>`
+
+    - :ref:`envoy.resource_monitors.global_downstream_max_connections <extension_envoy.resource_monitors.global_downstream_max_connections>`
+
+    - :ref:`envoy.resource_monitors.injected_resource <extension_envoy.resource_monitors.injected_resource>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.overload.v3.ThresholdTrigger:
+
+config.overload.v3.ThresholdTrigger
+-----------------------------------
+
+
+:repo:`[config.overload.v3.ThresholdTrigger proto] <api/envoy/config/overload/v3/overload.proto#L47>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "value": ...
+  }
+
+.. _envoy_v3_api_field_config.overload.v3.ThresholdTrigger.value:
+
+
+value
+  (`double <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If the resource pressure is greater than or equal to this value, the trigger
+  will enter saturation.
+
+
+
+.. _envoy_v3_api_msg_config.overload.v3.ScaledTrigger:
+
+config.overload.v3.ScaledTrigger
+--------------------------------
+
+
+:repo:`[config.overload.v3.ScaledTrigger proto] <api/envoy/config/overload/v3/overload.proto#L56>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "scaling_threshold": ...,
+    "saturation_threshold": ...
+  }
+
+.. _envoy_v3_api_field_config.overload.v3.ScaledTrigger.scaling_threshold:
+
+
+scaling_threshold
+  (`double <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If the resource pressure is greater than this value, the trigger will be in the
+  :ref:`scaling <arch_overview_overload_manager-triggers-state>` state with value
+  ``(pressure - scaling_threshold) / (saturation_threshold - scaling_threshold)``.
+
+
+.. _envoy_v3_api_field_config.overload.v3.ScaledTrigger.saturation_threshold:
+
+
+saturation_threshold
+  (`double <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If the resource pressure is greater than this value, the trigger will enter saturation.
+
+
+
+.. _envoy_v3_api_msg_config.overload.v3.Trigger:
+
+config.overload.v3.Trigger
+--------------------------
+
+
+:repo:`[config.overload.v3.Trigger proto] <api/envoy/config/overload/v3/overload.proto#L66>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "threshold": {...},
+    "scaled": {...}
+  }
+
+.. _envoy_v3_api_field_config.overload.v3.Trigger.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the resource this is a trigger for.
+
+
+.. _envoy_v3_api_field_config.overload.v3.Trigger.threshold:
+
+
+threshold
+  (:ref:`config.overload.v3.ThresholdTrigger <envoy_v3_api_msg_config.overload.v3.ThresholdTrigger>`) 
+  
+
+  Precisely one of :ref:`threshold <envoy_v3_api_field_config.overload.v3.Trigger.threshold>`, :ref:`scaled <envoy_v3_api_field_config.overload.v3.Trigger.scaled>` must be set.
+
+.. _envoy_v3_api_field_config.overload.v3.Trigger.scaled:
+
+
+scaled
+  (:ref:`config.overload.v3.ScaledTrigger <envoy_v3_api_msg_config.overload.v3.ScaledTrigger>`) 
+  
+
+  Precisely one of :ref:`threshold <envoy_v3_api_field_config.overload.v3.Trigger.threshold>`, :ref:`scaled <envoy_v3_api_field_config.overload.v3.Trigger.scaled>` must be set.
+
+
+.. _envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig:
+
+config.overload.v3.ScaleTimersOverloadActionConfig
+--------------------------------------------------
+
+
+:repo:`[config.overload.v3.ScaleTimersOverloadActionConfig proto] <api/envoy/config/overload/v3/overload.proto#L85>`
+
+Typed configuration for the "envoy.overload_actions.reduce_timeouts" action. See
+:ref:`the docs <config_overload_manager_reducing_timeouts>` for an example of how to configure
+the action with different timeouts and minimum values.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "timer_scale_factors": []
+  }
+
+.. _envoy_v3_api_field_config.overload.v3.ScaleTimersOverloadActionConfig.timer_scale_factors:
+
+
+timer_scale_factors
+  (**repeated** :ref:`config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer <envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer>`, *REQUIRED*) A set of timer scaling rules to be applied.
+
+
+.. _envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer:
+
+config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer
+-------------------------------------------------------------
+
+
+:repo:`[config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer proto] <api/envoy/config/overload/v3/overload.proto#L121>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "timer": ...,
+    "min_timeout": {...},
+    "min_scale": {...}
+  }
+
+.. _envoy_v3_api_field_config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer.timer:
+
+
+timer
+  (:ref:`config.overload.v3.ScaleTimersOverloadActionConfig.TimerType <envoy_v3_api_enum_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType>`) The type of timer this minimum applies to.
+
+
+.. _envoy_v3_api_field_config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer.min_timeout:
+
+
+min_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Sets the minimum duration as an absolute value.
+
+
+  
+
+  Precisely one of :ref:`min_timeout <envoy_v3_api_field_config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer.min_timeout>`, :ref:`min_scale <envoy_v3_api_field_config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer.min_scale>` must be set.
+
+.. _envoy_v3_api_field_config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer.min_scale:
+
+
+min_scale
+  (:ref:`type.v3.Percent <envoy_v3_api_msg_type.v3.Percent>`) Sets the minimum duration as a percentage of the maximum value.
+
+
+  
+
+  Precisely one of :ref:`min_timeout <envoy_v3_api_field_config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer.min_timeout>`, :ref:`min_scale <envoy_v3_api_field_config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer.min_scale>` must be set.
+
+
+.. _envoy_v3_api_enum_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType:
+
+Enum config.overload.v3.ScaleTimersOverloadActionConfig.TimerType
+-----------------------------------------------------------------
+
+
+:repo:`[config.overload.v3.ScaleTimersOverloadActionConfig.TimerType proto] <api/envoy/config/overload/v3/overload.proto#L86>`
+
+
+
+
+.. _envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.UNSPECIFIED:
+
+
+UNSPECIFIED
+  *(DEFAULT)* ⁣Unsupported value; users must explicitly specify the timer they want scaled.
+
+
+.. _envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_CONNECTION_IDLE:
+
+
+HTTP_DOWNSTREAM_CONNECTION_IDLE
+  ⁣Adjusts the idle timer for downstream HTTP connections that takes effect when there are no active streams.
+  This affects the value of :ref:`HttpConnectionManager.common_http_protocol_options.idle_timeout
+  <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`
+
+
+.. _envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_IDLE:
+
+
+HTTP_DOWNSTREAM_STREAM_IDLE
+  ⁣Adjusts the idle timer for HTTP streams initiated by downstream clients.
+  This affects the value of :ref:`RouteAction.idle_timeout <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>` and
+  :ref:`HttpConnectionManager.stream_idle_timeout
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>`
+
+
+.. _envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.TRANSPORT_SOCKET_CONNECT:
+
+
+TRANSPORT_SOCKET_CONNECT
+  ⁣Adjusts the timer for how long downstream clients have to finish transport-level negotiations
+  before the connection is closed.
+  This affects the value of
+  :ref:`FilterChain.transport_socket_connect_timeout <envoy_v3_api_field_config.listener.v3.FilterChain.transport_socket_connect_timeout>`.
+
+
+.. _envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_CONNECTION_MAX:
+
+
+HTTP_DOWNSTREAM_CONNECTION_MAX
+  ⁣Adjusts the max connection duration timer for downstream HTTP connections.
+  This affects the value of
+  :ref:`HttpConnectionManager.common_http_protocol_options.max_connection_duration
+  <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`.
+
+
+.. _envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_FLUSH:
+
+
+HTTP_DOWNSTREAM_STREAM_FLUSH
+  ⁣Adjusts the timeout for the downstream codec to flush an ended stream.
+  This affects the value of :ref:`RouteAction.flush_timeout
+  <envoy_v3_api_field_config.route.v3.RouteAction.flush_timeout>` and
+  :ref:`HttpConnectionManager.stream_flush_timeout
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`
+
+
+
+
+.. _envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig:
+
+config.overload.v3.ShrinkHeapConfig
+-----------------------------------
+
+
+:repo:`[config.overload.v3.ShrinkHeapConfig proto] <api/envoy/config/overload/v3/overload.proto#L143>`
+
+Typed configuration for the "envoy.overload_actions.shrink_heap" action.
+See :ref:`the docs <config_overload_manager_shrink_heap>` for an example of how to configure
+this action.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "timer_interval": {...},
+    "max_unfreed_memory_bytes": {...}
+  }
+
+.. _envoy_v3_api_field_config.overload.v3.ShrinkHeapConfig.timer_interval:
+
+
+timer_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The interval at which shrink heap action checks if memory should be released.
+  If not specified, defaults to 10 seconds.
+
+
+.. _envoy_v3_api_field_config.overload.v3.ShrinkHeapConfig.max_unfreed_memory_bytes:
+
+
+max_unfreed_memory_bytes
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Maximum amount of unfreed memory in bytes to keep before releasing memory
+  back to the system. This is used as the threshold passed to
+  tcmalloc::MallocExtension::ReleaseMemoryToSystem().
+  If not specified, defaults to 104857600 (100MB).
+
+
+
+.. _envoy_v3_api_msg_config.overload.v3.OverloadAction:
+
+config.overload.v3.OverloadAction
+---------------------------------
+
+
+:repo:`[config.overload.v3.OverloadAction proto] <api/envoy/config/overload/v3/overload.proto#L155>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "triggers": [],
+    "typed_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.overload.v3.OverloadAction.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the overload action. This is just a well-known string that
+  listeners can use for registering callbacks.
+  Valid known overload actions include:
+  - envoy.overload_actions.stop_accepting_requests
+  - envoy.overload_actions.disable_http_keepalive
+  - envoy.overload_actions.stop_accepting_connections
+  - envoy.overload_actions.reject_incoming_connections
+  - envoy.overload_actions.shrink_heap
+  - envoy.overload_actions.reduce_timeouts
+  - envoy.overload_actions.reset_high_memory_stream
+
+
+.. _envoy_v3_api_field_config.overload.v3.OverloadAction.triggers:
+
+
+triggers
+  (**repeated** :ref:`config.overload.v3.Trigger <envoy_v3_api_msg_config.overload.v3.Trigger>`, *REQUIRED*) A set of triggers for this action. The state of the action is the maximum
+  state of all triggers, which can be scalar values between 0 and 1 or
+  saturated. Listeners are notified when the overload action changes state.
+  An overload manager action can only have one trigger for a given resource
+  e.g. :ref:`Trigger.name
+  <envoy_v3_api_field_config.overload.v3.Trigger.name>` must be unique
+  in this list.
+
+
+.. _envoy_v3_api_field_config.overload.v3.OverloadAction.typed_config:
+
+
+typed_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) Configuration for the action being instantiated if applicable.
+
+
+
+.. _envoy_v3_api_msg_config.overload.v3.LoadShedPoint:
+
+config.overload.v3.LoadShedPoint
+--------------------------------
+
+
+:repo:`[config.overload.v3.LoadShedPoint proto] <api/envoy/config/overload/v3/overload.proto#L187>`
+
+A point within the connection or request lifecycle that provides context on
+whether to shed load at that given stage for the current entity at the
+point.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "triggers": []
+  }
+
+.. _envoy_v3_api_field_config.overload.v3.LoadShedPoint.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) This is just a well-known string for the LoadShedPoint.
+  Deployment specific LoadShedPoints e.g. within a custom extension should
+  be prefixed by the company / deployment name to avoid colliding with any
+  open source LoadShedPoints.
+
+
+.. _envoy_v3_api_field_config.overload.v3.LoadShedPoint.triggers:
+
+
+triggers
+  (**repeated** :ref:`config.overload.v3.Trigger <envoy_v3_api_msg_config.overload.v3.Trigger>`, *REQUIRED*) A set of triggers for this LoadShedPoint. The LoadShedPoint will use the
+  the maximum state of all triggers, which can be scalar values between 0 and
+  1 or saturated. A LoadShedPoint can only have one trigger for a given
+  resource e.g. :ref:`Trigger.name
+  <envoy_v3_api_field_config.overload.v3.Trigger.name>` must be unique in
+  this list.
+
+
+
+.. _envoy_v3_api_msg_config.overload.v3.BufferFactoryConfig:
+
+config.overload.v3.BufferFactoryConfig
+--------------------------------------
+
+
+:repo:`[config.overload.v3.BufferFactoryConfig proto] <api/envoy/config/overload/v3/overload.proto#L205>`
+
+Configuration for which accounts the WatermarkBuffer Factories should
+track.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "minimum_account_to_track_power_of_two": ...
+  }
+
+.. _envoy_v3_api_field_config.overload.v3.BufferFactoryConfig.minimum_account_to_track_power_of_two:
+
+
+minimum_account_to_track_power_of_two
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The minimum power of two at which Envoy starts tracking an account.
+
+  Envoy has 8 power of two buckets starting with the provided exponent below.
+  Concretely the 1st bucket contains accounts for streams that use
+  [2^minimum_account_to_track_power_of_two,
+  2^(minimum_account_to_track_power_of_two + 1)) bytes.
+  With the 8th bucket tracking accounts
+  >= 128 * 2^minimum_account_to_track_power_of_two.
+
+  The maximum value is 56, since we're using uint64_t for bytes counting,
+  and that's the last value that would use the 8 buckets. In practice,
+  we don't expect the proxy to be holding 2^56 bytes.
+
+  If omitted, Envoy should not do any tracking.
+
+
+
+.. _envoy_v3_api_msg_config.overload.v3.OverloadManager:
+
+config.overload.v3.OverloadManager
+----------------------------------
+
+
+:repo:`[config.overload.v3.OverloadManager proto] <api/envoy/config/overload/v3/overload.proto#L224>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "refresh_interval": {...},
+    "resource_monitors": [],
+    "actions": [],
+    "loadshed_points": [],
+    "buffer_factory_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.overload.v3.OverloadManager.refresh_interval:
+
+
+refresh_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The interval for refreshing resource usage.
+
+
+.. _envoy_v3_api_field_config.overload.v3.OverloadManager.resource_monitors:
+
+
+resource_monitors
+  (**repeated** :ref:`config.overload.v3.ResourceMonitor <envoy_v3_api_msg_config.overload.v3.ResourceMonitor>`, *REQUIRED*) The set of resources to monitor.
+
+
+.. _envoy_v3_api_field_config.overload.v3.OverloadManager.actions:
+
+
+actions
+  (**repeated** :ref:`config.overload.v3.OverloadAction <envoy_v3_api_msg_config.overload.v3.OverloadAction>`) The set of overload actions.
+
+
+.. _envoy_v3_api_field_config.overload.v3.OverloadManager.loadshed_points:
+
+
+loadshed_points
+  (**repeated** :ref:`config.overload.v3.LoadShedPoint <envoy_v3_api_msg_config.overload.v3.LoadShedPoint>`) The set of load shed points.
+
+
+.. _envoy_v3_api_field_config.overload.v3.OverloadManager.buffer_factory_config:
+
+
+buffer_factory_config
+  (:ref:`config.overload.v3.BufferFactoryConfig <envoy_v3_api_msg_config.overload.v3.BufferFactoryConfig>`) Configuration for buffer factory.
+
+

@@ -1,0 +1,53 @@
+﻿2026-08-18T18:22:33.3668623Z Current runner version: '2.336.0'
+2026-08-18T18:22:33.3704201Z ##[group]Runner Image Provisioner
+2026-08-18T18:22:33.3705526Z Hosted Compute Agent
+2026-08-18T18:22:33.3706429Z Version: 20260729.566
+2026-08-18T18:22:33.3707572Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-18T18:22:33.3708772Z Build Date: 2026-07-29T19:17:02Z
+2026-08-18T18:22:33.3710004Z Worker ID: {4f1375b6-9ad3-4dd3-b112-5562970ad753}
+2026-08-18T18:22:33.3711176Z Azure Region: eastus
+2026-08-18T18:22:33.3712129Z ##[endgroup]
+2026-08-18T18:22:33.3714408Z ##[group]Operating System
+2026-08-18T18:22:33.3715453Z Ubuntu
+2026-08-18T18:22:33.3716345Z 24.04.4
+2026-08-18T18:22:33.3717166Z LTS
+2026-08-18T18:22:33.3717981Z ##[endgroup]
+2026-08-18T18:22:33.3718920Z ##[group]Runner Image
+2026-08-18T18:22:33.3719878Z Image: ubuntu-24.04
+2026-08-18T18:22:33.3720803Z Version: 20260810.271.1
+2026-08-18T18:22:33.3723041Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260810.271/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-18T18:22:33.3725722Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260810.271
+2026-08-18T18:22:33.3727369Z ##[endgroup]
+2026-08-18T18:22:33.3729292Z ##[group]GITHUB_TOKEN Permissions
+2026-08-18T18:22:33.3732183Z Contents: read
+2026-08-18T18:22:33.3733431Z Metadata: read
+2026-08-18T18:22:33.3734356Z ##[endgroup]
+2026-08-18T18:22:33.3737156Z Secret source: Actions
+2026-08-18T18:22:33.3739200Z Prepare workflow directory
+2026-08-18T18:22:33.4191348Z Prepare all required actions
+2026-08-18T18:22:33.4259477Z Getting action download info
+2026-08-18T18:22:33.6404444Z Download action repository 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c' (SHA:3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c)
+2026-08-18T18:22:33.9098177Z Download action repository 'envoyproxy/toolshed@4a6a2986abd53c8a2d1077de4165fae369c5bc41' (SHA:4a6a2986abd53c8a2d1077de4165fae369c5bc41)
+2026-08-18T18:22:34.4685610Z Getting action download info
+2026-08-18T18:22:34.5571741Z Download action repository 'envoyproxy/toolshed@ab31cf868faba51af4bd9f04671c30d4084d70ee' (SHA:ab31cf868faba51af4bd9f04671c30d4084d70ee)
+2026-08-18T18:22:35.0726539Z Uses: envoyproxy/envoy/.github/workflows/_upload_gcs.yml@refs/heads/main (447ae91525105d3bd9c5c9bc3672078d89c6958e)
+2026-08-18T18:22:35.0731351Z ##[group] Inputs
+2026-08-18T18:22:35.0731882Z   artifacts: ["coverage", "fuzz_coverage"]
+
+2026-08-18T18:22:35.0732580Z ##[endgroup]
+2026-08-18T18:22:35.0733124Z Complete job name: Check (pr/46497/main@143324b) / upload / upload (coverage)
+2026-08-18T18:22:35.1455185Z ##[group]Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+2026-08-18T18:22:35.1456062Z with:
+2026-08-18T18:22:35.1456422Z   name: coverage
+2026-08-18T18:22:35.1456774Z   path: coverage
+2026-08-18T18:22:35.1457132Z   merge-multiple: false
+2026-08-18T18:22:35.1457512Z   repository: envoyproxy/envoy
+2026-08-18T18:22:35.1457905Z   run-id: 32169091313
+2026-08-18T18:22:35.1458294Z   skip-decompress: false
+2026-08-18T18:22:35.1458692Z   digest-mismatch: error
+2026-08-18T18:22:35.1459222Z ##[endgroup]
+2026-08-18T18:22:35.2866942Z Downloading single artifact
+2026-08-18T18:22:35.3694805Z ##[error]Unable to download artifact(s): Artifact not found for name: coverage
+        Please ensure that your artifact is not expired and the artifact was uploaded using a compatible version of toolkit/upload-artifact.
+        For more information, visit the GitHub Artifacts FAQ: https://github.com/actions/toolkit/blob/main/packages/artifact/docs/faq.md
+2026-08-18T18:22:35.3990986Z Cleaning up orphan processes

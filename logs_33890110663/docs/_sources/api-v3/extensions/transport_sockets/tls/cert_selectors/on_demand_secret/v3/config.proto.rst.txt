@@ -1,0 +1,124 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.proto:
+
+On-demand secret certificate selector (proto)
+=============================================
+
+.. _extension_envoy.tls.certificate_selectors.on_demand_secret:
+
+This extension has the qualified name ``envoy.tls.certificate_selectors.on_demand_secret``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.tls.certificate_selectors <extension_category_envoy.tls.certificate_selectors>`
+
+  - :ref:`envoy.tls.upstream_certificate_selectors <extension_category_envoy.tls.upstream_certificate_selectors>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config:
+
+extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config
+--------------------------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config proto] <api/envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.proto#L27>`
+
+Fetches the secret on-demand while allowing the parent cluster or listener to accept connections
+without warming. During the handshake, a secret name is derived from the peer hello message, an
+SDS resource request starts, and the handshake is paused. Once an SDS response is received with a
+resource, the handshake is resumed with the provided certificate. If the SDS server indicates the
+resource removal, the handshake is failed, and the SDS subscription to the resource is stopped.
+
+Similar to the regular SDS, the certificate is configured using the outer common TLS context,
+e.g. by setting the FIPS compliance policy on the loaded certificate.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config_source": {...},
+    "certificate_mapper": {...},
+    "prefetch_secret_names": []
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.config_source:
+
+
+config_source
+  (:ref:`config.core.v3.ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`, *REQUIRED*) Defines the configuration source of the secrets.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.certificate_mapper:
+
+
+certificate_mapper
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`, *REQUIRED*) Extension point to specify a function to compute the secret name. The extension is called
+  during the TLS handshake after receiving the *CLIENT HELLO* message from the client for the
+  downstream certificate selector, and using the transport socket options and *SERVER HELLO* for
+  the upstream certificate selector.
+
+
+  .. _extension_category_envoy.tls.certificate_mappers:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.tls.certificate_mappers.sni <extension_envoy.tls.certificate_mappers.sni>`
+
+    - :ref:`envoy.tls.certificate_mappers.static_name <extension_envoy.tls.certificate_mappers.static_name>`
+
+
+
+
+
+  .. _extension_category_envoy.tls.upstream_certificate_mappers:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.tls.certificate_mappers.static_name <extension_envoy.tls.certificate_mappers.static_name>`
+
+    - :ref:`envoy.tls.upstream_certificate_mappers.filter_state_override <extension_envoy.tls.upstream_certificate_mappers.filter_state_override>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.prefetch_secret_names:
+
+
+prefetch_secret_names
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) A list of secret resource names to start fetching on configuration load (prior to receiving any
+  requests). The parent resource initializes immediately without waiting for the fetch to
+  complete.
+
+

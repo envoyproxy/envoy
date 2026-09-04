@@ -1,0 +1,19 @@
+.. _envoy_v3_api_file_envoy/service/discovery/v3/ads.proto:
+
+:orphan:
+
+Aggregated Discovery Service (ADS) (proto)
+==========================================
+
+
+
+
+Discovery services for endpoints, clusters, routes,
+and listeners are retained in the package `envoy.api.v2` for backwards
+compatibility with existing management servers. New development in discovery
+services should proceed in the package `envoy.service.discovery.v2`.
+
+
+
+
+

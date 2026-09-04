@@ -1,0 +1,21 @@
+.. _version_history_1.33.8:
+
+1.33.8 (September 2, 2025)
+===========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **oauth2**: Fixed an issue where cookies prefixed with ``__Secure-`` or ``__Host-`` were not receiving a
+  Secure attribute.
+

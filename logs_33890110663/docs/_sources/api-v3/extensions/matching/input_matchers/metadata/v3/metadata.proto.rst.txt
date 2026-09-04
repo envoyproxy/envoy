@@ -1,0 +1,72 @@
+.. _envoy_v3_api_file_envoy/extensions/matching/input_matchers/metadata/v3/metadata.proto:
+
+metadata matcher (proto)
+========================
+
+.. _extension_envoy.matching.matchers.metadata_matcher:
+
+This extension has the qualified name ``envoy.matching.matchers.metadata_matcher``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.input_matchers <extension_category_envoy.matching.input_matchers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.input_matchers.metadata.v3.Metadata <envoy_v3_api_msg_extensions.matching.input_matchers.metadata.v3.Metadata>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.input_matchers.metadata.v3.Metadata:
+
+extensions.matching.input_matchers.metadata.v3.Metadata
+-------------------------------------------------------
+
+
+:repo:`[extensions.matching.input_matchers.metadata.v3.Metadata proto] <api/envoy/extensions/matching/input_matchers/metadata/v3/metadata.proto#L19>`
+
+Metadata matcher for metadata from http matching input data.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "value": {...},
+    "invert": ...
+  }
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.metadata.v3.Metadata.value:
+
+
+value
+  (:ref:`type.matcher.v3.ValueMatcher <envoy_v3_api_msg_type.matcher.v3.ValueMatcher>`, *REQUIRED*) The Metadata is matched if the value retrieved by metadata matching input is matched to this value.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.metadata.v3.Metadata.invert:
+
+
+invert
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, the match result will be inverted.
+
+

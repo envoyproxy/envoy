@@ -1,0 +1,62 @@
+.. _envoy_v3_api_file_envoy/extensions/matching/common_inputs/environment_variable/v3/input.proto:
+
+Environment variable input (proto)
+==================================
+
+.. _extension_envoy.matching.common_inputs.environment_variable:
+
+This extension has the qualified name ``envoy.matching.common_inputs.environment_variable``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.common_inputs <extension_category_envoy.matching.common_inputs>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.environment_variable.v3.Config <envoy_v3_api_msg_extensions.matching.common_inputs.environment_variable.v3.Config>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.environment_variable.v3.Config:
+
+extensions.matching.common_inputs.environment_variable.v3.Config
+----------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.environment_variable.v3.Config proto] <api/envoy/extensions/matching/common_inputs/environment_variable/v3/input.proto#L17>`
+
+Reads an environment variable to provide an input for matching.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...
+  }
+
+.. _envoy_v3_api_field_extensions.matching.common_inputs.environment_variable.v3.Config.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Name of the environment variable to read from.
+
+

@@ -1,0 +1,81 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/reverse_tunnel/v3/drain_aware_hcm.proto:
+
+Drain-Aware HTTP Connection Manager (proto)
+===========================================
+
+.. _extension_envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager:
+
+This extension has the qualified name ``envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager <envoy_v3_api_msg_extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager>`
+
+
+
+A network filter that wraps the standard HCM and sends HTTP/2 GOAWAY frames
+on all active connections when the listener is drained (e.g. via admin
+/drain_listeners). Intended for use on reverse-tunnel listeners so that
+agents can detect drain and re-establish connections gracefully.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager:
+
+extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager
+----------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager proto] <api/envoy/extensions/filters/network/reverse_tunnel/v3/drain_aware_hcm.proto#L25>`
+
+Configuration for the drain-aware HTTP Connection Manager.
+All HCM fields are forwarded verbatim; the only difference is that this
+filter registers a listener-drain callback and emits a GOAWAY before the
+connection is closed.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "hcm_config": {...},
+    "enable_drain_with_goaway": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager.hcm_config:
+
+
+hcm_config
+  (:ref:`extensions.filters.network.http_connection_manager.v3.HttpConnectionManager <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>`) The underlying HCM configuration to apply.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager.enable_drain_with_goaway:
+
+
+enable_drain_with_goaway
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When true, a peer-initiated GOAWAY on a reverse tunnel makes the initiator drop the draining
+  tunnel and dial a replacement, so capacity is restored before the old tunnel closes while its
+  in-flight streams finish. Default false, so the behavior is opt-in and unconfigured listeners
+  are unaffected.
+
+

@@ -1,0 +1,306 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/http/peer_metadata/v3/peer_metadata.proto:
+
+Peer metadata HTTP filter (proto)
+=================================
+
+.. _extension_envoy.filters.http.peer_metadata:
+
+This extension has the qualified name ``envoy.filters.http.peer_metadata``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - ``type.googleapis.com/io.istio.http.peer_metadata.Config``
+
+
+
+
+Peer metadata HTTP filter for deriving and propagating peer telemetry attributes.
+
+
+
+
+.. _envoy_v3_api_msg_.io.istio.http.peer_metadata.Config:
+
+.io.istio.http.peer_metadata.Config
+-----------------------------------
+
+
+:repo:`[.io.istio.http.peer_metadata.Config proto] <api/contrib/envoy/extensions/filters/http/peer_metadata/v3/peer_metadata.proto#L20>`
+
+Peer metadata provider filter. This filter encapsulates the discovery of the
+peer telemetry attributes for consumption by the telemetry filters.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "downstream_discovery": [],
+    "upstream_discovery": [],
+    "downstream_propagation": [],
+    "upstream_propagation": [],
+    "shared_with_upstream": ...,
+    "additional_labels": []
+  }
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.downstream_discovery:
+
+
+downstream_discovery
+  (**repeated** .io.istio.http.peer_metadata.Config.DiscoveryMethod) The order of the derivation of the downstream peer metadata, in the precedence order.
+  First successful lookup wins.
+
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.upstream_discovery:
+
+
+upstream_discovery
+  (**repeated** .io.istio.http.peer_metadata.Config.DiscoveryMethod) The order of the derivation of the upstream peer metadata, in the precedence order.
+  First successful lookup wins.
+
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.downstream_propagation:
+
+
+downstream_propagation
+  (**repeated** .io.istio.http.peer_metadata.Config.PropagationMethod) Downstream injection of the metadata via a response header.
+
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.upstream_propagation:
+
+
+upstream_propagation
+  (**repeated** .io.istio.http.peer_metadata.Config.PropagationMethod) Upstream injection of the metadata via a request header.
+
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.shared_with_upstream:
+
+
+shared_with_upstream
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) True to enable sharing with the upstream.
+
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.additional_labels:
+
+
+additional_labels
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Additional labels to be added to the peer metadata to help your understand the traffic.
+  e.g. ``role``, ``location`` etc.
+
+
+.. _envoy_v3_api_msg_.io.istio.http.peer_metadata.Config.Baggage:
+
+.io.istio.http.peer_metadata.Config.Baggage
+-------------------------------------------
+
+
+:repo:`[.io.istio.http.peer_metadata.Config.Baggage proto] <api/contrib/envoy/extensions/filters/http/peer_metadata/v3/peer_metadata.proto#L22>`
+
+This method uses ``baggage`` header encoding. Only used for HTTP CONNECT tunnels.
+
+
+
+
+
+.. _envoy_v3_api_msg_.io.istio.http.peer_metadata.Config.WorkloadDiscovery:
+
+.io.istio.http.peer_metadata.Config.WorkloadDiscovery
+-----------------------------------------------------
+
+
+:repo:`[.io.istio.http.peer_metadata.Config.WorkloadDiscovery proto] <api/contrib/envoy/extensions/filters/http/peer_metadata/v3/peer_metadata.proto#L33>`
+
+This method uses the workload metadata xDS. Requires that the bootstrap extension is enabled.
+For downstream discovery, the remote address is the lookup key in xDS.
+For upstream discovery:
+
+* If the upstream host address is an IP, this IP is used as the lookup key;
+* If the upstream host address is internal, uses the
+  ``filter_metadata.tunnel.destination`` dynamic metadata value as the lookup key.
+
+
+
+
+
+
+.. _envoy_v3_api_msg_.io.istio.http.peer_metadata.Config.IstioHeaders:
+
+.io.istio.http.peer_metadata.Config.IstioHeaders
+------------------------------------------------
+
+
+:repo:`[.io.istio.http.peer_metadata.Config.IstioHeaders proto] <api/contrib/envoy/extensions/filters/http/peer_metadata/v3/peer_metadata.proto#L37>`
+
+This method uses Istio HTTP metadata exchange headers, e.g. ``x-envoy-peer-metadata``. Removes these headers if found.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "skip_external_clusters": ...
+  }
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.IstioHeaders.skip_external_clusters:
+
+
+skip_external_clusters
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Strip ``x-envoy-peer-metadata`` and ``x-envoy-peer-metadata-id`` headers on HTTP requests to services outside the mesh.
+  Detects upstream clusters with ``istio`` and ``external`` filter metadata fields
+
+
+
+.. _envoy_v3_api_msg_.io.istio.http.peer_metadata.Config.UpstreamFilterState:
+
+.io.istio.http.peer_metadata.Config.UpstreamFilterState
+-------------------------------------------------------
+
+
+:repo:`[.io.istio.http.peer_metadata.Config.UpstreamFilterState proto] <api/contrib/envoy/extensions/filters/http/peer_metadata/v3/peer_metadata.proto#L50>`
+
+This method extracts peer metadata from the upstream filter state if it's available.
+
+Upstream filter state could be populated by multiple means in general, but in practice the
+intention here is that upstream PeerMetadata filter will populate the filter state with peer
+details extracted from the baggage header sent in response.
+
+Naturally this metadata discovery method only makes sense for upstream peer metadata discovery.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "peer_metadata_key": ...
+  }
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.UpstreamFilterState.peer_metadata_key:
+
+
+peer_metadata_key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Upstream filter state key that will be used to store peer metadata.
+
+
+
+.. _envoy_v3_api_msg_.io.istio.http.peer_metadata.Config.DiscoveryMethod:
+
+.io.istio.http.peer_metadata.Config.DiscoveryMethod
+---------------------------------------------------
+
+
+:repo:`[.io.istio.http.peer_metadata.Config.DiscoveryMethod proto] <api/contrib/envoy/extensions/filters/http/peer_metadata/v3/peer_metadata.proto#L56>`
+
+An exhaustive list of the derivation methods.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "baggage": {...},
+    "workload_discovery": {...},
+    "istio_headers": {...},
+    "upstream_filter_state": {...}
+  }
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.baggage:
+
+
+baggage
+  (.io.istio.http.peer_metadata.Config.Baggage) 
+  
+
+  Only one of :ref:`baggage <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.baggage>`, :ref:`workload_discovery <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.workload_discovery>`, :ref:`istio_headers <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.istio_headers>`, :ref:`upstream_filter_state <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.upstream_filter_state>` may be set.
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.workload_discovery:
+
+
+workload_discovery
+  (.io.istio.http.peer_metadata.Config.WorkloadDiscovery) 
+  
+
+  Only one of :ref:`baggage <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.baggage>`, :ref:`workload_discovery <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.workload_discovery>`, :ref:`istio_headers <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.istio_headers>`, :ref:`upstream_filter_state <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.upstream_filter_state>` may be set.
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.istio_headers:
+
+
+istio_headers
+  (.io.istio.http.peer_metadata.Config.IstioHeaders) 
+  
+
+  Only one of :ref:`baggage <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.baggage>`, :ref:`workload_discovery <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.workload_discovery>`, :ref:`istio_headers <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.istio_headers>`, :ref:`upstream_filter_state <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.upstream_filter_state>` may be set.
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.upstream_filter_state:
+
+
+upstream_filter_state
+  (.io.istio.http.peer_metadata.Config.UpstreamFilterState) 
+  
+
+  Only one of :ref:`baggage <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.baggage>`, :ref:`workload_discovery <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.workload_discovery>`, :ref:`istio_headers <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.istio_headers>`, :ref:`upstream_filter_state <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.DiscoveryMethod.upstream_filter_state>` may be set.
+
+
+.. _envoy_v3_api_msg_.io.istio.http.peer_metadata.Config.PropagationMethod:
+
+.io.istio.http.peer_metadata.Config.PropagationMethod
+-----------------------------------------------------
+
+
+:repo:`[.io.istio.http.peer_metadata.Config.PropagationMethod proto] <api/contrib/envoy/extensions/filters/http/peer_metadata/v3/peer_metadata.proto#L69>`
+
+An exhaustive list of the metadata propagation methods.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "istio_headers": {...},
+    "baggage": {...}
+  }
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.PropagationMethod.istio_headers:
+
+
+istio_headers
+  (.io.istio.http.peer_metadata.Config.IstioHeaders) 
+  
+
+  Only one of :ref:`istio_headers <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.PropagationMethod.istio_headers>`, :ref:`baggage <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.PropagationMethod.baggage>` may be set.
+
+.. _envoy_v3_api_field_.io.istio.http.peer_metadata.Config.PropagationMethod.baggage:
+
+
+baggage
+  (.io.istio.http.peer_metadata.Config.Baggage) 
+  
+
+  Only one of :ref:`istio_headers <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.PropagationMethod.istio_headers>`, :ref:`baggage <envoy_v3_api_field_.io.istio.http.peer_metadata.Config.PropagationMethod.baggage>` may be set.
+
+

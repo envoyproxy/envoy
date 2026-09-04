@@ -1,0 +1,83 @@
+.. _envoy_v3_api_file_envoy/extensions/common/async_files/v3/async_file_manager.proto:
+
+AsyncFileManager configuration (proto)
+======================================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.common.async_files.v3.AsyncFileManagerConfig:
+
+extensions.common.async_files.v3.AsyncFileManagerConfig
+-------------------------------------------------------
+
+
+:repo:`[extensions.common.async_files.v3.AsyncFileManagerConfig proto] <api/envoy/extensions/common/async_files/v3/async_file_manager.proto#L19>`
+
+Configuration to instantiate or select a singleton ``AsyncFileManager``.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "id": ...,
+    "thread_pool": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.common.async_files.v3.AsyncFileManagerConfig.id:
+
+
+id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) An optional identifier for the manager. An empty string is a valid identifier
+  for a common, default ``AsyncFileManager``.
+
+  Reusing the same id with different configurations in the same envoy instance
+  is an error.
+
+
+.. _envoy_v3_api_field_extensions.common.async_files.v3.AsyncFileManagerConfig.thread_pool:
+
+
+thread_pool
+  (:ref:`extensions.common.async_files.v3.AsyncFileManagerConfig.ThreadPool <envoy_v3_api_msg_extensions.common.async_files.v3.AsyncFileManagerConfig.ThreadPool>`, *REQUIRED*) Configuration for a thread-pool based async file manager.
+
+
+  
+
+.. _envoy_v3_api_msg_extensions.common.async_files.v3.AsyncFileManagerConfig.ThreadPool:
+
+extensions.common.async_files.v3.AsyncFileManagerConfig.ThreadPool
+------------------------------------------------------------------
+
+
+:repo:`[extensions.common.async_files.v3.AsyncFileManagerConfig.ThreadPool proto] <api/envoy/extensions/common/async_files/v3/async_file_manager.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "thread_count": ...
+  }
+
+.. _envoy_v3_api_field_extensions.common.async_files.v3.AsyncFileManagerConfig.ThreadPool.thread_count:
+
+
+thread_count
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The number of threads to use. If unset or zero, will default to the number
+  of concurrent threads the hardware supports. This default is subject to
+  change if performance analysis suggests it.
+
+
+

@@ -1,0 +1,183 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/common/dependency/v3/dependency.proto:
+
+Filter dependency specification (proto)
+=======================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.common.dependency.v3.Dependency:
+
+extensions.filters.common.dependency.v3.Dependency
+--------------------------------------------------
+
+
+:repo:`[extensions.filters.common.dependency.v3.Dependency proto] <api/envoy/extensions/filters/common/dependency/v3/dependency.proto#L16>`
+
+Dependency specification and string identifier.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "type": ...,
+    "name": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.common.dependency.v3.Dependency.type:
+
+
+type
+  (:ref:`extensions.filters.common.dependency.v3.Dependency.DependencyType <envoy_v3_api_enum_extensions.filters.common.dependency.v3.Dependency.DependencyType>`) The kind of dependency.
+
+
+.. _envoy_v3_api_field_extensions.filters.common.dependency.v3.Dependency.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The string identifier for the dependency.
+
+
+.. _envoy_v3_api_enum_extensions.filters.common.dependency.v3.Dependency.DependencyType:
+
+Enum extensions.filters.common.dependency.v3.Dependency.DependencyType
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.common.dependency.v3.Dependency.DependencyType proto] <api/envoy/extensions/filters/common/dependency/v3/dependency.proto#L17>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.common.dependency.v3.Dependency.DependencyType.HEADER:
+
+
+HEADER
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.common.dependency.v3.Dependency.DependencyType.FILTER_STATE_KEY:
+
+
+FILTER_STATE_KEY
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.common.dependency.v3.Dependency.DependencyType.DYNAMIC_METADATA:
+
+
+DYNAMIC_METADATA
+  ⁣
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.common.dependency.v3.FilterDependencies:
+
+extensions.filters.common.dependency.v3.FilterDependencies
+----------------------------------------------------------
+
+
+:repo:`[extensions.filters.common.dependency.v3.FilterDependencies proto] <api/envoy/extensions/filters/common/dependency/v3/dependency.proto#L32>`
+
+Dependency specification for a filter. For a filter chain to be valid, any
+dependency that is required must be provided by an earlier filter.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "decode_required": [],
+    "decode_provided": [],
+    "encode_required": [],
+    "encode_provided": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.common.dependency.v3.FilterDependencies.decode_required:
+
+
+decode_required
+  (**repeated** :ref:`extensions.filters.common.dependency.v3.Dependency <envoy_v3_api_msg_extensions.filters.common.dependency.v3.Dependency>`) A list of dependencies required on the decode path.
+
+
+.. _envoy_v3_api_field_extensions.filters.common.dependency.v3.FilterDependencies.decode_provided:
+
+
+decode_provided
+  (**repeated** :ref:`extensions.filters.common.dependency.v3.Dependency <envoy_v3_api_msg_extensions.filters.common.dependency.v3.Dependency>`) A list of dependencies provided on the decode path.
+
+
+.. _envoy_v3_api_field_extensions.filters.common.dependency.v3.FilterDependencies.encode_required:
+
+
+encode_required
+  (**repeated** :ref:`extensions.filters.common.dependency.v3.Dependency <envoy_v3_api_msg_extensions.filters.common.dependency.v3.Dependency>`) A list of dependencies required on the encode path.
+
+
+.. _envoy_v3_api_field_extensions.filters.common.dependency.v3.FilterDependencies.encode_provided:
+
+
+encode_provided
+  (**repeated** :ref:`extensions.filters.common.dependency.v3.Dependency <envoy_v3_api_msg_extensions.filters.common.dependency.v3.Dependency>`) A list of dependencies provided on the encode path.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.common.dependency.v3.MatchingRequirements:
+
+extensions.filters.common.dependency.v3.MatchingRequirements
+------------------------------------------------------------
+
+
+:repo:`[extensions.filters.common.dependency.v3.MatchingRequirements proto] <api/envoy/extensions/filters/common/dependency/v3/dependency.proto#L52>`
+
+Matching requirements for a filter. For a match tree to be used with a filter, the match
+requirements must be satisfied.
+
+This protobuf is provided by the filter implementation as a way to communicate the matching
+requirements to the filter factories, allowing for config rejection if the requirements are
+not satisfied.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "data_input_allow_list": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.common.dependency.v3.MatchingRequirements.data_input_allow_list:
+
+
+data_input_allow_list
+  (:ref:`extensions.filters.common.dependency.v3.MatchingRequirements.DataInputAllowList <envoy_v3_api_msg_extensions.filters.common.dependency.v3.MatchingRequirements.DataInputAllowList>`) 
+
+.. _envoy_v3_api_msg_extensions.filters.common.dependency.v3.MatchingRequirements.DataInputAllowList:
+
+extensions.filters.common.dependency.v3.MatchingRequirements.DataInputAllowList
+-------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.common.dependency.v3.MatchingRequirements.DataInputAllowList proto] <api/envoy/extensions/filters/common/dependency/v3/dependency.proto#L53>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "type_url": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.common.dependency.v3.MatchingRequirements.DataInputAllowList.type_url:
+
+
+type_url
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) An explicit list of data inputs that are allowed to be used with this filter.
+
+
+

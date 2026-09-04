@@ -1,0 +1,44 @@
+.. _envoy_v3_api_file_envoy/extensions/upstreams/http/udp/v3/udp_connection_pool.proto:
+
+Udp Connection Pool (proto)
+===========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.upstreams.http.udp.v3.UdpConnectionPoolProto:
+
+extensions.upstreams.http.udp.v3.UdpConnectionPoolProto
+-------------------------------------------------------
+
+
+:repo:`[extensions.upstreams.http.udp.v3.UdpConnectionPoolProto proto] <api/envoy/extensions/upstreams/http/udp/v3/udp_connection_pool.proto#L16>`
+
+A connection pool which forwards downstream HTTP as UDP to upstream,
+
+.. _extension_envoy.upstreams.http.udp:
+
+This extension has the qualified name ``envoy.upstreams.http.udp``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.upstreams <extension_category_envoy.upstreams>`
+
+
+
+
+
+
+

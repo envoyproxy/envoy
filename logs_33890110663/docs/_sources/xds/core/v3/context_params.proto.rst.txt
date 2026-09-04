@@ -1,0 +1,46 @@
+.. _envoy_v3_api_file_xds/core/v3/context_params.proto:
+
+xds/core/v3/context_params.proto (proto)
+========================================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+.. _envoy_v3_api_msg_.xds.core.v3.ContextParams:
+
+.xds.core.v3.ContextParams
+--------------------------
+
+
+`[.xds.core.v3.ContextParams proto] <https://github.com/cncf/xds/blob/main/xds/core/v3/context_params.proto#L20>`_
+
+Additional parameters that can be used to select resource variants. These include any
+global context parameters, per-resource type client feature capabilities and per-resource
+type functional attributes. All per-resource type attributes will be `xds.resource.`
+prefixed and some of these are documented below:
+
+`xds.resource.listening_address`: The value is "IP:port" (e.g. "10.1.1.3:8080") which is
+  the listening address of a Listener. Used in a Listener resource query.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "params": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.core.v3.ContextParams.params:
+
+
+params
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_>) 
+
+
+

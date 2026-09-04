@@ -1,0 +1,756 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Listener configuration (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="QUIC listener config (proto)" href="quic_config.proto.html" />
+    <link rel="prev" title="Listener components (proto)" href="listener_components.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../listeners/listeners.html">Listeners</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="api_listener.proto.html">API listener (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="listener_components.proto.html">Listener components (proto)</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Listener configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="quic_config.proto.html">QUIC listener config (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/udp_packet_writer/v3/udp_gso_batch_writer_factory.proto.html">UDP GSO batch packet writer config (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="udp_listener_config.proto.html">UDP listener config (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/udp_packet_writer/v3/udp_default_writer_factory.proto.html">UDP packet writer config (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../config.html">Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../listeners/listeners.html">Listeners</a></li>
+      <li class="breadcrumb-item active">Listener configuration (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/config/listener/v3/listener.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="listener-configuration-proto">
+<span id="envoy-v3-api-file-envoy-config-listener-v3-listener-proto"></span><h1>Listener configuration (proto)<a class="headerlink" href="#listener-configuration-proto" title="Link to this heading"></a></h1>
+<p>Listener <a class="reference internal" href="../../../../configuration/listeners/listeners.html#config-listeners"><span class="std std-ref">configuration overview</span></a></p>
+<section id="config-listener-v3-additionaladdress">
+<span id="envoy-v3-api-msg-config-listener-v3-additionaladdress"></span><h2>config.listener.v3.AdditionalAddress<a class="headerlink" href="#config-listener-v3-additionaladdress" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/listener/v3/listener.proto#L37">[config.listener.v3.AdditionalAddress proto]</a></p>
+<p>The additional address the listener is listening on.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;socket_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;tcp_keepalive&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-additionaladdress-address">
+<dt>address</dt><dd><p>(<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-address"><span class="std std-ref">config.core.v3.Address</span></a>)</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-additionaladdress-socket-options">
+<dt>socket_options</dt><dd><p>(<a class="reference internal" href="../../core/v3/socket_option.proto.html#envoy-v3-api-msg-config-core-v3-socketoptionsoverride"><span class="std std-ref">config.core.v3.SocketOptionsOverride</span></a>) Additional socket options that may not be present in Envoy source code or
+precompiled binaries. If specified, this will override the
+<a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-socket-options"><span class="std std-ref">socket_options</span></a>
+in the listener. If specified with no
+<a class="reference internal" href="../../core/v3/socket_option.proto.html#envoy-v3-api-field-config-core-v3-socketoptionsoverride-socket-options"><span class="std std-ref">socket_options</span></a>
+or an empty list of <a class="reference internal" href="../../core/v3/socket_option.proto.html#envoy-v3-api-field-config-core-v3-socketoptionsoverride-socket-options"><span class="std std-ref">socket_options</span></a>,
+it means no socket option will apply.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-additionaladdress-tcp-keepalive">
+<dt>tcp_keepalive</dt><dd><p>(<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-tcpkeepalive"><span class="std std-ref">config.core.v3.TcpKeepalive</span></a>) Configures TCP keepalive settings for the additional address.
+If not set, the listener <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-tcp-keepalive"><span class="std std-ref">tcp_keepalive</span></a>
+configuration is inherited. You can explicitly disable TCP keepalive for the additional address by setting any keepalive field
+(<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-field-config-core-v3-tcpkeepalive-keepalive-probes"><span class="std std-ref">keepalive_probes</span></a>,
+<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-field-config-core-v3-tcpkeepalive-keepalive-time"><span class="std std-ref">keepalive_time</span></a>, or
+<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-field-config-core-v3-tcpkeepalive-keepalive-interval"><span class="std std-ref">keepalive_interval</span></a>) to <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="config-listener-v3-listener">
+<span id="envoy-v3-api-msg-config-listener-v3-listener"></span><h2>config.listener.v3.Listener<a class="headerlink" href="#config-listener-v3-listener" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/listener/v3/listener.proto#L65">[config.listener.v3.Listener proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;additional_addresses&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;stat_prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;stats_matcher&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;filter_chains&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;filter_chain_matcher&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;use_original_dst&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;default_filter_chain&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;per_connection_buffer_limit_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;per_connection_buffer_high_watermark_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;drain_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;listener_filters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;listener_filters_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;continue_on_listener_filters_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;transparent&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;freebind&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;socket_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;tcp_fast_open_queue_length&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;traffic_direction&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;udp_listener_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;api_listener&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;connection_balance_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;reuse_port&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;enable_reuse_port&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;access_log&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;tcp_backlog_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_connections_to_accept_per_socket_event&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;bind_to_port&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;internal_listener&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;enable_mptcp&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;ignore_global_conn_limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;bypass_overload_manager&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;tcp_keepalive&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The unique name by which this listener is known. If no name is provided,
+Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
+updated or removed via <a class="reference internal" href="../../../../configuration/listeners/lds.html#config-listeners-lds"><span class="std std-ref">LDS</span></a> a unique name must be provided.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-address">
+<dt>address</dt><dd><p>(<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-address"><span class="std std-ref">config.core.v3.Address</span></a>) The address that the listener should listen on. In general, the address must be unique, though
+that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
+Linux as the actual port will be allocated by the OS.
+Required unless <code class="docutils literal notranslate"><span class="pre">api_listener</span></code> or <code class="docutils literal notranslate"><span class="pre">listener_specifier</span></code> is populated.</p>
+<p>When the address contains a network namespace filepath (via
+<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-field-config-core-v3-socketaddress-network-namespace-filepath"><span class="std std-ref">network_namespace_filepath</span></a>),
+Envoy automatically populates the filter state with key <code class="docutils literal notranslate"><span class="pre">envoy.network.network_namespace</span></code>
+when a connection is accepted. This provides read-only access to the network namespace for
+filters, access logs, and other components.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-additional-addresses">
+<dt>additional_addresses</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-listener-v3-additionaladdress"><span class="std std-ref">config.listener.v3.AdditionalAddress</span></a>) The additional addresses the listener should listen on. The addresses must be unique across all
+listeners. Multiple addresses with port 0 can be supplied. When using multiple addresses in a single listener,
+all addresses use the same protocol, and multiple internal addresses are not supported.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-stat-prefix">
+<dt>stat_prefix</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional prefix to use on listener stats. If empty, the stats will be rooted at
+<code class="docutils literal notranslate"><span class="pre">listener.&lt;address</span> <span class="pre">as</span> <span class="pre">string&gt;.</span></code>. If non-empty, stats will be rooted at
+<code class="docutils literal notranslate"><span class="pre">listener.&lt;stat_prefix&gt;.</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-stats-matcher">
+<dt>stats_matcher</dt><dd><p>(<a class="reference internal" href="../../metrics/v3/stats.proto.html#envoy-v3-api-msg-config-metrics-v3-statsmatcher"><span class="std std-ref">config.metrics.v3.StatsMatcher</span></a>) Optional stats matcher that can be used to configure which stats are instantiated for this
+listener. If configured, this overrides the bootstrap <a class="reference internal" href="../../bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-stats-config"><span class="std std-ref">stats_config</span></a> stats matcher configuration
+for this listener.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-filter-chains">
+<dt>filter_chains</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="listener_components.proto.html#envoy-v3-api-msg-config-listener-v3-filterchain"><span class="std std-ref">config.listener.v3.FilterChain</span></a>) A list of filter chains to consider for this listener. The
+<a class="reference internal" href="listener_components.proto.html#envoy-v3-api-msg-config-listener-v3-filterchain"><span class="std std-ref">FilterChain</span></a> with the most specific
+<a class="reference internal" href="listener_components.proto.html#envoy-v3-api-msg-config-listener-v3-filterchainmatch"><span class="std std-ref">FilterChainMatch</span></a> criteria is used on a
+connection.</p>
+<p>Example using SNI for filter chain selection can be found in the
+<a class="reference internal" href="../../../../faq/configuration/sni.html#faq-how-to-setup-sni"><span class="std std-ref">FAQ entry</span></a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-filter-chain-matcher">
+<dt>filter_chain_matcher</dt><dd><p>(<a class="reference internal" href="../../../../xds/type/matcher/v3/matcher.proto.html#envoy-v3-api-msg-xds-type-matcher-v3-matcher"><span class="std std-ref">.xds.type.matcher.v3.Matcher</span></a>) <a class="reference internal" href="../../../../intro/arch_overview/advanced/matching/matching_listener.html#arch-overview-matching-listener"><span class="std std-ref">Matcher API</span></a> resolving the filter chain name from the
+network properties. This matcher is used as a replacement for the filter chain match condition
+<a class="reference internal" href="listener_components.proto.html#envoy-v3-api-field-config-listener-v3-filterchain-filter-chain-match"><span class="std std-ref">filter_chain_match</span></a>. If specified, all
+<a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-filter-chains"><span class="std std-ref">filter_chains</span></a> must have a
+non-empty and unique <a class="reference internal" href="listener_components.proto.html#envoy-v3-api-field-config-listener-v3-filterchain-name"><span class="std std-ref">name</span></a> field
+and not specify <a class="reference internal" href="listener_components.proto.html#envoy-v3-api-field-config-listener-v3-filterchain-filter-chain-match"><span class="std std-ref">filter_chain_match</span></a> field.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Once matched, each connection is permanently bound to its filter chain.
+If the matcher changes but the filter chain remains the same, the
+connections bound to the filter chain are not drained. If, however, the
+filter chain is removed or structurally modified, then the drain for its
+connections is initiated.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-use-original-dst">
+<dt>use_original_dst</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) If a connection is redirected using <code class="docutils literal notranslate"><span class="pre">iptables</span></code>, the port on which the proxy
+receives it might be different from the original destination address. When this flag is set to
+true, the listener hands off redirected connections to the listener associated with the
+original destination address. If there is no listener associated with the original destination
+address, the connection is handled by the listener that receives it. Defaults to false.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-default-filter-chain">
+<dt>default_filter_chain</dt><dd><p>(<a class="reference internal" href="listener_components.proto.html#envoy-v3-api-msg-config-listener-v3-filterchain"><span class="std std-ref">config.listener.v3.FilterChain</span></a>) The default filter chain if none of the filter chain matches. If no default filter chain is supplied,
+the connection will be closed. The filter chain match is ignored in this field.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-per-connection-buffer-limit-bytes">
+<dt>per_connection_buffer_limit_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Soft limit on size of the listener’s new connection read and write buffers.
+If unspecified, an implementation defined default is applied (1MiB).</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>This field should be configured in the presence of untrusted <em>downstreams</em>.</p>
+<p>Example configuration for untrusted environments:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">per_connection_buffer_limit_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32768.0</span>
+</pre></div>
+</div>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-per-connection-buffer-high-watermark-timeout">
+<dt>per_connection_buffer_high_watermark_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Optional timeout that controls how long a connection is allowed to stay above the configured
+buffer high watermark before it is closed. If this timeout is not specified, or explicitly set
+to 0, connections will not be closed due to buffer high watermark usage.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-metadata">
+<dt>metadata</dt><dd><p>(<a class="reference internal" href="../../core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-metadata"><span class="std std-ref">config.core.v3.Metadata</span></a>) Listener metadata.</p>
+<p>The following pre-defined metadata could be used by Envoy to manipulate the listener behavior:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">envoy.stats_matcher</span></code>: this metadata could be used to customize the stats emitted by the
+listener. See <a class="reference internal" href="../../../../configuration/advanced/metadata_configurations.html#well-known-metadata-envoy-stats-matcher"><span class="std std-ref">well-known metadata</span></a> for more details.
+If <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-stats-matcher"><span class="std std-ref">stats_matcher</span></a> is configured, this metadata
+is ignored. The <code class="docutils literal notranslate"><span class="pre">stats_matcher</span></code> field should be preferred.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-drain-type">
+<dt>drain_type</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-config-listener-v3-listener-draintype"><span class="std std-ref">config.listener.v3.Listener.DrainType</span></a>) The type of draining to perform at a listener-wide level.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-listener-filters">
+<dt>listener_filters</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="listener_components.proto.html#envoy-v3-api-msg-config-listener-v3-listenerfilter"><span class="std std-ref">config.listener.v3.ListenerFilter</span></a>) Listener filters have the opportunity to manipulate and augment the connection metadata that
+is used in connection filter chain matching, for example. These filters are run before any in
+<a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-filter-chains"><span class="std std-ref">filter_chains</span></a>. Order matters as the
+filters are processed sequentially right after a socket has been accepted by the listener, and
+before a connection is created.
+UDP Listener filters can be specified when the protocol in the listener socket address in
+<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-field-config-core-v3-socketaddress-protocol"><span class="std std-ref">protocol</span></a> is <a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-enum-value-config-core-v3-socketaddress-protocol-udp"><span class="std std-ref">UDP</span></a> and no
+<a class="reference internal" href="udp_listener_config.proto.html#envoy-v3-api-field-config-listener-v3-udplistenerconfig-quic-options"><span class="std std-ref">quic_options</span></a> is specified in <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-udp-listener-config"><span class="std std-ref">udp_listener_config</span></a>.
+QUIC listener filters can be specified when <a class="reference internal" href="udp_listener_config.proto.html#envoy-v3-api-field-config-listener-v3-udplistenerconfig-quic-options"><span class="std std-ref">quic_options</span></a> is
+specified in <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-udp-listener-config"><span class="std std-ref">udp_listener_config</span></a>.
+They are processed sequentially right before connection creation. And like TCP Listener filters, they can be used to manipulate the connection metadata and socket. But the difference is that they can’t be used to pause connection creation.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-listener-filters-timeout">
+<dt>listener_filters_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The timeout to wait for all listener filters to complete operation. If the timeout is reached,
+the accepted socket is closed without a connection being created unless
+<code class="docutils literal notranslate"><span class="pre">continue_on_listener_filters_timeout</span></code> is set to true. Specify 0 to disable the
+timeout. If not specified, a default timeout of 15s is used.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-continue-on-listener-filters-timeout">
+<dt>continue_on_listener_filters_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Whether a connection should be created when listener filters timeout. Default is false.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Some listener filters, such as <a class="reference internal" href="../../../../configuration/listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a>, should not be used with this option. It will cause
+unexpected behavior when a connection is created.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-transparent">
+<dt>transparent</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Whether the listener should be set as a transparent socket.
+When this flag is set to true, connections can be redirected to the listener using an
+<code class="docutils literal notranslate"><span class="pre">iptables</span></code> <code class="docutils literal notranslate"><span class="pre">TPROXY</span></code> target, in which case the original source and destination addresses and
+ports are preserved on accepted connections. This flag should be used in combination with
+<a class="reference internal" href="../../../../configuration/listeners/listener_filters/original_dst_filter.html#config-listener-filters-original-dst"><span class="std std-ref">an original_dst</span></a> <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-listener-filters"><span class="std std-ref">listener filter</span></a> to mark the connections’ local addresses as
+“restored.” This can be used to hand off each redirected connection to another listener
+associated with the connection’s destination address. Direct connections to the socket without
+using <code class="docutils literal notranslate"><span class="pre">TPROXY</span></code> cannot be distinguished from connections redirected using <code class="docutils literal notranslate"><span class="pre">TPROXY</span></code> and are
+therefore treated as if they were redirected.
+When this flag is set to false, the listener’s socket is explicitly reset as non-transparent.
+Setting this flag requires Envoy to run with the <code class="docutils literal notranslate"><span class="pre">CAP_NET_ADMIN</span></code> capability.
+When this flag is not set (default), the socket is not modified, i.e. the transparent option
+is neither set nor reset.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-freebind">
+<dt>freebind</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Whether the listener should set the <code class="docutils literal notranslate"><span class="pre">IP_FREEBIND</span></code> socket option. When this
+flag is set to true, listeners can be bound to an IP address that is not
+configured on the system running Envoy. When this flag is set to false, the
+option <code class="docutils literal notranslate"><span class="pre">IP_FREEBIND</span></code> is disabled on the socket. When this flag is not set
+(default), the socket is not modified, i.e. the option is neither enabled
+nor disabled.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-socket-options">
+<dt>socket_options</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../core/v3/socket_option.proto.html#envoy-v3-api-msg-config-core-v3-socketoption"><span class="std std-ref">config.core.v3.SocketOption</span></a>) Additional socket options that may not be present in Envoy source code or
+precompiled binaries.
+It is not allowed to update the socket options for any existing address if
+<a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-enable-reuse-port"><span class="std std-ref">enable_reuse_port</span></a>
+is <code class="docutils literal notranslate"><span class="pre">false</span></code> to avoid the conflict when creating new sockets for the listener.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-tcp-fast-open-queue-length">
+<dt>tcp_fast_open_queue_length</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Whether the listener should accept TCP Fast Open (TFO) connections.
+When this flag is set to a value greater than 0, the option TCP_FASTOPEN is enabled on
+the socket, with a queue length of the specified size
+(see <a class="reference external" href="https://tools.ietf.org/html/rfc7413#section-5.1">details in RFC7413</a>).
+When this flag is set to 0, the option TCP_FASTOPEN is disabled on the socket.
+When this flag is not set (default), the socket is not modified,
+i.e. the option is neither enabled nor disabled.</p>
+<p>On Linux, the net.ipv4.tcp_fastopen kernel parameter must include flag 0x2 to enable
+TCP_FASTOPEN.
+See <a class="reference external" href="https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt">ip-sysctl.txt</a>.</p>
+<p>On macOS, only values of 0, 1, and unset are valid; other values may result in an error.
+To set the queue length on macOS, set the net.inet.tcp.fastopen_backlog kernel parameter.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-traffic-direction">
+<dt>traffic_direction</dt><dd><p>(<a class="reference internal" href="../../core/v3/base.proto.html#envoy-v3-api-enum-config-core-v3-trafficdirection"><span class="std std-ref">config.core.v3.TrafficDirection</span></a>) Specifies the intended direction of the traffic relative to the local Envoy.
+This property is required on Windows for listeners using the original destination filter,
+see <a class="reference internal" href="../../../../configuration/listeners/listener_filters/original_dst_filter.html#config-listener-filters-original-dst"><span class="std std-ref">Original Destination</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-udp-listener-config">
+<dt>udp_listener_config</dt><dd><p>(<a class="reference internal" href="udp_listener_config.proto.html#envoy-v3-api-msg-config-listener-v3-udplistenerconfig"><span class="std std-ref">config.listener.v3.UdpListenerConfig</span></a>) If the protocol in the listener socket address in <a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-field-config-core-v3-socketaddress-protocol"><span class="std std-ref">protocol</span></a> is <a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-enum-value-config-core-v3-socketaddress-protocol-udp"><span class="std std-ref">UDP</span></a>, this field specifies UDP
+listener specific configuration.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-api-listener">
+<dt>api_listener</dt><dd><p>(<a class="reference internal" href="api_listener.proto.html#envoy-v3-api-msg-config-listener-v3-apilistener"><span class="std std-ref">config.listener.v3.ApiListener</span></a>) Used to represent an API listener, which is used in non-proxy clients. The type of API
+exposed to the non-proxy application depends on the type of API listener.
+When this field is set, no other field except for <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-name"><span class="std std-ref">name</span></a>
+should be set.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Currently only one ApiListener can be installed; and it can only be done via bootstrap config,
+not LDS.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-connection-balance-config">
+<dt>connection_balance_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-listener-v3-listener-connectionbalanceconfig"><span class="std std-ref">config.listener.v3.Listener.ConnectionBalanceConfig</span></a>) The listener’s connection balancer configuration, currently only applicable to TCP listeners.
+If no configuration is specified, Envoy will not attempt to balance active connections between
+worker threads.</p>
+<p>In the scenario that the listener X redirects all the connections to the listeners Y1 and Y2
+by setting <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-use-original-dst"><span class="std std-ref">use_original_dst</span></a> in X
+and <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-bind-to-port"><span class="std std-ref">bind_to_port</span></a> to false in Y1 and Y2,
+it is recommended to disable the balance config in listener X to avoid the cost of balancing, and
+enable the balance config in Y1 and Y2 to balance the connections among the workers.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-reuse-port">
+<dt>reuse_port</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Deprecated. Use <code class="docutils literal notranslate"><span class="pre">enable_reuse_port</span></code> instead.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-enable-reuse-port">
+<dt>enable_reuse_port</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) When this flag is set to true, listeners set the <code class="docutils literal notranslate"><span class="pre">SO_REUSEPORT</span></code> socket option and
+create one socket for each worker thread. This makes inbound connections
+distribute among worker threads roughly evenly in cases where there are a high number
+of connections. When this flag is set to false, all worker threads share one socket. This field
+defaults to true. The change of field will be rejected during an listener update when the
+runtime flag <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.enable_update_listener_socket_options</span></code> is enabled.
+Otherwise, the update of this field will be ignored quietly.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Although this field defaults to true, it has different behavior on different platforms. See
+the following text for more information.</p>
+</div>
+<ul class="simple">
+<li><p>On Linux, reuse_port is respected for both TCP and UDP listeners. It also works correctly
+with hot restart.</p></li>
+<li><p>On macOS, reuse_port for TCP does not do what it does on Linux. Instead of load balancing,
+the last socket wins and receives all connections/packets. For TCP, reuse_port is force
+disabled and the user is warned. For UDP, it is enabled, but only one worker will receive
+packets. For QUIC/H3, SW routing will send packets to other workers. For “raw” UDP, only
+a single worker will currently receive packets.</p></li>
+<li><p>On Windows, reuse_port for TCP has undefined behavior. It is force disabled and the user
+is warned similar to macOS. It is left enabled for UDP with undefined behavior currently.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-access-log">
+<dt>access_log</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../accesslog/v3/accesslog.proto.html#envoy-v3-api-msg-config-accesslog-v3-accesslog"><span class="std std-ref">config.accesslog.v3.AccessLog</span></a>) Configuration for <a class="reference internal" href="../../../../intro/arch_overview/observability/access_logging.html#arch-overview-access-logs"><span class="std std-ref">access logs</span></a>
+emitted by this listener.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-tcp-backlog-size">
+<dt>tcp_backlog_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The maximum length a tcp listener’s pending connections queue can grow to. If no value is
+provided net.core.somaxconn will be used on Linux and 128 otherwise.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-max-connections-to-accept-per-socket-event">
+<dt>max_connections_to_accept_per_socket_event</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The maximum number of connections to accept from the kernel per socket
+event. Envoy may decide to close these connections after accepting them
+from the kernel e.g. due to load shedding, or other policies.
+If there are more than max_connections_to_accept_per_socket_event
+connections pending accept, connections over this threshold will be
+accepted in later event loop iterations.
+If no value is provided Envoy will accept all connections pending accept
+from the kernel.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It is recommended to lower this value for better overload management and reduced per-event cost.
+Setting it to 1 is a viable option with no noticeable impact on performance.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-bind-to-port">
+<dt>bind_to_port</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Whether the listener should bind to the port. A listener that doesn’t
+bind can only receive connections redirected from other listeners that set
+<a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-use-original-dst"><span class="std std-ref">use_original_dst</span></a>
+to true. Default is true.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-internal-listener">
+<dt>internal_listener</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-listener-v3-listener-internallistenerconfig"><span class="std std-ref">config.listener.v3.Listener.InternalListenerConfig</span></a>) Used to represent an internal listener which does not listen on OSI L4 address but can be used by the
+<a class="reference internal" href="../../cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">envoy cluster</span></a> to create a user space connection to.
+The internal listener acts as a TCP listener. It supports listener filters and network filter chains.
+Upstream clusters refer to the internal listeners by their <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-name"><span class="std std-ref">name</span></a>. <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-address"><span class="std std-ref">Address</span></a> must not be set on the internal listeners.</p>
+<p>There are some limitations that are derived from the implementation. The known limitations include:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-config-listener-v3-listener-connectionbalanceconfig"><span class="std std-ref">ConnectionBalanceConfig</span></a> is not
+allowed because both the cluster connection and the listener connection must be owned by the same dispatcher.</p></li>
+<li><p><a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-tcp-backlog-size"><span class="std std-ref">tcp_backlog_size</span></a></p></li>
+<li><p><a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-freebind"><span class="std std-ref">freebind</span></a></p></li>
+<li><p><a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-transparent"><span class="std std-ref">transparent</span></a></p></li>
+</ul>
+<p>The exclusive listener type and the corresponding config.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-enable-mptcp">
+<dt>enable_mptcp</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Enable MPTCP (multi-path TCP) on this listener. Clients will be allowed to establish
+MPTCP connections. Non-MPTCP clients will fall back to regular TCP.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-ignore-global-conn-limit">
+<dt>ignore_global_conn_limit</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Whether the listener should limit connections based upon the value of
+<a class="reference internal" href="../../../../configuration/operations/overload_manager/overload_manager.html#config-overload-manager-limiting-connections"><span class="std std-ref">global_downstream_max_connections</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-bypass-overload-manager">
+<dt>bypass_overload_manager</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Whether the listener bypasses configured overload manager actions.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-listener-v3-listener-tcp-keepalive">
+<dt>tcp_keepalive</dt><dd><p>(<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-tcpkeepalive"><span class="std std-ref">config.core.v3.TcpKeepalive</span></a>) If set, TCP keepalive settings are configured for the listener address and inherited by
+additional addresses. If not set, TCP keepalive settings are not configured for the
+listener address and additional addresses by default. See <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-additionaladdress-tcp-keepalive"><span class="std std-ref">tcp_keepalive</span></a>
+to explicitly configure TCP keepalive settings for individual additional addresses.</p>
+</dd>
+</dl>
+</section>
+<section id="config-listener-v3-listener-connectionbalanceconfig">
+<span id="envoy-v3-api-msg-config-listener-v3-listener-connectionbalanceconfig"></span><h2>config.listener.v3.Listener.ConnectionBalanceConfig<a class="headerlink" href="#config-listener-v3-listener-connectionbalanceconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/listener/v3/listener.proto#L94">[config.listener.v3.Listener.ConnectionBalanceConfig proto]</a></p>
+<p>Configuration for listener connection balancing.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;exact_balance&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;extend_balance&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;cpu_locality_balance&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-connectionbalanceconfig-exact-balance">
+<dt>exact_balance</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-listener-v3-listener-connectionbalanceconfig-exactbalance"><span class="std std-ref">config.listener.v3.Listener.ConnectionBalanceConfig.ExactBalance</span></a>) If specified, the listener will use the exact connection balancer.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-connectionbalanceconfig-exact-balance"><span class="std std-ref">exact_balance</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-connectionbalanceconfig-extend-balance"><span class="std std-ref">extend_balance</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-connectionbalanceconfig-cpu-locality-balance"><span class="std std-ref">cpu_locality_balance</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-connectionbalanceconfig-extend-balance">
+<dt>extend_balance</dt><dd><p>(<a class="reference internal" href="../../core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) The listener will use the connection balancer according to <code class="docutils literal notranslate"><span class="pre">type_url</span></code>. If <code class="docutils literal notranslate"><span class="pre">type_url</span></code> is invalid,
+Envoy will not attempt to balance active connections between worker threads.
+The <code class="docutils literal notranslate"><span class="pre">envoy.network.connection_balance</span></code> extension category is currently empty.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-connectionbalanceconfig-exact-balance"><span class="std std-ref">exact_balance</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-connectionbalanceconfig-extend-balance"><span class="std std-ref">extend_balance</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-connectionbalanceconfig-cpu-locality-balance"><span class="std std-ref">cpu_locality_balance</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-listener-v3-listener-connectionbalanceconfig-cpu-locality-balance">
+<dt>cpu_locality_balance</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-listener-v3-listener-connectionbalanceconfig-cpulocalitybalance"><span class="std std-ref">config.listener.v3.Listener.ConnectionBalanceConfig.CpuLocalityBalance</span></a>) If specified, the listener will steer new connections to worker threads using a kernel
+<code class="docutils literal notranslate"><span class="pre">SO_REUSEPORT</span></code> BPF program. See <a class="reference internal" href="#envoy-v3-api-msg-config-listener-v3-listener-connectionbalanceconfig-cpulocalitybalance"><span class="std std-ref">CpuLocalityBalance</span></a>
+for the requirements and fallback behavior.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-connectionbalanceconfig-exact-balance"><span class="std std-ref">exact_balance</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-connectionbalanceconfig-extend-balance"><span class="std std-ref">extend_balance</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-connectionbalanceconfig-cpu-locality-balance"><span class="std std-ref">cpu_locality_balance</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="config-listener-v3-listener-connectionbalanceconfig-exactbalance">
+<span id="envoy-v3-api-msg-config-listener-v3-listener-connectionbalanceconfig-exactbalance"></span><h2>config.listener.v3.Listener.ConnectionBalanceConfig.ExactBalance<a class="headerlink" href="#config-listener-v3-listener-connectionbalanceconfig-exactbalance" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/listener/v3/listener.proto#L104">[config.listener.v3.Listener.ConnectionBalanceConfig.ExactBalance proto]</a></p>
+<p>A connection balancer implementation that does exact balancing. This means that a lock is
+held during balancing so that connection counts are nearly exactly balanced between worker
+threads. This is “nearly” exact in the sense that a connection might close in parallel thus
+making the counts incorrect, but this should be rectified on the next accept. This balancer
+sacrifices accept throughput for accuracy and should be used when there are a small number of
+connections that rarely cycle (e.g., service mesh gRPC egress).</p>
+</section>
+<section id="config-listener-v3-listener-connectionbalanceconfig-cpulocalitybalance">
+<span id="envoy-v3-api-msg-config-listener-v3-listener-connectionbalanceconfig-cpulocalitybalance"></span><h2>config.listener.v3.Listener.ConnectionBalanceConfig.CpuLocalityBalance<a class="headerlink" href="#config-listener-v3-listener-connectionbalanceconfig-cpulocalitybalance" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/listener/v3/listener.proto#L129">[config.listener.v3.Listener.ConnectionBalanceConfig.CpuLocalityBalance proto]</a></p>
+<p>A connection balancer that steers each new TCP connection to the worker thread pinned to the
+CPU that received the connection, using a kernel <code class="docutils literal notranslate"><span class="pre">SO_REUSEPORT</span></code> BPF program. This removes
+the lock that the <a class="reference internal" href="#envoy-v3-api-msg-config-listener-v3-listener-connectionbalanceconfig-exactbalance"><span class="std std-ref">exact balancer</span></a> takes on
+every accept and keeps each connection on a single worker for cache and <code class="docutils literal notranslate"><span class="pre">NUMA</span></code> locality. To
+realize locality the operator should align <code class="docutils literal notranslate"><span class="pre">NIC</span></code> receive steering so connections arrive on
+the worker CPUs, for example with receive side scaling or <code class="docutils literal notranslate"><span class="pre">IRQ</span></code> affinity.</p>
+<p>It is available on Linux only and requires <a class="reference internal" href="../../bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-enable-worker-cpu-affinity"><span class="std std-ref">enable_worker_cpu_affinity</span></a> so worker <code class="docutils literal notranslate"><span class="pre">i</span></code>
+is pinned to the CPU the program steers to it, <a class="reference internal" href="#envoy-v3-api-field-config-listener-v3-listener-enable-reuse-port"><span class="std std-ref">enable_reuse_port</span></a>, a kernel that supports
+reuse port BPF steering, and a worker count no greater than the number of CPUs in the process
+affinity mask. When any of these is not met, or if the kernel rejects the steering program at
+runtime, the listener keeps serving with the kernel default reuse port hashing and without CPU
+locality.</p>
+<p>Worker affinity is fixed when the worker threads start, so a listener added dynamically via LDS
+steers with the same mapping. During a hot restart new connections may be steered to the
+draining parent process until it exits.</p>
+</section>
+<section id="config-listener-v3-listener-internallistenerconfig">
+<span id="envoy-v3-api-msg-config-listener-v3-listener-internallistenerconfig"></span><h2>config.listener.v3.Listener.InternalListenerConfig<a class="headerlink" href="#config-listener-v3-listener-internallistenerconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/listener/v3/listener.proto#L152">[config.listener.v3.Listener.InternalListenerConfig proto]</a></p>
+<p>Configuration for envoy internal listener. All the future internal listener features should be added here.</p>
+</section>
+<section id="enum-config-listener-v3-listener-draintype">
+<span id="envoy-v3-api-enum-config-listener-v3-listener-draintype"></span><h2>Enum config.listener.v3.Listener.DrainType<a class="headerlink" href="#enum-config-listener-v3-listener-draintype" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/listener/v3/listener.proto#L68">[config.listener.v3.Listener.DrainType proto]</a></p>
+<dl class="simple" id="envoy-v3-api-enum-value-config-listener-v3-listener-draintype-default">
+<dt>DEFAULT</dt><dd><p><em>(DEFAULT)</em> ⁣Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
+filter), listener removal/modification, and hot restart.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-listener-v3-listener-draintype-modify-only">
+<dt>MODIFY_ONLY</dt><dd><p>⁣Drain in response to listener removal/modification and hot restart. This setting does not
+include /healthcheck/fail. This setting may be desirable if Envoy is hosting both ingress
+and egress listeners.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="listener_components.proto.html" class="btn btn-neutral float-left" title="Listener components (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="quic_config.proto.html" class="btn btn-neutral float-right" title="QUIC listener config (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Listener configuration (proto)</a><ul>
+<li><a class="reference internal" href="#config-listener-v3-additionaladdress">config.listener.v3.AdditionalAddress</a></li>
+<li><a class="reference internal" href="#config-listener-v3-listener">config.listener.v3.Listener</a></li>
+<li><a class="reference internal" href="#config-listener-v3-listener-connectionbalanceconfig">config.listener.v3.Listener.ConnectionBalanceConfig</a></li>
+<li><a class="reference internal" href="#config-listener-v3-listener-connectionbalanceconfig-exactbalance">config.listener.v3.Listener.ConnectionBalanceConfig.ExactBalance</a></li>
+<li><a class="reference internal" href="#config-listener-v3-listener-connectionbalanceconfig-cpulocalitybalance">config.listener.v3.Listener.ConnectionBalanceConfig.CpuLocalityBalance</a></li>
+<li><a class="reference internal" href="#config-listener-v3-listener-internallistenerconfig">config.listener.v3.Listener.InternalListenerConfig</a></li>
+<li><a class="reference internal" href="#enum-config-listener-v3-listener-draintype">Enum config.listener.v3.Listener.DrainType</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,738 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto:
+
+TCP Proxy (proto)
+=================
+
+.. _extension_envoy.filters.network.tcp_proxy:
+
+This extension has the qualified name ``envoy.filters.network.tcp_proxy``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy <envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy>`
+
+
+
+TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy:
+
+extensions.filters.network.tcp_proxy.v3.TcpProxy
+------------------------------------------------
+
+
+:repo:`[extensions.filters.network.tcp_proxy.v3.TcpProxy proto] <api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L84>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "cluster": ...,
+    "weighted_clusters": {...},
+    "on_demand": {...},
+    "metadata_match": {...},
+    "idle_timeout": {...},
+    "access_log": [],
+    "max_connect_attempts": {...},
+    "backoff_options": {...},
+    "hash_policy": [],
+    "tunneling_config": {...},
+    "max_downstream_connection_duration": {...},
+    "max_downstream_connection_duration_jitter_percentage": {...},
+    "access_log_flush_interval": {...},
+    "flush_access_log_on_connected": ...,
+    "access_log_options": {...},
+    "proxy_protocol_tlvs": [],
+    "proxy_protocol_tlv_merge_policy": ...,
+    "upstream_connect_mode": ...,
+    "max_early_data_bytes": {...},
+    "check_drain_close": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The prefix to use when emitting :ref:`statistics
+  <config_network_filters_tcp_proxy_stats>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The upstream cluster to connect to.
+
+
+  
+
+  Precisely one of :ref:`cluster <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.cluster>`, :ref:`weighted_clusters <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.weighted_clusters>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.weighted_clusters:
+
+
+weighted_clusters
+  (:ref:`extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster <envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster>`) Multiple upstream clusters can be specified. The request is routed to one of the upstream clusters
+  based on the weights assigned to each cluster.
+
+
+  
+
+  Precisely one of :ref:`cluster <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.cluster>`, :ref:`weighted_clusters <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.weighted_clusters>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.on_demand:
+
+
+on_demand
+  (:ref:`extensions.filters.network.tcp_proxy.v3.TcpProxy.OnDemand <envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy.OnDemand>`) The on demand policy for the upstream cluster.
+  It applies to both
+  :ref:`TcpProxy.cluster <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.cluster>`
+  and
+  :ref:`TcpProxy.weighted_clusters <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.weighted_clusters>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.metadata_match:
+
+
+metadata_match
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints
+  in the upstream cluster with metadata matching what is set in this field will be considered
+  for load balancing. The filter name should be specified as ``envoy.lb``.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.idle_timeout:
+
+
+idle_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The idle timeout for connections managed by the TCP proxy filter. The idle timeout is defined as the
+  period in which there are no bytes sent or received on either the upstream or downstream connection.
+  If not set, the default idle timeout is 1 hour. If set to ``0s``, the timeout is disabled.
+  It is possible to dynamically override this configuration by setting a per-connection filter state
+  object for the key ``envoy.tcp_proxy.per_connection_idle_timeout_ms``.
+
+  .. warning::
+    Disabling this timeout is likely to yield connection leaks due to lost TCP FIN packets, etc.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log:
+
+
+access_log
+  (**repeated** :ref:`config.accesslog.v3.AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`) Configuration for :ref:`access logs <arch_overview_access_logs>` emitted by this TCP proxy.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts:
+
+
+max_connect_attempts
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The maximum number of unsuccessful connection attempts that will be made before
+  giving up. If the parameter is not specified, 1 connection attempt will be made.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.backoff_options:
+
+
+backoff_options
+  (:ref:`config.core.v3.BackoffStrategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`) Sets the backoff strategy. If not set, the retries are performed without backoff.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.hash_policy:
+
+
+hash_policy
+  (**repeated** :ref:`type.v3.HashPolicy <envoy_v3_api_msg_type.v3.HashPolicy>`) Optional configuration for TCP proxy hash policy. If hash_policy is not set, the hash-based
+  load balancing algorithms will select a host randomly. Currently the number of hash policies is
+  limited to 1.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config:
+
+
+tunneling_config
+  (:ref:`extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig <envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig>`) If set, this configures tunneling, for example configuration options to tunnel TCP payload over
+  HTTP CONNECT. If this message is absent, the payload is proxied upstream as usual.
+  It is possible to dynamically override this configuration and disable tunneling per connection by
+  setting a per-connection filter state object for the key ``envoy.tcp_proxy.disable_tunneling``.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration:
+
+
+max_downstream_connection_duration
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The maximum duration of a connection. The duration is defined as the period since a connection was
+  established. If not set, there is no maximum duration. When ``max_downstream_connection_duration`` is
+  reached, the connection is closed. The duration must be at least ``1ms``.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration_jitter_percentage:
+
+
+max_downstream_connection_duration_jitter_percentage
+  (:ref:`type.v3.Percent <envoy_v3_api_msg_type.v3.Percent>`) Percentage-based jitter for ``max_downstream_connection_duration``. The jitter increases the
+  ``max_downstream_connection_duration`` by a random duration up to the provided percentage.
+  This field is ignored if ``max_downstream_connection_duration`` is not set. If not set, no jitter
+  is added.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval:
+
+
+access_log_flush_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) If both this field and :ref:`access_log_flush_interval
+  <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`
+  are specified, the former (deprecated field) is ignored.
+
+  .. attention::
+    This field is deprecated in favor of
+    :ref:`access_log_flush_interval
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected:
+
+
+flush_access_log_on_connected
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If both this field and :ref:`flush_access_log_on_connected
+  <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`
+  are specified, the former (deprecated field) is ignored.
+
+  .. attention::
+    This field is deprecated in favor of
+    :ref:`flush_access_log_on_connected
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_options:
+
+
+access_log_options
+  (:ref:`extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions <envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions>`) Additional access log options for the TCP proxy.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlvs:
+
+
+proxy_protocol_tlvs
+  (**repeated** :ref:`config.core.v3.TlvEntry <envoy_v3_api_msg_config.core.v3.TlvEntry>`) TLVs to add to the PROXY protocol header sent upstream. Behavior when PROXY protocol
+  state already exists (e.g., downstream TLVs from proxy_protocol listener filter) is
+  controlled by ``proxy_protocol_tlv_merge_policy``.
+
+  .. note::
+    To ensure the TLVs are allowed upstream, configure passthrough TLVs on the upstream
+    proxy protocol transport. See :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs
+    <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>` for details.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlv_merge_policy:
+
+
+proxy_protocol_tlv_merge_policy
+  (:ref:`extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy <envoy_v3_api_enum_extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy>`) Specifies how TLVs in ``proxy_protocol_tlvs`` are merged with existing PROXY protocol state
+  (e.g., downstream TLVs from the proxy_protocol listener filter). See
+  :ref:`ProxyProtocolTlvMergePolicy
+  <envoy_v3_api_enum_extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode:
+
+
+upstream_connect_mode
+  (:ref:`extensions.filters.network.tcp_proxy.v3.UpstreamConnectMode <envoy_v3_api_enum_extensions.filters.network.tcp_proxy.v3.UpstreamConnectMode>`) Specifies when to establish the upstream connection.
+
+  When not specified, defaults to ``IMMEDIATE`` for backward compatibility.
+
+  .. attention::
+    Server-first protocols (e.g., SMTP, MySQL, POP3) require ``IMMEDIATE`` mode.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes:
+
+
+max_early_data_bytes
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Maximum bytes of early data to buffer from the downstream connection before
+  the upstream connection is established.
+
+  If not set, the TCP proxy will read-disable the downstream connection until the
+  upstream connection is established (legacy behavior).
+
+  If set, enables ``receive_before_connect`` mode where the filter allows the filter
+  chain to read downstream data before the upstream connection exists. The data is
+  buffered and forwarded once the upstream connection is ready. When the buffer exceeds
+  this limit, the downstream connection is read-disabled to prevent excessive memory usage.
+
+  This field is required when ``upstream_connect_mode`` is not ``IMMEDIATE``.
+
+  .. note::
+    Use this carefully with server-first protocols. The upstream may send data before
+    receiving anything from downstream, which could fill the early data buffer.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.check_drain_close:
+
+
+check_drain_close
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If set to ``true``, the TCP proxy checks if the downstream connection was marked as drained
+  after each read or write. When drain close is requested for the listener's traffic direction,
+  the downstream connection is closed with ``FlushWrite``.
+
+  This is disabled by default for backward compatibility.
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster:
+
+extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster
+----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster proto] <api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L90>`
+
+Allows specification of multiple upstream clusters along with weights indicating the percentage of
+traffic forwarded to each cluster. The cluster selection is based on these weights.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "clusters": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.clusters:
+
+
+clusters
+  (**repeated** :ref:`extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight <envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight>`, *REQUIRED*) Specifies the upstream clusters associated with this configuration.
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight:
+
+extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight
+------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight proto] <api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L94>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "weight": ...,
+    "metadata_match": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Name of the upstream cluster.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight.weight:
+
+
+weight
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When a request matches the route, the choice of an upstream cluster is
+  determined by its weight. The sum of weights across all entries in the
+  clusters array determines the total weight.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight.metadata_match:
+
+
+metadata_match
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints
+  in the upstream cluster with metadata matching what is set in this field will be considered
+  for load balancing. Note that this will be merged with what's provided in
+  :ref:`TcpProxy.metadata_match
+  <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.metadata_match>`, with values
+  here taking precedence. The filter name should be specified as ``envoy.lb``.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig:
+
+extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig
+----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig proto] <api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L123>`
+
+Configuration for tunneling TCP over other transports or application layers.
+Tunneling is supported over HTTP/1.1 and HTTP/2. The upstream protocol is
+determined by the cluster configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "hostname": ...,
+    "use_post": ...,
+    "headers_to_add": [],
+    "propagate_response_headers": ...,
+    "post_path": ...,
+    "propagate_response_trailers": ...,
+    "request_id_extension": {...},
+    "request_id_header": ...,
+    "request_id_metadata_key": ...,
+    "formatters": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.hostname:
+
+
+hostname
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The hostname to send in the synthesized CONNECT headers to the upstream proxy.
+  This field evaluates command operators if present; otherwise, the value is used as-is.
+
+  For example, dynamically set the hostname using downstream SNI:
+
+  .. code-block:: yaml
+
+     tunneling_config:
+       hostname: "%REQUESTED_SERVER_NAME%:443"
+
+  For example, dynamically set the hostname using dynamic metadata:
+
+  .. code-block:: yaml
+
+     tunneling_config:
+       hostname: "%DYNAMIC_METADATA(tunnel:address)%"
+
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.use_post:
+
+
+use_post
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Use the ``POST`` method instead of the ``CONNECT`` method to tunnel the TCP stream.
+  The ``protocol: bytestream`` header is not set for HTTP/2 to comply with the specification.
+
+  The upstream proxy is expected to interpret the POST payload as raw TCP.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.headers_to_add:
+
+
+headers_to_add
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) Additional request headers to send to the upstream proxy. This is mainly used to
+  trigger the upstream to convert POST requests back to CONNECT requests.
+
+  Neither ``:``-prefixed pseudo-headers like ``:path`` nor the ``host`` header can be overridden.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_headers:
+
+
+propagate_response_headers
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Save response headers to the downstream connection's filter state for consumption
+  by network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_headers``.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.post_path:
+
+
+post_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The path used with the POST method. The default path is ``/``. If this field is specified and
+  :ref:`use_post field <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.use_post>`
+  is not set to ``true``, the configuration will be rejected.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_trailers:
+
+
+propagate_response_trailers
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Save response trailers to the downstream connection's filter state for consumption
+  by network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_trailers``.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_extension:
+
+
+request_id_extension
+  (:ref:`extensions.filters.network.http_connection_manager.v3.RequestIDExtension <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.RequestIDExtension>`) The configuration of the request ID extension used for generation, validation, and
+  associated tracing operations when tunneling.
+
+  If this field is set, a request ID is generated using the specified extension. If
+  this field is not set, no request ID is generated.
+
+  When a request ID is generated, it is also stored in the downstream connection's
+  dynamic metadata under the namespace ``envoy.filters.network.tcp_proxy`` with the key
+  ``tunnel_request_id`` to allow emission from TCP proxy access logs via the
+  ``%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:tunnel_request_id)%`` formatter.
+
+
+  .. _extension_category_envoy.request_id:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.request_id.uuid <extension_envoy.request_id.uuid>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_header:
+
+
+request_id_header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The request header name to use for emitting the generated request ID on the tunneling
+  HTTP request.
+
+  If not specified or set to an empty string, the default header name ``x-request-id`` is
+  used.
+
+  .. note::
+    This setting does not alter the internal request ID handling elsewhere in Envoy and
+    only controls the header emitted on the tunneling request.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_metadata_key:
+
+
+request_id_metadata_key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The dynamic metadata key to use when storing the generated request ID. The metadata is
+  stored under the namespace ``envoy.filters.network.tcp_proxy``.
+
+  If not specified or set to an empty string, the default key ``tunnel_request_id`` is used.
+  This enables customizing the key used by access log formatters such as
+  ``%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:<key>)%``.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.formatters:
+
+
+formatters
+  (**repeated** :ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Specifies a collection of Formatter plugins that can be used in substitution formatters
+  in ``headers_to_add``.
+  See the formatters extensions documentation for details.
+
+
+  .. _extension_category_envoy.formatter:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.formatter.cel <extension_envoy.formatter.cel>`
+
+    - :ref:`envoy.formatter.dynamic_modules <extension_envoy.formatter.dynamic_modules>`
+
+    - :ref:`envoy.formatter.file_content <extension_envoy.formatter.file_content>`
+
+    - :ref:`envoy.formatter.generic_secret <extension_envoy.formatter.generic_secret>`
+
+    - :ref:`envoy.formatter.metadata <extension_envoy.formatter.metadata>`
+
+    - :ref:`envoy.formatter.req_without_query <extension_envoy.formatter.req_without_query>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy.OnDemand:
+
+extensions.filters.network.tcp_proxy.v3.TcpProxy.OnDemand
+---------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.tcp_proxy.v3.TcpProxy.OnDemand proto] <api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L211>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "odcds_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.OnDemand.odcds_config:
+
+
+odcds_config
+  (:ref:`config.core.v3.ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`) Optional configuration for the on-demand cluster discovery service.
+  If not specified, on-demand cluster discovery is disabled. When specified, the filter pauses a request
+  to an unknown cluster and begins a cluster discovery process. When discovery completes (successfully
+  or not), the request is resumed.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions:
+
+extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions
+--------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions proto] <api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L228>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "access_log_flush_interval": {...},
+    "flush_access_log_on_connected": ...,
+    "flush_access_log_on_start": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval:
+
+
+access_log_flush_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The interval for flushing access logs. By default, the TCP proxy flushes a single access log when the
+  connection is closed. If this field is set, the TCP proxy flushes access logs periodically at the
+  specified interval.
+  The interval must be at least 1ms.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected:
+
+
+flush_access_log_on_connected
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to ``true``, the access log is flushed when the TCP proxy successfully establishes a
+  connection with the upstream. If the connection fails, the access log is not flushed.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_start:
+
+
+flush_access_log_on_start
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to ``true``, the access log is flushed when the TCP proxy accepts a connection.
+
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.tcp_proxy.v3.UpstreamConnectMode:
+
+Enum extensions.filters.network.tcp_proxy.v3.UpstreamConnectMode
+----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.tcp_proxy.v3.UpstreamConnectMode proto] <api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L33>`
+
+Specifies when the TCP proxy establishes the upstream connection.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.tcp_proxy.v3.UpstreamConnectMode.IMMEDIATE:
+
+
+IMMEDIATE
+  *(DEFAULT)* ⁣Establish the upstream connection immediately when the downstream connection is accepted.
+  This is the default behavior and provides the lowest latency.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.tcp_proxy.v3.UpstreamConnectMode.ON_DOWNSTREAM_DATA:
+
+
+ON_DOWNSTREAM_DATA
+  ⁣Wait for initial data from the downstream connection before establishing the upstream connection.
+  This allows preceding filters to inspect the initial data (e.g., extracting SNI from TLS ClientHello)
+  before the upstream connection is established.
+
+  This mode requires ``max_early_data_bytes`` to be set.
+
+  .. warning::
+    This mode is not suitable for server-first protocols (e.g., SMTP, MySQL, POP3) where the
+    server sends the initial greeting. For such protocols, use ``IMMEDIATE`` mode.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.tcp_proxy.v3.UpstreamConnectMode.ON_DOWNSTREAM_TLS_HANDSHAKE:
+
+
+ON_DOWNSTREAM_TLS_HANDSHAKE
+  ⁣Wait for the downstream TLS handshake to complete before establishing the upstream connection.
+  This allows access to the full TLS connection information, including client certificates
+  and negotiated parameters, which can be used for routing decisions or passed as metadata
+  to the upstream.
+
+  This mode requires ``max_early_data_bytes`` to be set (can be zero to disable buffering).
+
+  .. note::
+    This mode is only effective when the downstream connection uses TLS. For non-TLS
+    connections, it behaves the same as ``IMMEDIATE``.
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy:
+
+Enum extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy
+------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy proto] <api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L64>`
+
+Specifies how TLVs in ``proxy_protocol_tlvs`` are merged with existing PROXY protocol state
+(e.g., downstream TLVs parsed by the proxy_protocol listener filter).
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy.ADD_IF_ABSENT:
+
+
+ADD_IF_ABSENT
+  *(DEFAULT)* ⁣Add configured TLVs only if no PROXY protocol state exists (e.g., no downstream TLVs).
+  If state exists, ignore configured TLVs and use only the existing TLVs.
+  This is the default for backward compatibility.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy.OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD:
+
+
+OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD
+  ⁣Overwrite existing TLVs (e.g., downstream TLVs) by type with configured TLVs.
+  Non-conflicting TLVs from both sources are preserved.
+  If no state exists, add all configured TLVs.
+  Source/destination addresses from existing state are preserved.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy.APPEND_IF_EXISTS_OR_ADD:
+
+
+APPEND_IF_EXISTS_OR_ADD
+  ⁣Append configured TLVs to existing TLVs (e.g., downstream TLVs), preserving all TLVs
+  from both sources (PROXY protocol v2 allows duplicate types).
+  If no state exists, add all configured TLVs.
+  Source/destination addresses from existing state are preserved.
+
+

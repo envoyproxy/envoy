@@ -1,0 +1,426 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/proto_message_extraction/v3/config.proto:
+
+Proto Message Extraction (proto)
+================================
+
+.. _extension_envoy.filters.http.proto_message_extraction:
+
+This extension has the qualified name ``envoy.filters.http.proto_message_extraction``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig <envoy_v3_api_msg_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+Overview
+--------
+
+ProtoMessageExtraction filter supports extracting gRPC
+requests/responses(proto messages) into google.protobuf.Struct and storing
+results in the dynamic metadata `envoy.filters.http.proto_message_extraction`
+for later access.
+
+Assumptions
+-----------
+
+This filter assumes it is only applicable for gRPC with Protobuf as payload.
+
+Process Flow
+------------
+
+On the request path, it will check
+
+1. if the incoming gRPC request is configured, the filter tries to:
+
+  a. buffer the incoming data to complete protobuf messages
+  b. extract individual protobuf messages according to directives
+  c. write the result into the dynamic metadata.
+  d. pass through the request data
+
+2. otherwise, pass through the request.
+
+On the response path, it will check
+
+1. if the incoming gRPC request is configured, the filter tries to:
+
+  a. buffer the incoming data to complete protobuf messages
+  b. extract individual protobuf messages according to directives
+  c. write the result into the dynamic metadata.
+  d. pass through the response data
+
+2. otherwise, pass through the response.
+
+Config Requirements
+-------------------
+
+
+Here are config requirements
+
+
+1. the extracted target field should be among the following primitive types:
+`string`, `uint32`, `uint64`, `int32`, `int64`, `sint32`, `sint64`,
+`fixed32`, `fixed64`, `sfixed32`, `sfixed64`, `float`, `double`.
+
+
+2. the target field could be repeated.
+
+
+3. the intermediate type could also be repeated.
+
+
+Output Format
+-------------
+
+
+The extracted requests and responses will be  will be added in the dynamic
+``metadata<google.protobuf.Struct>`` with the same layout of the message.
+
+
+For the default `FIRST_AND_LAST` mode, it will be like:
+
+
+.. code-block:: json
+
+
+  {
+    "requests":{
+       "first":{
+          "foo": "val_foo1",
+       }
+       "last":{
+          "foo": "val_foo3",
+       }
+    },
+    "responses":{
+       "first":{
+          "baz": "val_baz1",
+       }
+       "last":{
+          "baz": "val_foo3",
+       }
+    }
+  }
+
+
+Example for `FIRST_AND_LAST` mode
+---------------------------------
+
+Let's say we have the following definition for the bi-streaming request
+`pkg.svc.Method`.
+
+.. code-block:: proto
+
+  message MethodRequest {
+    string foo = 1;
+    Nested nested = 2;
+    Msg redacted = 3;
+    ...
+  }
+
+  message MethodResponse {
+    string baz = 1;
+  }
+
+  message Nested {
+    Msg double_nested = 2;
+  }
+
+  message Msg {
+    string bar = 1;
+    string not_extracted = 2;
+  }
+
+This is the filter config in JSON.
+
+.. code-block:: json
+
+  {
+    "descriptor_set":{},
+    "mode": "FIRST_AND_LAST",
+    "extraction_by_method":{
+       "pkg.svc.Method":{
+          "request_extraction_by_field":{
+             "foo":"EXTRACT",
+             "nested.doubled_nested.bar":"EXTRACT",
+             "redacted":"EXTRACT_REDACT"
+          },
+          "response_extraction_by_field":{
+             "bar":"EXTRACT",
+          }
+       }
+    }
+  }
+
+During runtime, the filter receives the following `MethodRequest` message in
+JSON.
+
+.. code-block:: json
+
+  {
+    "foo": "val_foo1",
+    "nested": { "double_nested": {"bar": "val_bar1", "not_extracted":
+    "val_not_extracted1"}, "redacted": { "bar": "val_redacted_bar1"}
+  }
+  {
+    "foo": "val_foo2",
+    "nested": { "double_nested": {"bar": "val_bar2", "not_extracted":
+    "val_not_extracted2"}, "redacted": { "bar": "val_redacted_bar2"}
+  }
+  {
+    "foo": "val_foo3",
+    "nested": { "double_nested": {"bar": "val_bar3", "not_extracted":
+    "val_not_extracted3"}, "redacted": { "bar": "val_redacted_bar3"}
+  }
+
+the filter receives the following `MethodResponse` message in
+JSON.
+
+.. code-block:: json
+
+  {
+    "baz": "val_baz1",
+  }
+  {
+    "baz": "val_baz2",
+  }
+  {
+    "baz": "val_baz3",
+  }
+
+The filter will write the following dynamic
+metadata(`envoy.filters.http.proto_message_extraction`) in JSON.
+
+.. code-block:: json
+
+  {
+    "requests":{
+       "first":{
+          "foo": "val_foo1",
+          "nested": { "double_nested": {"bar": "val_bar1"}},
+          "redacted": {}
+       }
+       "last":{
+          "foo": "val_foo3",
+          "nested": { "double_nested": {"bar": "val_bar3"}},
+          "redacted": {}
+       }
+    },
+    "responses":{
+       "first":{
+          "baz": "val_baz1"
+       }
+       "last":{
+          "baz": "val_foo3"
+       }
+    }
+  }
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig:
+
+extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig
+--------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig proto] <api/envoy/extensions/filters/http/proto_message_extraction/v3/config.proto#L214>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "data_source": {...},
+    "proto_descriptor_typed_metadata": ...,
+    "mode": ...,
+    "extraction_by_method": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.data_source:
+
+
+data_source
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) It could be passed by a local file through ``Datasource.filename`` or
+  embedded in the ``Datasource.inline_bytes``.
+
+
+  The proto descriptor set binary for the gRPC services.
+
+
+  Only one of :ref:`data_source <envoy_v3_api_field_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.data_source>`, :ref:`proto_descriptor_typed_metadata <envoy_v3_api_field_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.proto_descriptor_typed_metadata>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.proto_descriptor_typed_metadata:
+
+
+proto_descriptor_typed_metadata
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Unimplemented, the key of proto descriptor TypedMetadata.
+  Among filters depending on the proto descriptor, we can have a
+  TypedMetadata for proto descriptors, so that these filters can share one
+  copy of proto descriptor in memory.
+
+
+  The proto descriptor set binary for the gRPC services.
+
+
+  Only one of :ref:`data_source <envoy_v3_api_field_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.data_source>`, :ref:`proto_descriptor_typed_metadata <envoy_v3_api_field_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.proto_descriptor_typed_metadata>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.mode:
+
+
+mode
+  (:ref:`extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.ExtractMode <envoy_v3_api_enum_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.ExtractMode>`) 
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.extraction_by_method:
+
+
+extraction_by_method
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.filters.http.proto_message_extraction.v3.MethodExtraction <envoy_v3_api_msg_extensions.filters.http.proto_message_extraction.v3.MethodExtraction>`>) Specify the message extraction info.
+  The key is the fully qualified gRPC method name.
+  ``${package}.${Service}.${Method}``, like
+  ``endpoints.examples.bookstore.BookStore.GetShelf``
+
+  The value is the message extraction information for individual gRPC
+  methods.
+
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.ExtractMode:
+
+Enum extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.ExtractMode
+-------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.ExtractMode proto] <api/envoy/extensions/filters/http/proto_message_extraction/v3/config.proto#L215>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.ExtractMode.ExtractMode_UNSPECIFIED:
+
+
+ExtractMode_UNSPECIFIED
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig.ExtractMode.FIRST_AND_LAST:
+
+
+FIRST_AND_LAST
+  ⁣The filter will extract the first and the last message for
+  for streaming cases, containing
+  client-side streaming, server-side streaming or bi-directional streaming.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.proto_message_extraction.v3.MethodExtraction:
+
+extensions.filters.http.proto_message_extraction.v3.MethodExtraction
+--------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.proto_message_extraction.v3.MethodExtraction proto] <api/envoy/extensions/filters/http/proto_message_extraction/v3/config.proto#L251>`
+
+This message can be used to support per route config approach later even
+though the Istio doesn't support that so far.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_extraction_by_field": {...},
+    "response_extraction_by_field": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_message_extraction.v3.MethodExtraction.request_extraction_by_field:
+
+
+request_extraction_by_field
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.filters.http.proto_message_extraction.v3.MethodExtraction.ExtractDirective <envoy_v3_api_enum_extensions.filters.http.proto_message_extraction.v3.MethodExtraction.ExtractDirective>`>) The mapping of field path to its ExtractDirective for request messages
+
+
+.. _envoy_v3_api_field_extensions.filters.http.proto_message_extraction.v3.MethodExtraction.response_extraction_by_field:
+
+
+response_extraction_by_field
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.filters.http.proto_message_extraction.v3.MethodExtraction.ExtractDirective <envoy_v3_api_enum_extensions.filters.http.proto_message_extraction.v3.MethodExtraction.ExtractDirective>`>) The mapping of field path to its ExtractDirective for response messages
+
+
+
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.proto_message_extraction.v3.MethodExtraction.ExtractDirective:
+
+Enum extensions.filters.http.proto_message_extraction.v3.MethodExtraction.ExtractDirective
+------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.proto_message_extraction.v3.MethodExtraction.ExtractDirective proto] <api/envoy/extensions/filters/http/proto_message_extraction/v3/config.proto#L252>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.proto_message_extraction.v3.MethodExtraction.ExtractDirective.ExtractDirective_UNSPECIFIED:
+
+
+ExtractDirective_UNSPECIFIED
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.proto_message_extraction.v3.MethodExtraction.ExtractDirective.EXTRACT:
+
+
+EXTRACT
+  ⁣The value of this field will be extracted.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.proto_message_extraction.v3.MethodExtraction.ExtractDirective.EXTRACT_REDACT:
+
+
+EXTRACT_REDACT
+  ⁣It should be only annotated on Message type fields so if the field isn't
+  empty, an empty Struct will be extracted.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.proto_message_extraction.v3.MethodExtraction.ExtractDirective.EXTRACT_REPEATED_CARDINALITY:
+
+
+EXTRACT_REPEATED_CARDINALITY
+  ⁣Extract a repeated top-level field and record its number of entries in
+  the extraction result. Can be applied to at most one field in the
+  response, and cannot be applied to any fields in the request.
+
+
+

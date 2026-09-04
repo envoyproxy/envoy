@@ -1,0 +1,65 @@
+.. _envoy_v3_api_file_envoy/extensions/watchdog/backtrace_action/v3/backtrace_action.proto:
+
+Watchdog Action that logs backtraces. (proto)
+=============================================
+
+.. _extension_envoy.watchdog.backtrace_action:
+
+This extension has the qualified name ``envoy.watchdog.backtrace_action``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.guarddog_actions <extension_category_envoy.guarddog_actions>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.watchdog.backtrace_action.v3.BacktraceActionConfig <envoy_v3_api_msg_extensions.watchdog.backtrace_action.v3.BacktraceActionConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.watchdog.backtrace_action.v3.BacktraceActionConfig:
+
+extensions.watchdog.backtrace_action.v3.BacktraceActionConfig
+-------------------------------------------------------------
+
+
+:repo:`[extensions.watchdog.backtrace_action.v3.BacktraceActionConfig proto] <api/envoy/extensions/watchdog/backtrace_action/v3/backtrace_action.proto#L20>`
+
+Configuration for the backtrace watchdog action.
+
+This action is currently only supported on Linux.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cooldown_duration": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.watchdog.backtrace_action.v3.BacktraceActionConfig.cooldown_duration:
+
+
+cooldown_duration
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Minimum time between backtrace logs per thread. Defaults to 10 seconds if not set.
+  Set to 0 to disable the cooldown and log a backtrace on every watchdog event.
+
+
