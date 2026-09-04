@@ -73,6 +73,15 @@ void IoHandleImpl::setAbortiveClose() {
   }
 }
 
+void IoHandleImpl::onPeerDestroy() {
+  peer_handle_ = nullptr;
+  sent_eof_ = true;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.internal_listener_peer_destroyed_propagation")) {
+    receive_data_reset_after_drain_ = true;
+  }
+}
+
 Api::IoCallUint64Result IoHandleImpl::close() {
   ASSERT(!closed_);
   if (!closed_) {
@@ -114,6 +123,9 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
   }
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
+      if (receive_data_reset_after_drain_) {
+        return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
+      }
       return {0, Api::IoError::none()};
     } else {
       return {0, Network::IoSocketError::getIoSocketEagainError()};
@@ -151,6 +163,9 @@ Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
   }
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
+      if (receive_data_reset_after_drain_) {
+        return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
+      }
       return {0, Api::IoError::none()};
     } else {
       return {0, Network::IoSocketError::getIoSocketEagainError()};
@@ -268,6 +283,9 @@ Api::IoCallUint64Result IoHandleImpl::recv(void* buffer, size_t length, int flag
   // No data and the writer closed.
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
+      if (receive_data_reset_after_drain_) {
+        return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
+      }
       return {0, Api::IoError::none()};
     } else {
       return {0, Network::IoSocketError::getIoSocketEagainError()};
