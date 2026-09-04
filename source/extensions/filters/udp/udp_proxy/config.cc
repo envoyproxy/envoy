@@ -23,11 +23,25 @@ const std::string& TunnelResponseTrailers::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.udp_proxy.propagate_response_trailers");
 }
 
+Envoy::Router::HeaderParserPtr
+buildTunnelingHeaderParser(const TunnelingConfig& config,
+                           Server::Configuration::FactoryContext& context) {
+  if (config.formatters().empty()) {
+    return THROW_OR_RETURN_VALUE(Envoy::Router::HeaderParser::configure(config.headers_to_add()),
+                                 Envoy::Router::HeaderParserPtr);
+  }
+
+  auto command_parsers = THROW_OR_RETURN_VALUE(
+      Formatter::SubstitutionFormatStringUtils::parseFormatters(config.formatters(), context),
+      Formatter::CommandParserPtrVector);
+  return THROW_OR_RETURN_VALUE(
+      Envoy::Router::HeaderParser::configure(config.headers_to_add(), command_parsers),
+      Envoy::Router::HeaderParserPtr);
+}
+
 TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
                                          Server::Configuration::FactoryContext& context)
-    : header_parser_(
-          THROW_OR_RETURN_VALUE(Envoy::Router::HeaderParser::configure(config.headers_to_add()),
-                                Envoy::Router::HeaderParserPtr)),
+    : header_parser_(buildTunnelingHeaderParser(config, context)),
       target_port_(config.default_target_port()), use_post_(config.use_post()),
       post_path_(config.post_path()),
       max_connect_attempts_(config.has_retry_options()

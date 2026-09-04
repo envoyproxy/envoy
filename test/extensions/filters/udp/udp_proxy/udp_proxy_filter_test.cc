@@ -12,6 +12,7 @@
 #include "source/extensions/filters/udp/udp_proxy/config.h"
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/extensions/filters/udp/udp_proxy/mocks.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
@@ -29,6 +30,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -2822,6 +2824,101 @@ TEST(TunnelingConfigImplTest, TargetHostFromFilterState) {
   TunnelingConfigImpl config(proto_config, context);
 
   EXPECT_EQ("test.host.com", config.targetHost(stream_info));
+}
+
+TEST(TunnelingConfigImplTest, FormatterExtension) {
+  Envoy::Formatter::TestCommandFactory test_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(test_factory);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  TunnelingConfig proto_config;
+  auto* header_to_add = proto_config.add_headers_to_add();
+  auto* header = header_to_add->mutable_header();
+  header->set_key("test_key");
+  header->set_value("%COMMAND_EXTENSION()%");
+  auto* formatter = proto_config.add_formatters();
+  formatter->set_name("envoy.formatter.TestFormatter");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+
+  TunnelingConfigImpl config(proto_config, context);
+
+  auto headers = Http::TestRequestHeaderMapImpl{{":scheme", "http"}, {":authority", "host.com"}};
+  config.headerEvaluator().evaluateHeaders(headers, {}, stream_info);
+  EXPECT_EQ("TestFormatter", headers.get_("test_key"));
+}
+
+TEST(TunnelingConfigImplTest, FormatterExtensionMixedWithBuiltinCommands) {
+  Envoy::Formatter::TestCommandFactory test_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(test_factory);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  stream_info.filterState()->setData(
+      "test_key", std::make_shared<Envoy::Router::StringAccessorImpl>("test_val"));
+
+  TunnelingConfig proto_config;
+  auto* header_to_add = proto_config.add_headers_to_add();
+  auto* header = header_to_add->mutable_header();
+  header->set_key("test_key");
+  header->set_value("%COMMAND_EXTENSION()%-%FILTER_STATE(test_key:PLAIN)%");
+  auto* formatter = proto_config.add_formatters();
+  formatter->set_name("envoy.formatter.TestFormatter");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+
+  TunnelingConfigImpl config(proto_config, context);
+
+  auto headers = Http::TestRequestHeaderMapImpl{{":scheme", "http"}, {":authority", "host.com"}};
+  config.headerEvaluator().evaluateHeaders(headers, {}, stream_info);
+  EXPECT_EQ("TestFormatter-test_val", headers.get_("test_key"));
+}
+
+TEST(TunnelingConfigImplTest, MultipleFormatterExtensions) {
+  Envoy::Formatter::TestCommandFactory test_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(test_factory);
+  Envoy::Formatter::AdditionalCommandFactory additional_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_additional_factory(
+      additional_factory);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  TunnelingConfig proto_config;
+  auto* header_to_add = proto_config.add_headers_to_add();
+  auto* header = header_to_add->mutable_header();
+  header->set_key("test_key");
+  header->set_value("%COMMAND_EXTENSION()%-%ADDITIONAL_EXTENSION()%");
+
+  auto* formatter = proto_config.add_formatters();
+  formatter->set_name("envoy.formatter.TestFormatter");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+  auto* additional = proto_config.add_formatters();
+  additional->set_name("envoy.formatter.AdditionalFormatter");
+  ASSERT_TRUE(additional->mutable_typed_config()->PackFrom(Protobuf::UInt32Value()));
+
+  TunnelingConfigImpl config(proto_config, context);
+
+  auto headers = Http::TestRequestHeaderMapImpl{{":scheme", "http"}, {":authority", "host.com"}};
+  config.headerEvaluator().evaluateHeaders(headers, {}, stream_info);
+  EXPECT_EQ("TestFormatter-AdditionalFormatter", headers.get_("test_key"));
+}
+
+TEST(TunnelingConfigImplTest, UnknownFormatterExtension) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  TunnelingConfig proto_config;
+  auto* header_to_add = proto_config.add_headers_to_add();
+  auto* header = header_to_add->mutable_header();
+  header->set_key("test_key");
+  header->set_value("%COMMAND_EXTENSION()%");
+  auto* formatter = proto_config.add_formatters();
+  formatter->set_name("envoy.formatter.does_not_exist");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+
+  EXPECT_THROW_WITH_REGEX(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                          "envoy.formatter.does_not_exist");
 }
 
 TEST(TunnelingConfigImplTest, BufferingState) {
