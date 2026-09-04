@@ -9,8 +9,8 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
-#include "envoy/extensions/clusters/dns_srv/v3/cluster.pb.h"
-#include "envoy/extensions/clusters/dns_srv/v3/cluster.pb.validate.h"
+#include "contrib/envoy/extensions/clusters/dns_srv/v3/cluster.pb.h"
+#include "contrib/envoy/extensions/clusters/dns_srv/v3/cluster.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/empty_string.h"

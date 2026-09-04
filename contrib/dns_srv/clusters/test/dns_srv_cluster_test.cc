@@ -1,8 +1,8 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/extensions/clusters/dns_srv/v3/cluster.pb.h"
+#include "contrib/envoy/extensions/clusters/dns_srv/v3/cluster.pb.h"
 
 #include "source/common/config/utility.h"
-#include "source/extensions/clusters/dns_srv/dns_srv_cluster.h"
+#include "contrib/dns_srv/clusters/source/dns_srv_cluster.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/network/mocks.h"

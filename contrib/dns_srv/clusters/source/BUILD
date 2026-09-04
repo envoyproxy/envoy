@@ -1,14 +1,14 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_extension_package",
+    "envoy_cc_contrib_extension",
+    "envoy_contrib_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_extension_package()
+envoy_contrib_package()
 
-envoy_cc_extension(
+envoy_cc_contrib_extension(
     name = "cluster",
     srcs = ["dns_srv_cluster.cc"],
     hdrs = ["dns_srv_cluster.h"],
@@ -27,6 +27,6 @@ envoy_cc_extension(
         "//source/common/upstream:upstream_includes",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/clusters/dns_srv/v3:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/clusters/dns_srv/v3:pkg_cc_proto",
     ],
 )

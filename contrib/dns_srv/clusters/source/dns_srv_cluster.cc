@@ -1,4 +1,4 @@
-#include "source/extensions/clusters/dns_srv/dns_srv_cluster.h"
+#include "contrib/dns_srv/clusters/source/dns_srv_cluster.h"
 
 #include <algorithm>
 #include <chrono>
