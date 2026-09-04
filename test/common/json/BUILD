@@ -6,6 +6,7 @@ load(
     "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -102,6 +103,37 @@ envoy_cc_test(
         "//source/common/json:json_internal_lib",
         "//source/common/json:json_streamer_lib",
         "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "proto_streamer_test_proto",
+    srcs = ["proto_streamer_test.proto"],
+)
+
+envoy_cc_test(
+    name = "proto_streamer_test",
+    srcs = ["proto_streamer_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":proto_streamer_test_proto_cc_proto",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/json:proto_streamer_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/proto:sensitive_proto_cc_proto",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "proto_streamer_speed_test",
+    srcs = ["proto_streamer_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/json:proto_streamer_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/proto:extraction_proto_cc_proto",
+        "//test/proto:sensitive_proto_cc_proto",
     ],
 )
 
