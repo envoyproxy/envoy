@@ -364,8 +364,9 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   if (thread_local_cluster == nullptr) {
     // TODO(dio): Add stats related to this.
     ENVOY_LOG(debug, "ext_authz cluster '{}' does not exist", cluster);
-    callbacks_->onComplete(errorResponse());
+    RequestCallbacks* callbacks = callbacks_;
     callbacks_ = nullptr;
+    callbacks->onComplete(errorResponse());
   } else {
     // Do not enforce a sampling decision on this span; instead keep the parent's sampling status.
     auto options = Http::AsyncClient::RequestOptions()
@@ -388,8 +389,9 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
 
 void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
                                   Http::ResponseMessagePtr&& message) {
-  callbacks_->onComplete(toResponse(std::move(message)));
+  RequestCallbacks* callbacks = callbacks_;
   callbacks_ = nullptr;
+  callbacks->onComplete(toResponse(std::move(message)));
 }
 
 void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
@@ -397,8 +399,9 @@ void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
   // TODO(botengyao): handle different failure reasons.
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
          reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
-  callbacks_->onComplete(errorResponse());
+  RequestCallbacks* callbacks = callbacks_;
   callbacks_ = nullptr;
+  callbacks->onComplete(errorResponse());
 }
 
 void RawHttpClientImpl::onBeforeFinalizeUpstreamSpan(

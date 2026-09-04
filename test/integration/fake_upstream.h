@@ -373,11 +373,25 @@ public:
         rst_disconnected_ = true;
       }
       disconnected_ = true;
+      if (disconnect_callback_) {
+        disconnect_callback_();
+      }
     }
   }
 
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+
+  void setDisconnectCallback(DisconnectCallback callback) {
+    absl::MutexLock lock(lock_);
+    ASSERT(!disconnect_callback_);
+    disconnect_callback_ = std::move(callback);
+  }
+
+  void clearDisconnectCallback() {
+    absl::MutexLock lock(lock_);
+    disconnect_callback_ = nullptr;
+  }
 
   Event::Dispatcher& dispatcher() { return dispatcher_; }
 
@@ -461,6 +475,7 @@ private:
   bool parented_ ABSL_GUARDED_BY(lock_){};
   bool disconnected_ ABSL_GUARDED_BY(lock_){};
   bool rst_disconnected_ ABSL_GUARDED_BY(lock_){};
+  DisconnectCallback disconnect_callback_ ABSL_GUARDED_BY(lock_);
 };
 
 using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
@@ -482,6 +497,15 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult close(Network::ConnectionCloseType close_type,
                                  std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  // Half-close the write side of a TCP connection and wait for the peer to close its side.
+  // Successful completion proves that the peer observed the shutdown, unlike close(). The peer
+  // must have half-close disabled so that it responds to the shutdown with a full close. Fails
+  // immediately if this connection was already configured for half-close, since that indicates
+  // that the caller expects half-close semantics and cannot rely on a reciprocal full close.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  halfCloseAndWaitForDisconnect(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -556,6 +580,7 @@ public:
                      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                          headers_with_underscores_action,
                      bool deferred_read_enable = false);
+  ~FakeHttpConnection() override;
 
   void initialize() override;
 
@@ -591,12 +616,24 @@ public:
   Http::ServerHeaderValidatorPtr makeHeaderValidator();
   Http::CodecType type() const { return type_; }
 
+  // Stop dispatching HTTP data and half-close the write side of this connection. Both operations
+  // happen in one dispatcher callback so an EOF cannot be dispatched to an incomplete HTTP codec
+  // after the fake upstream has sent its FIN. Network reads remain enabled so cleanup can observe
+  // the peer's reciprocal FIN.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  halfCloseForCleanup(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
     ReadFilter(FakeHttpConnection& parent) : parent_(parent) {}
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
+      if (parent_.shutting_down_for_cleanup_) {
+        data.drain(data.length());
+        return Network::FilterStatus::StopIteration;
+      }
       Http::Status status = parent_.codec_->dispatch(data);
 
       if (Http::isCodecProtocolError(status)) {
@@ -619,6 +656,8 @@ private:
   };
 
   const Http::CodecType type_;
+  // Accessed only from the fake upstream connection's dispatcher thread.
+  bool shutting_down_for_cleanup_{false};
   bool deferred_read_enable_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);

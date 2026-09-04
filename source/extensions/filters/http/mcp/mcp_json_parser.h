@@ -53,6 +53,10 @@ public:
   // Get extraction policy for a specific method
   const std::vector<AttributeExtractionRule>& getFieldsForMethod(const std::string& method) const;
 
+  // Get the attribute path corresponding to Mcp-Name for a method.
+  // Returns empty when the method has no name-like attribute.
+  std::string getNameAttributePath(const std::string& method) const;
+
   // Get merged requirements for a specific method (global + method-specific).
   const FieldRequirements& getFieldRequirementsForMethod(const std::string& method) const;
 
@@ -163,7 +167,7 @@ private:
   bool requiredFieldsCollected() const;
 
   // Store field in temp storage
-  void storeField(const std::string& path, const Protobuf::Value& value);
+  void storeField(const std::string& path, absl::string_view name, const Protobuf::Value& value);
 
   // Copy selected fields from temp to final
   void copySelectedFields();

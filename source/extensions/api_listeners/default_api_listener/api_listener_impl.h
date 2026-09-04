@@ -134,7 +134,7 @@ protected:
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }
-      void onDrain() override {}
+      void onDrain(Network::ConnectionDrainEvent) override {}
       void close(Network::ConnectionCloseType) override {}
       void close(Network::ConnectionCloseType, absl::string_view) override {}
       StreamInfo::DetectedCloseType detectedCloseType() const override {

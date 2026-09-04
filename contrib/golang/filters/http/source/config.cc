@@ -1,10 +1,12 @@
 #include "contrib/golang/filters/http/source/config.h"
 
+#include <format>
 #include <string>
 
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/fmt.h"
+#include "source/server/generic_factory_context.h"
 
 #include "contrib/golang/common/dso/dso.h"
 #include "contrib/golang/filters/http/source/golang_filter.h"
@@ -14,9 +16,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Golang {
 
-absl::StatusOr<Http::FilterFactoryCb> GolangFilterConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> GolangFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
 
   ENVOY_LOG_MISC(debug, "load golang library at parse config: {} {}", proto_config.library_id(),
                  proto_config.library_path());
@@ -27,13 +30,15 @@ absl::StatusOr<Http::FilterFactoryCb> GolangFilterConfig::createFilterFactoryFro
   auto dso_lib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::load(
       proto_config.library_id(), proto_config.library_path(), proto_config.plugin_name());
   if (dso_lib == nullptr) {
-    return absl::InvalidArgumentError(fmt::format("golang_filter: load library failed: {} {}",
+    return absl::InvalidArgumentError(std::format("golang_filter: load library failed: {} {}",
                                                   proto_config.library_id(),
                                                   proto_config.library_path()));
   }
 
+  Server::GenericFactoryContextImpl generic_context(
+      context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
-      proto_config, dso_lib, fmt::format("{}golang.", stats_prefix), context);
+      proto_config, dso_lib, std::format("{}golang.", extra_context.stats_prefix), generic_context);
   RETURN_IF_NOT_OK(config->newGoPluginConfig());
   return [config, dso_lib](Http::FilterChainFactoryCallbacks& callbacks) {
     const std::string& worker_name = callbacks.dispatcher().name();

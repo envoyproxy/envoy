@@ -72,7 +72,7 @@ public:
 private:
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::IsolatedStoreImpl stats_store_{server_factory_context_.serverScope().symbolTable()};
   Event::GlobalTimeSystem time_system_;
   Api::ApiPtr api_;
   Network::Address::IpVersion version_;

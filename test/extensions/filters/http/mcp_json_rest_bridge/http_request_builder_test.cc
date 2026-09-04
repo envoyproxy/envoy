@@ -12,6 +12,7 @@ namespace McpJsonRestBridge {
 namespace {
 
 using ::envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule;
+using ::Envoy::StatusHelpers::HasStatus;
 using ::Envoy::StatusHelpers::StatusIs;
 using ::nlohmann::json;
 using ::testing::StrEq;
@@ -40,8 +41,10 @@ body: "*"
     "theme": "Kids"
   })json");
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
   ASSERT_OK(http_request);
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789"));
   EXPECT_THAT(http_request->method, StrEq("GET"));
@@ -85,8 +88,10 @@ body: "shelf"
     "theme": "Kids"
   })json");
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
   ASSERT_OK(http_request);
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789?theme=Kids"));
   EXPECT_THAT(http_request->method, StrEq("POST"));
@@ -117,8 +122,10 @@ put: "/v1/{parent=projects/*}/shelves/{shelf.name}"
     "parent": "projects/123456789"
   })json");
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
   ASSERT_OK(http_request);
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   EXPECT_THAT(
       http_request->url,
@@ -146,8 +153,10 @@ patch: "/v1/{parent=projects/*}/shelves/{shelf.name}"
     "parent": "projects/123456789"
   })json");
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
   ASSERT_OK(http_request);
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   EXPECT_THAT(http_request->url,
               StrEq("/v1/projects/123456789/shelves/"
@@ -171,8 +180,10 @@ delete: "/v1/{parent=projects/*}"
     "parent": "projects/123456789"
   })json");
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
   ASSERT_OK(http_request);
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789?boolean=true&float=123.456&"
                                        "integer=123&null=null&string=test%20string"));
@@ -196,8 +207,10 @@ body: "*"
     "theme": "Kids"
   })json");
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
   ASSERT_OK(http_request);
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789/shelves/science-fiction"));
   EXPECT_THAT(http_request->method, StrEq("GET"));
@@ -214,24 +227,33 @@ body: "*"
 // constructed upstream path. Before the fix this returned "/v1/users/../../admin/secrets/profile".
 TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableRejectsPathTraversal) {
   json arguments = json::parse(R"json({"id": "../../admin/secrets"})json");
-  EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments, status),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "path template variable 'id' must not contain path traversal segments"));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallPathTraversalRejected);
 }
 
 // A simple variable's '/' is confined to a single segment (percent-encoded), not treated as a
 // path separator that could bypass the intended route prefix.
 TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableEncodesSlash) {
   json arguments = json::parse(R"json({"id": "a/b"})json");
-  absl::StatusOr<std::string> url = constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<std::string> url =
+      constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments, status);
   ASSERT_TRUE(url.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
   EXPECT_THAT(*url, StrEq("/v1/users/a%2Fb/profile"));
 }
 
 // A benign single-segment value still substitutes unchanged.
 TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableAllowsSingleSegment) {
   json arguments = json::parse(R"json({"id": "alice"})json");
-  absl::StatusOr<std::string> url = constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<std::string> url =
+      constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments, status);
   ASSERT_TRUE(url.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
   EXPECT_THAT(*url, StrEq("/v1/users/alice/profile"));
 }
 
@@ -239,9 +261,11 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableAllowsSingleSegment) 
 // preserved and left as the operator's explicit choice.
 TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariablePreservesSlash) {
   json arguments = json::parse(R"json({"parent": "projects/123456789"})json");
+  BridgeStatus status = BridgeStatus::Ok;
   absl::StatusOr<std::string> url =
-      constructBaseUrl("/v1/{parent=projects/*}/shelves", {"parent"}, arguments);
+      constructBaseUrl("/v1/{parent=projects/*}/shelves", {"parent"}, arguments, status);
   ASSERT_TRUE(url.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
   EXPECT_THAT(*url, StrEq("/v1/projects/123456789/shelves"));
 }
 
@@ -250,8 +274,11 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariablePreservesSlash) {
 // "/v1/../../admin/secrets/shelves".
 TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariableRejectsPathTraversal) {
   json arguments = json::parse(R"json({"name": "../../admin/secrets"})json");
-  EXPECT_THAT(constructBaseUrl("/v1/{name=projects/*}/shelves", {"name"}, arguments),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(constructBaseUrl("/v1/{name=projects/*}/shelves", {"name"}, arguments, status),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "path template variable 'name' must not contain path traversal segments"));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallPathTraversalRejected);
 }
 
 // '\' is percent-encoded to %5C rather than reaching the upstream literally, but an upstream that
@@ -259,15 +286,21 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariableRejectsPathTraversa
 // separator by the check as well.
 TEST(HttpRequestBuilderTest, ConstructBaseUrlRejectsBackslashPathTraversal) {
   json arguments = json::parse(R"json({"id": "..\\.."})json");
-  EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments, status),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "path template variable 'id' must not contain path traversal segments"));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallPathTraversalRejected);
 }
 
 // A backslash that is not a traversal segment is still allowed through, percent-encoded.
 TEST(HttpRequestBuilderTest, ConstructBaseUrlEncodesNonTraversalBackslash) {
   json arguments = json::parse(R"json({"id": "a\\b"})json");
-  absl::StatusOr<std::string> url = constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<std::string> url =
+      constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments, status);
   ASSERT_TRUE(url.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
   EXPECT_THAT(*url, StrEq("/v1/users/a%5Cb/profile"));
 }
 
@@ -281,7 +314,11 @@ get: "/v1/{parent=projects/*}"
     "string": "test string"
   })json");
 
-  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(
+      buildHttpRequest(http_rule, arguments, status),
+      HasStatus(absl::StatusCode::kInvalidArgument, "Could not find value for path: parent"));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
 }
 
 TEST(HttpRequestBuilderTest, FailToExtractBodyReturnError) {
@@ -293,7 +330,20 @@ body: "foo"
                             http_rule);
   json arguments = json::parse(R"json({})json");
 
-  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
+              HasStatus(absl::StatusCode::kInvalidArgument, "Could not find value for path: foo"));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
+}
+
+TEST(HttpRequestBuilderTest, UnsupportedHttpMethodReturnInvalidHttpRuleError) {
+  HttpRule http_rule;
+  json arguments = json::parse(R"json({})json");
+
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
+              HasStatus(absl::StatusCode::kInvalidArgument, "HttpRule is malformed"));
+  EXPECT_EQ(status, BridgeStatus::InternalToolsCallInvalidHttpRule);
 }
 
 TEST(HttpRequestBuilderTest, ConstructBaseUrlTest) {
@@ -304,19 +354,24 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlTest) {
     "projectId": "project_C"
   })json");
 
+  BridgeStatus status = BridgeStatus::Ok;
   // Single substitution.
-  EXPECT_THAT(*constructBaseUrl("/v1/{parent=projects/*}", {"parent"}, arguments),
+  EXPECT_THAT(*constructBaseUrl("/v1/{parent=projects/*}", {"parent"}, arguments, status),
               StrEq("/v1/projects/123456789"));
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   // Multiple substitutions.
   EXPECT_THAT(*constructBaseUrl(
                   "/test/v2/projects/{projectId}/datasets/{datasetId}/tables/{tableId}/insertAll",
-                  {"projectId", "datasetId", "tableId"}, arguments),
+                  {"projectId", "datasetId", "tableId"}, arguments, status),
               StrEq("/test/v2/projects/project_C/datasets/dataset_B/tables/table_A/insertAll"));
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   // Missing argument.
-  EXPECT_THAT(constructBaseUrl("/v1/{missing}", {"missing"}, arguments),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(
+      constructBaseUrl("/v1/{missing}", {"missing"}, arguments, status),
+      HasStatus(absl::StatusCode::kInvalidArgument, "Could not find value for path: missing"));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
 }
 
 // Substitution matches a whole `{name}` or `{name=pattern}` and nothing else. These cases pin the
@@ -324,15 +379,20 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlTest) {
 TEST(HttpRequestBuilderTest, ConstructBaseUrlVariableMatchingIsExact) {
   json arguments = json::parse(R"json({"id": "7"})json");
 
+  BridgeStatus status = BridgeStatus::Ok;
   // A longer name that merely starts with the variable name is left alone.
-  EXPECT_THAT(*constructBaseUrl("/v1/{identifier}/{id}", {"id"}, arguments),
+  EXPECT_THAT(*constructBaseUrl("/v1/{identifier}/{id}", {"id"}, arguments, status),
               StrEq("/v1/{identifier}/7"));
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   // An explicit pattern needs at least one character, so `{id=}` is not a variable.
-  EXPECT_THAT(*constructBaseUrl("/v1/{id=}", {"id"}, arguments), StrEq("/v1/{id=}"));
+  EXPECT_THAT(*constructBaseUrl("/v1/{id=}", {"id"}, arguments, status), StrEq("/v1/{id=}"));
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   // Every occurrence is substituted, not just the first.
-  EXPECT_THAT(*constructBaseUrl("/v1/{id}/copy/{id}", {"id"}, arguments), StrEq("/v1/7/copy/7"));
+  EXPECT_THAT(*constructBaseUrl("/v1/{id}/copy/{id}", {"id"}, arguments, status),
+              StrEq("/v1/7/copy/7"));
+  EXPECT_EQ(status, BridgeStatus::Ok);
 }
 
 TEST(HttpRequestBuilderTest, ConstructQueryParamsNestingDepthLimit) {
@@ -349,7 +409,10 @@ get: "/v1"
     current = &((*current)["a"]);
   }
 
-  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
 }
 
 TEST(HttpRequestBuilderTest, ConstructQueryParamsArrayNestingDepthLimit) {
@@ -366,7 +429,10 @@ get: "/v1"
     current = &((*current)[0]);
   }
 
-  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
 }
 
 } // namespace

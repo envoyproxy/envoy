@@ -30,8 +30,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.6",
-        sha256 = "4c949b54da816e83673028faf28831206f0ef3a28fc4eb95cc01a5275d85cfe6",
+        version = "0.4.13",
+        sha256 = "89a3e2f2839d619687e43f8e847ec8677a1a7274bce7411fb676950f831be17f",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -393,7 +393,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "googletest-{version}",
         urls = ["https://github.com/google/googletest/releases/download/v{version}/googletest-{version}.tar.gz"],
     ),
-    com_google_protobuf = dict(
+    protobuf = dict(
         version = "35.1",
         # When upgrading the protobuf library, please re-run
         # test/common/json:gen_excluded_unicodes to recompute the ranges
@@ -433,7 +433,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "ocp-diag-core-{version}/apis/c++",
         urls = ["https://github.com/opencomputeproject/ocp-diag-core/archive/{version}.zip"],
     ),
-    io_bazel_rules_go = dict(
+    rules_go = dict(
         version = "0.61.1",
         sha256 = "763f4a3f6b03469fdb00a77a333dd0b5546d3ee1fa29db373128c08fee73e0e8",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
@@ -537,8 +537,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "90a1e2218164586d4dc711bb9639a313d95de9df",
-        sha256 = "42336ae13c29d687ad9458e230bc56cc7e36f5ffc02ee78541929e6e165c8c90",
+        version = "5c9cc6b37f55a97071077a6190bf4f0bc7a09c1f",
+        sha256 = "da1f77ceff9ffdf65fdc4ff7fc63ba475e83015ed77fdb02d7fbc0118207d0ba",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -638,11 +638,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "vpp-{version}",
         urls = ["https://github.com/FDio/vpp/archive/{version}.tar.gz"],
     ),
-    dlb = dict(
-        version = "8.8.0",
-        sha256 = "564534254ef32bfed56e0a464c53fca0907e446b30929c253210e2c3d6de58b9",
-        urls = ["https://downloadmirror.intel.com/819078/dlb_linux_src_release_8.8.0.txz"],
-    ),
     libpfm = dict(
         version = "4.11.0",
         sha256 = "bd49c66c1854f9a5f347725c298fce39d7ac2644b2dfc3237e67d91c9c0d7823",
@@ -667,8 +662,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/apache/thrift/archive/refs/tags/v{version}.tar.gz"],
     ),
     toolchains_llvm = dict(
-        version = "1.8.0",
-        sha256 = "3b05826f256040f91c24dcaad673eb1c91e4cc93f4043d0205f2512327640205",
+        version = "1.9.0",
+        sha256 = "779b3280571647034931c7f9ce8ef3836bfc55d00d23e7dad5370151e1f7149e",
         strip_prefix = "toolchains_llvm-v{version}",
         urls = ["https://github.com/bazel-contrib/toolchains_llvm/releases/download/v{version}/toolchains_llvm-v{version}.tar.gz"],
     ),

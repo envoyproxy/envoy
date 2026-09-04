@@ -226,10 +226,16 @@ void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
       ->setRequestedServerName(server_name_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setSslConnection(
       ssl_connection_);
+  // The connection manager reads the drain type from the listener that accepted the connection,
+  // in initializeReadFilterCallbacks() below.
+  ON_CALL(*listener_info_, drainType()).WillByDefault(Return(drain_type_));
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setListenerInfo(
+      listener_info_);
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       std::make_shared<ConnectionManagerConfigProxyObject>(*this), drain_close_, random_,
       http_context_, runtime_, local_info_, cluster_manager_, overload_manager_,
-      test_time_.timeSystem(), factory_context_.listenerInfo().direction());
+      test_time_.timeSystem(), factory_context_.listenerInfo().direction(),
+      factory_context_.server_factory_context_);
 
   conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 

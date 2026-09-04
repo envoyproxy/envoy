@@ -13,13 +13,17 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
 using testing::HasSubstr;
+using testing::IsSupersetOf;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +31,7 @@ namespace Tracers {
 namespace XRay {
 
 namespace {
-using ::testing::_;
+using testing::_;
 using ::testing::Invoke;
 using ::testing::Return;
 using namespace source::extensions::tracers::xray;
@@ -73,12 +77,12 @@ public:
 void XRayTracerTest::commonAsserts(daemon::Segment& s) {
   EXPECT_EQ(expected_->span_name, s.name().c_str());
   EXPECT_EQ(expected_->origin_name, s.origin().c_str());
-  EXPECT_EQ(expected_->aws_key_value, s.aws().fields().at("key").string_value().c_str());
-  EXPECT_EQ(expected_->http_method,
-            s.http().request().fields().at("method").string_value().c_str());
-  EXPECT_EQ(expected_->http_url, s.http().request().fields().at("url").string_value().c_str());
-  EXPECT_EQ(expected_->user_agent,
-            s.http().request().fields().at(Tracing::Tags::get().UserAgent).string_value().c_str());
+  EXPECT_THAT(s.aws().fields(), Contains(IsStructString("key", expected_->aws_key_value)));
+  EXPECT_THAT(s.http().request().fields(),
+              IsSupersetOf(StructMatchers(
+                  IsStructString("method", expected_->http_method),
+                  IsStructString("url", expected_->http_url),
+                  IsStructString(Tracing::Tags::get().UserAgent, expected_->user_agent))));
   EXPECT_EQ(expected_->direction, s.annotations().at("direction").c_str());
 }
 
@@ -103,14 +107,14 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
     EXPECT_FALSE(s.fault());    /*server error*/
     EXPECT_FALSE(s.error());    /*client error*/
     EXPECT_FALSE(s.throttle()); /*request throttled*/
-    EXPECT_EQ(expected_status_code,
-              s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
-    EXPECT_EQ(expected_content_length,
-              s.http().response().fields().at("content_length").number_value());
-    EXPECT_EQ(expected_client_ip,
-              s.http().request().fields().at("client_ip").string_value().c_str());
-    EXPECT_EQ(expected_x_forwarded_for,
-              s.http().request().fields().at("x_forwarded_for").bool_value());
+    EXPECT_THAT(
+        s.http().response().fields(),
+        UnorderedElementsAre(IsStructNumber(Tracing::Tags::get().Status, expected_status_code),
+                             IsStructNumber("content_length", expected_content_length)));
+    EXPECT_THAT(
+        s.http().request().fields(),
+        IsSupersetOf(StructMatchers(IsStructString("client_ip", expected_client_ip),
+                                    IsStructBool("x_forwarded_for", expected_x_forwarded_for))));
     EXPECT_EQ(expected_upstream_address,
               s.annotations().at(Tracing::Tags::get().UpstreamAddress).c_str());
   };
@@ -154,14 +158,14 @@ TEST_F(XRayTracerTest, SerializeSpanTestXForwardedForSet) {
     EXPECT_FALSE(s.fault());    /*server error*/
     EXPECT_FALSE(s.error());    /*client error*/
     EXPECT_FALSE(s.throttle()); /*request throttled*/
-    EXPECT_EQ(expected_status_code,
-              s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
-    EXPECT_EQ(expected_content_length,
-              s.http().response().fields().at("content_length").number_value());
-    EXPECT_EQ(expected_client_ip,
-              s.http().request().fields().at("client_ip").string_value().c_str());
-    EXPECT_EQ(expected_x_forwarded_for,
-              s.http().request().fields().at("x_forwarded_for").bool_value());
+    EXPECT_THAT(
+        s.http().response().fields(),
+        UnorderedElementsAre(IsStructNumber(Tracing::Tags::get().Status, expected_status_code),
+                             IsStructNumber("content_length", expected_content_length)));
+    EXPECT_THAT(
+        s.http().request().fields(),
+        IsSupersetOf(StructMatchers(IsStructString("client_ip", expected_client_ip),
+                                    IsStructBool("x_forwarded_for", expected_x_forwarded_for))));
     EXPECT_EQ(expected_upstream_address,
               s.annotations().at(Tracing::Tags::get().UpstreamAddress).c_str());
   };
@@ -200,8 +204,8 @@ TEST_F(XRayTracerTest, SerializeSpanTestServerError) {
     EXPECT_TRUE(s.type().empty());
     EXPECT_TRUE(s.fault());  /*server error*/
     EXPECT_FALSE(s.error()); /*client error*/
-    EXPECT_EQ(expected_status_code,
-              s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
+    EXPECT_THAT(s.http().response().fields(),
+                Contains(IsStructNumber(Tracing::Tags::get().Status, expected_status_code)));
   };
 
   ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
@@ -236,8 +240,8 @@ TEST_F(XRayTracerTest, SerializeSpanTestClientError) {
     EXPECT_FALSE(s.fault());    /*server error*/
     EXPECT_TRUE(s.error());     /*client error*/
     EXPECT_FALSE(s.throttle()); /*request throttled*/
-    EXPECT_EQ(expected_status_code,
-              s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
+    EXPECT_THAT(s.http().response().fields(),
+                Contains(IsStructNumber(Tracing::Tags::get().Status, expected_status_code)));
   };
 
   ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
@@ -271,8 +275,8 @@ TEST_F(XRayTracerTest, SerializeSpanTestClientErrorWithThrottle) {
     EXPECT_FALSE(s.fault());   /*server error*/
     EXPECT_TRUE(s.error());    /*client error*/
     EXPECT_TRUE(s.throttle()); /*request throttled*/
-    EXPECT_EQ(expected_status_code,
-              s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
+    EXPECT_THAT(s.http().response().fields(),
+                Contains(IsStructNumber(Tracing::Tags::get().Status, expected_status_code)));
   };
 
   ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));

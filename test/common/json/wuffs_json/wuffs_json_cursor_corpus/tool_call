@@ -1,0 +1,1 @@
+{"tools":[{"type":"function","function":{"name":"get_weather","parameters":{"properties":{"city":{"type":"string"}}}}}]}

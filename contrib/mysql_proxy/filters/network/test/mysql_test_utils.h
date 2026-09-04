@@ -1,6 +1,8 @@
 #pragma once
+
+#include <format>
+
 #include "contrib/mysql_proxy/filters/network/source/mysql_codec.h"
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,7 +30,7 @@ public:
   static std::vector<uint8_t> getAuthResp8() { return std::vector<uint8_t>(8, 0xff); }
   static std::vector<uint8_t> getAuthResp20() { return std::vector<uint8_t>(20, 0xff); }
   static std::string getVersion() {
-    return fmt::format("{0}.{1}.{2}", MYSQL_VER_MAJOR, MYSQL_VER_MINOR, MYSQL_VER_VAR);
+    return std::format("{0}.{1}.{2}", MYSQL_VER_MAJOR, MYSQL_VER_MINOR, MYSQL_VER_VAR);
   }
   static std::string getSqlState() { return "HY000"; }
   static std::string getErrorMessage() { return "auth failed"; }

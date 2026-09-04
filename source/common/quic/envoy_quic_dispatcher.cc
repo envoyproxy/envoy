@@ -157,6 +157,11 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     quic_session->close(Network::ConnectionCloseType::FlushWrite, "no filter chain found");
   }
   quic_session->Initialize();
+  if (filter_chain != nullptr && drain_event_.has_value()) {
+    // The listener began draining before this session was created. Notify it now that its network
+    // filter chain.
+    quic_session->onDrain(*drain_event_);
+  }
   connection_handler_.incNumConnections();
   listener_stats_.downstream_cx_active_.inc();
   listener_stats_.downstream_cx_total_.inc();
@@ -204,6 +209,59 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
       // If any filters access those configs during destruction, it'll be use-after-free
       DeleteSessions();
     }
+  }
+}
+
+void EnvoyQuicDispatcher::drainSessionsOfFilterChain(const Network::FilterChain* filter_chain,
+                                                     Network::ConnectionDrainEvent drain_event) {
+  auto iter = connections_by_filter_chain_.find(filter_chain);
+  if (iter == connections_by_filter_chain_.end()) {
+    return;
+  }
+  // Snapshot the sessions before notifying any of them. A drain callback may synchronously close a
+  // session, which removes it from this list, and the last such removal erases the whole map entry
+  // (see EnvoyQuicServerSession::OnConnectionClosed()), destroying the list this would otherwise be
+  // iterating. A closed session is not destroyed until quic::QuicDispatcher deletes it on a later
+  // event loop iteration, so the snapshot stays valid; skip any session a previous callback closed.
+  const std::vector<std::reference_wrapper<Network::Connection>> sessions(iter->second.begin(),
+                                                                          iter->second.end());
+  for (Network::Connection& session : sessions) {
+    if (session.state() != Network::Connection::State::Open) {
+      continue;
+    }
+    session.onDrain(drain_event);
+  }
+}
+
+void EnvoyQuicDispatcher::drainConnectionsWithFilterChains(
+    const std::list<const Network::FilterChain*>& filter_chains,
+    Network::ConnectionDrainEvent drain_event) {
+  for (const Network::FilterChain* filter_chain : filter_chains) {
+    drainSessionsOfFilterChain(filter_chain, drain_event);
+  }
+}
+
+void EnvoyQuicDispatcher::drainAllConnections(Network::ConnectionDrainEvent drain_event) {
+  // Remember the drain so sessions created after this point are also notified (see
+  // CreateQuicSession). As on the TCP path (OwnedActiveStreamListenerBase::onListenerDrainStart),
+  // the first event wins: a listener can be notified more than once (a server drain escalating
+  // from InboundOnly to All), and a later notification neither pushes the drain back nor
+  // re-notifies sessions, all of which have already been notified of the first event.
+  if (drain_event_.has_value()) {
+    return;
+  }
+  drain_event_ = drain_event;
+  // Snapshot the keys before notifying: a drain callback may synchronously close a session, and the
+  // last close for a filter chain erases its entry from connections_by_filter_chain_, which would
+  // invalidate an iterator held across the loop. Entries erased in the meantime are simply not
+  // found on lookup.
+  std::vector<const Network::FilterChain*> filter_chains;
+  filter_chains.reserve(connections_by_filter_chain_.size());
+  for (const auto& entry : connections_by_filter_chain_) {
+    filter_chains.push_back(entry.first);
+  }
+  for (const Network::FilterChain* filter_chain : filter_chains) {
+    drainSessionsOfFilterChain(filter_chain, drain_event);
   }
 }
 

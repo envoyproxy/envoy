@@ -7,9 +7,10 @@ load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@envoy_toolshed//dependency:macros.bzl", "updater")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
+load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load(":deprecated_features.bzl", "check_removed_fips_define")
+load(":deprecated_features.bzl", "check_removed_fips_define", "check_removed_wasm_defines")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
@@ -31,6 +32,9 @@ exports_files([
     "test_for_benchmark_wrapper.sh",
     "repository_locations.bzl",
     "deps.yaml",
+    "gazelle.patch",
+    "googleapis.patch",
+    "rules_go.patch",
     "exported_symbols.txt",
     "exported_symbols_apple.txt",
 ])
@@ -551,6 +555,19 @@ label_flag(
     build_setting_default = "@boringssl//:crypto",
 )
 
+# wee8 engine: envoy_toolshed prebuilt by default, source for configs the
+# prebuilt is incompatible with (gcc libstdc++ ABI; sanitizers need instrumented deps).
+alias(
+    name = "wee8_engine",
+    actual = select({
+        ":gcc_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":asan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":msan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":tsan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        "//conditions:default": "@envoy_toolshed//v8:wee8",
+    }),
+)
+
 bool_flag(
     name = "fips",
     build_setting_default = False,
@@ -573,7 +590,7 @@ config_setting(
 
 config_setting(
     name = "using_boringssl_fips",
-    flag_values = {":ssl": "@boringssl_fips//:ssl"},
+    flag_values = {":ssl": "@boringssl-fips//:ssl"},
 )
 
 config_setting(
@@ -595,29 +612,38 @@ check_removed_fips_define(
     visibility = ["//visibility:public"],
 )
 
+check_removed_wasm_defines(
+    name = "check_removed_wasm_defines",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
 label_flag(
     name = "zlib",
     build_setting_default = "@zlib-ng",
 )
 
+# Wasm engine config settings. The single source of truth for engine selection
+# is @proxy-wasm-cpp-host//bazel:engine (a string_flag defined in that repo).
+# Use --@proxy-wasm-cpp-host//bazel:engine=<value> to select the engine.
 config_setting(
     name = "wasm_v8",
-    values = {"define": "wasm=v8"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "v8"},
 )
 
 config_setting(
     name = "wasm_wamr",
-    values = {"define": "wasm=wamr"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "wamr"},
 )
 
 config_setting(
     name = "wasm_wasmtime",
-    values = {"define": "wasm=wasmtime"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "wasmtime"},
 )
 
 config_setting(
     name = "wasm_disabled",
-    values = {"define": "wasm=disabled"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "disabled"},
 )
 
 # This config setting enables Universal Header Validator and disables
@@ -969,11 +995,17 @@ json_merge(
     | .[1] as $metadata1
     | .[2] as $metadata2
     | ($metadata1 * $metadata2) as $metadata
-    | $versions
+    | $metadata
     | keys
     | reduce .[] as $k ({};
-        . + {($k): (
-          ($versions[$k] + ($metadata[$k] // {}))
+        ([$k,
+          ($metadata[$k].apparent_name // empty),
+          ($k | gsub("-"; "_")),
+          ($k | gsub("_"; "-"))]
+         | map(select($versions[.] != null))
+         | first) as $vkey
+        | . + {($k): (
+          (if $vkey then $versions[$vkey] else {} end) + $metadata[$k]
           | .version as $ver
           | if .license_url and $ver then
               .license_url |= (
@@ -989,6 +1021,67 @@ json_merge(
         ":deps.yaml",
         "@envoy_api//bazel:deps.yaml",
     ],
+)
+
+json_merge(
+    name = "bzlmod_all_repository_locations",
+    srcs = [
+        "@envoy_mod_graph//:deps.json",
+    ],
+    filter = """
+    .
+    | .[0] as $modules
+    | .[1] as $metadata1
+    | .[2] as $metadata2
+    | ($metadata1 * $metadata2) as $metadata
+    | def module_source($dep):
+        if $modules[$dep] then
+          ($modules[$dep] + {module_name: $dep})
+        elif ($dep | startswith("com_google_")) and $modules[$dep | sub("^com_google_"; "")] then
+          (($dep | sub("^com_google_"; "")) as $m | $modules[$m] + {module_name: $m})
+        elif $modules[$dep | gsub("_"; "-")] then
+          ($dep | gsub("_"; "-")) as $m | $modules[$m] + {module_name: $m}
+        elif ($metadata[$dep].apparent_name // null) as $a | $a and $modules[$a] then
+          ($metadata[$dep].apparent_name) as $m | $modules[$m] + {module_name: $m}
+        else null end;
+      def dependency_source($dep):
+        module_source($dep);
+      $metadata
+      | keys
+      | reduce .[] as $k ({};
+          (dependency_source($k)) as $source
+          | if $source then
+              . + {($k): (
+                ($source + ($metadata[$k] // {}))
+                | .version as $ver
+                | if .license_url and $ver then
+                    .license_url |= (
+                      gsub("{version}"; $ver)
+                      | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
+                      | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
+                    )
+                  else . end
+              )}
+            else . + {($k): $metadata[$k]}
+            end
+        )
+    """,
+    visibility = ["//visibility:public"],
+    yaml_srcs = [
+        ":deps.yaml",
+        "@envoy_api//bazel:deps.yaml",
+    ],
+)
+
+py_test(
+    name = "all_repository_locations_test",
+    srcs = ["all_repository_locations_test.py"],
+    args = ["$(location :all_repository_locations)"],
+    data = [":all_repository_locations"],
+    target_compatible_with = select({
+        ":bzlmod_mode": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
 )
 
 # A dependency required by python protobuf
@@ -1096,5 +1189,8 @@ alias(
 
 alias(
     name = "all_repository_locations",
-    actual = ":legacy_all_repository_locations",
+    actual = select({
+        ":bzlmod_mode": ":bzlmod_all_repository_locations",
+        "//conditions:default": ":legacy_all_repository_locations",
+    }),
 )
