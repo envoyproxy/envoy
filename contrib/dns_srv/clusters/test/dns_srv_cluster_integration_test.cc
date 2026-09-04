@@ -2,9 +2,9 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/extensions/clusters/dns_srv/v3/cluster.pb.h"
+#include "contrib/envoy/extensions/clusters/dns_srv/v3/cluster.pb.h"
 
-#include "source/extensions/clusters/dns_srv/dns_srv_cluster.h"
+#include "contrib/dns_srv/clusters/source/dns_srv_cluster.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"

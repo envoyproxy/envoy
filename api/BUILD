@@ -73,6 +73,7 @@ proto_library(
     name = "v3_protos",
     visibility = ["//visibility:public"],
     deps = [
+        "//contrib/envoy/extensions/clusters/dns_srv/v3:pkg",
         "//contrib/envoy/extensions/compression/qatzip/compressor/v3alpha:pkg",
         "//contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/common/workload_discovery/v3:pkg",
@@ -160,7 +161,6 @@ proto_library(
         "//envoy/extensions/clusters/common/dns/v3:pkg",
         "//envoy/extensions/clusters/composite/v3:pkg",
         "//envoy/extensions/clusters/dns/v3:pkg",
-        "//envoy/extensions/clusters/dns_srv/v3:pkg",
         "//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/clusters/dynamic_modules/v3:pkg",
         "//envoy/extensions/clusters/mcp_multicluster/v3:pkg",
