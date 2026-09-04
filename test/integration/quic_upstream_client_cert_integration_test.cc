@@ -146,7 +146,7 @@ TEST_P(QuicUpstreamClientCertIntegrationTest, RequireClientCertificateFailsWhenN
 // rejects it and the request results in a 503.
 TEST_P(QuicUpstreamClientCertIntegrationTest, UntrustedClientCertificateRejected) {
   require_client_cert_ = true;
-  // upstreamcert.pem is signed by upstreamcacert.pem, not cacert.pem.
+  // `upstreamcert.pem` is signed by `upstreamcacert.pem`, not `cacert.pem`.
   client_cert_path_ = "test/config/integration/certs/upstreamcert.pem";
   client_key_path_ = "test/config/integration/certs/upstreamkey.pem";
   initialize();
