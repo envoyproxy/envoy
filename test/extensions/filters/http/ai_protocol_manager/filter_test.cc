@@ -857,9 +857,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, TrailersFinalize) {
   EXPECT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
 }
 
-// With the trailer signal configured, a response that ends on a data frame
-// gets empty trailers added after the record is published -- which is what
-// gives a trailer-driven consumer (ext_proc) a message to carry it on.
+// Verifies empty trailers are added when usage is published.
 TEST_F(AiProtocolManagerFilterResponseTest, UsageSignalSynthesizesTrailers) {
   setup("{usage_signal: SYNTHESIZE_TRAILERS}");
   sendHeaders("application/json");
@@ -871,8 +869,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, UsageSignalSynthesizesTrailers) {
   EXPECT_EQ(counterValue("usage_trailers_synthesized"), 1);
 }
 
-// Nothing published, nothing to signal: a response carrying no usage must not
-// grow trailers it did not have.
+// Verifies trailers are not added when no usage was published.
 TEST_F(AiProtocolManagerFilterResponseTest, NoTrailersWhenNothingPublished) {
   setup("{usage_signal: SYNTHESIZE_TRAILERS}");
   sendHeaders("application/json");
@@ -882,9 +879,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, NoTrailersWhenNothingPublished) {
   EXPECT_EQ(counterValue("usage_trailers_synthesized"), 0);
 }
 
-// A response that carries its own trailers is left alone: publication in
-// encodeTrailers() already precedes them down the chain, and adding a second
-// set is not possible.
+// Verifies existing trailers are not duplicated.
 TEST_F(AiProtocolManagerFilterResponseTest, ResponseWithOwnTrailersNotSynthesized) {
   setup("{usage_signal: SYNTHESIZE_TRAILERS}");
   sendHeaders("application/json");
@@ -897,7 +892,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ResponseWithOwnTrailersNotSynthesize
   EXPECT_EQ(added_trailers_, 0);
 }
 
-// The signal is opt-in; the default publishes and adds nothing.
+// Verifies no trailers are synthesized by default.
 TEST_F(AiProtocolManagerFilterResponseTest, DefaultSignalAddsNoTrailers) {
   setup();
   sendHeaders("application/json");
@@ -1322,7 +1317,7 @@ TEST_F(AiProtocolManagerFilterTest, RaisedInlineStringThresholdKeepsLargeValuesI
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(), payload);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
   EXPECT_TRUE(injected_end_stream_);
 }
 

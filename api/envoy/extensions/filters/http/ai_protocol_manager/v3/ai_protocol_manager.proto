@@ -109,28 +109,14 @@ message ResponseHandling {
 // metadata readers such as ext_proc typed forwarding. No untyped ``Struct``
 // mirror is emitted.
 message TokenUsageExtraction {
-  // How to make the published record reachable by a consumer that is driven
-  // by stream events rather than by reading metadata after the stream ends.
+  // Stream signals emitted upon publishing token usage metadata.
   enum UsageSignal {
-    // Publish only. Consumers that read dynamic metadata at stream end (access
-    // loggers, filters on a later hop) see the record; a consumer that needs
-    // an event does not.
     USAGE_SIGNAL_UNSPECIFIED = 0;
 
-    // Add response trailers at a clean end of stream when the response
-    // carries none of its own, so that a trailer-driven consumer runs after
-    // publication. The intended consumer is ``ext_proc`` with
-    // ``response_trailer_mode: SEND``, whose trailers message rebuilds
-    // ``metadata_context`` and therefore carries the record -- letting the
-    // processor account for a response without being sent its body.
-    //
-    // The trailers are empty and the response is otherwise untouched. A
-    // response that already has trailers is left alone: publication happens
-    // before those trailers continue down the chain, so the consumer already
-    // runs late enough. HTTP/1.1 downstreams drop the added trailers at the
-    // codec unless :ref:`enable_trailers
-    // <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.enable_trailers>`
-    // is set; HTTP/2 and HTTP/3 clients receive an empty trailers frame.
+    // Synthesize empty response trailers at end of stream if none exist.
+    // This wakes downstream trailer-driven consumers (such as ext_proc with
+    // ``response_trailer_mode: SEND``) with metadata context without transferring
+    // response body bytes.
     SYNTHESIZE_TRAILERS = 1;
   }
 
@@ -162,8 +148,7 @@ message TokenUsageExtraction {
   // Extraction resource limits. Defaults apply when unset.
   TokenUsageExtractionLimits limits = 4;
 
-  // What, beyond publishing, to do at end of stream so event-driven consumers
-  // observe the record. Defaults to publishing only.
+  // Optional signal to emit at end of stream after publishing token usage.
   UsageSignal usage_signal = 5 [(validate.rules).enum = {defined_only: true}];
 }
 

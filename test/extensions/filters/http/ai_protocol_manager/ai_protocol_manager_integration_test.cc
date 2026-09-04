@@ -898,11 +898,7 @@ TEST_P(AiProtocolManagerExtProcIntegrationTest, UpstreamTrailerEndedResponseForw
   expectUsageMetadataAtProcessor();
 }
 
-// When the upstream response ends on a data frame (no native trailers),
-// SYNTHESIZE_TRAILERS in an upstream AIPM filter synthesizes empty trailers at
-// end of stream. Downstream ext_proc with response_trailer_mode: SEND and
-// response_body_mode: NONE receives the response_trailers message carrying
-// token usage without streaming any body bytes.
+// Verifies upstream SYNTHESIZE_TRAILERS forwards metadata to downstream ext_proc trailers.
 TEST_P(AiProtocolManagerExtProcIntegrationTest,
        UpstreamSynthesizedTrailersForwardsMetadataToExtProc) {
   initializeWithExtProc(/*upstream_filter=*/true, /*trailer_mode=*/true,
@@ -911,6 +907,7 @@ TEST_P(AiProtocolManagerExtProcIntegrationTest,
   expectUsageMetadataAtProcessor();
 }
 
+// Verifies downstream SYNTHESIZE_TRAILERS forwards metadata to downstream ext_proc trailers.
 TEST_P(AiProtocolManagerExtProcIntegrationTest,
        DownstreamSynthesizedTrailersForwardsMetadataToExtProc) {
   initializeWithExtProc(/*upstream_filter=*/false, /*trailer_mode=*/true,

@@ -518,12 +518,8 @@ Http::FilterDataStatus AiProtocolManagerFilter::encodeData(Buffer::Instance& dat
     response_handler_->onData(data);
     if (end_stream) {
       response_handler_->onEndStream();
-      // Only a response that ends on a data frame can have trailers added:
-      // one that carries its own reaches encodeTrailers() instead, where
-      // publication already happens ahead of those trailers continuing down
-      // the chain. addEncodedTrailers() is valid exactly here -- in
-      // encodeData with end_stream set, on a stream with no trailers yet.
       if (finalizeResponseHandling() && config_->synthesizeUsageTrailers()) {
+        // Synthesize empty trailers at end of stream to wake trailer-driven consumers.
         encoder_callbacks_->addEncodedTrailers();
         config_->stats().usage_trailers_synthesized_.inc();
         ENVOY_LOG(trace, "ai_protocol_manager: added end-of-stream trailers to carry usage");

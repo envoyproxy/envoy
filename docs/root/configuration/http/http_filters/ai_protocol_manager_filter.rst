@@ -346,35 +346,28 @@ namespace alone is not sufficient:
       typed:
       - envoy.ai.token_usage
 
-``response_body_mode: STREAMED`` costs a copy of every response byte across the
-gRPC boundary, which for a long streamed generation is the whole response. When
-the processor only needs the record, :ref:`usage_signal
+When the external processor only needs token usage metadata, streaming response body
+bytes across gRPC can be avoided. Configuring :ref:`usage_signal
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.usage_signal>`
-avoids that: ``SYNTHESIZE_TRAILERS`` adds empty response trailers at a clean
-end of stream when the response carries none of its own, so a processor
-configured for trailers alone receives one small message carrying the record
-and no body at all. A response that already has trailers is left untouched —
-publication precedes them either way.
+to ``SYNTHESIZE_TRAILERS`` adds empty response trailers at end of stream if none exist.
+A downstream ``ext_proc`` filter with ``response_trailer_mode: SEND`` and
+``response_body_mode: NONE`` receives the token usage metadata in ``metadata_context``
+without streaming response body bytes:
 
 .. code-block:: yaml
 
-  # In the cluster's upstream filter chain:
+  # Upstream filter chain:
   response_handling:
     token_usage:
       usage_signal: SYNTHESIZE_TRAILERS
 
 .. code-block:: yaml
 
-  # In the downstream ext_proc filter:
+  # Downstream ext_proc:
   processing_mode:
     response_header_mode: SKIP
     response_body_mode: NONE
     response_trailer_mode: SEND
-
-Note that HTTP/1.1 downstreams drop the added trailers at the codec unless
-:ref:`enable_trailers
-<envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.enable_trailers>` is
-set, while HTTP/2 and HTTP/3 clients receive an empty trailers frame.
 
 Upstream (cluster) installation
 -------------------------------
