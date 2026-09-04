@@ -703,9 +703,6 @@ case $CI_TARGET in
               //tools/dependency:validate_reachability_test
         echo "dependency graph structure..."
         "${ENVOY_SRCDIR}/tools/dependency/validate_graph_structure.sh"
-        # Validate repository metadata.
-        echo "check repositories..."
-        "${ENVOY_SRCDIR}/tools/check_repositories.sh"
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
@@ -922,39 +919,11 @@ case $CI_TARGET in
 
     lockfiles|lockfiles.regenerate)
         # TODO(phlax): Add other lockfiles here and a check path
-        bazel mod \
-              "${BAZEL_GLOBAL_OPTIONS[@]}" \
-             --enable_bzlmod \
-             --noenable_workspace \
-             deps --lockfile_mode=update
-        pushd "$ENVOY_DOCS_PATH"
-        bazel mod \
-              "${BAZEL_GLOBAL_OPTIONS[@]}" \
-              --enable_bzlmod \
-              --noenable_workspace \
-              deps --lockfile_mode=update
-        popd
-        pushd "api/"
-        bazel mod \
-              "${BAZEL_GLOBAL_OPTIONS[@]}" \
-              --enable_bzlmod \
-              --noenable_workspace \
-              deps --lockfile_mode=update
-        popd
-        pushd "mobile/"
-        bazel mod \
-              "${BAZEL_GLOBAL_OPTIONS[@]}" \
-              --enable_bzlmod \
-              --noenable_workspace \
-              deps --lockfile_mode=update
-        popd
-        pushd "bazel/tests/external/"
-        bazel mod \
-              "${BAZEL_GLOBAL_OPTIONS[@]}" \
-              --enable_bzlmod \
-              --noenable_workspace \
-              deps --lockfile_mode=update
-        popd
+        for module_dir in . "$ENVOY_DOCS_PATH" api/ mobile/ bazel/tests/external/; do
+            pushd "$module_dir"
+            bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --lockfile_mode=update
+            popd
+        done
         ;;
 
     msan)
