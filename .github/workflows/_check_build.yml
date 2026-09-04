@@ -41,7 +41,6 @@ jobs:
         error:
         Error:
         FAILED
-        not meeting coverage
         FAIL:
       rbe: true
       request: ${{ inputs.request }}

@@ -41,7 +41,6 @@ jobs:
         error:
         Error:
         FAILED
-        not meeting coverage
         FAIL:
       request: ${{ inputs.request }}
       target: ${{ matrix.target }}

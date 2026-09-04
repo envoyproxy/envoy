@@ -77,7 +77,6 @@ on:
           error:
           Error:
           FAILED
-          not meeting coverage
           FAIL:
       notice-match:
         type: string

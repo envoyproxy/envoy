@@ -42,7 +42,6 @@ jobs:
         error:
         Error:
         FAILED
-        not meeting coverage
         FAIL:
       rbe: true
       target: ${{ matrix.target }}
