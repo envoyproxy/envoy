@@ -306,13 +306,16 @@ private:
 };
 
 /**
- * This is a variant of the isolated store that has locking across all operations so that it can
- * be used during the integration tests.
+ * This is a thread-safe wrapper around a stats store. By default it owns an isolated store, but it
+ * can also wrap an externally owned store so its test-facing state remains authoritative.
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
-  TestIsolatedStoreImpl() = default;
-  explicit TestIsolatedStoreImpl(SymbolTable& symbol_table) : store_(symbol_table) {}
+  TestIsolatedStoreImpl()
+      : owned_store_(std::make_unique<IsolatedStoreImpl>()), store_(*owned_store_) {}
+  explicit TestIsolatedStoreImpl(SymbolTable& symbol_table)
+      : owned_store_(std::make_unique<IsolatedStoreImpl>(symbol_table)), store_(*owned_store_) {}
+  explicit TestIsolatedStoreImpl(Store& store) : store_(store) {}
 
   // Stats::Store
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
@@ -360,8 +363,8 @@ public:
     Thread::LockGuard lock(lock_);
     store_.deliverHistogramToSinks(histogram, value);
   }
-  NullGaugeImpl& nullGauge() override { return store_.nullGauge(); }
-  NullCounterImpl& nullCounter() override { return store_.nullCounter(); }
+  Gauge& nullGauge() override { return store_.nullGauge(); }
+  Counter& nullCounter() override { return store_.nullCounter(); }
   ScopeSharedPtr rootScope() override {
     Thread::LockGuard lock(lock_);
     if (lazy_default_scope_ == nullptr) {
@@ -426,7 +429,8 @@ public:
 
 private:
   mutable Thread::MutexBasicLockable lock_;
-  IsolatedStoreImpl store_;
+  std::unique_ptr<IsolatedStoreImpl> owned_store_;
+  Store& store_;
   PostMergeCb merge_cb_;
   ScopeSharedPtr lazy_default_scope_;
   uint32_t eviction_count_{0};
