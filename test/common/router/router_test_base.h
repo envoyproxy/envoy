@@ -52,6 +52,11 @@ public:
   }
 
   const Network::Connection* downstreamConnection() const override {
+    // Simulate the Http::AsyncClient-driven router path (ext_authz / ratelimit
+    // side calls, mirror/shadow), which has no downstream connection.
+    if (downstream_connection_is_null_) {
+      return nullptr;
+    }
     return &downstream_connection_;
   }
 
@@ -59,6 +64,7 @@ public:
   MockRetryState* retry_state_{};
   bool reject_all_hosts_ = false;
   bool retry_425_response_ = false;
+  bool downstream_connection_is_null_ = false;
 };
 
 class RouterTestBase : public testing::Test {
