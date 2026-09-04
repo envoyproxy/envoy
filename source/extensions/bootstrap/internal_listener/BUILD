@@ -71,6 +71,7 @@ envoy_cc_library(
         "//envoy/network:client_connection_factory",
         "//envoy/network:connection_handler_interface",
         "//envoy/thread_local:thread_local_interface",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 
