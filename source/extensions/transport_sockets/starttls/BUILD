@@ -21,6 +21,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
         "//source/common/config:utility_lib",
+        "//source/common/network:raw_buffer_socket_lib",
         "@envoy_api//envoy/extensions/transport_sockets/starttls/v3:pkg_cc_proto",
     ],
 )
