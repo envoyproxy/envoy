@@ -438,7 +438,8 @@ TEST(HttpUtility, H1H2H1Request) {
 
 // Start with H2 style websocket request headers. Transform to H1 and back.
 TEST(HttpUtility, H2H1H2Request) {
-  TestRequestHeaderMapImpl converted_headers = {{":method", "CONNECT"}, {":protocol", "websocket"}};
+  TestRequestHeaderMapImpl converted_headers = {
+      {":method", "CONNECT"}, {":protocol", "websocket"}, {"sec-websocket-version", "13"}};
   const TestRequestHeaderMapImpl original_headers(converted_headers);
 
   ASSERT_FALSE(Utility::isUpgrade(converted_headers));
@@ -458,6 +459,25 @@ TEST(HttpUtility, H2H1H2Request) {
 TEST(HttpUtility, ConnectBytestreamSpecialCased) {
   TestRequestHeaderMapImpl headers = {{":method", "CONNECT"}, {":protocol", "bytestream"}};
   ASSERT_FALSE(Utility::isH2UpgradeRequest(headers));
+}
+
+TEST(HttpUtility, H2toH1PreservesWebSocketHandshakeHeaders) {
+  TestRequestHeaderMapImpl headers = {{":method", "CONNECT"},
+                                      {":protocol", "websocket"},
+                                      {"sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ=="},
+                                      {"sec-websocket-version", "13"}};
+  Utility::transformUpgradeRequestFromH2toH1(headers);
+
+  EXPECT_EQ(headers.get_("sec-websocket-key"), "dGhlIHNhbXBsZSBub25jZQ==");
+  EXPECT_EQ(headers.get_("sec-websocket-version"), "13");
+}
+
+TEST(HttpUtility, H2toH1DoesNotSynthesizeWebSocketHandshakeHeaders) {
+  TestRequestHeaderMapImpl headers = {{":method", "CONNECT"}, {":protocol", "websocket"}};
+  Utility::transformUpgradeRequestFromH2toH1(headers);
+
+  EXPECT_TRUE(headers.get_("sec-websocket-key").empty());
+  EXPECT_TRUE(headers.get_("sec-websocket-version").empty());
 }
 
 // Start with H1 style websocket response headers. Transform to H2 and back.

@@ -88,6 +88,8 @@ public:
 
   private:
     void maybeEndDecode(bool end_stream);
+    bool hasValidGeneratedWebsocketHandshakeHeaders(const Http::ResponseHeaderMap& headers) const;
+    void rejectInvalidGeneratedWebsocketHandshake();
     bool seen_1xx_headers_{};
     bool first_body_rx_recorded_{};
     UpstreamCodecFilter& filter_;
@@ -101,9 +103,14 @@ public:
   bool calling_encode_headers_ = false;
 
 private:
+  Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream);
   StreamInfo::UpstreamTiming& upstreamTiming() {
     return callbacks_->upstreamCallbacks()->upstreamStreamInfo().upstreamInfo()->upstreamTiming();
   }
+
+  // HttpTcpBridge retains a pointer to the headers for module callbacks.
+  Http::RequestHeaderMapPtr upstream_headers_;
+  bool injected_generated_websocket_key_ = false;
 };
 
 class UpstreamCodecFilterFactory

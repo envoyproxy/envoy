@@ -575,7 +575,11 @@ envoy_cc_test(
     srcs = ["upstream_request_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:status_lib",
         "//source/common/router:router_lib",
+        "//source/common/websocket:handshake_lib",
         "//test/common/http:common_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/mocks:common_lib",
