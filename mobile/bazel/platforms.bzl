@@ -4,6 +4,6 @@ def envoy_mobile_platforms():
     arch_alias(
         name = "mobile_clang_platform",
         aliases = {
-            "amd64": "@envoy_mobile//bazel/platforms/rbe:linux_x64",
+            "amd64": "//bazel/platforms/rbe:linux_x64",
         },
     )

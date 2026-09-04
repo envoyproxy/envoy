@@ -13,7 +13,7 @@ cc_library(
     deps = [
         ":test_jni_impl_lib",
         "//library/jni:envoy_jni_lib",
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:test_extensions",
     ],
     alwayslink = True,
 )
@@ -53,9 +53,9 @@ cc_library(
         "//library/jni:jni_utility_lib",
         "//test/common/integration:test_server_lib",
         "@envoy//test/test_common:test_version_linkstamp",
-        "@envoy_build_config//:extension_registry",
+        "@mobile_envoy_build_config//:extension_registry",
         # This is needed since some tests use test extensions.
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:test_extensions",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
@@ -87,9 +87,9 @@ cc_library(
         "//library/jni:jni_utility_lib",
         "//test/common/integration:test_server_lib",
         "@envoy//test/test_common:test_version_linkstamp",
-        "@envoy_build_config//:extension_registry",
+        "@mobile_envoy_build_config//:extension_registry",
         # This is needed since some tests use test extensions.
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:test_extensions",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,

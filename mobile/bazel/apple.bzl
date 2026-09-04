@@ -26,7 +26,7 @@ def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], m
 # - Sets default visibility and OS requirements
 #
 # Usage example:
-# load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_swift_test")
+# load("//bazel:apple.bzl", "envoy_mobile_swift_test")
 #
 # envoy_mobile_swift_test(
 #     name = "sample_test",
