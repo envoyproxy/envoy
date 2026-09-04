@@ -220,8 +220,8 @@ typed_config:
   EXPECT_EQ(nullptr, upstream_request_);
 }
 
-// Test that an MCP request with malformed JSON is rejected with a 400.
-TEST_P(McpFilterIntegrationTest, InvalidJsonBodyRejected) {
+// Test that an MCP request with malformed JSON is passed through in PASS_THROUGH mode.
+TEST_P(McpFilterIntegrationTest, InvalidJsonBodyPassedThrough) {
   FakeAccessLogFactory factory;
   Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
 
@@ -236,7 +236,8 @@ TEST_P(McpFilterIntegrationTest, InvalidJsonBodyRejected) {
         if (it != dynamic_metadata.end()) {
           Protobuf::Struct expected_metadata;
           MessageUtil::loadFromJson(R"json({
-            "status": "mcp_parse_error",
+            "status": "mcp_ok",
+            "passthrough_reason": "mcp_parse_error",
             "is_mcp_request": false
           })json",
                                     expected_metadata);
@@ -268,10 +269,12 @@ TEST_P(McpFilterIntegrationTest, InvalidJsonBodyRejected) {
                                      {"content-type", "application/json"}},
       R"({"jsonrpc": "2.0",)"); // Malformed JSON
 
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
   ASSERT_TRUE(response->waitForEndStream());
-  // The upstream should NOT receive a request because the filter sends a local reply.
-  EXPECT_FALSE(upstream_request_ != nullptr);
-  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_TRUE(metadata_verified);
 }
 
@@ -331,6 +334,31 @@ TEST_P(McpFilterIntegrationTest, WrongContentTypePostRequestIgnored) {
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {"content-type", "text/plain"}}, // Incorrect content type
+      request_body);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that invalid JSON is allowed in PASS_THROUGH mode and forwarded to upstream.
+TEST_P(McpFilterIntegrationTest, PassThroughModeAllowsInvalidJson) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Invalid JSON (unclosed brace)
+  const std::string request_body = R"({"jsonrpc": "2.0", "method": "test")";
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
       request_body);
 
   waitForNextUpstreamRequest();
@@ -583,6 +611,8 @@ TEST_P(McpFilterIntegrationTest, PerRouteRejectDuplicateKeysOverride) {
 
         envoy::extensions::filters::http::mcp::v3::McpOverride mcp_override;
         mcp_override.set_reject_duplicate_keys(true);
+        mcp_override.set_traffic_mode(
+            envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
         std::ignore =
             (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp"].PackFrom(
                 mcp_override);

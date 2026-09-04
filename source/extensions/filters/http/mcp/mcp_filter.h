@@ -201,6 +201,7 @@ private:
   std::string header_method_;
   std::string header_name_;
   Filters::Common::Mcp::Status status_{Filters::Common::Mcp::Status::Ok};
+  std::optional<Filters::Common::Mcp::Status> passthrough_reason_;
 };
 
 } // namespace Mcp
