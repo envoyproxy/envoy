@@ -139,6 +139,7 @@ envoy_cc_library(
         "//envoy/common:time_interface",
         "//envoy/http:header_map_interface",
         "//source/common/common:matchers_lib",
+        "//source/common/common:utility_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",

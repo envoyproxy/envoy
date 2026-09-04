@@ -48,7 +48,7 @@ void FakeStreamHttpSource::getBody(AdjustedByteRange range, GetBodyCallback&& cb
     if (range.begin() == body_.size()) {
       cb(nullptr, trailers_ ? EndStream::More : EndStream::End);
     } else {
-      range = AdjustedByteRange(range.begin(), std::min(range.end(), body_.size()));
+      range = AdjustedByteRange(range.begin(), std::min<uint64_t>(range.end(), body_.size()));
       EndStream end_stream =
           (trailers_ || range.end() < body_.size()) ? EndStream::More : EndStream::End;
       Buffer::InstancePtr fragment = std::make_unique<Buffer::OwnedImpl>(

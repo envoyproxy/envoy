@@ -4,6 +4,7 @@
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache/cache_filter.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/cacheability_utils.h"
 
 namespace Envoy {
@@ -56,6 +57,12 @@ void UpstreamRequest::processSuccessfulValidation(Http::ResponseHeaderMapPtr res
   // Remove any existing Age header in the cached response.
   lookup_result_->headers_->removeInline(CacheCustomHeaders::age());
 
+  const ResponseMetadata response_metadata = {config_->timeSource().systemTime()};
+  // A 304 without a Date would inherit the stored one in the update below, and the validated entry
+  // would still read as aged since its insertion rather than since its validation, see
+  // https://www.rfc-editor.org/rfc/rfc9111#section-4.2.3.
+  CacheHeadersUtils::ensureDateHeader(*response_headers, response_metadata.response_time_);
+
   // Add any missing headers from the cached response to the 304 response.
   lookup_result_->headers_->iterate([&response_headers](const Http::HeaderEntry& cached_header) {
     // TODO(yosrym93): Try to avoid copying the header key twice.
@@ -70,8 +77,7 @@ void UpstreamRequest::processSuccessfulValidation(Http::ResponseHeaderMapPtr res
   if (should_update_cached_entry) {
     // TODO(yosrym93): else the cached entry should be deleted.
     // Update metadata associated with the cached response. Right now this is only response_time;
-    const ResponseMetadata metadata = {config_->timeSource().systemTime()};
-    cache_->updateHeaders(*lookup_, *response_headers, metadata,
+    cache_->updateHeaders(*lookup_, *response_headers, response_metadata,
                           [](bool updated ABSL_ATTRIBUTE_UNUSED) {});
     setInsertStatus(InsertStatus::HeaderUpdate);
   }
@@ -216,6 +222,9 @@ void UpstreamRequest::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
                                                            std::move(insert_context), *this);
         // Add metadata associated with the cached response. Right now this is only response_time;
         const ResponseMetadata metadata = {config_->timeSource().systemTime()};
+        // Must stay after isCacheableResponse, which rejects a response that has Expires but no
+        // Date. Adding the Date first would make such responses cacheable.
+        CacheHeadersUtils::ensureDateHeader(*headers, metadata.response_time_);
         insert_queue_->insertHeaders(*headers, metadata, end_stream);
         // insert_status_ remains std::nullopt if end_stream == false, as we have not completed the
         // insertion yet.

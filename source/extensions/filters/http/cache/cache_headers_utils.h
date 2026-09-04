@@ -103,6 +103,11 @@ namespace CacheHeadersUtils {
 // header_entry is null or malformed.
 SystemTime httpTime(const Http::HeaderEntry* header_entry);
 
+// Sets Date to response_time in IMF-fixdate format if it is absent or does not parse.
+// A cache must append a Date with the response time when it is absent, and may replace an invalid
+// one with it, see https://www.rfc-editor.org/rfc/rfc9110#section-6.6.1.
+void ensureDateHeader(Http::ResponseHeaderMap& headers, SystemTime response_time);
+
 // Calculates the age of a cached response
 Seconds calculateAge(const Http::ResponseHeaderMap& response_headers, SystemTime response_time,
                      SystemTime now);

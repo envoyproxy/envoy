@@ -326,12 +326,16 @@ TEST_P(ResponseCacheControlTest, ResponseCacheControlTest) {
   EXPECT_EQ(expected_response_cache_control, ResponseCacheControl(cache_control_header));
 }
 
+// Manually confirmed that 784111777 is 11/6/94, 8:49:37.
+constexpr SystemTime kDateSystemTime{Seconds(784111777)};
+constexpr absl::string_view kDateImfFixdate = "Sun, 06 Nov 1994 08:49:37 GMT";
+
 class HttpTimeTest : public testing::TestWithParam<std::string> {
 public:
   static const std::vector<std::string>& getOkTestCases() {
     // clang-format off
     CONSTRUCT_ON_FIRST_USE(std::vector<std::string>,
-        "Sun, 06 Nov 1994 08:49:37 GMT",  // IMF-fixdate.
+        std::string(kDateImfFixdate),     // IMF-fixdate.
         "Sunday, 06-Nov-94 08:49:37 GMT", // obsolete RFC 850 format.
         "Sun Nov  6 08:49:37 1994"        // ANSI C's asctime() format.
     );
@@ -343,9 +347,13 @@ INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, testing::ValuesIn(HttpTimeTest::getOk
 
 TEST_P(HttpTimeTest, OkFormats) {
   const Http::TestResponseHeaderMapImpl response_headers{{"date", GetParam()}};
-  // Manually confirmed that 784111777 is 11/6/94, 8:46:37.
-  EXPECT_EQ(784111777,
-            SystemTime::clock::to_time_t(CacheHeadersUtils::httpTime(response_headers.Date())));
+  EXPECT_EQ(CacheHeadersUtils::httpTime(response_headers.Date()), kDateSystemTime);
+}
+
+TEST_P(HttpTimeTest, EnsureDateHeaderPreservesParseableDate) {
+  Http::TestResponseHeaderMapImpl response_headers{{"date", GetParam()}};
+  CacheHeadersUtils::ensureDateHeader(response_headers, kDateSystemTime + Seconds(30));
+  EXPECT_EQ(response_headers.getDateValue(), GetParam());
 }
 
 TEST(HttpTime, InvalidFormat) {
@@ -355,6 +363,18 @@ TEST(HttpTime, InvalidFormat) {
 }
 
 TEST(HttpTime, Null) { EXPECT_EQ(CacheHeadersUtils::httpTime(nullptr), SystemTime()); }
+
+TEST(EnsureDateHeader, StampsAbsentDate) {
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  CacheHeadersUtils::ensureDateHeader(response_headers, kDateSystemTime);
+  EXPECT_EQ(response_headers.getDateValue(), kDateImfFixdate);
+}
+
+TEST(EnsureDateHeader, ReplacesUnparseableDate) {
+  Http::TestResponseHeaderMapImpl response_headers{{"date", "Sun, 06 Nov 1994 08:49:37 +0000"}};
+  CacheHeadersUtils::ensureDateHeader(response_headers, kDateSystemTime);
+  EXPECT_EQ(response_headers.getDateValue(), kDateImfFixdate);
+}
 
 struct CalculateAgeTestCase {
   std::string test_name;
@@ -433,6 +453,13 @@ public:
           /*response_time=*/currentTime() + Seconds(3),
           /*now=*/currentTime() + Seconds(5),
           /*expected_age=*/Seconds(5)
+        },
+        {
+          "no_date_header",
+          /*response_headers=*/{{"age", "1"}},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime() + Seconds(5),
+          /*expected_age=*/Seconds(6)
         },
     );
     // clang-format on

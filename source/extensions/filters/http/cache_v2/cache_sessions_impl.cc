@@ -202,7 +202,6 @@ void CacheSession::onHeadersInserted(CacheReaderPtr cache_reader,
   }
   entry_.cache_reader_ = std::move(cache_reader);
   entry_.response_headers_ = std::move(headers);
-  entry_.response_metadata_ = cache_sessions->makeMetadata();
   if (end_stream) {
     insertComplete();
   } else {
@@ -695,6 +694,15 @@ void CacheSession::processSuccessfulValidation(Http::ResponseHeaderMapPtr header
   // Remove any existing Age header in the cached response.
   entry_.response_headers_->removeInline(CacheCustomHeaders::age());
 
+  const auto cache_sessions = cache_sessions_.lock();
+  // Without a live cache nothing is persisted, so the entry keeps its existing metadata.
+  const ResponseMetadata response_metadata =
+      cache_sessions ? cache_sessions->makeMetadata() : entry_.response_metadata_;
+  // A 304 without a Date would inherit the stored one in the update below, and the validated entry
+  // would still read as aged since its insertion rather than since its validation, see
+  // https://www.rfc-editor.org/rfc/rfc9111#section-4.2.3.
+  CacheHeadersUtils::ensureDateHeader(*headers, response_metadata.response_time_);
+
   // Add any missing headers from the cached response to the 304 response.
   entry_.response_headers_->iterate([&headers](const Http::HeaderEntry& cached_header) {
     // TODO(yosrym93): see if we do this without copying the header key twice.
@@ -707,13 +715,13 @@ void CacheSession::processSuccessfulValidation(Http::ResponseHeaderMapPtr header
 
   entry_.response_headers_ = std::move(headers);
   state_ = State::Exists;
-  if (auto cache_sessions = cache_sessions_.lock()) {
+  if (cache_sessions) {
     if (should_update_cached_entry) {
       // TODO(yosrym93): else evict, set state to Pending, and treat as insert.
       LookupSubscriber& sub = lookup_subscribers_.front();
       // Update metadata associated with the cached response. Right now this is only
       // response_time.
-      entry_.response_metadata_.response_time_ = cache_sessions->time_source_.systemTime();
+      entry_.response_metadata_ = response_metadata;
       cache_sessions->cache().updateHeaders(sub.dispatcher(), key_, *entry_.response_headers_,
                                             entry_.response_metadata_);
     }
@@ -726,7 +734,7 @@ void CacheSession::processSuccessfulValidation(Http::ResponseHeaderMapPtr header
     // so it's detectable that we didn't need to do multiple validations.
     status = CacheEntryStatus::ValidatedFree;
   }
-  if (auto cache_sessions = cache_sessions_.lock()) {
+  if (cache_sessions) {
     cache_sessions->stats().subCacheSessionsSubscribers(lookup_subscribers_.size());
   }
   lookup_subscribers_.clear();
@@ -832,15 +840,19 @@ void CacheSession::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStre
   if (end_stream == EndStream::End) {
     upstream_request_ = nullptr;
   }
+  // Must stay after isCacheableResponse, which rejects a response that has Expires but no
+  // Date. Adding the Date first would make such responses cacheable.
+  const ResponseMetadata metadata = cache_sessions->makeMetadata();
+  CacheHeadersUtils::ensureDateHeader(*headers, metadata.response_time_);
+  entry_.response_metadata_ = metadata;
   // We're already on this subscriber's thread; this is posted to ensure no
   // deadlock on the mutex if the insert operation calls back directly.
   lookup_subscribers_.front().dispatcher().post(
       [p = shared_from_this(), &dispatcher = lookup_subscribers_.front().dispatcher(), key = key_,
-       cache_sessions, headers = std::move(headers),
+       cache_sessions, headers = std::move(headers), metadata,
        upstream_request = std::move(upstream_request_)]() mutable {
-        cache_sessions->cache().insert(dispatcher, key, std::move(headers),
-                                       cache_sessions->makeMetadata(), std::move(upstream_request),
-                                       p);
+        cache_sessions->cache().insert(dispatcher, key, std::move(headers), metadata,
+                                       std::move(upstream_request), p);
         // When the cache entry insertion completes it will call back to onHeadersInserted,
         // or on error onInsertFailed.
       });
