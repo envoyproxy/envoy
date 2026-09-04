@@ -1797,7 +1797,7 @@
     "@@envoy_toolshed+//v8:extensions.bzl%wee8_prebuilt_extension": {
       "general": {
         "bzlTransitiveDigest": "gXMFfVg+qoio1QNyicAgzuZLG0526gxbQBOVTkMq3iM=",
-        "usagesDigest": "LXqYe3BMRezM0hzeqznG7SbZUDAE075hGgzFRZyQknA=",
+        "usagesDigest": "53yRbs6u1ShmmTpzkqUCI42IObBFFt3lX1XuELDPZxQ=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},

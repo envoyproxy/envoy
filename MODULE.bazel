@@ -182,6 +182,11 @@ grcov_ext = use_extension("@envoy_toolshed//coverage/grcov:extensions.bzl", "grc
 grcov_ext.setup()
 use_repo(grcov_ext, "grcov")
 
+# Prebuilt wee8 (V8) static library, selected via the //bazel:v8_engine flag.
+wee8_ext = use_extension("@envoy_toolshed//v8:extensions.bzl", "wee8_prebuilt_extension")
+wee8_ext.setup()
+use_repo(wee8_ext, "wee8_prebuilt_x86_64", "wee8_prebuilt_x86_64_libstdcxx", "wee8_prebuilt_aarch64")
+
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.cxx_cross_lib(
     name = "llvm_toolchain",

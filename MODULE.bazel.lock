@@ -1728,7 +1728,7 @@
     "@@envoy_toolshed+//v8:extensions.bzl%wee8_prebuilt_extension": {
       "general": {
         "bzlTransitiveDigest": "gXMFfVg+qoio1QNyicAgzuZLG0526gxbQBOVTkMq3iM=",
-        "usagesDigest": "LXqYe3BMRezM0hzeqznG7SbZUDAE075hGgzFRZyQknA=",
+        "usagesDigest": "XuBitzuIntPy/266vKmY1dtWJfErLg+//DNIWJyJTaY=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -13400,6 +13400,10 @@
             "https://files.pythonhosted.org/packages/19/0d/bbb5b5ee188dec84647a4664f3e11b06ade2bde568dbd489d9d64adef8ed/gitdb-4.0.11.tar.gz": "bf5421126136d6d0af55bc1e7c1af1c397a34f5b7bd79e776cd3e89785c2b04b",
             "https://files.pythonhosted.org/packages/fd/5b/8f0c4a5bb9fd491c277c21eff7ccae71b47d43c4446c9d0c6cff2fe8c2c4/gitdb-4.0.11-py3-none-any.whl": "81a3407ddd2ee8df444cbacea00e2d038e40150acfa3001696fe0dcf1d3adfa4"
           },
+          "gitpython": {
+            "https://files.pythonhosted.org/packages/ca/dc/126b28e76b24a9268ba931ad3e012f71ebdadf62fd9f17758f7074bb0b20/gitpython-3.1.59.tar.gz": "0a1475cfdc38a5bfba1a3e9a4a9da52a39749ecec322b772915c019f94e5b7e4",
+            "https://files.pythonhosted.org/packages/ef/ed/ae57eb7d344f43f87b74b3a281ead6ec7d6394eef72a7b1dcb28dd089550/gitpython-3.1.59-py3-none-any.whl": "67a82f537384578643624c8b2c531938a9b82be431663e575dcf638526631d4c"
+          },
           "google-auth": {
             "https://files.pythonhosted.org/packages/9d/47/603554949a37bca5b7f894d51896a9c534b9eab808e2520a748e081669d0/google_auth-2.38.0-py2.py3-none-any.whl": "e7dae6694313f434a2727bf2906f27ad259bae090d7aa896590d86feec3d9d4a",
             "https://files.pythonhosted.org/packages/c6/eb/d504ba1daf190af6b204a9d4714d457462b486043744901a6eeea711f913/google_auth-2.38.0.tar.gz": "8285113607d3b80a3f1543b75962447ba8a09fe85783432a784fdeef6ac094c4"
@@ -14271,6 +14275,8 @@
           },
           "setuptools": {
             "https://files.pythonhosted.org/packages/40/50/bc3d02829a3babd70b7f1414c93cf6acd198976f0469a07d0e7b813c5002/setuptools-77.0.1-py3-none-any.whl": "81a234dff81a82bb52e522c8aef145d0dd4de1fd6de4d3b196d0f77dc2fded26",
+            "https://files.pythonhosted.org/packages/6d/44/f5da03a8ef95d369145c5bb53050e7877c9f3d312e128605fd9504829143/setuptools-84.0.0.tar.gz": "f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73",
+            "https://files.pythonhosted.org/packages/95/9c/c510029fc6ef33a6275cd2c5d3cecd6613dfd6aa401d57c54f1c18852ccf/setuptools-84.0.0-py3-none-any.whl": "51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670",
             "https://files.pythonhosted.org/packages/ea/df/9f719dc48f64284be8bd99e2e0bb0dd6e9f8e2c2c3c7bf7a685bc5adf2c7/setuptools-77.0.1.tar.gz": "a1246a1b4178c66d7cf50c9fc6d530fac3f89bc284cf803c7fa878c41b1a03b2"
           },
           "six": {
