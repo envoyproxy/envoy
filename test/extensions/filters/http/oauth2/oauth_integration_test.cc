@@ -373,7 +373,7 @@ typed_config:
         false);
 
     envoy::extensions::http_filters::oauth2::OAuthResponse oauth_response;
-    oauth_response.mutable_access_token()->set_value("bar");
+    oauth_response.mutable_access_token()->set_value(access_token_value_);
     oauth_response.mutable_refresh_token()->set_value("foo");
     oauth_response.mutable_expires_in()->set_value(DateUtil::nowToSeconds(api_->timeSource()) + 10);
 
@@ -496,6 +496,10 @@ typed_config:
 
     cleanup();
   }
+
+  // The access token the fake authorization server returns. Tests override it to exceed the cookie
+  // size limit.
+  std::string access_token_value_{"bar"};
 
   const CookieNames default_cookie_names_{"BearerToken",  "OauthHMAC",  "OauthExpires", "IdToken",
                                           "RefreshToken", "OauthNonce", "CodeVerifier"};
@@ -999,6 +1003,116 @@ TEST_P(OauthIntegrationTest, LegacyCbcCodeVerifierAcceptedByDefault) {
   // Passing a CBC ciphertext here proves the default-on compat fallback succeeds end-to-end.
   doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
                        TEST_ENCRYPTED_CODE_VERIFIER);
+}
+
+// With chunking enabled, a token too large for one cookie must be split on the way out and
+// rejoined on the way back in, with the HMAC still valid. This also covers real header size
+// limits.
+class OauthChunkedCookieIntegrationTest : public OauthIntegrationTest {
+public:
+  void initialize() override {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.oauth2_chunk_large_token_cookies",
+                                      "true");
+    OauthIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OauthChunkedCookieIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS_WITH_GCM_FLAG,
+                         OauthIntegrationTest::oauthIntegrationParamsToString);
+
+TEST_P(OauthChunkedCookieIntegrationTest, LargeAccessTokenIsChunkedAndRejoined) {
+  // Comfortably past the 4096 bytes a browser will store in one cookie.
+  access_token_value_ = std::string(6000, 'a');
+
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", absl::StrCat("/callback?code=foo&state=", TEST_ENCODED_STATE)},
+      {":scheme", "http"},
+      {"x-forwarded-proto", "http"},
+      {":authority", "authority"},
+      {"authority", "Bearer token"},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, ".", TEST_FLOW_ID, "=",
+                              TEST_STATE_CSRF_TOKEN)},
+      {"cookie", absl::StrCat(default_cookie_names_.code_verifier_, ".", TEST_FLOW_ID, "=",
+                              TEST_ENCRYPTED_CODE_VERIFIER)}};
+
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  waitForOAuth2Response("token_secret");
+  response->waitForHeaders();
+  EXPECT_EQ("302", response->headers().getStatusValue());
+
+  // The access token came back as several cookies plus a count, not one oversized cookie.
+  const std::string chunk_count = Http::Utility::parseSetCookieValue(
+      response->headers(), absl::StrCat(default_cookie_names_.bearer_token_, "_chunks"));
+  ASSERT_FALSE(chunk_count.empty());
+  EXPECT_TRUE(
+      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.bearer_token_)
+          .empty());
+
+  std::vector<std::string> chunk_values;
+  for (uint32_t i = 0; i < 15; ++i) {
+    std::string value = Http::Utility::parseSetCookieValue(
+        response->headers(), absl::StrCat(default_cookie_names_.bearer_token_, "_", i));
+    if (value.empty()) {
+      break;
+    }
+    chunk_values.push_back(std::move(value));
+  }
+  EXPECT_GT(chunk_values.size(), 1);
+  EXPECT_EQ(absl::StrCat(chunk_values.size()), chunk_count);
+
+  const std::string hmac =
+      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.oauth_hmac_);
+  const std::string oauth_expires =
+      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.oauth_expires_);
+  const std::string refresh_token =
+      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.refresh_token_);
+
+  RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
+  cleanup();
+
+  // Send every chunk back. The HMAC covers the token value, so this only passes if the filter
+  // rejoined exactly what it signed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl replay{
+      {":method", "GET"},
+      {":path", absl::StrCat("/callback?code=foo&state=", TEST_ENCODED_STATE)},
+      {":scheme", "http"},
+      {"x-forwarded-proto", "http"},
+      {":authority", "authority"},
+      {"authority", "Bearer token"},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_hmac_, "=", hmac)},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_expires_, "=", oauth_expires)},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, ".", TEST_FLOW_ID, "=",
+                              TEST_STATE_CSRF_TOKEN)},
+      {"cookie", absl::StrCat(default_cookie_names_.refresh_token_, "=", refresh_token)},
+      {"cookie", absl::StrCat(default_cookie_names_.bearer_token_, "_chunks=", chunk_count)},
+  };
+  for (uint32_t i = 0; i < chunk_values.size(); ++i) {
+    replay.addCopy(Http::LowerCaseString("cookie"),
+                   absl::StrCat(default_cookie_names_.bearer_token_, "_", i, "=", chunk_values[i]));
+  }
+
+  auto encoder_decoder2 = codec_client_->startRequest(replay, true);
+  auto response2 = std::move(encoder_decoder2.second);
+  response2->waitForHeaders();
+  // Redirecting to the original location means the session was accepted rather than restarted.
+  EXPECT_EQ("302", response2->headers().getStatusValue());
+  EXPECT_EQ("http://traffic.example.com/not/_oauth",
+            response2->headers().Location()->value().getStringView());
+  RELEASE_ASSERT(response2->waitForEndStream(), "unexpected timeout");
+  cleanup();
 }
 
 } // namespace

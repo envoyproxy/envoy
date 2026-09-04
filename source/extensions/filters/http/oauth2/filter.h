@@ -122,7 +122,11 @@ private:
   COUNTER(oauth_refreshtoken_success)                                                              \
   COUNTER(oauth_refreshtoken_failure)                                                              \
   COUNTER(oauth_allow_failed_passthrough)                                                          \
-  COUNTER(oauth_legacy_cbc_decrypt)
+  COUNTER(oauth_legacy_cbc_decrypt)                                                                \
+  COUNTER(oauth_token_cookie_chunked)                                                              \
+  COUNTER(oauth_token_cookie_reassembled)                                                          \
+  COUNTER(oauth_token_cookie_malformed_chunks)                                                     \
+  COUNTER(oauth_token_cookie_oversized)
 
 /**
  * Wrapper struct filter stats. @see stats_macros.h
@@ -481,6 +485,12 @@ private:
   std::string flow_id_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
+  // Token names that arrived chunked, mapped to how many chunks to clean up. The response path
+  // uses this to delete stale chunks even when chunking is disabled.
+  absl::flat_hash_map<std::string, uint32_t> chunked_token_cookies_seen_;
+  // Token names that arrived as a single unchunked cookie. Only filled in on the refresh path,
+  // which strips those cookies from the request before the response is built.
+  absl::flat_hash_set<std::string> unchunked_token_cookies_seen_;
 
   std::shared_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr default_config_;
@@ -517,7 +527,20 @@ private:
                                          const absl::string_view state) const;
   bool validateCsrfToken(const Http::RequestHeaderMap& headers, const std::string& csrf_token,
                          absl::string_view flow_id) const;
+  // Rejoins chunked token cookies into one cookie under the base name and removes the chunks from
+  // the Cookie header. Runs before decryption because the chunks hold ciphertext.
+  void reassembleChunkedTokenCookies(Http::RequestHeaderMap& headers);
   void decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
+  // Adds a token cookie, splitting it into ``<name>_0``.. plus a ``<name>_chunks`` count cookie
+  // when it is too large and chunking is enabled. Returns the number of chunks written, or 0 when
+  // it was written as one cookie.
+  uint32_t addTokenCookie(Http::ResponseHeaderMap& headers, const std::string& name,
+                          const std::string& value, const std::string& cookie_tail) const;
+  // Deletes chunk cookies the request carried beyond chunks_written, so a response that writes
+  // fewer chunks, or none, does not leave stale chunks in the client.
+  void addChunkDeletionHeaders(Http::ResponseHeaderMap& headers, const std::string& name,
+                               uint32_t chunks_written, absl::string_view cookie_path,
+                               absl::string_view cookie_domain) const;
   std::string encryptToken(const std::string& token) const;
   std::string decryptToken(const std::string& encrypted_token) const;
   void removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const;
