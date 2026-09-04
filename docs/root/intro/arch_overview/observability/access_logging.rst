@@ -151,6 +151,14 @@ Fluentd
   `Fluentd Forward Mode events <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#forward-mode>`_
   which may contain one or more access log entries (depending on the flushing interval and other configuration parameters).
 
+Syslog
+******
+
+* Sends access logs over syslog. Currently supports UDP and Unix domain sockets.
+* The syslog protocol standard defaults to RFC3164 and also supports RFC5424. Access log
+  content is configured with Envoy's access log format.
+* Delivery is fire-and-forget: Envoy does not buffer, retry, or wait for the receiver.
+
 Further reading
 ---------------
 
@@ -162,3 +170,4 @@ Further reading
 * Stdout :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StdoutAccessLog>`
 * Stderr :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StderrAccessLog>`
 * Fluentd :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig>`
+* Syslog :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.syslog.v3.SyslogAccessLogConfig>`
