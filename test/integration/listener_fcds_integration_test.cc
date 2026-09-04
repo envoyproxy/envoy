@@ -455,7 +455,7 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
   ASSERT_TRUE(codec_client2->waitForDisconnect(std::chrono::seconds(5)));
 }
 
-// Tests that removing a tcp_proxy filter chain via FCDS keeps the existing connection working while
+// Tests that removing a TCP Proxy filter chain via FCDS keeps the existing connection working while
 // it drains, closes it once the drain sequence completes, and rejects new connections.
 TEST_P(ListenerFcdsIntegrationTest, FcdsTcpFilterChainRemovalAndDraining) {
   // SotW gRPC subscriptions do not support dynamic resource deletion notifications
