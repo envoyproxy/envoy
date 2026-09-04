@@ -67,6 +67,27 @@ message RequestHandling {
   // full-duplex request would stall it, since the client may not finish the
   // request until it sees a response the held upstream cannot produce.
   bool parse_unconfigured_routes = 1;
+
+  // Request-path parsing limits. Defaults apply when unset.
+  RequestParsingLimits limits = 2;
+}
+
+// Per-stream limits for request payload parsing.
+message RequestParsingLimits {
+  // Maximum size, in bytes, of a decoded string value kept inline in the
+  // parsed document; a larger value stays in the external buffer and is
+  // referenced by offset. Object keys are always inline.
+  //
+  // This is the deployment-wide default, applied when a declared API's payload
+  // schema does not pin its own threshold. Defaults to 1KiB, which keeps
+  // ordinary metadata (model names, roles, tool names) inline while
+  // conversation content goes to the buffer.
+  //
+  // Keep it above the longest ``model`` name in use. Values over the threshold
+  // are offloaded, and on a declared AI endpoint the payload schema requires
+  // ``model`` inline, so an offloaded one is rejected with a 400.
+  google.protobuf.UInt32Value inline_string_threshold_bytes = 1
+      [(validate.rules).uint32 = {lte: 1048576 gte: 64}];
 }
 
 // Response-side processing configuration. Individual response features are

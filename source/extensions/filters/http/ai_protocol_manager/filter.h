@@ -78,6 +78,7 @@ public:
 
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
+  uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
   bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
   ApiProtocol defaultApiProtocol() const { return default_api_protocol_; }
@@ -93,6 +94,7 @@ private:
   mutable AiProtocolManagerStats stats_;
   const bool request_handling_enabled_ = false;
   const bool parse_unconfigured_routes_ = false;
+  const uint32_t inline_string_threshold_bytes_ = 0;
   const bool token_usage_enabled_ = false;
   const bool include_unconfigured_routes_ = false;
   const ApiProtocol default_api_protocol_ = ApiProtocol::Unspecified;
@@ -223,6 +225,10 @@ private:
   // Whether the route handed its request payload to the filter, which is also
   // what makes a parse failure fatal.
   bool isAiEndpoint() const { return route_has_request_; }
+
+  // The inline-string threshold for this stream: the route's payload schema
+  // when it pins one, otherwise the filter's configured default.
+  uint32_t inlineStringThresholdBytes() const;
 
   // Publish the accumulated token usage as dynamic metadata and account stats.
   // Called exactly once, at response end of stream (data or trailers).

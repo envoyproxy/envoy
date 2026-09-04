@@ -136,6 +136,9 @@ FilterConfig::FilterConfig(
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
       parse_unconfigured_routes_(proto.request_handling().parse_unconfigured_routes()),
+      inline_string_threshold_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          proto.request_handling().limits(), inline_string_threshold_bytes,
+          JsonWithExtBufParser::kDefaultInlineStringThresholdBytes)),
       token_usage_enabled_(proto.response_handling().has_token_usage()),
       include_unconfigured_routes_(
           proto.response_handling().token_usage().include_unconfigured_routes()),
@@ -211,7 +214,9 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     return Http::FilterHeadersStatus::Continue;
   }
 
-  request_parser_ = std::make_unique<JsonWithExtBufParser>(JsonWithExtBufParser::Config{});
+  JsonWithExtBufParser::Config parser_config;
+  parser_config.inline_string_threshold_bytes = inlineStringThresholdBytes();
+  request_parser_ = std::make_unique<JsonWithExtBufParser>(parser_config);
   // Built here, not at setDecoderFilterCallbacks(), so a pass-through stream pays
   // for none of it: constructing it subscribes to upstream watermarks and claims
   // a schedulable callback.
@@ -225,6 +230,24 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // for an empty/trailer-only body, when the manager continues iteration).
   ENVOY_LOG(trace, "ai_protocol_manager: holding headers until payload is offloaded");
   return Http::FilterHeadersStatus::StopIteration;
+}
+
+uint32_t AiProtocolManagerFilter::inlineStringThresholdBytes() const {
+  // The filter's configured value is the default. A declared endpoint's payload
+  // schema may pin its own, because what has to stay inline for the payload to
+  // validate is a property of the wire API, not of the deployment.
+  if (isAiEndpoint()) {
+    if (const PayloadSchema* payload_schema =
+            AdapterRegistry::get(route_request_protocol_).schema();
+        payload_schema != nullptr) {
+      if (const std::optional<uint32_t> pinned =
+              payload_schema->requestInlineStringThresholdBytes();
+          pinned.has_value()) {
+        return *pinned;
+      }
+    }
+  }
+  return config_->inlineStringThresholdBytes();
 }
 
 bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_stream) {
