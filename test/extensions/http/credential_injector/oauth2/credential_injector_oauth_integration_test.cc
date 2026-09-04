@@ -181,6 +181,75 @@ typed_config:
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Regression test: a client_secret containing '+', '/' and '=' (a realistic base64-encoded
+// IdP-issued secret, e.g. Keycloak) must be fully percent-encoded on the wire.
+//
+// This asserts on the raw bytes of request_body_ directly, NOT via the HasClientSecret matcher
+// used elsewhere in this file: that matcher decodes via QueryParamsMulti::parseParameters ->
+// PercentEncoding::decode(), which only handles %XX sequences and does NOT implement the
+// x-www-form-urlencoded '+' -> space substitution -- so it cannot
+// distinguish a raw, unescaped '+' from a correctly-encoded one and would pass either way. The
+// real token endpoint on the other end of this request *does* implement that substitution (this
+// was independently confirmed against a live Keycloak instance), so the wire bytes are what
+// actually matters here, not what this test suite's own simplified decoder reports.
+//
+// '/' and '=' are included alongside '+' as a control: PercentEncoding::encode(value, ":/=&?")
+// (the pre-fix code) already encodes those two correctly, so their presence in the assertion
+// confirms this test isn't trivially passing on unrelated grounds.
+TEST_P(CredentialInjectorIntegrationTest, InjectCredentialSecretWithSpecialCharacters) {
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: envoy.http.injected_credentials.oauth2
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2
+      token_endpoint:
+        cluster: oauth
+        timeout: 3s
+        uri: "oauth.com/token"
+      client_credentials:
+        client_id: test_client_id
+        client_secret:
+          name: test-client-secret
+)EOF";
+  const std::string secret_with_special_chars = "sec+ret/with=chars";
+  const std::string expected_wire_encoded_secret = "sec%2Bret%2Fwith%3Dchars";
+  config_helper_.addConfigModifier(
+      [&secret_with_special_chars](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+        secret->set_name("test-client-secret");
+        auto* generic = secret->mutable_generic_secret();
+        generic->mutable_secret()->set_inline_string(secret_with_special_chars);
+      });
+  initializeFilter(filter_config);
+  getFakeOauth2Connection();
+  acceptNewStream();
+  EXPECT_THAT(request_body_, testing::HasSubstr("client_secret=" + expected_wire_encoded_secret));
+  oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
+  encodeGoodJsonResponseBody();
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
+                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->value()
+                                            .getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Inject credential to a request without credential
 TEST_P(CredentialInjectorIntegrationTest, InjectCredential) {
   const std::string filter_config =
