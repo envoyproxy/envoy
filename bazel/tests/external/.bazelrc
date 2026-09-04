@@ -17,7 +17,7 @@ common --enable_bzlmod
 common --noenable_workspace
 common --@envoy//bazel:enable_bzlmod=True
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/81647f94d05cce9d7dca9176f01ad1358e9bac19
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/7b38d27d192670d0ec16ef9309d875387c781de9
 common --noincompatible_disallow_empty_glob
 
 build --workspace_status_command="bash get_workspace_status"

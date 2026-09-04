@@ -1,6 +1,6 @@
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/81647f94d05cce9d7dca9176f01ad1358e9bac19
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/7b38d27d192670d0ec16ef9309d875387c781de9
 
 # Enable bzlmod for modern dependency management with MODULE.bazel
 common --enable_bzlmod
