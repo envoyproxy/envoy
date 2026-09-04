@@ -25,8 +25,8 @@ envoy_cc_contrib_extension(
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",
+        "@envoy_api//contrib/envoy/extensions/clusters/dns_srv/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "@envoy_api//contrib/envoy/extensions/clusters/dns_srv/v3:pkg_cc_proto",
     ],
 )

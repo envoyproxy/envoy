@@ -27,9 +27,9 @@ envoy_cc_test(
     srcs = ["dns_srv_cluster_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//contrib/dns_srv/clusters/source:cluster",
         "//source/common/config:utility_lib",
         "//source/common/network:utility_lib",
-        "//contrib/dns_srv/clusters/source:cluster",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/common/upstream:utility_lib",
@@ -39,7 +39,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//contrib/envoy/extensions/clusters/dns_srv/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )

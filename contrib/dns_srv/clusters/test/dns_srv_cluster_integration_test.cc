@@ -2,15 +2,14 @@
 #include <cstdint>
 #include <string>
 
-#include "contrib/envoy/extensions/clusters/dns_srv/v3/cluster.pb.h"
-
-#include "contrib/dns_srv/clusters/source/dns_srv_cluster.h"
-
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+
+#include "contrib/dns_srv/clusters/source/dns_srv_cluster.h"
+#include "contrib/envoy/extensions/clusters/dns_srv/v3/cluster.pb.h"
 
 namespace Envoy {
 namespace Extensions {
