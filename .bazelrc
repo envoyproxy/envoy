@@ -19,9 +19,6 @@ startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 # global
 #############################################################################
 
-common --enable_bzlmod
-common --noenable_workspace
-common --@envoy//bazel:enable_bzlmod=True
 common --noincompatible_disallow_empty_glob
 common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
