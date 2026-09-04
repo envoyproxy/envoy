@@ -66,7 +66,7 @@ private:
   std::optional<size_t> max_length_;
   GetMetadataFunction get_func_;
   // Latched at construction to keep the runtime lookup off the formatting path.
-  const bool only_truncate_string_;
+  const bool only_truncate_string_ = false;
 };
 
 /**
