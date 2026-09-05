@@ -54,7 +54,6 @@ RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 // the factory is rebuilt before the batched update is posted and a worker cannot snapshot a stale
 // factory after a transient health-check flap.
 RUNTIME_GUARD(envoy_reloadable_features_enable_batch_aware_update);
-RUNTIME_GUARD(envoy_reloadable_features_enable_cel_regex_precompilation);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_response_path_matching);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
