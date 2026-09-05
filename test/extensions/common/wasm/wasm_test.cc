@@ -1040,6 +1040,127 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   dispatcher_->clearDeferredDeleteList();
 }
 
+// Regression test for the in_progress race condition.
+//
+// Pre-fix bug: when a second createWasm call arrived while a remote fetch was
+// in_progress, the code called cb(nullptr) but did NOT return. Execution fell
+// through to the empty-code path which:
+//   1. Called cb(nullptr) a SECOND time (double callback)
+//   2. Set fetch=true, triggering a spurious second HTTP request
+//   3. Wrote a negative cache entry (code="" with fresh fetch_time)
+//   4. Returned true instead of false
+//
+// Post-fix: the in_progress branch calls cb(nullptr) and returns false.
+// Only one callback, no second fetch, no negative cache entry.
+TEST_P(WasmCommonTest, RemoteCodeInProgressRace) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
+  Init::ExpectableWatcherImpl init_watcher;
+
+  std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto vm_config = plugin_config.mutable_vm_config();
+  vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  Protobuf::BytesValue vm_configuration_bytes;
+  vm_configuration_bytes.set_value("vm_cache");
+  std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
+  plugin_config.mutable_configuration()->set_value("done");
+
+  std::string sha256_str = Extensions::Common::Wasm::sha256(code);
+  std::string sha256Hex = Hex::encode(absl::Span<const uint8_t>(
+      reinterpret_cast<const uint8_t*>(&*sha256_str.begin()), sha256_str.size()));
+  vm_config->mutable_code()->mutable_remote()->set_sha256(sha256Hex);
+  vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_uri(
+      "http://example.com/test.wasm");
+  vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_cluster("example_com");
+  vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_);
+
+  WasmHandleSharedPtr wasm_handle;
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientRequest> request(&client);
+
+  int http_fetch_count = 0;
+  cluster_manager.initializeThreadLocalClusters({"example_com"});
+  EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
+      .WillRepeatedly(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            ++http_fetch_count;
+            std::cerr << "[DEBUG] HTTP fetch #" << http_fetch_count << " triggered\n";
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+            response->body().add(code);
+            callbacks.onSuccess(request, std::move(response));
+            return nullptr;
+          }));
+
+  // --- Step 1: First createWasm — cache miss, sets in_progress = true ---
+  std::cerr << "[DEBUG] Step 1: first createWasm (expect cache miss, in_progress=true)\n";
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
+    init_target_handle = target.createHandle("test");
+  }));
+  bool first_ret = createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
+                               lifecycle_notifier_, remote_data_provider_,
+                               [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
+  std::cerr << "[DEBUG] first createWasm returned: " << (first_ret ? "true" : "false") << "\n";
+  std::cerr << "[DEBUG] HTTP fetches so far: " << http_fetch_count << "\n";
+  EXPECT_TRUE(first_ret);
+
+  // --- Step 2: Second createWasm while in_progress = true (the race) ---
+  // Pre-fix:  cb called 2x, second fetch triggered, returns true
+  // Post-fix: cb called 1x, no second fetch, returns false
+  std::cerr << "[DEBUG] Step 2: second createWasm (in_progress race)\n";
+  int race_cb_count = 0;
+  bool second_ret =
+      createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
+                 lifecycle_notifier_, remote_data_provider_,
+                 [&race_cb_count](const WasmHandleSharedPtr& w) {
+                   ++race_cb_count;
+                   std::cerr << "[DEBUG] race callback #" << race_cb_count
+                             << " (wasm_handle=" << (w ? "non-null" : "nullptr") << ")"
+                             << (race_cb_count > 1 ? " ** BUG: double callback! **" : "")
+                             << "\n";
+                   EXPECT_EQ(w, nullptr);
+                 });
+  std::cerr << "[DEBUG] second createWasm returned: " << (second_ret ? "true ** BUG **" : "false")
+            << "\n";
+  std::cerr << "[DEBUG] race callback count: " << race_cb_count
+            << (race_cb_count > 1 ? " ** BUG: expected 1 **" : " (correct)") << "\n";
+  std::cerr << "[DEBUG] HTTP fetches so far: " << http_fetch_count
+            << " (fetch is deferred until init target fires)\n";
+
+  // Post-fix assertions for the race:
+  EXPECT_FALSE(second_ret);       // pre-fix: true  (fell through to fetch path)
+  EXPECT_EQ(race_cb_count, 1);    // pre-fix: 2     (in_progress cb + negative cache cb)
+  EXPECT_EQ(http_fetch_count, 0); // no fetches yet — deferred until init
+
+  // --- Step 3: Complete the first fetch — wasm_handle must succeed ---
+  std::cerr << "[DEBUG] Step 3: completing first fetch via init target\n";
+  EXPECT_CALL(init_watcher, ready());
+  init_target_handle->initialize(init_watcher);
+  EXPECT_NE(wasm_handle, nullptr);
+  std::cerr << "[DEBUG] wasm_handle: " << (wasm_handle ? "created OK" : "nullptr ** BUG **")
+            << "\n";
+  std::cerr << "[DEBUG] HTTP fetches after init: " << http_fetch_count
+            << (http_fetch_count > 1 ? " ** BUG: spurious second fetch **" : " (correct)") << "\n";
+  EXPECT_EQ(http_fetch_count, 1); // pre-fix: 2  (original fetch + spurious retry)
+
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->clearDeferredDeleteList();
+}
+
 // test that wasm imports/exports do not work when ABI restriction is enforced
 TEST_P(WasmCommonTest, RestrictCapabilities) {
   if (std::get<0>(GetParam()) == "null") {
