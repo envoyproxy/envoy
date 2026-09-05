@@ -1,3 +1,5 @@
+#include <cerrno>
+
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
@@ -104,6 +106,10 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
 Api::IoCallUint64Result makeError(int sys_errno) {
   return {0, Network::IoSocketError::create(sys_errno)};
 }
+
+constexpr int TestSocketOptionLevel = 1;
+constexpr int TestSocketOptionName = 36;
+constexpr int TestSocketOptionValue = 4;
 
 class UdpProxyFilterBase : public testing::Test {
 public:
@@ -350,6 +356,28 @@ public:
     ON_CALL(*host, address()).WillByDefault(Return(host_address));
     ON_CALL(*host, coarseHealth()).WillByDefault(Return(Upstream::Host::Health::Healthy));
     return host;
+  }
+
+  void setUpstreamSocketOptions(const Network::Address::InstanceConstSharedPtr& local_address) {
+    auto socket_options = std::make_shared<Network::ConnectionSocket::Options>();
+    socket_options->push_back(std::make_shared<Network::SocketOptionImpl>(
+        envoy::config::core::v3::SocketOption::STATE_PREBIND,
+        Network::SocketOptionName(TestSocketOptionLevel, TestSocketOptionName,
+                                  "test upstream socket option"),
+        TestSocketOptionValue));
+    auto host =
+        factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_;
+    ON_CALL(*host->cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_, _))
+        .WillByDefault(Return(Upstream::UpstreamLocalAddress{local_address, socket_options}));
+  }
+
+  void expectUpstreamSocketOption(TestSession& session, Api::SysCallIntResult result) {
+    EXPECT_CALL(*session.socket_->io_handle_,
+                setOption(TestSocketOptionLevel, TestSocketOptionName, _, sizeof(int)))
+        .WillOnce(Invoke([result](int, int, const void* value, socklen_t) {
+          EXPECT_EQ(TestSocketOptionValue, *static_cast<const int*>(value));
+          return result;
+        }));
   }
 
   void checkTransferStats(uint64_t rx_bytes, uint64_t rx_datagrams, uint64_t tx_bytes,
@@ -1251,6 +1279,182 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
   InSequence s;
 
   ensureIpTransparentSocketOptions(upstream_address_, "10.0.0.2:80", 1, 0);
+}
+
+TEST_F(UdpProxyFilterTest, AppliesUpstreamSocketOptionsWithoutBindingConfiguredAddress) {
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF"));
+
+  const auto local_address =
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.2:12345");
+  setUpstreamSocketOptions(local_address);
+  expectSessionCreate(upstream_address_);
+  expectUpstreamSocketOption(test_sessions_[0], {0, 0});
+  EXPECT_CALL(*test_sessions_[0].socket_, bind(_)).Times(0);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+}
+
+TEST_F(UdpProxyFilterTest, UpstreamSocketOptionFailureRejectsSession) {
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF"));
+
+  const auto local_address =
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.2:12345");
+  setUpstreamSocketOptions(local_address);
+  expectSessionCreate(upstream_address_);
+  expectUpstreamSocketOption(test_sessions_[0], {-1, EPERM});
+  EXPECT_CALL(*test_sessions_[0].socket_->io_handle_, connect(_)).Times(0);
+
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+  EXPECT_EQ(1, TestUtility::findCounter(factory_context_.server_factory_context_.cluster_manager_
+                                            .thread_local_cluster_.cluster_.info_->stats_store_,
+                                        "udp.sess_tx_errors")
+                   ->value());
+}
+
+TEST_F(UdpProxyFilterTest, UpstreamSocketOptionFailureDuringSynchronousContinueRejectsSession) {
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+session_filters:
+- name: continue-on-new-session-1
+  typed_config:
+    '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.DrainerUdpSessionReadFilterConfig
+- name: continue-on-new-session-2
+  typed_config:
+    '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.DrainerUdpSessionReadFilterConfig
+  )EOF"));
+
+  const auto local_address =
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.2:12345");
+  setUpstreamSocketOptions(local_address);
+  expectSessionCreate(upstream_address_);
+  expectUpstreamSocketOption(test_sessions_[0], {-1, EPERM});
+
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+  EXPECT_EQ(1, TestUtility::findCounter(factory_context_.server_factory_context_.cluster_manager_
+                                            .thread_local_cluster_.cluster_.info_->stats_store_,
+                                        "udp.sess_tx_errors")
+                   ->value());
+
+  // A new datagram with the same tuple can create a fresh session after the failed setup.
+  expectSessionCreate(upstream_address_);
+  expectUpstreamSocketOption(test_sessions_[1], {0, 0});
+  test_sessions_[1].expectWriteToUpstream("world", 0, nullptr, true);
+
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "world");
+
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+}
+
+TEST_F(UdpProxyFilterTest, UpstreamSocketOptionFailureDuringOnDataContinueRejectsSession) {
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+session_filters:
+- name: continue-on-data
+  typed_config:
+    '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.DrainerUdpSessionReadFilterConfig
+    stop_iteration_on_new_session: true
+    continue_filter_chain: true
+  )EOF"));
+
+  const auto local_address =
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.2:12345");
+  setUpstreamSocketOptions(local_address);
+  expectSessionCreate(upstream_address_);
+  expectUpstreamSocketOption(test_sessions_[0], {-1, EPERM});
+  EXPECT_CALL(*test_sessions_[0].idle_timer_, enableTimer(config_->sessionTimeout(), nullptr));
+  Event::PostCb remove_session_cb;
+  EXPECT_CALL(callbacks_.udp_listener_.dispatcher_, post(_))
+      .Times(2)
+      .WillRepeatedly([&](Event::PostCb cb) { remove_session_cb = std::move(cb); });
+
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  remove_session_cb();
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+
+  expectSessionCreate(upstream_address_);
+  expectUpstreamSocketOption(test_sessions_[1], {-1, EPERM});
+  EXPECT_CALL(*test_sessions_[1].idle_timer_, enableTimer(config_->sessionTimeout(), nullptr));
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "world");
+
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  cluster_update_callbacks_->onClusterRemoval("fake_cluster");
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+  remove_session_cb();
+  EXPECT_EQ(2, TestUtility::findCounter(factory_context_.server_factory_context_.cluster_manager_
+                                            .thread_local_cluster_.cluster_.info_->stats_store_,
+                                        "udp.sess_tx_errors")
+                   ->value());
+}
+
+TEST_F(UdpProxyFilterTest, UpstreamSocketOptionsAreCompatibleWithUseOriginalSrcIp) {
+  if (!isTransparentSocketOptionsSupported()) {
+    GTEST_SKIP();
+  }
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+use_original_src_ip: true
+  )EOF"));
+
+  const auto configured_local_address =
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.2:12345");
+  setUpstreamSocketOptions(configured_local_address);
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectSetIpTransparentSocketOption();
+  expectUpstreamSocketOption(test_sessions_[0], {0, 0});
+  test_sessions_[0].expectWriteToUpstream("hello", 0, peer_address_->ip());
+
+  recvDataFromDownstream(peer_address_->asString(), "10.0.0.2:80", "hello");
+  checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, 1,
+                     ENVOY_SOCKET_IPV6_TRANSPARENT, 0);
 }
 
 TEST_F(UdpProxyFilterTest, MutualExcludePerPacketLoadBalancingAndSessionFilters) {
