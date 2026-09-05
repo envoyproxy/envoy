@@ -33,15 +33,41 @@ constexpr absl::string_view kProtocolVersion = "2025-06-18";
 constexpr absl::string_view kContentTypeJson = "application/json";
 constexpr absl::string_view kContentTypeSse = "text/event-stream";
 
-void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeaderMap& dest) {
-  // Headers that we set explicitly or should not be forwarded
-  static const absl::flat_hash_set<absl::string_view> kSkipHeaders = {
-      ":method", ":path", ":authority", "host", "content-type", "accept", kSessionIdHeader};
+void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeaderMap& dest,
+                        const HeaderForwardingPolicy& header_forwarding) {
+  // Headers that we set explicitly or should not be forwarded. Unaffected by
+  // header_forwarding policy -- these are router-owned/framing/session/hop-by-hop headers,
+  // and can never be forwarded via that mechanism regardless of configuration.
+  //
+  // connection/upgrade/te/keep-alive/transfer-encoding/proxy-connection are already stripped
+  // by the HTTP connection manager before any filter runs (see
+  // ConnectionManagerUtility::mutateRequestHeaders), except on Upgrade-classified requests,
+  // where connection/upgrade are deliberately preserved -- listed here too for defense in
+  // depth. proxy-authenticate/proxy-authorization are never stripped anywhere in Envoy core,
+  // so they must be excluded explicitly here to keep hop-by-hop headers from being forwarded.
+  static const absl::flat_hash_set<absl::string_view> kSkipHeaders = {":method",
+                                                                      ":path",
+                                                                      ":authority",
+                                                                      "host",
+                                                                      "content-type",
+                                                                      "accept",
+                                                                      kSessionIdHeader,
+                                                                      "connection",
+                                                                      "upgrade",
+                                                                      "te",
+                                                                      "keep-alive",
+                                                                      "transfer-encoding",
+                                                                      "trailer",
+                                                                      "proxy-connection",
+                                                                      "proxy-authenticate",
+                                                                      "proxy-authorization"};
 
-  source.iterate([&dest](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+  source.iterate([&dest,
+                  &header_forwarding](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     absl::string_view key = header.key().getStringView();
+    std::string lower_key = absl::AsciiStrToLower(key);
 
-    if (!kSkipHeaders.contains(absl::AsciiStrToLower(key))) {
+    if (!kSkipHeaders.contains(lower_key) && headerCanBeForwarded(lower_key, header_forwarding)) {
       dest.addCopy(Http::LowerCaseString(std::string(key)), header.value().getStringView());
     }
     return Http::HeaderMap::Iterate::Continue;
@@ -1980,9 +2006,8 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
     headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), backend_session_id);
   }
 
-  // TODO(botengyao): Make header forwarding (authorization, etc.) configurable via proto config.
   if (request_headers_) {
-    copyRequestHeaders(*request_headers_, *headers);
+    copyRequestHeaders(*request_headers_, *headers, backend.header_forwarding);
 
     // Adjust content-length when body rewriting changes size.
     if (needs_body_rewrite_ && request_headers_->ContentLength()) {
