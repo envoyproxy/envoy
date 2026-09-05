@@ -64,9 +64,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_lrs_server_self_ads);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_user_retry_on);
-// Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
-// @yanjunxiang-google before removing.
-RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_report_client_creation_error);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_return_stop_iteration);
