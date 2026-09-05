@@ -74,7 +74,6 @@ envoy_cc_library(
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:conn_manager_lib",
-        "//source/common/http:date_provider_lib",
         "//source/common/http:default_server_string_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",

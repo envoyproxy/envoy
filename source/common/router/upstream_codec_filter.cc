@@ -155,6 +155,13 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
   filter_.upstreamTiming().onFirstUpstreamRxByteReceived(
       filter_.callbacks_->dispatcher().timeSource());
 
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http_set_response_date_at_ingress") &&
+      !DateUtil::parseHttpDate(headers->getDateValue()).has_value()) {
+    headers->setDate(
+        DateUtil::httpDate(filter_.callbacks_->dispatcher().timeSource().systemTime()));
+  }
+
   if (filter_.callbacks_->upstreamCallbacks()->pausedForConnect() &&
       ((Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(*headers))))) {
     filter_.callbacks_->upstreamCallbacks()->setPausedForConnect(false);

@@ -20,7 +20,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/context_impl.h"
-#include "source/common/http/date_provider_impl.h"
 #include "source/common/http/exception.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/address_impl.h"
@@ -134,7 +133,6 @@ public:
                                   ServerConnectionCallbacks&, Server::OverloadManager&) override {
     return ServerConnectionPtr{codec_};
   }
-  DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() const override { return true; }
@@ -270,7 +268,6 @@ public:
   MockStreamEncoderFilter* encoder_filter_{};
   NiceMock<MockFilterChainFactory> filter_factory_;
   Event::SimulatedTimeSystem time_system_;
-  SlowDateProviderImpl date_provider_{time_system_};
   bool use_srds_{};
   Router::MockRouteConfigProvider route_config_provider_;
   Router::MockScopedRouteConfigProvider scoped_route_config_provider_;

@@ -24,7 +24,7 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 const absl::flat_hash_set<std::string> ExtProcTestUtility::ignoredHeaders() {
-  CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "x-request-id",
+  CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "x-request-id", "date",
                          "x-envoy-upstream-service-time", "x-envoy-expected-rq-timeout-ms");
 }
 

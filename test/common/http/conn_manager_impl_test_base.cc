@@ -38,7 +38,6 @@ public:
                                   Server::OverloadManager& overload_manager) override {
     return parent_.createCodec(connection, data, callbacks, overload_manager);
   }
-  DateProvider& dateProvider() override { return parent_.dateProvider(); }
   std::chrono::milliseconds drainTimeout() const override { return parent_.drainTimeout(); }
   FilterChainFactory& filterFactory() override { return parent_.filterFactory(); }
   bool generateRequestId() const override { return parent_.generateRequestId(); }

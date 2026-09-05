@@ -258,7 +258,6 @@ envoy_cc_fuzz_test(
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
-        "//source/common/http:date_provider_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:rds_lib",
         "//source/common/network:address_lib",
@@ -379,18 +378,6 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "date_provider_impl_test",
-    srcs = ["date_provider_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
-    deps = [
-        "//source/common/http:date_provider_lib",
-        "//source/common/http:header_map_lib",
-        "//test/mocks/event:event_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
     ],
 )
 
