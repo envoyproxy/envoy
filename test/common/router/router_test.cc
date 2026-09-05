@@ -3339,11 +3339,6 @@ TEST_F(RouterTest, RetryRequestBeforeBody) {
 // Test retrying a request, when the first attempt fails while the client
 // is sending the body.
 TEST_F(RouterTest, RetryRequestDuringBody) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -3390,15 +3385,44 @@ TEST_F(RouterTest, RetryRequestDuringBody) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
+// Verify that when retry buffering is enabled, the router stores the body in its private
+// retry_buffer_ and does NOT call callbacks_->addDecodedData().
+TEST_F(RouterTest, RetryBufferDoesNotDuplicateBodyOnContinueDecodingReplay) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}, {"myheader", "present"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  // First decodeData: router forwards body upstream and stores in private retry_buffer_.
+  // addDecodedData must NOT be called, buffered_request_data_ must stay null.
+  const std::string body("hello world");
+  Buffer::OwnedImpl buf(body);
+  EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
+  EXPECT_CALL(encoder1, encodeData(BufferString(body), false));
+  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  router_->decodeData(buf, false);
+  EXPECT_EQ(callbacks_.decodingBuffer(), nullptr);
+
+  // Complete the request.
+  Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
+  router_->decodeTrailers(trailers);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
 // Test retrying a request, when the first attempt fails while the client
 // is sending the body, with more data arriving in between upstream attempts
 // (which would normally happen during the backoff timer interval), but not end_stream.
 TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -3450,11 +3474,6 @@ TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
 // Test when the upstream request gets reset while the client is sending the body
 // with more data arriving but not buffering any data.
 TEST_F(RouterTest, UpstreamResetDuringBodyDataTransferNotBufferingNotEndStream) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -3477,11 +3496,6 @@ TEST_F(RouterTest, UpstreamResetDuringBodyDataTransferNotBufferingNotEndStream) 
 // is sending the body, with the rest of the request arriving in between upstream
 // request attempts.
 TEST_F(RouterTest, RetryRequestDuringBodyCompleteBetweenAttempts) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -3528,11 +3542,6 @@ TEST_F(RouterTest, RetryRequestDuringBodyCompleteBetweenAttempts) {
 // is sending the body, with the trailers arriving in between upstream
 // request attempts.
 TEST_F(RouterTest, RetryRequestDuringBodyTrailerBetweenAttempts) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -3579,10 +3588,6 @@ TEST_F(RouterTest, RetryRequestDuringBodyTrailerBetweenAttempts) {
 // is sending the body, with the rest of the request arriving in between upstream
 // request attempts, but exceeding the buffer limit causing a downstream request abort.
 TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(50));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3618,11 +3623,6 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
 // Test when request_body_buffer_limit is set we should use request_body_buffer_limit
 // regardless of other settings.
 TEST_F(RouterTest, BufferLimitLogicCase1RequestBodyBufferLimitSet) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-
   // Use route level buffer limit.
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(60));
 
@@ -3658,10 +3658,6 @@ TEST_F(RouterTest, BufferLimitLogicCase1RequestBodyBufferLimitSet) {
 
 // Route level request buffer limit will override the connection buffer limit.
 TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
   // Set up the connection buffer limit mock to return 40 as expected
   EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
@@ -3701,10 +3697,6 @@ TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
 
 // Test that when neither fields are set we use per_connection_buffer_limit_bytes.
 TEST_F(RouterTest, BufferLimitLogicCase3NeitherFieldSet) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
   // Set up the connection buffer limit mock to return 40 as expected
   EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
@@ -3745,11 +3737,6 @@ TEST_F(RouterTest, BufferLimitLogicCase3NeitherFieldSet) {
 
 // Test edge case: Zero limits should prevent buffering
 TEST_F(RouterTest, BufferLimitLogicEdgeCaseZeroLimits) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-
   // Set request_body_buffer_limit to 0 (should prevent any buffering)
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(0));
 
@@ -3782,10 +3769,6 @@ TEST_F(RouterTest, BufferLimitLogicEdgeCaseZeroLimits) {
 
 // Test mixed buffer limit scenarios with multiple content chunks
 TEST_F(RouterTest, BufferLimitLogicMultipleDataChunks) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
   EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Buffer limit that should allow multiple small chunks but fail on larger ones
@@ -3830,10 +3813,6 @@ TEST_F(RouterTest, BufferLimitLogicMultipleDataChunks) {
 
 // Test request_body_buffer_limit with exactly uint32_t max value behavior
 TEST_F(RouterTest, BufferLimitLogicMaxUint32Boundary) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
   EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Test exactly at uint32_t max boundary
@@ -3860,8 +3839,7 @@ TEST_F(RouterTest, BufferLimitLogicMaxUint32Boundary) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
 
-  // Should be successful with the large buffer limit
-  EXPECT_EQ(1000U, decoding_buffer.length());
+  // Should be successful with the large buffer limit — request completes without overflow.
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
@@ -4273,7 +4251,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, _));
+  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
   Buffer::OwnedImpl body("test body");
   router_->decodeData(body, true);
   EXPECT_EQ(1U,
@@ -4346,7 +4324,7 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, _));
+  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
   Buffer::OwnedImpl body("test body");
   router_->decodeData(body, true);
   EXPECT_EQ(1U,
@@ -5183,7 +5161,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
@@ -5278,7 +5256,7 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
@@ -5453,7 +5431,7 @@ TEST_F(RouterTest, RetryRespectsMaxHostSelectionCount) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
@@ -5526,7 +5504,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
@@ -5674,7 +5652,7 @@ TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, true));
 
   const std::vector<Http::LowerCaseString> toCopy;
@@ -5747,10 +5725,7 @@ TEST_F(RouterTest, InternalRedirectNoDoubleCountWhenDecodingBufferIsData) {
   ASSERT_EQ(15, body_data.length());
 
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(20));
-  // Return a pointer to the SAME buffer to simulate the buffer filter having
-  // already buffered the data into the shared decoding buffer.
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&body_data));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
 
   enableRedirects();
   sendRequest(false);

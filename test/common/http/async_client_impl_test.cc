@@ -1013,7 +1013,7 @@ TEST_F(AsyncClientImplTest, Retry) {
           }));
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_copy->headers()), false));
-  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString("test body"), true));
   timer_->invokeCallback();
 
   // Normal response.
