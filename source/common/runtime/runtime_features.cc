@@ -137,7 +137,6 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_mtls_server_enabled);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
-RUNTIME_GUARD(envoy_reloadable_features_quic_signal_headers_only_to_http1_backend);
 RUNTIME_GUARD(envoy_reloadable_features_quic_support_additional_ecdsa_curves);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_client_certificates);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets);
