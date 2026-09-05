@@ -312,6 +312,64 @@ Note in the example that the minimum idle time is specified as an absolute durat
 would be computed based on the maximum (specified elsewhere). So if ``idle_timeout`` is
 again 600 seconds, then the minimum timer value would be :math:`10\% \cdot 600s = 60s`.
 
+Named reduce-timeouts actions
+"""""""""""""""""""""""""""""
+
+By default all timers in ``timer_scale_factors`` share the action-level triggers and their scale
+factors are driven by the maximum pressure across those triggers. To give groups of timer types
+independent triggers, configure multiple actions with unique names and a
+:ref:`ScaleTimersOverloadActionConfig
+<envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>` ``typed_config``. The
+``typed_config`` identifies these named action instances as ``reduce_timeouts`` actions. The
+well-known ``envoy.overload_actions.reduce_timeouts`` name remains supported for existing
+configurations. Custom names cannot use the reserved ``envoy.overload_actions.`` prefix.
+
+The legacy ``envoy.overload_actions.reduce_timeouts`` action and named instances can coexist in the
+same configuration. Each action may configure one or more timer types that share its triggers, and
+each timer type can be claimed by at most one legacy or named action. A timer type that is not
+configured by any action is not scaled by the overload manager. If multiple actions claim the same
+timer type, the configuration is rejected with an error that identifies both actions. A named
+action without a ``ScaleTimersOverloadActionConfig`` or with a name that collides with another
+well-known overload action is also rejected at startup. Action names cannot duplicate load shed
+point names because both emit stats under the ``overload.<name>`` prefix.
+
+Timers created with an explicit minimum instead of a timer type always use the legacy
+``envoy.overload_actions.reduce_timeouts`` action. If only named instances are configured, these
+timers remain unscaled.
+
+.. code-block:: yaml
+
+  actions:
+    - name: "fixed_heap_timeouts"
+      triggers:
+        - name: "envoy.resource_monitors.fixed_heap"
+          scaled:
+            scaling_threshold: 0.85
+            saturation_threshold: 0.95
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_STREAM_IDLE
+            min_timeout: 2s
+          - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+            min_timeout: 1s
+    - name: "custom_resource_timeouts"
+      triggers:
+        - name: "envoy.resource_monitors.custom_resource"
+          scaled:
+            scaling_threshold: 0.7
+            saturation_threshold: 0.9
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+            min_timeout: 1s
+
+In this configuration ``HTTP_DOWNSTREAM_STREAM_IDLE`` and ``HTTP_DOWNSTREAM_CONNECTION_MAX`` are
+driven by ``fixed_heap``, while ``HTTP_DOWNSTREAM_CONNECTION_IDLE`` is independently driven by
+``custom_resource``. Each action exposes ``active`` and ``scale_percent`` stats under its configured
+name, for example ``overload.custom_resource_timeouts.scale_percent``.
+
 .. _config_overload_manager_limiting_connections:
 
 Limiting Active Connections
