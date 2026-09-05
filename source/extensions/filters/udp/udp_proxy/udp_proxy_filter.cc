@@ -483,6 +483,9 @@ bool UdpProxyFilter::ActiveSession::onNewSession() {
 
     active_read_filter->initialized_ = true;
     auto status = active_read_filter->read_filter_->onNewSession();
+    if (handleUpstreamCreationFailure()) {
+      return false;
+    }
     if (status == ReadFilterStatus::StopIteration) {
       return true;
     }
@@ -504,6 +507,10 @@ bool UdpProxyFilter::ActiveSession::onNewSession() {
 }
 
 void UdpProxyFilter::ActiveSession::onData(Network::UdpRecvData& data) {
+  if (handleUpstreamCreationFailure()) {
+    return;
+  }
+
   const uint64_t rx_buffer_length = data.buffer_->length();
   ENVOY_LOG(trace, "received {} byte datagram from downstream: downstream={} local={} upstream={}",
             rx_buffer_length, addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
@@ -518,6 +525,9 @@ void UdpProxyFilter::ActiveSession::onData(Network::UdpRecvData& data) {
 
   for (auto& active_read_filter : read_filters_) {
     auto status = active_read_filter->read_filter_->onData(data);
+    if (handleUpstreamCreationFailure()) {
+      return;
+    }
     if (status == ReadFilterStatus::StopIteration) {
       return;
     }
@@ -583,6 +593,10 @@ void UdpProxyFilter::UdpActiveSession::writeUpstream(Network::UdpRecvData& data)
 bool UdpProxyFilter::ActiveSession::onContinueFilterChain(ActiveReadFilter* filter) {
   ASSERT(filter != nullptr);
 
+  if (handleUpstreamCreationFailure()) {
+    return false;
+  }
+
   std::list<ActiveReadFilterPtr>::iterator entry = std::next(filter->entry());
   for (; entry != read_filters_.end(); entry++) {
     if (!(*entry)->read_filter_ || (*entry)->initialized_) {
@@ -591,6 +605,9 @@ bool UdpProxyFilter::ActiveSession::onContinueFilterChain(ActiveReadFilter* filt
 
     (*entry)->initialized_ = true;
     auto status = (*entry)->read_filter_->onNewSession();
+    if (handleUpstreamCreationFailure()) {
+      return false;
+    }
     if (status == ReadFilterStatus::StopIteration) {
       return true;
     }
@@ -608,8 +625,40 @@ bool UdpProxyFilter::ActiveSession::onContinueFilterChain(ActiveReadFilter* filt
     }
   }
 
-  filter_.removeSession(this);
+  upstream_creation_failed_ = true;
+  handleUpstreamCreationFailure();
   return false;
+}
+
+bool UdpProxyFilter::ActiveSession::handleUpstreamCreationFailure() {
+  if (!upstream_creation_failed_) {
+    return false;
+  }
+
+  // A filter may reach this path from continueFilterChain() or injectDatagramToFilterChain().
+  // Defer removal so that the calling filter can unwind before the session and its filters are
+  // destroyed. During initial session creation the session has not been inserted, and the caller
+  // owns it until onNewSession() returns false.
+  const auto session = filter_.sessions_.find(this);
+  if (!upstream_failure_removal_scheduled_ && session != filter_.sessions_.end() &&
+      session->get() == this) {
+    if (cluster_ != nullptr) {
+      ASSERT(!cluster_->sessions_.contains(this));
+      cluster_->sessions_.emplace(this);
+    }
+    upstream_failure_removal_scheduled_ = true;
+    std::weak_ptr<ActiveSession> weak_session = *session;
+    filter_.read_callbacks_->udpListener().dispatcher().post([weak_session] {
+      if (auto session = weak_session.lock()) {
+        const auto stored_session = session->filter_.sessions_.find(session.get());
+        if (stored_session != session->filter_.sessions_.end() &&
+            stored_session->get() == session.get()) {
+          session->filter_.removeSession(session.get());
+        }
+      }
+    });
+  }
+  return true;
 }
 
 bool UdpProxyFilter::UdpActiveSession::shouldCreateUpstream() {
@@ -639,16 +688,33 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
   udp_session_info_.upstreamInfo()->addUpstreamHostAttempted(host_);
   udp_session_info_.upstreamInfo()->setUpstreamHost(host_);
   udp_session_info_.upstreamInfo()->setUpstreamRemoteAddress(host_->address());
+  if (!createUdpSocket(host_)) {
+    cluster_->cluster_stats_.sess_tx_errors_.inc();
+    // The host is not registered with ClusterInfo until socket setup succeeds. Clear it so that a
+    // deferred session can be removed without trying to unregister it.
+    host_.reset();
+    return false;
+  }
   cluster_->addSession(host_.get(), this);
-  createUdpSocket(host_);
   return true;
 }
 
-void UdpProxyFilter::UdpActiveSession::createUdpSocket(const Upstream::HostConstSharedPtr& host) {
+bool UdpProxyFilter::UdpActiveSession::createUdpSocket(const Upstream::HostConstSharedPtr& host) {
   ASSERT(cluster_);
-  // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
-  //       is bound until the first packet is sent to the upstream host.
+  Network::ConnectionSocket::OptionsSharedPtr socket_options;
+  if (use_original_src_ip_) {
+    socket_options = Network::SocketOptionFactory::buildIpTransparentOptions();
+  }
+
+  const auto upstream_socket_options =
+      host->cluster()
+          .getUpstreamLocalAddressSelector()
+          ->getUpstreamLocalAddress(host->address(), socket_options,
+                                    /*transport_socket_options=*/{})
+          .socket_options_;
+
   udp_socket_ = filter_.createUdpSocket(host);
+
   udp_socket_->ioHandle().initializeFileEvent(
       filter_.read_callbacks_->udpListener().dispatcher(),
       [this](uint32_t) {
@@ -657,17 +723,18 @@ void UdpProxyFilter::UdpActiveSession::createUdpSocket(const Upstream::HostConst
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
+  if (!Network::Socket::applyOptions(upstream_socket_options, *udp_socket_,
+                                     envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
+    ENVOY_LOG(debug, "cannot apply options to UDP upstream socket");
+    udp_socket_.reset();
+    return false;
+  }
+
   ENVOY_LOG(debug, "creating new session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host->address()->asStringView());
 
   if (use_original_src_ip_) {
-    const Network::Socket::OptionsSharedPtr socket_options =
-        Network::SocketOptionFactory::buildIpTransparentOptions();
-    const bool ok = Network::Socket::applyOptions(
-        socket_options, *udp_socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND);
-
-    RELEASE_ASSERT(ok, "Should never occur!");
     ENVOY_LOG(debug, "The original src is enabled for address {}.",
               addresses_.peer_->asStringView());
   }
@@ -677,11 +744,16 @@ void UdpProxyFilter::UdpActiveSession::createUdpSocket(const Upstream::HostConst
   // sockets. We need to figure out how to either refactor Socket into something that works better
   // for this use case or allow the socket option abstractions to work directly against an IO
   // handle.
+  return true;
 }
 
 void UdpProxyFilter::ActiveSession::onInjectReadDatagramToFilterChain(ActiveReadFilter* filter,
                                                                       Network::UdpRecvData& data) {
   ASSERT(filter != nullptr);
+
+  if (handleUpstreamCreationFailure()) {
+    return;
+  }
 
   std::list<ActiveReadFilterPtr>::iterator entry = std::next(filter->entry());
   for (; entry != read_filters_.end(); entry++) {
@@ -690,6 +762,9 @@ void UdpProxyFilter::ActiveSession::onInjectReadDatagramToFilterChain(ActiveRead
     }
 
     auto status = (*entry)->read_filter_->onData(data);
+    if (handleUpstreamCreationFailure()) {
+      return;
+    }
     if (status == ReadFilterStatus::StopIteration) {
       return;
     }
