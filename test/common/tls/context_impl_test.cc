@@ -34,7 +34,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -1369,59 +1368,6 @@ TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineBytes) {
           inline_bytes: ""
   )EOF";
   EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException, "DataSource cannot be empty");
-}
-
-TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAWhenRuntimeDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
-  const std::string empty_ca_path = TestEnvironment::writeStringToFileForTest("test_envoy", "");
-  const std::string yaml = fmt::format(R"EOF(
-    common_tls_context:
-      tls_certificates:
-        certificate_chain:
-          filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/san_dns_cert.pem"
-        private_key:
-          filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/san_dns_key.pem"
-      validation_context:
-        trusted_ca:
-          filename: "{}"
-  )EOF",
-                                       empty_ca_path);
-  EXPECT_NO_THROW(loadConfigYaml(yaml));
-}
-
-TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineStringWhenRuntimeDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
-  const std::string yaml = R"EOF(
-    common_tls_context:
-      tls_certificates:
-        certificate_chain:
-          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
-        private_key:
-          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
-      validation_context:
-        trusted_ca:
-          inline_string: ""
-  )EOF";
-  EXPECT_NO_THROW(loadConfigYaml(yaml));
-}
-
-TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineByteWhenRuntimeDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
-  const std::string yaml = R"EOF(
-    common_tls_context:
-      tls_certificates:
-        certificate_chain:
-          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
-        private_key:
-          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
-      validation_context:
-        trusted_ca:
-          inline_bytes: ""
-  )EOF";
-  EXPECT_NO_THROW(loadConfigYaml(yaml));
 }
 
 TEST_F(SslServerContextImplTicketTest, ValidationContextWithPinnedCertificateHash) {
