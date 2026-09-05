@@ -133,20 +133,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false,
                       {{Admin::ParamDescriptor::Type::String, "filter",
                         "Regular expression (Google re2) for filtering clusters by name"}}),
-          makeHandler(
-              "/config_dump", "dump current Envoy configs",
-              MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false,
-              {{Admin::ParamDescriptor::Type::String, "resource", "The resource to dump"},
-               {Admin::ParamDescriptor::Type::String, "mask",
-                "The mask to apply. When both resource and mask are specified, "
-                "the mask is applied to every element in the desired repeated field so that only a "
-                "subset of fields are returned. The mask is parsed as a Protobuf::FieldMask"},
-               {Admin::ParamDescriptor::Type::String, "name_regex",
-                "Dump only the currently loaded configurations whose names match the specified "
-                "regex. Can be used with both resource and mask query parameters."},
-               {Admin::ParamDescriptor::Type::Boolean, "include_eds",
-                "Dump currently loaded configuration including EDS. See the response definition "
-                "for more information"}}),
+          config_dump_handler_.handlerConfigDumpStreamed(),
           makeHandler("/init_dump", "dump current Envoy init manager information (experimental)",
                       MAKE_ADMIN_HANDLER(init_dump_handler_.handlerInitDump), false, false,
                       {{Admin::ParamDescriptor::Type::String, "mask",
