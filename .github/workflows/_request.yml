@@ -21,10 +21,10 @@ on:
       cache-bazel-hash-paths:
         type: string
         default: |
-          WORKSPACE
-          bazel/repository_locations.bzl
-          bazel/toolchains.bzl
-          api/bazel/repository_locations.bzl
+          MODULE.bazel
+          MODULE.bazel.lock
+          bazel/deps.yaml
+          api/bazel/deps.yaml
           .bazelversion
           .github/workflows/_request_cache_bazel.yml
       config-file:
