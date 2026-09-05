@@ -273,7 +273,8 @@ TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
 // from choose_host (which exercises enable/enabled/disable and increments timer_armed_total). The
 // timer then fires repeatedly on the worker dispatcher and re-arms itself, so timer_fired_total
 // keeps climbing without further requests — proving the timer is created on the worker dispatcher,
-// fires on the worker thread, and re-arms.
+// fires on the worker thread, and re-arms. Each fire also records through a resolved counter handle
+// from the worker thread, exercising the resolve-then-record path end to end.
 TEST_P(DynamicModuleClusterIntegrationTest, WorkerTimerArmsFiresAndReArms) {
   initializeWithDecCluster("worker_timer");
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -290,6 +291,11 @@ TEST_P(DynamicModuleClusterIntegrationTest, WorkerTimerArmsFiresAndReArms) {
 
   // The timer fires on the worker dispatcher and re-arms, so the counter keeps climbing.
   test_server_->waitForCounter("dynamicmodulescustom.timer_fired_total", testing::Ge(3));
+
+  // Each fire also records through a resolved counter handle from the worker thread, so the tagged
+  // child stat climbs alongside timer_fired_total.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_fired_by_outcome.outcome.fired",
+                               testing::Ge(3));
 }
 
 // =============================================================================

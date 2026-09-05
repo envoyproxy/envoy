@@ -129,6 +129,12 @@ public:
       ASSERT(tags.has_value());
       Stats::Utility::counterFromElements(scope, {name_}, tags).add(amount);
     }
+    // Resolves one label-value tuple to its child counter. The reference is stable for the life of
+    // the scope, so a module holds it and skips the per-call name build that `add` pays.
+    Stats::Counter& resolve(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags) const {
+      ASSERT(tags.has_value());
+      return Stats::Utility::counterFromElements(scope, {name_}, tags);
+    }
 
   private:
     Stats::StatName name_;
@@ -164,6 +170,11 @@ public:
       ASSERT(tags.has_value());
       Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).set(amount);
     }
+    // See ModuleCounterVecHandle::resolve.
+    Stats::Gauge& resolve(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags) const {
+      ASSERT(tags.has_value());
+      return Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags);
+    }
 
   private:
     Stats::StatName name_;
@@ -190,6 +201,11 @@ public:
                      uint64_t value) const {
       ASSERT(tags.has_value());
       Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags).recordValue(value);
+    }
+    // See ModuleCounterVecHandle::resolve.
+    Stats::Histogram& resolve(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags) const {
+      ASSERT(tags.has_value());
+      return Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags);
     }
 
   private:
