@@ -838,6 +838,16 @@ envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
   return false;
 }
 
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    const envoy_dynamic_module_type_module_key_value_pair*, size_t) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch: "
+      "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_cluster_scheduler_module_ptr
 envoy_dynamic_module_callback_cluster_scheduler_new(envoy_dynamic_module_type_cluster_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_scheduler_new: "

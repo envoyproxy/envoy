@@ -4715,6 +4715,32 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_async_host_selection_
 ) {
 }
 
+// Records the batched entries so a test can assert the wrapper flattened them in order.
+pub(crate) static MOCK_CLUSTER_LB_CONTEXT_METADATA_BATCH: std::sync::Mutex<Vec<(String, String)>> =
+  std::sync::Mutex::new(Vec::new());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _ns: abi::envoy_dynamic_module_type_module_buffer,
+  entries: *const abi::envoy_dynamic_module_type_module_key_value_pair,
+  entries_size: usize,
+) -> bool {
+  let mut recorded = MOCK_CLUSTER_LB_CONTEXT_METADATA_BATCH.lock().unwrap();
+  recorded.clear();
+  for i in 0..entries_size {
+    let entry = unsafe { &*entries.add(i) };
+    let key = unsafe { std::slice::from_raw_parts(entry.key_ptr as *const u8, entry.key_length) };
+    let value =
+      unsafe { std::slice::from_raw_parts(entry.value_ptr as *const u8, entry.value_length) };
+    recorded.push((
+      String::from_utf8_lossy(key).into_owned(),
+      String::from_utf8_lossy(value).into_owned(),
+    ));
+  }
+  true
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
   _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,

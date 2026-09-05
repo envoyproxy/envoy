@@ -3037,6 +3037,85 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataString) {
   EXPECT_THAT(fields, Contains(IsStructString(key, "test_value")));
 }
 
+// The batch setter resolves the namespace and merges once for many keys.
+TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataStringBatch) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  size_t set_calls = 0;
+  ON_CALL(stream_info, setDynamicMetadata(_, _))
+      .WillByDefault(testing::Invoke([&](const std::string& name, const Protobuf::Struct& value) {
+        set_calls++;
+        (*stream_info.metadata_.mutable_filter_metadata())[name].MergeFrom(value);
+      }));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  std::string ns = "dynamic_modules.test";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns.data(), ns.size()};
+  std::string k1 = "l1_decision";
+  std::string v1 = "resolved";
+  std::string k2 = "l2_selector";
+  std::string v2 = "dicer";
+  const envoy_dynamic_module_type_module_key_value_pair entries[2] = {
+      {k1.data(), k1.size(), v1.data(), v1.size()},
+      {k2.data(), k2.size(), v2.data(), v2.size()},
+  };
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+      context_ptr, ns_buf, entries, 2));
+
+  // One merge for both keys, not one per key.
+  EXPECT_EQ(1, set_calls);
+  const auto& fields = stream_info.metadata_.filter_metadata().at(ns).fields();
+  EXPECT_THAT(fields, Contains(IsStructString(k1, "resolved")));
+  EXPECT_THAT(fields, Contains(IsStructString(k2, "dicer")));
+
+  // A later entry in the same call wins.
+  std::string v1b = "park";
+  const envoy_dynamic_module_type_module_key_value_pair dupes[2] = {
+      {k1.data(), k1.size(), v1.data(), v1.size()},
+      {k1.data(), k1.size(), v1b.data(), v1b.size()},
+  };
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+      context_ptr, ns_buf, dupes, 2));
+  EXPECT_THAT(stream_info.metadata_.filter_metadata().at(ns).fields(),
+              Contains(IsStructString(k1, "park")));
+
+  // The merge leaves keys the second batch did not mention intact.
+  EXPECT_THAT(stream_info.metadata_.filter_metadata().at(ns).fields(),
+              Contains(IsStructString(k2, "dicer")));
+}
+
+// An empty batch must not create the namespace, and a missing context or stream info fails.
+TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataStringBatchEdgeCases) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  size_t set_calls = 0;
+  ON_CALL(stream_info, setDynamicMetadata(_, _))
+      .WillByDefault(
+          testing::Invoke([&](const std::string&, const Protobuf::Struct&) { set_calls++; }));
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  std::string ns = "dynamic_modules.test";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns.data(), ns.size()};
+
+  // An empty batch reports success and touches nothing, so the namespace stays absent.
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+      context_ptr, ns_buf, nullptr, 0));
+  EXPECT_EQ(0, set_calls);
+  EXPECT_EQ(0, stream_info.metadata_.filter_metadata().count(ns));
+
+  // A null context is rejected rather than dereferenced.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+      nullptr, ns_buf, nullptr, 0));
+
+  // A request with no stream info fails instead of writing nowhere.
+  NiceMock<Upstream::MockLoadBalancerContext> no_info_context;
+  ON_CALL(no_info_context, requestStreamInfo()).WillByDefault(Return(nullptr));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+      static_cast<Upstream::LoadBalancerContext*>(&no_info_context), ns_buf, nullptr, 0));
+}
+
 // =================================================================================================
 // Async Host Selection Tests
 // =================================================================================================

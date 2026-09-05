@@ -1044,6 +1044,24 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_strin
   return true;
 }
 
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  ContextAccessor::setDynamicMetadataStringBatch(*stream_info, absl::string_view(ns.ptr, ns.length),
+                                                 entries, entries_size);
+  return true;
+}
+
 envoy_dynamic_module_type_cluster_scheduler_module_ptr
 envoy_dynamic_module_callback_cluster_scheduler_new(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {

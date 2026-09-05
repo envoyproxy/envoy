@@ -441,6 +441,9 @@ WEAK_STUB(ClusterLbContextSetFilterStateTyped,
           envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(nullptr,
                                                                                   {nullptr, 0},
                                                                                   {nullptr, 0}))
+WEAK_STUB(ClusterLbContextSetDynamicMetadataStringBatch,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+              nullptr, {nullptr, 0}, nullptr, 0))
 WEAK_STUB(ClusterLbGetClusterName,
           envoy_dynamic_module_callback_cluster_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(ClusterLbGetHostsCount,

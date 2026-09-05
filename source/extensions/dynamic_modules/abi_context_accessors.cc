@@ -596,6 +596,23 @@ void ContextAccessor::setDynamicMetadataNumber(StreamInfo::StreamInfo& stream_in
   stream_info.setDynamicMetadata(std::string(filter_name), metadata_value);
 }
 
+void ContextAccessor::setDynamicMetadataStringBatch(
+    StreamInfo::StreamInfo& stream_info, absl::string_view filter_name,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size) {
+  if (entries_size == 0) {
+    // An empty batch is a no-op and must not create the namespace.
+    return;
+  }
+  Protobuf::Struct metadata_value;
+  auto* fields = metadata_value.mutable_fields();
+  for (size_t i = 0; i < entries_size; i++) {
+    const auto& entry = entries[i];
+    (*fields)[absl::string_view(entry.key_ptr, entry.key_length)].set_string_value(
+        absl::string_view(entry.value_ptr, entry.value_length));
+  }
+  stream_info.setDynamicMetadata(std::string(filter_name), metadata_value);
+}
+
 bool ContextAccessor::setFilterStateBytes(
     StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
     std::optional<StreamInfo::FilterState::LifeSpan> life_span) {
