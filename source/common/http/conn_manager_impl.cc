@@ -375,9 +375,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
       // There was a downstream reset, log immediately.
       !stream.filter_manager_.sawDownstreamReset() &&
       // On recreate stream, log immediately.
-      stream.response_encoder_ != nullptr &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_defer_logging_to_ack_listener")) {
+      stream.response_encoder_ != nullptr) {
     stream.deferHeadersAndTrailers();
   } else {
     // For HTTP/1 and HTTP/2, log here as usual.
