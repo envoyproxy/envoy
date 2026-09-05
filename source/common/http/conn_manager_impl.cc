@@ -129,7 +129,7 @@ Stats::Counter& responseCodeClassCounter(Stats::Scope& scope, Stats::StatName ba
                                          absl::string_view name) {
   ASSERT(absl::StartsWith(name, "downstream_rq_"));
   ASSERT(absl::EndsWith(name, "xx"));
-  ASSERT(std::isdigit(name[name.size() - 3]));
+  ASSERT(absl::ascii_isdigit(name[name.size() - 3]));
   const absl::string_view response_code_class = name.substr(name.size() - 3, 1);
 
   Stats::SymbolTable& symbol_table = scope.symbolTable();

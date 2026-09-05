@@ -300,8 +300,7 @@ private:
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   Server::Configuration::FactoryContext& context_;
   const std::string stats_prefix_;
-  // The 'http.<stat_prefix>.' scope in which this connection manager and its HTTP filters create
-  // their stats.
+  // The 'http.<stat_prefix>.' scope in which this connection manager creates its stats.
   const Stats::ScopeSharedPtr http_scope_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
