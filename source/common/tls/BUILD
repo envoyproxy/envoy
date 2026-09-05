@@ -147,6 +147,7 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
         "//source/common/ssl:ssl_lib",
@@ -162,6 +163,7 @@ envoy_cc_library(
     deps = [
         ":context_config_lib",
         ":server_context_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/ssl:ssl_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
