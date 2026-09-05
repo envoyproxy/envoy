@@ -97,6 +97,32 @@ jobs:
       version-minor: ${{ fromJSON(inputs.request).request.version.minor }}
       version-patch: ${{ fromJSON(inputs.request).request.version.patch }}
 
+  dockerhub:
+    # Updates the Dockerhub repository description/readme
+    # (generated from `distribution/dockerhub`).
+    #
+    # The readme lists the supported (stable) release tags, so it only needs
+    # updating for release commits - skip it entirely otherwise.
+    if: inputs.trusted && ! fromJSON(inputs.request).request.version.dev
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+      dockerhub-write-token: ${{ secrets.dockerhub-write-token }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    needs:
+    - container
+    name: Publish Dockerhub readme
+    uses: ./.github/workflows/_run.yml
+    with:
+      target: dockerhub-publish
+      bazel-cache: true
+      rbe: false
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      request: ${{ inputs.request }}
+      trusted: ${{ inputs.trusted }}
+
   release:
     secrets:
       app-id: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_ID || '' }}

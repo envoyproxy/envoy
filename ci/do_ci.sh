@@ -816,8 +816,19 @@ case $CI_TARGET in
 
     dockerhub-publish)
         setup_clang_toolchain
+        DOCKERHUB_ARGS=()
+        if [[ -n "${DOCKERHUB_USERNAME:-}" ]]; then
+            DOCKERHUB_ARGS+=("--user=${DOCKERHUB_USERNAME}")
+        fi
+        if [[ -n "${ENVOY_PUBLISH_DRY_RUN:-}" ]]; then
+            DOCKERHUB_ARGS+=("--dry-run")
+        elif [[ -z "${DOCKERHUB_PASSWORD:-}" ]]; then
+            echo "DOCKERHUB_PASSWORD must be set to publish the Dockerhub readme" >&2
+            exit 1
+        fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-              //tools/distribution:update_dockerhub_repository
+              //tools/distribution:update_dockerhub_repository \
+              -- "${DOCKERHUB_ARGS[@]}"
         ;;
 
     dockerhub-readme)

@@ -79,6 +79,10 @@ class DockerhubRepositoryRunner(runner.Runner):
         return DockerhubAPI(self.args.repo, self.args.user, os.environ["DOCKERHUB_PASSWORD"])
 
     @property
+    def dry_run(self) -> bool:
+        return self.args.dry_run
+
+    @property
     def readme(self) -> str:
         return self.readme_path.read_text()
 
@@ -91,9 +95,18 @@ class DockerhubRepositoryRunner(runner.Runner):
         parser.add_argument("--user", default="envoyproxydockerbot")
         parser.add_argument("--description", default=ENVOY_DEFAULT_DESCRIPTION)
         parser.add_argument("--readme-file", default="distribution/dockerhub/readme.md")
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Print the description/readme without updating the Dockerhub repository")
         super().add_arguments(parser)
 
     async def run(self) -> None:
+        if self.dry_run:
+            print(f"[DRY RUN] Repo ({self.args.repo}) would be updated with:")
+            print(f"description: {self.description}")
+            print(self.readme)
+            return
         await self.dockerhub.update_repository(description=self.description, readme=self.readme)
         print(f"Repo ({self.args.repo}) updated")
 
