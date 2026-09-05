@@ -2293,6 +2293,13 @@ envoy.load_balancing_policies.dynamic_modules:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig
+envoy.http.early_header_mutation.exact_path_rewrite:
+  categories:
+  - envoy.http.early_header_mutation
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.early_header_mutation.exact_path_rewrite.v3.ExactPathRewrite
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation

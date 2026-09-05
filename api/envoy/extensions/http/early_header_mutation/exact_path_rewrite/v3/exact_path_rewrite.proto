@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package envoy.extensions.http.early_header_mutation.exact_path_rewrite.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.early_header_mutation.exact_path_rewrite.v3";
+option java_outer_classname = "ExactPathRewriteProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/early_header_mutation/exact_path_rewrite/v3;exact_path_rewritev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Exact path rewrite early header mutation extension]
+// [#extension: envoy.http.early_header_mutation.exact_path_rewrite]
+
+// Rewrites configured exact request paths before the initial route lookup.
+message ExactPathRewrite {
+  // The request header used to select a host rule set, such as ``:authority``.
+  string host_header = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Host rule sets. The most-specific matching rule set owns the path lookup.
+  repeated HostRules hosts = 2 [(validate.rules).repeated = {min_items: 1}];
+}
+
+// A set of exact path rewrites for one or more domains.
+message HostRules {
+  // Exact domains and virtual-host-style wildcard domains. A wildcard may occur
+  // only at the beginning or end of a domain. ``*`` matches every non-empty host.
+  repeated string domains = 1 [(validate.rules).repeated = {
+    min_items: 1
+    items {string {min_len: 1}}
+  }];
+
+  // Exact path rewrites. An empty list prevents less-specific domain rules from
+  // applying to a matching host.
+  repeated PathRewrite rules = 2;
+}
+
+// Replaces an exact path component. Query strings are preserved verbatim.
+message PathRewrite {
+  // The path component to match. It must not contain a query string.
+  string exact_path = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The replacement path component. It must not contain a query string.
+  string replacement_path = 2 [(validate.rules).string = {min_len: 1}];
+}

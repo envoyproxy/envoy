@@ -397,6 +397,7 @@
 /*/extensions/load_balancing_policies/load_aware_locality @tonya11en @jukie @nezdolik
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
+/*/extensions/http/early_header_mutation/exact_path_rewrite @wbpcode @tyxia @UNOWNED
 # Network matching extensions
 /*/extensions/matching/network/ @kyessenov @mattklein123
 # String matching extensions
