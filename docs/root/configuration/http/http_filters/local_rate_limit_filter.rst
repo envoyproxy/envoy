@@ -56,6 +56,23 @@ enforced, or when a custom status other than 429 is configured. The option is di
       denominator: HUNDRED
   enable_retry_after_header: true
 
+Sharing across a local cluster
+------------------------------
+
+When
+:ref:`local_cluster_rate_limit <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_cluster_rate_limit>`
+is configured, Envoy divides each token bucket evenly across the current local cluster membership
+by scaling each request's token cost by the membership. If the scaled cost is larger than
+``max_tokens``, the request cannot be admitted even when the bucket is full.
+
+By default, Envoy caps the scaled cost at ``max_tokens`` when the request would fit without sharing.
+This lets one request consume the full bucket instead of being rejected permanently after the local
+cluster grows. This behavior can be temporarily reverted by setting runtime guard
+``envoy.reloadable_features.local_ratelimit_local_cluster_preserve_one_request`` to ``false``.
+Because each member can consume a full bucket, the aggregate burst and admitted rate can exceed the
+configured values. A request that costs more than ``max_tokens`` without sharing remains rejected,
+and a bucket with ``max_tokens: 0`` rejects every request.
+
 Example configuration
 ---------------------
 

@@ -1,5 +1,6 @@
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <memory>
@@ -83,7 +84,16 @@ RateLimitTokenBucket::RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_
       fill_interval_(fill_interval), shadow_mode_(shadow_mode) {}
 bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume) {
   ASSERT(!(factor <= 0.0 || factor > 1.0));
-  auto cb = [tokens = to_consume / factor](double total) { return total < tokens ? 0.0 : tokens; };
+  const double max_tokens = token_bucket_.maxTokens();
+  const double scaled_tokens = to_consume / factor;
+  // When sharing makes a request that would otherwise fit larger than the bucket, charge one full
+  // bucket so it can be admitted when full.
+  const bool preserve_one_request =
+      max_tokens > 0 && to_consume <= max_tokens && scaled_tokens > max_tokens &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.local_ratelimit_local_cluster_preserve_one_request");
+  const double tokens = preserve_one_request ? max_tokens : scaled_tokens;
+  auto cb = [tokens](double total) { return total < tokens ? 0.0 : tokens; };
   return token_bucket_.consume(cb) != 0.0;
 }
 
