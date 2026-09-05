@@ -315,9 +315,10 @@ public:
   bool removeCluster(absl::string_view cluster, const bool remove_ignored = false) override;
   void shutdown() override {
     shutdown_ = true;
-    if (resume_cds_ != nullptr) {
-      resume_cds_->cancel();
+    for (auto& [name, handle] : cds_pauses_) {
+      handle->cancel();
     }
+    cds_pauses_.clear();
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     xds_manager_.shutdown();
@@ -997,8 +998,10 @@ private:
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
-  // Temporarily saved resume cds callback from updateClusterCounts invocation.
-  Config::ScopedResume resume_cds_;
+  // Per-cluster CDS pause handles. Each warming cluster that can block CDS holds one handle here. 
+  // CDS stays paused as long as any handle is live. Clusters with a zero-timeout SDS dependency
+  // are excluded so a missing secret never deadlocks ADS for unrelated clusters.
+  absl::flat_hash_map<std::string, Config::ScopedResume> cds_pauses_;
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined.
   std::optional<std::string> local_cluster_name_;
