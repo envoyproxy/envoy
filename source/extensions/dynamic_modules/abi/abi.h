@@ -15463,6 +15463,326 @@ envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value);
 
+// =============================================================================
+// ========================= Early Header Mutation =============================
+// =============================================================================
+
+// =============================================================================
+// Early Header Mutation Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleEarlyHeaderMutation class in Envoy. This is passed to the module when creating a new
+ * in-module early header mutation configuration and may be used to access the early header mutation
+ * configuration-scoped information in the future.
+ *
+ * This has 1:1 correspondence with
+ * envoy_dynamic_module_type_early_header_mutation_config_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_early_header_mutation_config_module_ptr is a pointer to an in-module
+ * early header mutation configuration created by
+ * envoy_dynamic_module_on_early_header_mutation_config_new. Exactly one configuration is created
+ * per configured extension entry, and it is shared by every request handled by every worker thread.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_early_header_mutation_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_early_header_mutation_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr is a raw pointer to the Envoy
+ * context of a single early header mutation. It provides read and write access to the request
+ * headers and read access to the stream info through the early header mutation callbacks.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is only valid during the
+ * envoy_dynamic_module_on_early_header_mutation_mutate callback on the worker thread handling the
+ * request, and it refers to storage that Envoy reuses once the callback returns. The module must
+ * not store this pointer, share it across threads, or use it after the callback returns.
+ */
+typedef void* envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr;
+
+// =============================================================================
+// Early Header Mutation Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_early_header_mutation_config_new is called on the main thread when an
+ * early header mutation extension referencing this module is configured. The module should parse
+ * the configuration and return a pointer to the in-module early header mutation configuration.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleEarlyHeaderMutation object for the
+ * corresponding config.
+ * @param name is the early header mutation name used to select an implementation within the module.
+ * @param config is the configuration bytes for the early header mutation.
+ * @return envoy_dynamic_module_type_early_header_mutation_config_module_ptr is the pointer to the
+ * in-module early header mutation configuration. Returning nullptr indicates a failure to
+ * initialize, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_early_header_mutation_config_module_ptr
+envoy_dynamic_module_on_early_header_mutation_config_new(
+    envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_early_header_mutation_config_destroy is called when the early header
+ * mutation configuration is destroyed, which happens when the listener owning the connection
+ * manager configuration that references it is drained and removed.
+ *
+ * @param config_module_ptr is the pointer to the in-module early header mutation configuration.
+ */
+void envoy_dynamic_module_on_early_header_mutation_config_destroy(
+    envoy_dynamic_module_type_early_header_mutation_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_early_header_mutation_mutate is called once per request to rewrite the
+ * request headers, before routing, tracing, request ID generation, x-forwarded-for handling and any
+ * HTTP filter runs.
+ *
+ * This may be called concurrently on multiple worker threads with the same in-module configuration,
+ * so the module must treat the configuration as read-only and avoid shared mutable state.
+ *
+ * Only the request headers exist at this point. The stream info is read-only: the connection-level
+ * attributes and any dynamic metadata or filter state published by listener or network filters are
+ * available, while the route, the response and every upstream attribute are not yet populated and
+ * their getters return false.
+ *
+ * @param config_module_ptr is the pointer to the in-module early header mutation configuration.
+ * @param envoy_ptr is the pointer to the Envoy early header mutation context, valid only during
+ * this call.
+ * @return true to continue to the next early header mutation extension in the configured chain,
+ * false to stop the chain. This is not a success or failure signal: the mutations the module has
+ * already made are kept either way, and returning false only suppresses the extensions configured
+ * after this one. When this is the last or only extension in the chain, the return value has no
+ * effect.
+ */
+bool envoy_dynamic_module_on_early_header_mutation_mutate(
+    envoy_dynamic_module_type_early_header_mutation_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr);
+
+// =============================================================================
+// Early Header Mutation Callbacks
+// =============================================================================
+
+// ------------------ Early Header Mutation Callbacks - Headers ----------------
+// Only the request headers exist at this point in the request lifecycle, so these callbacks take no
+// header type and always operate on the request header map.
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_headers_size is called by the module to
+ * get the number of request headers.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @return the number of request headers.
+ */
+size_t envoy_dynamic_module_callback_early_header_mutation_get_headers_size(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_headers is called by the module to get
+ * all request headers.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param result_headers is the array to store the headers. The module must ensure that the array
+ * has enough space to store all headers, i.e. at least
+ * envoy_dynamic_module_callback_early_header_mutation_get_headers_size entries. Envoy does not
+ * bounds check the array, so passing a shorter one is undefined behavior. The buffers in the
+ * entries are owned by Envoy and are invalidated by any of the header setter callbacks below.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_headers(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_header_value is called by the module to
+ * get the value of a request header with the given key.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the key of the header.
+ * @param result is the pointer to the buffer where the header value will be stored. It is set to a
+ * null buffer of length zero when the key does not exist or the index is out of range. The buffer
+ * is owned by Envoy and is invalidated by any of the header setter callbacks below.
+ * @param index is the index of the header value in the case of multiple values for the same key,
+ * zero for the first value.
+ * @param total_count_out, when non-null, receives the total number of values for the key.
+ * @return true if the header exists at the given index, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_header_value(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_set_header is called by the module to set the
+ * value of the request header with the given key. If the header does not exist, it will be created.
+ * If the header already exists, all existing values will be removed and the new value will be set.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the key of the header. An empty key is rejected.
+ * @param value is the value of the header. An empty value sets the header to an empty string; use
+ * envoy_dynamic_module_callback_early_header_mutation_remove_header to remove a header.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that this only sets the header on the underlying Envoy object. The connection manager and
+ * the subsequent filters may still rewrite or drop it, so returning true does not guarantee that
+ * the header reaches the upstream. In particular, the connection manager sanitizes the
+ * ``connection``,
+ * ``upgrade``, ``te`` and ``x-forwarded-for`` headers right after this hook runs.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_set_header(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_add_header is called by the module to add a
+ * value to the request header with the given key, preserving any existing values. If the header
+ * does not exist, it will be created.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the key of the header. An empty key is rejected.
+ * @param value is the value to add.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_add_header(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_remove_header is called by the module to
+ * remove all values of the request header with the given key.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the key of the header to remove. An empty key is rejected.
+ * @return true if the operation is successful, false otherwise. Removing a key that does not exist
+ * is successful.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_remove_header(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
+// ----------- Early Header Mutation Callbacks - Generic Attributes ------------
+// The attribute callbacks share the envoy_dynamic_module_type_attribute_id enum with the access
+// logger. Early header mutation runs before routing and before the upstream request, so the route,
+// response and upstream attributes are not populated yet and the getters return false for them.
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_attribute_string is called by the module
+ * to get a string attribute value from the stream info. If the attribute is not found, not
+ * supported or is not a string, this returns false.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the buffer where the string value will be stored. The buffer is
+ * owned by Envoy and is valid until the end of the current event hook.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_attribute_string(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_attribute_int is called by the module to
+ * get an integer attribute value from the stream info. If the attribute is not found, not supported
+ * or is not an integer, this returns false.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_attribute_int(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_attribute_bool is called by the module to
+ * get a boolean attribute value from the stream info. If the attribute is not found, not supported
+ * or is not a boolean, this returns false.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the boolean value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_attribute_bool(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+// -------- Early Header Mutation Callbacks - Metadata and Dynamic State -------
+// The stream info is read-only at this point in the request lifecycle, so only getters are exposed.
+// A module that needs to publish state for later extensions should do so from an HTTP filter.
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata is called by the module
+ * to get a string value from dynamic metadata by filter name and key path.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result is the pointer to the buffer where the string value will be stored. Only string
+ * values are returned. The buffer is owned by Envoy and is valid until the end of the current event
+ * hook.
+ * @return true if a string value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_number is called by the
+ * module to get a number value from dynamic metadata by filter name and key path.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result is the pointer to the variable where the number value will be stored.
+ * @return true if a number value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, double* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_bool is called by the
+ * module to get a boolean value from dynamic metadata by filter name and key path.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result is the pointer to the variable where the boolean value will be stored.
+ * @return true if a boolean value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes is called by the
+ * module to get a bytes value from the filter state. Only objects stored as
+ * Envoy::Router::StringAccessor, which is what the dynamic module filter state setters create, are
+ * readable through this callback.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the filter state key to look up.
+ * @param result is the pointer to the buffer where the bytes value will be stored. The buffer is
+ * owned by Envoy and is valid until the end of the current event hook.
+ * @return true if the key exists and holds a readable value, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
 #ifdef __cplusplus
 }
 #endif

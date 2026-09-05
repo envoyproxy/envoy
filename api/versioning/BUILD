@@ -278,6 +278,7 @@ proto_library(
         "//envoy/extensions/http/cache_v2/simple_http_cache/v3:pkg",
         "//envoy/extensions/http/custom_response/local_response_policy/v3:pkg",
         "//envoy/extensions/http/custom_response/redirect_policy/v3:pkg",
+        "//envoy/extensions/http/early_header_mutation/dynamic_modules/v3:pkg",
         "//envoy/extensions/http/early_header_mutation/header_mutation/v3:pkg",
         "//envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3:pkg",
         "//envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3:pkg",
