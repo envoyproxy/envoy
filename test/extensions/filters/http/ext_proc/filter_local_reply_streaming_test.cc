@@ -24,7 +24,6 @@
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -166,9 +165,6 @@ public:
 
   void expectFailureWithWrongBodyMode(absl::string_view body_mode,
                                       absl::string_view error_details) {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.ext_proc_fail_close_spurious_resp", "true"}});
     std::string config = R"EOF(
     grpc_service:
       envoy_grpc:
@@ -900,9 +896,6 @@ TEST_F(StreamingLocalReplyTest,
 }
 
 TEST_F(StreamingLocalReplyTest, LocalBodyWithoutHeadersResponse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_fail_close_spurious_resp", "true"}});
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -933,9 +926,6 @@ TEST_F(StreamingLocalReplyTest, LocalBodyWithoutHeadersResponse) {
 }
 
 TEST_F(StreamingLocalReplyTest, LocalTrailersWithoutHeadersResponse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_fail_close_spurious_resp", "true"}});
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -985,9 +975,6 @@ TEST_F(StreamingLocalReplyTest, LocalBodyResponseInStreamingMode) {
 }
 
 TEST_F(StreamingLocalReplyTest, LocalBodyWithoutHeadersResponseWithFailOpen) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_fail_close_spurious_resp", "true"}});
   initialize(R"EOF(
   failure_mode_allow: true
   grpc_service:
@@ -1013,9 +1000,6 @@ TEST_F(StreamingLocalReplyTest, LocalBodyWithoutHeadersResponseWithFailOpen) {
 }
 
 TEST_F(StreamingLocalReplyTest, LocalTrailersWithoutHeadersResponseWithFailOpen) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_fail_close_spurious_resp", "true"}});
   initialize(R"EOF(
   failure_mode_allow: true
   grpc_service:
@@ -1042,9 +1026,6 @@ TEST_F(StreamingLocalReplyTest, LocalTrailersWithoutHeadersResponseWithFailOpen)
 }
 
 TEST_F(StreamingLocalReplyTest, InvalidBodyMessageAfterLocalResponseStarted) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_fail_close_spurious_resp", "true"}});
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -1082,9 +1063,6 @@ TEST_F(StreamingLocalReplyTest, InvalidBodyMessageAfterLocalResponseStarted) {
 }
 
 TEST_F(StreamingLocalReplyTest, InvalidTrailersMessageAfterLocalResponseStarted) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_fail_close_spurious_resp", "true"}});
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -1126,9 +1104,6 @@ TEST_F(StreamingLocalReplyTest, InvalidTrailersMessageAfterLocalResponseStarted)
 }
 
 TEST_F(StreamingLocalReplyTest, InvalidBodyMessageAfterLocalResponseStartedWithFailOpen) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_fail_close_spurious_resp", "true"}});
   initialize(R"EOF(
   failure_mode_allow: true
   grpc_service:
@@ -1167,9 +1142,6 @@ TEST_F(StreamingLocalReplyTest, InvalidBodyMessageAfterLocalResponseStartedWithF
 }
 
 TEST_F(StreamingLocalReplyTest, InitiateLocalSteramingResponseWithoutRequestHeaders) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_fail_close_spurious_resp", "true"}});
   // Skip sending headers from the client and try to initiate local response streaming
   // when processing request body.
   initialize(R"EOF(
