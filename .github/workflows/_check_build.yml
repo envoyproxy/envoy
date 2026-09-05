@@ -40,7 +40,8 @@ jobs:
         ERROR
         error:
         Error:
-        FAILED in
+        FAILED
+        FAIL:
       rbe: true
       request: ${{ inputs.request }}
       catch-errors: ${{ matrix.catch-errors || false }}

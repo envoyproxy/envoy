@@ -48,7 +48,8 @@ jobs:
         ERROR
         error:
         Error:
-        FAILED in
+        FAILED
+        FAIL:
       skip: ${{ matrix.skip != false && true || false }}
       steps-post: ${{ matrix.steps-post }}
       target: ${{ matrix.target }}

@@ -70,22 +70,6 @@ paths:
     - bazel/toolchains/
     - docs
 
-  # `build_urls`:
-  #   We want all URL references to exist in repository_locations.bzl files and have
-  #   metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below
-  #   we have some exceptions for either infrastructure files or places we fall
-  #   short today (Rust).
-  #
-  # NB: Please DO NOT extend the `build_urls` allow list without consulting
-  # @envoyproxy/dependency-shepherds.
-  build_urls:
-    include:
-    - api/bazel/envoy_http_archive.bzl
-    - api/bazel/repository_locations.bzl
-    - bazel/external/cargo/remote/defs.bzl
-    - bazel/repository_locations.bzl
-    - docs/bazel/repository_locations.bzl
-
   exception:
     include:
     # Header files that can throw exceptions. These should be limited; the only

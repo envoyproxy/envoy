@@ -1,5 +1,4 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
-load("@aspect_bazel_lib//lib:yq.bzl", "yq")
 load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@rules_go//proto:compiler.bzl", "go_proto_compiler")
 load(
@@ -8,15 +7,11 @@ load(
     "EXTERNAL_PROTO_GO_BAZEL_DEP_MAP",
     "EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP",
 )
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
-load(":repository_locations_utils.bzl", "load_repository_locations_spec")
 
 licenses(["notice"])  # Apache 2
 
 exports_files([
     "extensions.bzl",
-    "repository_locations.bzl",
-    "repository_locations_utils.bzl",
     "utils.bzl",
     "deps.yaml",
 ])
@@ -30,48 +25,6 @@ go_proto_compiler(
     plugin = "@com_github_planetscale_vtprotobuf//cmd/protoc-gen-go-vtproto",
     suffix = "_vtproto.pb.go",
     valid_archive = False,
-    visibility = ["//visibility:public"],
-)
-
-json_data(
-    name = "legacy_repository_locations_version_info",
-    data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
-)
-
-yq(
-    name = "deps_yaml_to_json",
-    srcs = [":deps.yaml"],
-    outs = ["deps.json"],
-    args = ["-o=json"],
-)
-
-jq(
-    name = "legacy_repository_locations",
-    srcs = [
-        ":deps_yaml_to_json",
-        ":legacy_repository_locations_version_info",
-    ],
-    out = "repository_locations.json",
-    args = ["--slurp"],
-    filter = """
-    .[0] as $versions
-    | .[1] as $metadata
-    | $versions
-    | keys
-    | reduce .[] as $k ({};
-        . + {($k): (
-          ($versions[$k] + ($metadata[$k] // {}))
-          | .version as $ver
-          | if .license_url and $ver then
-              .license_url |= (
-                gsub("{version}"; $ver)
-                | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
-                | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
-              )
-            else . end
-        )}
-      )
-    """,
     visibility = ["//visibility:public"],
 )
 
