@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.tcp.dns_filter.v3;
+
+import "envoy/config/accesslog/v3/accesslog.proto";
+import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/resolver.proto";
+import "envoy/data/dns/v3/dns_table.proto";
+
+import "google/protobuf/duration.proto";
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.tcp.dns_filter.v3";
+option java_outer_classname = "DnsFilterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/tcp/dns_filter/v3;dns_filterv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// Configuration for the TCP DNS filter.
+message DnsFilterConfig {
+  message ServerContextConfig {
+    oneof config_source {
+      option (validate.required) = true;
+
+      data.dns.v3.DnsTable inline_dns_table = 1;
+
+      config.core.v3.DataSource external_dns_table = 2;
+    }
+  }
+
+  message ClientContextConfig {
+    google.protobuf.Duration resolver_timeout = 1 [(validate.rules).duration = {gte {seconds: 1}}];
+
+    repeated config.core.v3.Address upstream_resolvers = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+    config.core.v3.DnsResolutionConfig dns_resolution_config = 5
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+    config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 4;
+
+    uint64 max_pending_lookups = 3 [(validate.rules).uint64 = {gte: 1}];
+  }
+
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  ServerContextConfig server_config = 2;
+
+  ClientContextConfig client_config = 3;
+
+  repeated config.accesslog.v3.AccessLog access_log = 4;
+}
