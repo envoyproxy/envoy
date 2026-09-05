@@ -313,6 +313,7 @@ public:
   ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 
   bool removeCluster(absl::string_view cluster, const bool remove_ignored = false) override;
+  std::vector<std::string> removeClusters(const std::vector<std::string>& clusters, const bool remove_ignored = false) override;
   void shutdown() override {
     shutdown_ = true;
     if (resume_cds_ != nullptr) {
