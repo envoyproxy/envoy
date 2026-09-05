@@ -45,8 +45,7 @@ constexpr uint32_t kMaxBackoffExponent = 32;
 // ``Retry-After`` cool-off, and the maintenance re-check) so agents that fail together
 // de-synchronize their next attempt.
 constexpr uint64_t kReconnectJitterPercent = 15;
-// Steady-state maintenance re-check interval.
-constexpr uint64_t kMaintainIntervalMs = 10000;
+
 // Short re-check interval used while a hot-restart child is waiting to be allowed to dial (i.e.
 // until it has asked the parent to stop accepting). The handoff window is brief, so poll frequently
 // to bound the added latency before the child stands up its own tunnel.
@@ -113,6 +112,8 @@ void ReverseConnectionIOHandle::cleanup() {
                  "reverse_tunnel: resetting file events before closing trigger pipe; "
                  "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
                  trigger_pipe_write_fd_, trigger_pipe_read_fd_);
+  // The worker dispatcher is destroyed before this handle during server teardown.
+  worker_dispatcher_ = nullptr;
   resetFileEvents();
   SET_SOCKET_INVALID(trigger_pipe_read_fd_);
 
@@ -392,11 +393,38 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
               fd_);
   }
 
-  if (rev_conn_retry_timer_) {
+  // Avoid destroying the worker-owned timer from another thread.
+  if (rev_conn_retry_timer_ != nullptr &&
+      (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe())) {
     rev_conn_retry_timer_.reset();
   }
 
   return IoSocketHandleImpl::close();
+}
+
+void ReverseConnectionIOHandle::resetFileEvents() {
+  // Stop redials on the timer's worker before the listener closes.
+  if (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe()) {
+    rev_conn_retry_timer_.reset();
+  }
+
+  // Handshake connections have their own file events. Tear them down on this worker so
+  // main-thread close()/destructor does not destroy in-flight codecs. Skip when
+  // worker_dispatcher_ is null (cleanup() after workers are gone).
+  if (worker_dispatcher_ != nullptr && worker_dispatcher_->isThreadSafe()) {
+    conn_wrapper_to_host_map_.clear();
+    std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers = std::move(connection_wrappers_);
+    connection_wrappers_.clear();
+    for (auto& wrapper : wrappers) {
+      if (wrapper == nullptr) {
+        continue;
+      }
+      wrapper->shutdown();
+      worker_dispatcher_->deferredDelete(std::move(wrapper));
+    }
+  }
+
+  IoSocketHandleImpl::resetFileEvents();
 }
 
 void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
@@ -524,12 +552,8 @@ void ReverseConnectionIOHandle::removeStaleHostAndCloseConnections(const std::st
       connection->close(Network::ConnectionCloseType::FlushWrite);
     }
 
-    // Remove from wrapper-to-host map.
-    conn_wrapper_to_host_map_.erase(wrapper);
-    // Remove the wrapper from connection_wrappers_ vector.
-    std::erase_if(connection_wrappers_, [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) {
-      return w.get() == wrapper;
-    });
+    wrapper->shutdown();
+    removeAndDeferredDeleteWrapper(wrapper);
   }
   // Clear connection keys from host info.
   auto host_it = host_to_conn_info_map_.find(host);
@@ -612,7 +636,7 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
     uint32_t current_connections = host_to_conn_info_map_[key].connection_keys.size();
     uint32_t pending_connections = host_to_conn_info_map_[key].connecting_count;
 
-    ENVOY_LOG(info,
+    ENVOY_LOG(debug,
               "reverse_tunnel: Number of reverse connections to host {} of cluster {} from source "
               "node: {}: "
               "Current: {}, Pending: {}, Required: {}",
@@ -911,10 +935,17 @@ void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
     return;
   }
 
-  // Dial the replacement on the next dispatcher pass instead of waiting for the periodic tick.
-  if (rev_conn_retry_timer_ != nullptr) {
-    rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(0));
+  // A stopped listener has no retry timer.
+  if (rev_conn_retry_timer_ == nullptr) {
+    ENVOY_LOG(debug,
+              "reverse_tunnel: skipping replacement dial for {}; retry timer is gone "
+              "(listener stop)",
+              connection_key);
+    return;
   }
+
+  // Dial the replacement on the next dispatcher pass instead of waiting for the periodic tick.
+  rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(0));
 }
 
 void ReverseConnectionIOHandle::updateStateGauge(const std::string& host_address,
@@ -1008,7 +1039,7 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
   // Enable the retry timer to periodically check for missing connections (like maintainConnCount).
   if (rev_conn_retry_timer_) {
     const uint64_t retry_timeout_ms = ReverseConnectionUtility::addJitter(
-        kMaintainIntervalMs, kReconnectJitterPercent, extension_->randomGenerator());
+        config_.maintain_interval_ms, kReconnectJitterPercent, extension_->randomGenerator());
     rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(retry_timeout_ms));
     ENVOY_LOG(debug, "Enabled retry timer for next connection check in {}ms.", retry_timeout_ms);
   }
@@ -1249,12 +1280,10 @@ void ReverseConnectionIOHandle::onConnectionDone(
     updateConnectionState(host_address, cluster_name, connection_key,
                           ReverseConnectionState::Failed);
 
-    // Safely close connection if still valid.
-    if (connection) {
-      if (connection->getSocket()) {
-        connection->getSocket()->ioHandle().resetFileEvents();
-      }
-      connection->close(Network::ConnectionCloseType::NoFlush);
+    // decodeHeaders() runs inside Http1::dispatch(); do not close() here.
+    // The wrapper is deferred-deleted; shutdown() closes the connection afterwards.
+    if (closed && connection && connection->getSocket()) {
+      connection->getSocket()->ioHandle().resetFileEvents();
     }
 
     trackConnectionFailure(host_address, cluster_name, retry_after);
@@ -1318,14 +1347,15 @@ void ReverseConnectionIOHandle::onConnectionDone(
     }
   }
 
-  // Safely remove wrapper from tracking.
+  removeAndDeferredDeleteWrapper(wrapper);
+}
+
+void ReverseConnectionIOHandle::removeAndDeferredDeleteWrapper(RCConnectionWrapper* wrapper) {
   conn_wrapper_to_host_map_.erase(wrapper);
 
-  // Find and remove wrapper from vector safely.
   auto wrapper_vector_it = std::find_if(
       connection_wrappers_.begin(), connection_wrappers_.end(),
       [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) { return w.get() == wrapper; });
-
   if (wrapper_vector_it != connection_wrappers_.end()) {
     auto wrapper_to_delete = std::move(*wrapper_vector_it);
     connection_wrappers_.erase(wrapper_vector_it);

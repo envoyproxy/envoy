@@ -14,6 +14,7 @@ envoy_cc_extension(
     hdrs = ["xfcc_value.h"],
     deps = [
         "//source/common/formatter:formatter_extension_lib",
+        "//source/common/formatter:serializer_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/protobuf:utility_lib",
     ],

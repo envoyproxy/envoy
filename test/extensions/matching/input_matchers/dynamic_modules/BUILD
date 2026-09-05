@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_dyn_module_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -8,12 +9,13 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:matcher_check_headers",
         "//test/extensions/dynamic_modules/test_data/c:matcher_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:matcher_lifecycle_counter",
         "//test/extensions/dynamic_modules/test_data/c:matcher_missing_config_destroy",
         "//test/extensions/dynamic_modules/test_data/c:matcher_missing_config_new",
         "//test/extensions/dynamic_modules/test_data/c:matcher_missing_match",
@@ -21,6 +23,7 @@ envoy_cc_test(
     ],
     deps = [
         "//envoy/registry",
+        "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/matching/input_matchers/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/server:server_factory_context_mocks",
@@ -28,7 +31,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
     data = [
@@ -52,7 +55,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [

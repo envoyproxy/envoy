@@ -21,10 +21,13 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::Eq;
 using testing::Ge;
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -284,13 +287,11 @@ void ReverseTunnelFilterIntegrationTest::completeReverseTunnelHandshake(
   std::string handshake_request;
   ASSERT_TRUE(connection.waitForData(FakeRawConnection::waitForInexactMatch("\r\n\r\n"),
                                      &handshake_request));
-  EXPECT_NE(handshake_request.find("GET /reverse_connections/request HTTP/1.1"), std::string::npos);
-  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-node-id: e2e-node"), std::string::npos);
-  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-cluster-id: e2e-cluster"),
-            std::string::npos);
-  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-tenant-id: e2e-tenant"),
-            std::string::npos);
-  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-initiation-time:"), std::string::npos);
+  EXPECT_THAT(handshake_request, HasSubstr("GET /reverse_connections/request HTTP/1.1"));
+  EXPECT_THAT(handshake_request, HasSubstr("x-envoy-reverse-tunnel-node-id: e2e-node"));
+  EXPECT_THAT(handshake_request, HasSubstr("x-envoy-reverse-tunnel-cluster-id: e2e-cluster"));
+  EXPECT_THAT(handshake_request, HasSubstr("x-envoy-reverse-tunnel-tenant-id: e2e-tenant"));
+  EXPECT_THAT(handshake_request, HasSubstr("x-envoy-reverse-tunnel-initiation-time:"));
 
   ASSERT_TRUE(connection.write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"));
 }

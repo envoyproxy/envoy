@@ -87,8 +87,9 @@ public:
   MOCK_METHOD(void, shutdownListener, (const Network::ExtraShutdownListenerOptions&));
   MOCK_METHOD(void, updateListenerConfig, (Network::ListenerConfig&));
   MOCK_METHOD(void, onFilterChainDraining, (const std::list<const Network::FilterChain*>&));
-  MOCK_METHOD(void, onFilterChainDrainStart, (const std::list<const Network::FilterChain*>&));
-  MOCK_METHOD(void, onListenerDrainStart, ());
+  MOCK_METHOD(void, onFilterChainDrainStart,
+              (const std::list<const Network::FilterChain*>&, Network::ConnectionDrainEvent));
+  MOCK_METHOD(void, onListenerDrainStart, (Network::ConnectionDrainEvent));
   MOCK_METHOD(void, onAccept, (Network::ConnectionSocketPtr&&));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 };

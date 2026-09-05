@@ -28,7 +28,7 @@ envoy_extension_cc_test(
         "filter_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_server"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_server:config",
@@ -45,7 +45,7 @@ envoy_extension_cc_test(
         "integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_server"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_server:config",

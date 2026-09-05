@@ -259,6 +259,48 @@ TEST_P(DynamicModulesIntegrationTest, LogLevel) {
                         .getStringView());
 }
 
+// A `direct_response` route is served as a local reply. The module did not send it, so its
+// response callbacks must still run. Regression test for the C++ SDK, which set the same
+// `local_reply_sent_` flag on the local-reply notification that it sets when the module itself
+// calls `sendLocalResponse()`, and then skipped every response callback for the stream.
+TEST_P(DynamicModulesIntegrationTest, ResponseCallbacksOnLocalReply) {
+#ifdef __APPLE__
+  if (GetParam() == "go") {
+    // Not this test: with a Go module loaded, ~IntegrationTestServer never returns, because the
+    // exiting server thread runs macOS pthread key destructors and one of them enters the Go
+    // runtime and does not come back. The request itself succeeds. See #46905. Scoped to Apple
+    // platforms because Go is the only SDK here whose runtime installs key destructors and this
+    // has not been seen on Linux.
+    GTEST_SKIP() << "Go module deadlocks server teardown on macOS, see #46905";
+  }
+#endif
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->clear_route();
+        auto* direct_response = route->mutable_direct_response();
+        direct_response->set_status(200);
+        direct_response->mutable_body()->set_inline_string("ok");
+      });
+  initializeFilter("local_reply_response_headers");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("called", response->headers()
+                          .get(Http::LowerCaseString("on-response-headers"))[0]
+                          ->value()
+                          .getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, HeaderCallbacks) { runHeaderCallbacksTest(false); }
 
 TEST_P(DynamicModulesIntegrationTest, HeaderCallbacksWithUpstreamFilter) {

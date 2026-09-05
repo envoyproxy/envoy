@@ -258,8 +258,10 @@ protected:
     const std::string server_ctx_yaml = upstream ? ctx_yaml : absl::StrCat(ctx_yaml, selector_yaml);
     const std::string client_ctx_yaml = upstream ? absl::StrCat(ctx_yaml, selector_yaml) : ctx_yaml;
 
+    NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
     Event::SimulatedTimeSystem time_system;
-    Stats::TestUtil::TestStore server_stats_store;
+    Stats::TestUtil::TestStore server_stats_store(
+        server_factory_context.serverScope().symbolTable());
     Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
     NiceMock<Runtime::MockLoader> runtime;
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
@@ -287,7 +289,6 @@ protected:
     Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
     provider_factory_.mod_ = mod;
 
-    NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
     Tls::ContextManagerImpl manager(server_factory_context);
     auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
         std::move(server_cfg), manager, *server_stats_store.rootScope());
@@ -304,7 +305,8 @@ protected:
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
     TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
 
-    Stats::TestUtil::TestStore client_stats_store;
+    Stats::TestUtil::TestStore client_stats_store(
+        server_factory_context.serverScope().symbolTable());
     Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
         client_factory_context;

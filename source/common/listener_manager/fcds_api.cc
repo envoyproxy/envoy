@@ -51,26 +51,31 @@ absl::Status
 FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                             const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                             const std::string& system_version_info) {
+  const size_t added = added_resources.size();
+  const size_t removed = removed_resources.size();
   ENVOY_LOG(info, "fcds: config update received for name {}: added/updated: {}, removed: {}",
-            filter_chain_name_, added_resources.size(), removed_resources.size());
+            filter_chain_name_, added, removed);
   OptRef<const FilterChainProto> updated_or_removed;
-  if (added_resources.size() == 1) {
-    if (removed_resources.size() > 0) {
-      return absl::InvalidArgumentError(
-          "Invalid FCDS update: cannot add and remove in the same update");
-    }
+  if (added == 0 && removed == 0) {
+    // Heart-beat message.
+    system_version_info_ = system_version_info;
+    return absl::OkStatus();
+  } else if (added == 1 && removed == 0) {
+    // Updated or added.
     updated_or_removed = makeOptRef(
         Protobuf::DynamicCastMessage<FilterChainProto>(added_resources[0].get().resource()));
     if (updated_or_removed->name() != filter_chain_name_) {
       return absl::InvalidArgumentError("Invalid FCDS update: invalid filter chain name");
     }
-  } else {
-    if (removed_resources.size() != 1 || added_resources.size() != 0) {
-      return absl::InvalidArgumentError("Invalid FCDS update: must remove exactly one resource");
-    }
+  } else if (added == 0 && removed == 1) {
+    // Removed: updated_or_removed is set to nil.
     if (removed_resources[0] != filter_chain_name_) {
       return absl::InvalidArgumentError("Invalid FCDS update: invalid removed filter chain name");
     }
+  } else {
+    // Invalid: both added and removed.
+    return absl::InvalidArgumentError(
+        "Invalid FCDS update: cannot add and remove in the same update");
   }
   if (updated_or_removed && config_ &&
       Protobuf::util::MessageDifferencer::Equals(*updated_or_removed, *config_)) {

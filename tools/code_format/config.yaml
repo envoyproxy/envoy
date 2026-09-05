@@ -70,22 +70,6 @@ paths:
     - bazel/toolchains/
     - docs
 
-  # `build_urls`:
-  #   We want all URL references to exist in repository_locations.bzl files and have
-  #   metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below
-  #   we have some exceptions for either infrastructure files or places we fall
-  #   short today (Rust).
-  #
-  # NB: Please DO NOT extend the `build_urls` allow list without consulting
-  # @envoyproxy/dependency-shepherds.
-  build_urls:
-    include:
-    - api/bazel/envoy_http_archive.bzl
-    - api/bazel/repository_locations.bzl
-    - bazel/external/cargo/remote/defs.bzl
-    - bazel/repository_locations.bzl
-    - docs/bazel/repository_locations.bzl
-
   exception:
     include:
     # Header files that can throw exceptions. These should be limited; the only
@@ -112,8 +96,6 @@ paths:
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
-    - source/common/formatter/http_specific_formatter.cc
-    - source/common/formatter/substitution_formatter.cc
     - source/common/stats/tag_extractor_impl.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/utility.cc
@@ -211,9 +193,11 @@ paths:
     - source/extensions/load_balancing_policies/subset
     - source/extensions/matching
     - source/extensions/network/dns_resolver/cares/
+    - source/extensions/queue_policy/common/
+    - source/extensions/queue_policy/fifo/
     - source/extensions/quic/server_preferred_address
     - source/extensions/quic/connection_id_generator
-    - source/extensions/resource_monitors
+    - source/extensions/router/cluster_specifiers/dynamic_modules/config.cc
     - source/extensions/router/cluster_specifiers/lua/lua_cluster_specifier.cc
     - source/extensions/string_matcher/lua/match.cc
     - source/extensions/tracers
@@ -332,6 +316,7 @@ paths:
     - test/tools/router_check/router_check.cc
     - source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.cc
     - test/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper_test.cc
+    - test/extensions/router/cluster_specifiers/dynamic_modules/cluster_specifier_test.cc
 
   # Files in these paths can use std::regex
   std_regex:

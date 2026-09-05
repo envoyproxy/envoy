@@ -92,9 +92,14 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
 
+.. _config_access_log_format_bytes_received:
+
 ``%BYTES_RECEIVED%``
   HTTP/THRIFT
-    Body bytes received.
+    Body bytes received from the downstream, i.e. the size of the request body. This value is
+    independent of :ref:`%BYTES_SENT% <config_access_log_format_bytes_sent>`, which reflects the
+    response body sent to the downstream, so the two may differ significantly (e.g. a large file
+    upload with a small response, or vice versa).
 
   TCP
     Downstream bytes received on connection.
@@ -200,9 +205,15 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
 
+.. _config_access_log_format_bytes_sent:
+
 ``%BYTES_SENT%``
   HTTP/THRIFT
-    Body bytes sent. For WebSocket connection it will also include response header bytes.
+    Body bytes sent to the downstream, i.e. the size of the response body (which is typically
+    produced by the upstream). For WebSocket connection it will also include response header
+    bytes. This value is independent of :ref:`%BYTES_RECEIVED% <config_access_log_format_bytes_received>`,
+    which reflects the request body received from the downstream, so the two may differ
+    significantly (e.g. a large file upload with a small response, or vice versa).
 
   TCP
     Downstream bytes sent on connection.
@@ -1696,8 +1707,13 @@ Current supported substitution commands include:
 ``%COALESCE(JSON_CONFIG):Z%``
   HTTP
     A higher-order formatter operator that evaluates multiple formatter operators in sequence and
-    returns the first non-null, non-empty result. This is useful for implementing fallback behavior,
+    returns the first non-null result. This is useful for implementing fallback behavior,
     such as using SNI when available but falling back to the ``:authority`` header when SNI is not set.
+
+    An operator that produces a value which is present but empty is accepted as the result. Set the
+    runtime guard ``envoy.reloadable_features.coalesce_formatter_accept_empty_values`` to ``false``
+    to restore the legacy behavior, where an empty value is skipped and the next operator is
+    evaluated.
 
     The ``JSON_CONFIG`` parameter is a JSON object with an ``operators`` array. Each operator can be
     specified as either:

@@ -42,6 +42,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Router {
 namespace {
@@ -407,6 +411,9 @@ TEST(RouteMatchContextTest, NoQueryString) {
 }
 
 TEST(RouteMatchContextTest, SanitizedPathStripsPathParams) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.strip_path_parameters_per_segment", "false"}});
   Http::TestRequestHeaderMapImpl headers{{":path", "/foo;env=prod;ver=2?a=1"}};
   RouteMatchContext ctx(headers, /*ignore_path_params=*/true);
 
@@ -423,6 +430,36 @@ TEST(RouteMatchContextTest, SanitizedPathNoOpWhenNotConfigured) {
 
   EXPECT_EQ(ctx.sanitizedPath(), "/foo;env=prod?a=1");
   EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo;env=prod");
+}
+
+TEST(RouteMatchContextTest, SanitizedPathStripsPathParamsPerSegmentEnabled) {
+  {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/foo;param=1/bar;param2=2?a=1"}};
+    RouteMatchContext ctx(headers, /*ignore_path_params=*/true);
+
+    EXPECT_EQ(ctx.sanitizedPath(), "/foo/bar?a=1");
+    EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo/bar");
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/foo;a=1;b=2/bar;c=3"}};
+    RouteMatchContext ctx(headers, /*ignore_path_params=*/true);
+
+    EXPECT_EQ(ctx.sanitizedPath(), "/foo/bar");
+    EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo/bar");
+  }
+}
+
+TEST(RouteMatchContextTest, SanitizedPathStripsPathParamsPerSegmentDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.strip_path_parameters_per_segment", "false"}});
+
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo;param=1/bar;param2=2?a=1"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/true);
+
+  EXPECT_EQ(ctx.sanitizedPath(), "/foo");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo");
 }
 
 TEST(RouteMatchContextTest, IsGrpc) {
@@ -8837,7 +8874,7 @@ virtual_hosts:
   std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
   const Tracing::CustomTagMap& map = route3->tracingConfig()->getCustomTags();
   for (const std::string& custom_tag : custom_tags) {
-    EXPECT_TRUE(map.contains(custom_tag));
+    EXPECT_THAT(map, Contains(Key(custom_tag)));
   }
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -10375,9 +10412,7 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const RouteEntry::UpgradeMap& upgrade_map = config.route(headers, 0)->routeEntry()->upgradeMap();
-  EXPECT_TRUE(upgrade_map.find("websocket")->second);
-  EXPECT_FALSE(upgrade_map.contains("foo"));
-  EXPECT_FALSE(upgrade_map.find("disabled")->second);
+  EXPECT_THAT(upgrade_map, UnorderedElementsAre(Pair("websocket", true), Pair("disabled", false)));
 }
 
 TEST_F(RouteConfigurationV2, EmptyFilterConfigRejected) {

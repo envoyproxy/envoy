@@ -16,16 +16,12 @@ namespace SseToMetadata {
  * Config registration for the SSE to Metadata filter.
  */
 class SseToMetadataConfig
-    : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
+    : public Extensions::HttpFilters::Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata> {
 public:
-  SseToMetadataConfig() : ExceptionFreeFactoryBase("envoy.filters.http.sse_to_metadata") {}
+  SseToMetadataConfig() : UnifiedFactoryBase("envoy.filters.http.sse_to_metadata") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata& proto_config,
       Server::Configuration::ServerFactoryContext& context,

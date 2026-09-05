@@ -21,10 +21,10 @@ on:
       cache-bazel-hash-paths:
         type: string
         default: |
-          WORKSPACE
-          bazel/repository_locations.bzl
-          bazel/toolchains.bzl
-          api/bazel/repository_locations.bzl
+          MODULE.bazel
+          MODULE.bazel.lock
+          bazel/deps.yaml
+          api/bazel/deps.yaml
           .bazelversion
           .github/workflows/_request_cache_bazel.yml
       config-file:
@@ -206,8 +206,8 @@ jobs:
           target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
         filter: |
           .["target-branch"] as $branch
-          | if ($branch | test("^(release/v|patches/)[0-9]+\\.[0-9]+$")) then
-              ($branch | sub("^(release/v|patches/)"; "") + ".0") as $version_str
+          | if ($branch | test("^(release/v|patches/|embargo/)[0-9]+\\.[0-9]+$")) then
+              ($branch | sub("^(release/v|patches/|embargo/)"; "") + ".0") as $version_str
               | ($version_str | utils::version) as $version
               | if ($version.major < 1 or ($version.major == 1 and $version.minor <= 37)) then
                   .bazel["docs-x64"] = "skip"
