@@ -35,6 +35,7 @@
 #include "source/common/common/perf_tracing.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/exception.h"
@@ -98,22 +99,95 @@ upstreamOperationNameFormatter(const Http::TracingConnectionManagerConfig& hcm_c
   return formatter != nullptr ? formatter : hcm_config.upstream_operation_.get();
 }
 
-ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
-                                                            Stats::Scope& scope) {
-  return ConnectionManagerStats(
-      {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix),
-                               POOL_HISTOGRAM_PREFIX(scope, prefix))},
-      prefix, scope);
+namespace {
+// The stats of an HTTP connection manager are namespaced 'http.(<stat_prefix>.)*': the flat prefix
+// is 'http.<stat_prefix>.' and 'http' alone is the tag-extracted prefix, with the stat prefix
+// carried by an 'envoy.http_conn_manager_prefix' tag.
+constexpr absl::string_view HttpBaseStatPrefix = "http";
+
+std::string httpFlatStatPrefix(absl::string_view stat_prefix) {
+  return absl::StrCat(HttpBaseStatPrefix, ".", stat_prefix, ".");
 }
 
-ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const std::string& prefix,
-                                                                          Stats::Scope& scope) {
-  return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(scope, prefix + "tracing."))};
+Stats::TagStringView httpStatPrefixTag(absl::string_view stat_prefix) {
+  return {Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX, stat_prefix};
+}
+
+// Creates a 'downstream_rq_<class>xx' counter carrying the response code class as an explicit
+// 'envoy.response_code_class' tag, so it does not depend on the class being recovered from the
+// stat name by a tag extractor.
+//
+// `name` is the complete stat name, 'downstream_rq_<class>xx'. The class is the digit before the
+// trailing 'xx', which is exactly what the '_rq_((\d))xx$' extraction rule pulls out, and the
+// tag-extracted name is the same name with that digit removed.
+//
+// `base_prefix`, `prefix_tags` and `prefix` describe an enclosing prefix that is part of the stat
+// name rather than of the scope, as is the case for the listener stats. They are all empty when
+// the scope itself carries the prefix.
+Stats::Counter& responseCodeClassCounter(Stats::Scope& scope, Stats::StatName base_prefix,
+                                         Stats::StatNameTagSpan prefix_tags, Stats::StatName prefix,
+                                         absl::string_view name) {
+  ASSERT(absl::StartsWith(name, "downstream_rq_"));
+  ASSERT(absl::EndsWith(name, "xx"));
+  ASSERT(absl::ascii_isdigit(name[name.size() - 3]));
+  const absl::string_view response_code_class = name.substr(name.size() - 3, 1);
+
+  Stats::SymbolTable& symbol_table = scope.symbolTable();
+  Stats::StatNamePool pool(symbol_table);
+  const Stats::StatName base_leaf = pool.add(absl::StrCat(name.substr(0, name.size() - 3), "xx"));
+  const Stats::StatName leaf = pool.add(name);
+
+  Stats::StatNameTagVec tags(prefix_tags.begin(), prefix_tags.end());
+  tags.emplace_back(pool.add(Config::TagNames::get().RESPONSE_CODE_CLASS),
+                    pool.add(response_code_class));
+
+  const Stats::SymbolTable::StoragePtr base_name = symbol_table.join({base_prefix, base_leaf});
+  const Stats::SymbolTable::StoragePtr tagged_name = symbol_table.join({prefix, leaf});
+  return scope.counterFromTaggedName(Stats::StatName(base_name.get()), tags,
+                                     Stats::StatName(tagged_name.get()));
+}
+
+// Completes a POOL_COUNTER_RESPONSE_CODE_CLASS() invocation, in the style of the POOL_* macros in
+// stats_macros.h.
+#define FINISH_RESPONSE_CODE_CLASS_DECL_(X) #X),
+
+// Creates the response code class counters of a stats list. BASE_PREFIX, TAGS and PREFIX describe
+// an enclosing prefix that is part of the stat name rather than of the scope, and are all empty
+// when the scope itself carries the prefix.
+#define POOL_COUNTER_RESPONSE_CODE_CLASS(SCOPE, BASE_PREFIX, TAGS, PREFIX)                         \
+  responseCodeClassCounter(SCOPE, BASE_PREFIX, TAGS, PREFIX, FINISH_RESPONSE_CODE_CLASS_DECL_
+
+} // namespace
+
+ConnectionManagerStats ConnectionManagerImpl::generateStats(Stats::Scope& scope) {
+  // The scope already carries the 'http.<stat_prefix>.' prefix, so the response code class
+  // counters need no prefix of their own.
+  return ConnectionManagerStats(
+      {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope),
+                               POOL_COUNTER_RESPONSE_CODE_CLASS(scope, {}, {}, {}))},
+      scope);
+}
+
+ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(Stats::Scope& scope) {
+  return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(scope, "tracing."))};
+}
+
+Stats::ScopeSharedPtr ConnectionManagerImpl::createStatsScope(Stats::Scope& scope,
+                                                              absl::string_view stat_prefix) {
+  return scope.createScopeWithTaggedName(HttpBaseStatPrefix, {httpStatPrefixTag(stat_prefix)},
+                                         httpFlatStatPrefix(stat_prefix));
 }
 
 ConnectionManagerListenerStats
-ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::Scope& scope) {
-  return {CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+ConnectionManagerImpl::generateListenerStats(absl::string_view stat_prefix, Stats::Scope& scope) {
+  // These live in the listener's scope, so the 'http.<stat_prefix>.' prefix is part of the stat
+  // name rather than of the scope and has to be supplied to every stat.
+  const Stats::TaggedStatName prefix(scope.symbolTable(), HttpBaseStatPrefix,
+                                     {httpStatPrefixTag(stat_prefix)},
+                                     httpFlatStatPrefix(stat_prefix));
+  return {CONN_MAN_LISTENER_STATS(
+      POOL_COUNTER_TAGGED(scope, prefix),
+      POOL_COUNTER_RESPONSE_CODE_CLASS(scope, prefix.baseName(), prefix.tags(), prefix.name()))};
 }
 
 ConnectionManagerImpl::ConnectionManagerImpl(
@@ -1467,7 +1541,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   }
 
   connection_manager_.user_agent_.initializeFromHeaders(*request_headers_,
-                                                        connection_manager_.stats_.prefixStatName(),
                                                         connection_manager_.stats_.scope_);
 
   if (!request_headers_->Host()) {
