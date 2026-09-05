@@ -59,6 +59,22 @@ size_t SymbolTable::Encoding::encodingSizeBytes(uint64_t number) {
   return num_bytes;
 }
 
+SymbolTable::Encoding::EncodedNumber SymbolTable::Encoding::encodeNumber(uint64_t number) {
+  EncodedNumber encoded;
+  size_t num_bytes = 0;
+  do {
+    if (number < (1 << 7)) {
+      encoded.bytes[num_bytes] = number;
+    } else {
+      encoded.bytes[num_bytes] = (number & Low7Bits) | SpilloverMask;
+    }
+    ++num_bytes;
+    number >>= 7;
+  } while (number != 0);
+  encoded.size = num_bytes;
+  return encoded;
+}
+
 void SymbolTable::Encoding::appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block) {
   // UTF-8-like encoding where a value 127 or less gets written as a single
   // byte. For higher values we write the low-order 7 bits with a 1 in
@@ -690,6 +706,52 @@ SymbolTable::StoragePtr SymbolTable::join(absl::Span<const StatName> stat_names)
   return mem_block.release();
 }
 
+SymbolTable::InlineStorage SymbolTable::inlineJoin(absl::Span<const StatName> stat_names) const {
+  InlineStorage storage;
+  inlineJoin(stat_names, storage);
+  return storage;
+}
+
+void SymbolTable::inlineJoin(absl::Span<const StatName> stat_names, InlineStorage& storage) const {
+  size_t num_bytes = 0;
+  for (StatName stat_name : stat_names) {
+    if (!stat_name.empty()) {
+      num_bytes += stat_name.dataSize();
+    }
+  }
+  const size_t size_size = Encoding::encodingSizeBytes(num_bytes);
+  const size_t total_bytes = size_size + num_bytes;
+
+  // Initialize the first byte to avoid uninitialized memory in case of early return.
+  storage.inline_[0] = 0;
+  storage.heap_ = nullptr;
+
+  if (total_bytes > InlineStorage::InlineCapacity) {
+    // Fallback to heap-allocated storage.
+    MemBlockBuilder<uint8_t> mem_block(total_bytes);
+    Encoding::appendEncoding(num_bytes, mem_block);
+    for (StatName stat_name : stat_names) {
+      stat_name.appendDataToMemBlock(mem_block);
+    }
+    ASSERT(mem_block.capacityRemaining() == 0);
+    storage.heap_ = StoragePtr{mem_block.release()};
+    return;
+  }
+
+  // Use inline storage.
+  ASSERT(total_bytes <= InlineStorage::InlineCapacity);
+  uint8_t* p = storage.inline_;
+  const auto encoded_size = Encoding::encodeNumber(num_bytes);
+  memcpy(p, encoded_size.bytes, encoded_size.size); // NOLINT(safe-memcpy)
+  p += encoded_size.size;
+  for (StatName stat_name : stat_names) {
+    const size_t nbytes = stat_name.dataSize();
+    memcpy(p, stat_name.data(), nbytes); // NOLINT(safe-memcpy)
+    p += nbytes;
+  }
+  ASSERT(p == storage.inline_ + total_bytes);
+}
+
 void StatNameJoiner::join(absl::Span<const StatName> stat_names, const SymbolTable& symbol_table) {
   // A join with at most one non-empty name produces bytes identical to that name, so the
   // allocation can be skipped and the name referenced directly.
@@ -707,10 +769,11 @@ void StatNameJoiner::join(absl::Span<const StatName> stat_names, const SymbolTab
   }
 
   if (needs_join) {
-    storage_ = symbol_table.join(stat_names);
-    stat_name_ = StatName(storage_.get());
+    symbol_table.inlineJoin(stat_names, storage_);
+    stat_name_ = storage_.statName();
   } else {
-    storage_.reset();
+    storage_.inline_[0] = 0;
+    storage_.heap_ = nullptr;
     stat_name_ = sole_name;
   }
 }

@@ -676,3 +676,147 @@ static void bmEncodingSizeBytes_ClzMixed(benchmark::State& state) {
   }
 }
 BENCHMARK(bmEncodingSizeBytes_ClzMixed);
+
+// Joins the same names three ways -- the heap-allocating join(), the inline-storage
+// inlineJoin(), and StatNameJoiner, which uses inlineJoin() but elides a join that has at most
+// one non-empty name -- over the three shapes that tell them apart: a short name that fits
+// inline, a long one that spills onto the heap anyway, and a join that is a no-op.
+namespace {
+
+// A join whose result fits in SymbolTable::InlineStorage: 3 tokens, a few bytes.
+std::vector<Envoy::Stats::StatName> shortNames(Envoy::Stats::StatNamePool& pool) {
+  return {pool.add("cluster.upstream_rq"), pool.add("200")};
+}
+
+// A join whose result does not fit inline, so inlineJoin() allocates as join() does.
+std::vector<Envoy::Stats::StatName> longNames(Envoy::Stats::StatNamePool& pool) {
+  std::vector<std::string> tokens;
+  for (uint32_t i = 0; i < 64; ++i) {
+    tokens.push_back(absl::StrCat("token", i));
+  }
+  return {pool.add(absl::StrJoin(tokens, ".")), pool.add("200")};
+}
+
+} // namespace
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmJoinShort(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = shortNames(pool);
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const Envoy::Stats::SymbolTable::StoragePtr joined = symbol_table.join(names);
+    benchmark::DoNotOptimize(Envoy::Stats::StatName(joined.get()).dataIncludingSize());
+  }
+}
+BENCHMARK(bmJoinShort);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmInlineJoinShort(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = shortNames(pool);
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const Envoy::Stats::SymbolTable::InlineStorage joined = symbol_table.inlineJoin(names);
+    benchmark::DoNotOptimize(joined.statName().dataIncludingSize());
+  }
+}
+BENCHMARK(bmInlineJoinShort);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmJoinerShort(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = shortNames(pool);
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const Envoy::Stats::StatNameJoiner joiner(names, symbol_table);
+    benchmark::DoNotOptimize(joiner.statName().dataIncludingSize());
+  }
+}
+BENCHMARK(bmJoinerShort);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmJoinLong(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = longNames(pool);
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const Envoy::Stats::SymbolTable::StoragePtr joined = symbol_table.join(names);
+    benchmark::DoNotOptimize(Envoy::Stats::StatName(joined.get()).dataIncludingSize());
+  }
+}
+BENCHMARK(bmJoinLong);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmInlineJoinLong(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = longNames(pool);
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const Envoy::Stats::SymbolTable::InlineStorage joined = symbol_table.inlineJoin(names);
+    benchmark::DoNotOptimize(joined.statName().dataIncludingSize());
+  }
+}
+BENCHMARK(bmInlineJoinLong);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmJoinerLong(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = longNames(pool);
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const Envoy::Stats::StatNameJoiner joiner(names, symbol_table);
+    benchmark::DoNotOptimize(joiner.statName().dataIncludingSize());
+  }
+}
+BENCHMARK(bmJoinerLong);
+
+// A join with one non-empty name: the bytes are identical to that name, which is what the
+// joiner's elision exploits and what inlineJoin() copies.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmJoinNoOp(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = {Envoy::Stats::StatName(),
+                                                     pool.add("cluster.upstream_rq_200")};
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const Envoy::Stats::SymbolTable::StoragePtr joined = symbol_table.join(names);
+    benchmark::DoNotOptimize(Envoy::Stats::StatName(joined.get()).dataIncludingSize());
+  }
+}
+BENCHMARK(bmJoinNoOp);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmInlineJoinNoOp(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = {Envoy::Stats::StatName(),
+                                                     pool.add("cluster.upstream_rq_200")};
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const Envoy::Stats::SymbolTable::InlineStorage joined = symbol_table.inlineJoin(names);
+    benchmark::DoNotOptimize(joined.statName().dataIncludingSize());
+  }
+}
+BENCHMARK(bmInlineJoinNoOp);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmJoinerNoOp(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = {Envoy::Stats::StatName(),
+                                                     pool.add("cluster.upstream_rq_200")};
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const Envoy::Stats::StatNameJoiner joiner(names, symbol_table);
+    benchmark::DoNotOptimize(joiner.statName().dataIncludingSize());
+  }
+}
+BENCHMARK(bmJoinerNoOp);
