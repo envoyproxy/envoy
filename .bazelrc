@@ -48,7 +48,6 @@ build --extra_toolchains=@envoy//bazel:envoy_java_toolchain_definition
 # silence absl logspam.
 build --copt=-DABSL_MIN_LOG_LEVEL=4
 # Global C++ standard and common warning suppressions
-build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 build --copt=-Wno-deprecated-declarations
 build --define envoy_mobile_listener=enabled
 build --experimental_repository_downloader_retries=2
