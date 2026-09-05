@@ -112,3 +112,5 @@ jobs:
     with:
       artifacts: |
         ["coverage", "fuzz_coverage"]
+      request: ${{ inputs.request }}
+      trusted: ${{ inputs.trusted }}
