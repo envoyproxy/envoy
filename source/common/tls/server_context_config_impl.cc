@@ -107,7 +107,7 @@ const std::string ServerContextConfigImpl::DEFAULT_CURVES = "X25519MLKEM768:"
                                                             "P-256";
 
 const std::string ServerContextConfigImpl::DEFAULT_CURVES_NO_PQC = "X25519:"
-                                                                    "P-256";
+                                                                   "P-256";
 
 const std::string ServerContextConfigImpl::DEFAULT_CURVES_FIPS = "P-256";
 
@@ -129,11 +129,11 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     : ContextConfigImpl(
           config.common_tls_context(), false /* auto_sni_san_match */, DEFAULT_MIN_VERSION,
           DEFAULT_MAX_VERSION, FIPS_mode() ? DEFAULT_CIPHER_SUITES_FIPS : DEFAULT_CIPHER_SUITES,
-          FIPS_mode() ? DEFAULT_CURVES_FIPS
-                      : (Runtime::runtimeFeatureEnabled(
-                             "envoy.reloadable_features.pqc_default_ecdh_curves")
-                             ? DEFAULT_CURVES
-                             : DEFAULT_CURVES_NO_PQC),
+          FIPS_mode()
+              ? DEFAULT_CURVES_FIPS
+              : (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.pqc_default_ecdh_curves")
+                     ? DEFAULT_CURVES
+                     : DEFAULT_CURVES_NO_PQC),
           factory_context, creation_status),
       server_names_(server_names), require_client_certificate_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                        config, require_client_certificate, false)),

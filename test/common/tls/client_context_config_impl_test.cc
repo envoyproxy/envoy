@@ -934,8 +934,7 @@ TEST_F(ClientContextConfigImplTest, DefaultCurvesIncludePqc) {
 // Verify that disabling the runtime flag reverts to classical defaults.
 TEST_F(ClientContextConfigImplTest, DefaultCurvesNoPqcWithRuntimeFlag) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.pqc_default_ecdh_curves", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.pqc_default_ecdh_curves", "false"}});
 
   const std::string yaml = R"EOF(
   common_tls_context:
