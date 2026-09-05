@@ -128,9 +128,7 @@ BuilderConstPtr createBuilder(OptRef<const envoy::config::core::v3::CelExpressio
   options.enable_list_concat = false;
 
   // Performance-oriented defaults.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_cel_regex_precompilation")) {
-    options.enable_regex_precompilation = true;
-  }
+  options.enable_regex_precompilation = true;
 
   // Enable constant folding with arena if provided for RBAC backward compatibility optimization.
   if (arena != nullptr) {
