@@ -171,7 +171,6 @@ RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_bind_config_fix_port_exhaustion);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_http_filters_correct_stats_prefix);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_wasm_filter_uses_root_scope);
-RUNTIME_GUARD(envoy_reloadable_features_uri_template_match_on_asterisk);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_mixed_variable_literals);
 RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
 // Decide connection drain-close (HCM, TCP proxy, and the Mongo, Redis, Thrift and generic proxies)
