@@ -106,8 +106,7 @@ TEST_F(CanServeRequestFromCacheTest, AuthorizationHeader) {
 }
 
 INSTANTIATE_TEST_SUITE_P(ConditionalHeaders, RequestConditionalHeadersTest,
-                         testing::Values("if-none-match", "if-modified-since", "if-range"),
-                         [](const auto& info) {
+                         testing::Values("if-modified-since", "if-range"), [](const auto& info) {
                            std::string test_name = info.param;
                            absl::c_replace_if(
                                test_name, [](char c) { return !std::isalnum(c); }, '_');
@@ -119,6 +118,11 @@ TEST_P(RequestConditionalHeadersTest, ConditionalHeaders) {
   request_headers_.setCopy(Http::LowerCaseString{conditionalHeader()}, "test-value");
   EXPECT_THAT(CacheabilityUtils::canServeRequestFromCache(request_headers_),
               HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr(conditionalHeader())));
+}
+
+TEST_F(CanServeRequestFromCacheTest, IfNoneMatchIsCacheable) {
+  request_headers_.setCopy(Http::CustomHeaders::get().IfNoneMatch, R"("etag")");
+  EXPECT_OK(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 
 TEST_F(IsCacheableResponseTest, CacheableResponse) {
