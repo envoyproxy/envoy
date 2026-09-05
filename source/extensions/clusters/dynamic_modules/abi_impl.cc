@@ -312,6 +312,37 @@ envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
   return const_cast<Envoy::Upstream::Host*>(healthy_hosts[index].get());
 }
 
+bool envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* hosts_out, size_t hosts_capacity,
+    size_t* hosts_size_out) {
+  if (hosts_size_out == nullptr) {
+    return false;
+  }
+  *hosts_size_out = 0;
+  if (lb_envoy_ptr == nullptr) {
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return false;
+  }
+  const auto& healthy_hosts = host_sets[priority]->healthyHosts();
+  *hosts_size_out = healthy_hosts.size();
+  // Write nothing when the buffer is too small so a caller cannot act on a partial healthy set.
+  if (healthy_hosts.size() > hosts_capacity) {
+    return false;
+  }
+  // The fill loop writes through hosts_out, so reject a null buffer that claims nonzero capacity.
+  if (hosts_out == nullptr && !healthy_hosts.empty()) {
+    return false;
+  }
+  for (size_t i = 0; i < healthy_hosts.size(); i++) {
+    hosts_out[i] = const_cast<Envoy::Upstream::Host*>(healthy_hosts[i].get());
+  }
+  return true;
+}
+
 // =============================================================================
 // Cluster LB Host Information Callbacks
 // =============================================================================
