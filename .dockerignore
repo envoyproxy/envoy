@@ -14,5 +14,4 @@
 !/linux/arm64/router_check_tool
 !/linux/arm64/config_load_check_tool
 !/local
-!/test/config/integration/certs
 !/windows

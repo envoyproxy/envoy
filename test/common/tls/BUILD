@@ -162,6 +162,7 @@ envoy_cc_test(
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_config_lib",
         "//source/common/tls:server_context_lib",
+        "//test/common/tls/ocsp/test_data:ocsp_resp_infos",
         "//test/common/tls/test_data:cert_infos",
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",

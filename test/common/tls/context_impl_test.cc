@@ -19,6 +19,7 @@
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/common/tls/utility.h"
 
+#include "test/common/tls/ocsp/test_data/good_ocsp_resp_info.h"
 #include "test/common/tls/ssl_certs_test.h"
 #include "test/common/tls/ssl_test_utility.h"
 #include "test/common/tls/test_data/no_san_cert_info.h"
@@ -996,28 +997,8 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
   auto context = loadConfigYaml(yaml);
   auto cleanup = cleanUpHelper(context);
 
-  constexpr absl::string_view this_update = "This Update: ";
-  constexpr absl::string_view next_update = "Next Update: ";
-
-  auto ocsp_text_details =
-      absl::StrSplit(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-                         "{{ test_rundir "
-                         "}}/test/common/tls/ocsp/test_data/good_ocsp_resp_details.txt")),
-                     '\n');
-  std::string valid_from, expiration;
-  for (const auto& detail : ocsp_text_details) {
-    std::string::size_type pos = detail.find(this_update);
-    if (pos != std::string::npos) {
-      valid_from = std::string(detail.substr(pos + this_update.size()));
-      continue;
-    }
-
-    pos = detail.find(next_update);
-    if (pos != std::string::npos) {
-      expiration = std::string(detail.substr(pos + next_update.size()));
-      continue;
-    }
-  }
+  const std::string valid_from = TEST_GOOD_OCSP_RESP_THIS_UPDATE;
+  const std::string expiration = TEST_GOOD_OCSP_RESP_NEXT_UPDATE;
 
   std::string ocsp_json = absl::StrCat(R"EOF({
 "valid_from": ")EOF",

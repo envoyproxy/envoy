@@ -2205,6 +2205,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//test/config/integration/certs:hashes",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:registry_lib",

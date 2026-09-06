@@ -25,6 +25,18 @@ pkg_files(
     strip_prefix = "envoy/opt",
 )
 
+# Test cert/key used by the google-vrp image. The certificate is generated at
+# build time (see @envoy_toolshed//certs) so it cannot be ADDed from the Docker
+# build context, and is shipped in the release tarball instead.
+pkg_files(
+    name = "vrp_cert_files",
+    srcs = [
+        "//test/config/integration/certs:servercert.pem",
+        "//test/config/integration/certs:serverkey.pem",
+    ],
+    prefix = "certs",
+)
+
 pkg_files(
     name = "debug_files",
     srcs = [":envoy-debug"],
@@ -35,6 +47,7 @@ pkg_tar(
     name = "release",
     srcs = [
         ":release_files",
+        ":vrp_cert_files",
     ],
     compressor = "@zstd//:zstd_cli",
     compressor_args = "-T0",

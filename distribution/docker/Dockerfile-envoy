@@ -83,10 +83,10 @@ ADD --chown=0:0 --chmod=644 \
     configs/google-vrp/*.yaml /etc/envoy/
 ADD --chown=0:0 --chmod=755 \
     configs/google-vrp/launch_envoy.sh /usr/local/bin/launch_envoy.sh
-ADD --chown=0:0 --chmod=644 \
-    test/config/integration/certs/serverkey.pem /etc/envoy/certs/serverkey.pem
-ADD --chown=0:0 --chmod=644 \
-    test/config/integration/certs/servercert.pem /etc/envoy/certs/servercert.pem
+COPY --from=binary --chown=0:0 --chmod=644 \
+    /usr/local/bin/certs/serverkey.pem /etc/envoy/certs/serverkey.pem
+COPY --from=binary --chown=0:0 --chmod=644 \
+    /usr/local/bin/certs/servercert.pem /etc/envoy/certs/servercert.pem
 RUN --mount=type=tmpfs,target=/var/cache/apt \
     --mount=type=tmpfs,target=/var/lib/apt/lists \
     apt-get -qq update \

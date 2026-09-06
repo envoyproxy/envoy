@@ -15,6 +15,7 @@
 
 #include "test/common/memory/memory_test_utility.h"
 #include "test/config/integration/certs/clientcert_hash.h"
+#include "test/config/integration/certs/expired_cert_info.h"
 #include "test/config/integration/certs/servercert_info.h"
 #include "test/config/utility.h"
 #include "test/integration/integration.h"
@@ -255,11 +256,12 @@ TEST_P(StatsIntegrationTest, WithExpiredCert) {
 
   initialize();
   EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(), 0);
+  auto cert_expiry = TestUtility::parseTime(TEST_EXPIRED__CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
   EXPECT_EQ(
       test_server_
           ->gauge("listener.0.0.0.0_0.ssl.certificate.server_cert.expiration_unix_time_seconds")
           ->value(),
-      1743788480);
+      absl::ToUnixSeconds(cert_expiry));
 }
 
 // Verifies that the stats interface is unchanged whether the stats store derives tags with the
