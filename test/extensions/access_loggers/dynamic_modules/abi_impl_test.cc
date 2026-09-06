@@ -2876,6 +2876,41 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringDownstreamSslMissing) {
       env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate, &result));
 }
 
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeUpstreamRequestedServerName) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName, &string_result));
+
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::string sni;
+  ON_CALL(*ssl_info, sni()).WillByDefault(testing::ReturnRef(sni));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName, &string_result));
+
+  sni = "upstream.example.com";
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName, &string_result));
+  EXPECT_EQ("upstream.example.com", absl::string_view(string_result.ptr, string_result.length));
+  bool bool_result = false;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName, &bool_result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeUpstreamRequestedServerNameWithoutUpstreamInfo) {
+  stream_info_.upstream_info_.reset();
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName, &string_result));
+}
+
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntDestinationPort) {
   auto local_addr = Network::Address::InstanceConstSharedPtr{
       new Network::Address::Ipv4Instance("127.0.0.1", 8443)};

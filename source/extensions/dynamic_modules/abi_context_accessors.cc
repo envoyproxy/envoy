@@ -257,6 +257,13 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
     }
     break;
   }
+  case envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName:
+    return getUpstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          return ssl->sni();
+        },
+        result);
   case envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion:
     return getDownstreamSslAttribute(
         stream_info,

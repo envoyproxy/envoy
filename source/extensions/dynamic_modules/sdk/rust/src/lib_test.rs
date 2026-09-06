@@ -9739,6 +9739,18 @@ fn test_cluster_specifier_context_reads_request_state() {
 }
 
 #[test]
+fn test_attribute_id_ordering() {
+  assert_eq!(
+    67,
+    abi::envoy_dynamic_module_type_attribute_id::HealthCheck as u32
+  );
+  assert_eq!(
+    68,
+    abi::envoy_dynamic_module_type_attribute_id::UpstreamRequestedServerName as u32
+  );
+}
+
+#[test]
 fn test_cluster_specifier_context_records_selection() {
   use cluster_specifier::ResourcePriority;
 

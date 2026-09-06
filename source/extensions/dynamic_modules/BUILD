@@ -1,4 +1,4 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -98,6 +98,12 @@ go_library(
     cgo = True,
     importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_sdk_shared_test",
+    srcs = ["sdk/go/shared/types_test.go"],
+    embed = [":go_sdk_shared"],
 )
 
 go_library(

@@ -386,6 +386,8 @@ typedef enum envoy_dynamic_module_type_attribute_id {
   envoy_dynamic_module_type_attribute_id_XdsFilterChainName,
   // health_check
   envoy_dynamic_module_type_attribute_id_HealthCheck,
+  // upstream.server_name
+  envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
 } envoy_dynamic_module_type_attribute_id;
 
 /**
