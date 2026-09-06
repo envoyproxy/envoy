@@ -994,5 +994,64 @@ TEST_P(EnvoyQuicClientSessionTest, ScopedIpv6PortMigrationCrash) {
   // SPELLCHECKER(on)
   EXPECT_NO_THROW(quic_connection_->OnPathDegradingDetected());
 }
+
+TEST_P(EnvoyQuicClientSessionTest, ReadErrorClosesConnection) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quic_client_close_connection_on_read_error", "true"}});
+
+  NiceMock<MockOsSysCallsImpl> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector{&os_sys_calls};
+
+  envoy_quic_session_->connect();
+  EXPECT_TRUE(quic_connection_->connected());
+
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_CONNRESET}));
+
+  EnvoyQuicClientConnectionPeer::onFileEvent(*quic_connection_, Event::FileReadyType::Read,
+                                             *quic_connection_->connectionSocket());
+  EXPECT_FALSE(quic_connection_->connected());
+}
+
+TEST_P(EnvoyQuicClientSessionTest, ReadErrorOnNonCurrentSocketDoesNotCloseConnection) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quic_client_close_connection_on_read_error", "true"}});
+
+  NiceMock<MockOsSysCallsImpl> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector{&os_sys_calls};
+
+  envoy_quic_session_->connect();
+  EXPECT_TRUE(quic_connection_->connected());
+
+  Network::ConnectionSocketPtr other_socket =
+      createConnectionSocket(peer_addr_, self_addr_, nullptr);
+
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_CONNRESET}));
+
+  EnvoyQuicClientConnectionPeer::onFileEvent(*quic_connection_, Event::FileReadyType::Read,
+                                             *other_socket);
+  EXPECT_TRUE(quic_connection_->connected());
+}
+
+TEST_P(EnvoyQuicClientSessionTest, ReadErrorDoesNotCloseConnectionByDefault) {
+  NiceMock<MockOsSysCallsImpl> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector{&os_sys_calls};
+
+  envoy_quic_session_->connect();
+  EXPECT_TRUE(quic_connection_->connected());
+
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_CONNRESET}));
+
+  EnvoyQuicClientConnectionPeer::onFileEvent(*quic_connection_, Event::FileReadyType::Read,
+                                             *quic_connection_->connectionSocket());
+  EXPECT_TRUE(quic_connection_->connected());
+}
+
 } // namespace Quic
 } // namespace Envoy
