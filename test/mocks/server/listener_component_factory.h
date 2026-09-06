@@ -45,6 +45,10 @@ public:
               (Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
                const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
                const Network::SocketCreationOptions& creation_options, uint32_t worker_index));
+  MOCK_METHOD(absl::StatusOr<Network::ActiveUdpListenerFactoryPtr>, createUdpListenerFactory,
+              (const envoy::config::listener::v3::Listener& config, uint32_t concurrency,
+               Quic::QuicStatNames& quic_stat_names,
+               Configuration::ListenerFactoryContext& context));
   MOCK_METHOD(DrainManager*, createDrainManager_,
               (envoy::config::listener::v3::Listener::DrainType drain_type));
   MOCK_METHOD(uint64_t, nextListenerTag, ());

@@ -57,7 +57,28 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
-class ListenerManagerImplTest : public testing::TestWithParam<bool> {
+class MockUdpListenerFactory : public Network::ActiveUdpListenerFactory {
+public:
+  MockUdpListenerFactory() {
+    ON_CALL(*this, isTransportConnectionless()).WillByDefault(Return(true));
+    ON_CALL(*this, socketOptions()).WillByDefault(ReturnRef(socket_options_));
+  }
+
+  MOCK_METHOD(Network::ConnectionHandler::ActiveUdpListenerPtr, createActiveUdpListener,
+              (Runtime::Loader & runtime, uint32_t worker_index,
+               Network::UdpConnectionHandler& parent, Network::SocketSharedPtr&& listen_socket_ptr,
+               Event::Dispatcher& dispatcher, Network::ListenerConfig& config),
+              (override));
+  MOCK_METHOD(bool, isTransportConnectionless, (), (const, override));
+  MOCK_METHOD(const Network::Socket::OptionsSharedPtr&, socketOptions, (), (const, override));
+  MOCK_METHOD(absl::Status, initializeWorkerRouting,
+              (absl::Span<const Network::ListenSocketFactoryPtr>), (override));
+
+  Network::Socket::OptionsSharedPtr socket_options_{std::make_shared<Network::Socket::Options>()};
+};
+
+// Parameterized on (use_matcher, defer_worker_routing_init).
+class ListenerManagerImplTest : public testing::TestWithParam<std::tuple<bool, bool>> {
 public:
   // reuse_port is the default on Linux for TCP. On other platforms even if set it is disabled
   // and the user is warned. For UDP it's always the default even if not effective.
@@ -72,7 +93,12 @@ protected:
   ListenerManagerImplTest()
       : listener_factory_ptr_(std::make_unique<NiceMock<MockListenerComponentFactory>>()),
         listener_factory_(*listener_factory_ptr_),
-        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()) {}
+        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(std::get<0>(GetParam())) {
+    // Once the envoy.restart_features.defer_worker_routing_init flag is deprecated, this suite
+    // should no longer be parameterized on it.
+    scoped_runtime_.mergeValues({{"envoy.restart_features.defer_worker_routing_init",
+                                  std::get<1>(GetParam()) ? "true" : "false"}});
+  }
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
@@ -89,6 +115,10 @@ protected:
     manager_ = std::make_unique<ListenerManagerImpl>(server_, std::move(listener_factory_ptr_),
                                                      worker_factory_, enable_dispatcher_stats_,
                                                      server_.quic_stat_names_);
+
+    // Use the real UDP listener factory creation by default.
+    ON_CALL(listener_factory_, createUdpListenerFactory(_, _, _, _))
+        .WillByDefault(Invoke(ProdListenerComponentFactory::createUdpListenerFactoryImpl));
 
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
@@ -497,6 +527,7 @@ protected:
   NiceMock<testing::MockFunction<void()>> callback_;
   // Test parameter indicating whether the unified filter chain matcher is enabled.
   bool use_matcher_;
+  TestScopedRuntime scoped_runtime_;
   Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
   Filter::QuicListenerFilterConfigProviderManagerImpl quic_listener_config_provider_manager_;

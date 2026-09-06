@@ -76,7 +76,8 @@ envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
     rbe_pool = "linux_x64_small",
-    shard_count = 5,
+    # TODO: Decrease to 5 once "envoy.restart_features.defer_worker_routing_init" is removed
+    shard_count = 10,
     deps = [
         ":listener_manager_impl_test_lib",
         "//envoy/network:socket_interface",
@@ -133,6 +134,7 @@ envoy_cc_test(
         "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//test/common/quic:mock_quic_connection_id_generator_factory_lib",
         "//test/integration/filters:test_listener_filter_lib",
         "//test/integration/filters:test_network_filter_lib",
         "//test/server:utility_lib",
