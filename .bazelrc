@@ -40,7 +40,6 @@ build --copt=-DABSL_MIN_LOG_LEVEL=4
 build --experimental_repository_downloader_retries=2
 build --experimental_cc_static_library
 build --enable_platform_specific_config
-build --incompatible_merge_fixed_and_default_shell_env
 # A workaround for slow ICU download.
 build --http_timeout_scaling=6.0
 

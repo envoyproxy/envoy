@@ -9,5 +9,11 @@ common --@rules_python//python/config_settings:bootstrap_impl=script
 common --@protobuf//bazel/flags:prefer_prebuilt_protoc=true
 common --incompatible_enable_proto_toolchain_resolution
 
-try-import %workspace%/../../../ci.bazelrc
-try-import %workspace%/../../../user.bazelrc
+
+#############################################################################
+# ci
+#############################################################################
+
+common:ci --noshow_progress
+common:ci --noshow_loading_progress
+common:ci --test_output=errors
