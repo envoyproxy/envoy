@@ -129,8 +129,16 @@ TEST_P(DynamicModuleEarlyHeaderMutationIntegrationTest, SharedConfigServesManyRe
   codec_client_->close();
 }
 
+#ifndef __SANITIZE_ADDRESS__
+// TODO(wbpcode): address sanitizer cannot handle the cross shared libraries vptr casts.
+// and we need to figure out a way to fix it.
+auto DynamicModulesIntegrationTestValues = testing::Values("rust", "go", "cpp");
+#else
+auto DynamicModulesIntegrationTestValues = testing::Values("rust", "go");
+#endif
+
 INSTANTIATE_TEST_SUITE_P(Languages, DynamicModuleEarlyHeaderMutationIntegrationTest,
-                         testing::Values("rust", "cpp", "go"),
+                         DynamicModulesIntegrationTestValues,
                          DynamicModuleEarlyHeaderMutationIntegrationTest::paramName);
 
 // Chain semantics are language independent, so they are covered once with the C fixtures.
