@@ -389,8 +389,10 @@ envoy_cc_test(
     deps = [
         "//source/common/http:date_provider_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 
