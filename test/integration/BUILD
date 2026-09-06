@@ -1246,6 +1246,7 @@ envoy_cc_test_library(
         ":test_host_predicate_lib",
         "//envoy/event:timer_interface",
         "//source/common/common:thread_annotations",
+        "//source/common/http:header_utility_lib",
         "//source/common/network:socket_option_lib",
         "//source/common/tls:context_lib",
         "//source/extensions/filters/http/router:config",
