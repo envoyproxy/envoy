@@ -69,6 +69,14 @@ TEST(MessageStreamerTest, Scalars) {
   expectSameJson(message);
 }
 
+TEST(MessageStreamerTest, NumbersKeepTheirPrecision) {
+  TestMessage message;
+  message.set_float_value(0.1f);
+  message.mutable_nested()->set_ratio(1.72191555e-41f);
+  message.set_double_value(2.0 / 3.0);
+  expectSameJson(message);
+}
+
 TEST(MessageStreamerTest, Enums) {
   TestMessage message;
   message.set_enum_value(::test::common::json::BETA);

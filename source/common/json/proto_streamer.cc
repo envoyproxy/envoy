@@ -268,17 +268,21 @@ void MessageStreamer::emitValue(const Protobuf::Message& message, const Field& f
   case Field::CPPTYPE_BOOL:
     level.addBool(REFLECTION_GET(Bool, field, index));
     return;
-  case Field::CPPTYPE_DOUBLE:
-  case Field::CPPTYPE_FLOAT: {
-    const double number = field.cpp_type() == Field::CPPTYPE_DOUBLE
-                              ? REFLECTION_GET(Double, field, index)
-                              : REFLECTION_GET(Float, field, index);
-    if (std::isfinite(number)) {
-      level.addNumber(number);
-    } else if (std::isnan(number)) {
-      level.addString("NaN");
+  case Field::CPPTYPE_DOUBLE: {
+    const double number = REFLECTION_GET(Double, field, index);
+    if (!std::isfinite(number)) {
+      level.addString(std::isnan(number) ? "NaN" : (number > 0 ? "Infinity" : "-Infinity"));
     } else {
-      level.addString(number > 0 ? "Infinity" : "-Infinity");
+      level.addRawJson(Protobuf::io::SimpleDtoa(number));
+    }
+    return;
+  }
+  case Field::CPPTYPE_FLOAT: {
+    const float number = REFLECTION_GET(Float, field, index);
+    if (!std::isfinite(number)) {
+      level.addString(std::isnan(number) ? "NaN" : (number > 0 ? "Infinity" : "-Infinity"));
+    } else {
+      level.addRawJson(Protobuf::io::SimpleFtoa(number));
     }
     return;
   }

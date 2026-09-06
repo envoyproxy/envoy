@@ -14,6 +14,7 @@
 #include "google/protobuf/empty.pb.h"
 #include "google/protobuf/extension_set.h"
 #include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/io/strtod.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 #include "google/protobuf/map.h"
@@ -121,6 +122,8 @@ using ::google::protobuf::io::CodedInputStream;    // NOLINT(misc-unused-using-d
 using ::google::protobuf::io::CodedOutputStream;   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::io::IstreamInputStream;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::io::OstreamOutputStream; // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::io::SimpleDtoa;          // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::io::SimpleFtoa;          // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::io::StringOutputStream;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::io::ZeroCopyInputStream; // NOLINT(misc-unused-using-decls)
 } // namespace io
