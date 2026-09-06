@@ -1,15 +1,21 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@envoy_repo//:version.bzl", "VERSION")
+load("@envoy_toolshed//pgp:defs.bzl", "pgp_public_key", "pgp_sign_checksums")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load(":packages.bzl", "envoy_pkg_distros")
+load(":changes.bzl", "envoy_signed_changes")
+load(":packages.bzl", "envoy_pkg_distros", "release_version_for")
 
 licenses(["notice"])  # Apache 2
 
 # IMPORTANT: SECRET-HANDLING TARGETS
 #
-# Several targets in this file process release-signing material using the GPG signing key
+# The `pgp_sign_*` targets in this file process release-signing material via
+# the toolshed `@envoy_toolshed//pgp` rules (key/passphrase are host paths;
+# their bytes never enter the action graph, but the rules force local,
+# uncached execution of the signing actions themselves)
 #
-# Any target handling secrets MUST NOT be cached or executed remotely.
+# All other targets are ordinary, cacheable/remotable actions - no secrets.
 
 envoy_package()
 
@@ -112,19 +118,44 @@ label_flag(
     build_setting_default = ":placeholder",
 )
 
-# NOTE: HANDLES SECRETS
+# Which committed *public* key is bundled as `signing.key`. Deliberately a
+# constrained string_flag, not a label_flag: an arbitrary file can not be
+# passed in here, so key material can never enter the graph via this path.
+# The selected key is additionally validated by `pgp_public_key`.
+string_flag(
+    name = "signing-key",
+    build_setting_default = "maintainers",
+    values = [
+        "maintainers",
+        "snakeoil",
+    ],
+)
+
+config_setting(
+    name = "signing_key_snakeoil",
+    flag_values = {":signing-key": "snakeoil"},
+)
+
+pgp_public_key(
+    name = "signing_key_file",
+    src = select({
+        ":signing_key_snakeoil": ":snakeoil-public.key",
+        "//conditions:default": "//:envoy-maintainers-public.key",
+    }),
+)
+
+# Bundle the (unsigned) per-arch debs into a single debs.tar.gz. This is an
+# ordinary, cacheable/remotable action - signing happens separately below, via
+# the toolshed `pgp_*` rules.
 genrule(
     name = "multi_arch_debs",
     srcs = [
         ":arm64-packages",
         ":x64-packages",
     ],
-    outs = ["multiarch-debs.tar"],
-    # To ensure the debs tarball is not extracted and kept as a tarball, it is
-    # placed into a 2nd archive.
+    outs = ["debs.tar.gz"],
     cmd = """
     tmpdir=$$(mktemp -d)
-    tmpdir2=$$(mktemp -d)
     NEEDS_PATH=
     if [[ $$(basename $(location :x64-packages)) == "PLACEHOLDER.TXT" ]]; then
         NEEDS_PATH=1
@@ -137,30 +168,27 @@ genrule(
     fi
     tar xf $(location :x64-packages) -C "$$tmpdir"
     tar xf $(location :arm64-packages) -C "$$tmpdir"
-    rm "$${tmpdir}/signing.key"
     mv "$${tmpdir}/deb/"* "$${tmpdir}"
     rm -rf "$${tmpdir}/deb/"
-    tar czf $$tmpdir2/debs.tar.gz -C "$${tmpdir}" .
-    tar cf $@ -C "$${tmpdir2}" .
+    tar czf $@ -C "$${tmpdir}" .
     """,
-    tags = [
-        "no-remote",
-        "no-remote-cache",
-    ],
 )
 
-# NOTE: HANDLES SECRETS
+# Extract and rename the release binaries out of the per-arch release
+# tarballs. Ordinary, cacheable/remotable action.
 genrule(
-    name = "signed",
+    name = "release_binaries",
     srcs = [
         ":arm64-release",
-        ":multi_arch_debs",
         ":x64-release",
     ],
-    outs = ["release.signed.tar.zst"],
+    outs = [
+        "envoy-%s-linux-x86_64" % VERSION,
+        "envoy-contrib-%s-linux-x86_64" % VERSION,
+        "envoy-%s-linux-aarch_64" % VERSION,
+        "envoy-contrib-%s-linux-aarch_64" % VERSION,
+    ],
     cmd = """
-    # Sign the packages
-    VERSION=%s
     NEEDS_PATH=
     if [[ $$(basename $(location :x64-release)) == "PLACEHOLDER.TXT" ]]; then
         NEEDS_PATH=1
@@ -168,22 +196,79 @@ genrule(
         NEEDS_PATH=1
     fi
     if [[ -n $$NEEDS_PATH ]]; then
-        echo "You must set //distribution:x64-release and //distribution:arm64-release for signing packages" >&2
+        echo "You must set //distribution:x64-release and //distribution:arm64-release for building release binaries" >&2
         exit 1
     fi
-    $(location //tools/distribution:sign) \
-        "bin:$(location :multi_arch_debs)" \
-        "x64:$(location :x64-release)" \
-        "arm64:$(location :arm64-release)" \
-        -m x64/envoy:bin/envoy-$${VERSION}-linux-x86_64 \
-        -m x64/envoy-contrib:bin/envoy-contrib-$${VERSION}-linux-x86_64 \
-        -m arm64/envoy:bin/envoy-$${VERSION}-linux-aarch_64 \
-        -m arm64/envoy-contrib:bin/envoy-contrib-$${VERSION}-linux-aarch_64 \
-           --out $@
-    """ % VERSION,
-    tags = [
-        "no-remote",
-        "no-remote-cache",
+    ZSTD=$(location @zstd//:zstd_cli)
+    "$$ZSTD" -fcd $(location :x64-release) | tar xfO - envoy > $(location envoy-%s-linux-x86_64)
+    "$$ZSTD" -fcd $(location :x64-release) | tar xfO - envoy-contrib > $(location envoy-contrib-%s-linux-x86_64)
+    "$$ZSTD" -fcd $(location :arm64-release) | tar xfO - envoy > $(location envoy-%s-linux-aarch_64)
+    "$$ZSTD" -fcd $(location :arm64-release) | tar xfO - envoy-contrib > $(location envoy-contrib-%s-linux-aarch_64)
+    chmod +x \
+        $(location envoy-%s-linux-x86_64) \
+        $(location envoy-contrib-%s-linux-x86_64) \
+        $(location envoy-%s-linux-aarch_64) \
+        $(location envoy-contrib-%s-linux-aarch_64)
+    """ % (VERSION, VERSION, VERSION, VERSION, VERSION, VERSION, VERSION, VERSION),
+    tools = ["@zstd//:zstd_cli"],
+)
+
+# In-graph signing targets built on `@envoy_toolshed//pgp`.
+#
+# `manual`: pgp targets fail at analysis time (by design) unless
+# `--@envoy_toolshed//pgp:key_path` / `--@envoy_toolshed//pgp:passphrase_path`
+# are set, so they must never be reachable from wildcard builds.
+pgp_sign_checksums(
+    name = "signed_checksums",
+    srcs = [
+        ":multi_arch_debs",
+        ":release_binaries",
     ],
-    tools = ["//tools/distribution:sign"],
+    checksums_out = "checksums.txt",
+    tags = ["manual"],
+)
+
+SIGNED_CHANGES = envoy_signed_changes(
+    name = "signed_changes",
+    arch_packages = {
+        "arm64": ":arm64-packages",
+        "x64": ":x64-packages",
+    },
+    release_version = release_version_for(VERSION),
+)
+
+_SIGNED_CHANGES_COPY_CMD = "\n    ".join([
+    'mkdir -p "$$tmpdir/$$(dirname %s)" && cp $(location %s) "$$tmpdir/%s"' % (dest, label, dest)
+    for label, dest in SIGNED_CHANGES
+])
+
+# Final release bundle. This only assembles already-signed/plain artifacts -
+# it never touches key material, so (unlike the pgp targets above) it is an
+# ordinary, cacheable/remotable action.
+genrule(
+    name = "signed",
+    srcs = [
+        ":multi_arch_debs",
+        ":release_binaries",
+        ":signed_checksums",
+        ":signed_checksums_checksums",
+        ":signing_key_file",
+    ] + [label for label, _dest in SIGNED_CHANGES],
+    outs = ["release.signed.tar.zst"],
+    cmd = """
+    tmpdir=$$(mktemp -d)
+    mkdir -p "$$tmpdir/bin"
+    cp $(location :multi_arch_debs) "$$tmpdir/bin/debs.tar.gz"
+    for f in $(locations :release_binaries); do
+        cp "$$f" "$$tmpdir/bin/"
+    done
+    cp $(location :signed_checksums) "$$tmpdir/checksums.txt.asc"
+    cp $(location :signed_checksums_checksums) "$$tmpdir/checksums.txt"
+    cp $(location :signing_key_file) "$$tmpdir/signing.key"
+    %s
+    ZSTD=$(location @zstd//:zstd_cli)
+    tar -C "$$tmpdir" -cf - . | "$$ZSTD" -T0 -o $@ -
+    """ % _SIGNED_CHANGES_COPY_CMD,
+    tags = ["manual"],
+    tools = ["@zstd//:zstd_cli"],
 )

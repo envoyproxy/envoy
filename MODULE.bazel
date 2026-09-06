@@ -101,6 +101,7 @@ bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
 bazel_dep(name = "rules_shell", version = "0.8.0")
 bazel_dep(name = "rules_swift", version = "2.5.0.envoy")
 bazel_dep(name = "spdlog", version = "1.16.0")
+bazel_dep(name = "sq", version = "1.4.0.envoy")
 bazel_dep(name = "sql-parser", version = "0.0.0-260715-52e5ad1.envoy")
 bazel_dep(name = "su-exec", version = "0.3")
 bazel_dep(name = "tclap", version = "1.2.5")
@@ -271,7 +272,7 @@ compat = use_extension("@rules_cc//cc:extensions.bzl", "compatibility_proxy")
 use_repo(compat, "cc_compatibility_proxy")
 
 ####################################################################################
-# setup: Languages
+# setup: Languages/toolchains
 ####################################################################################
 
 # Jq/Yq
@@ -411,6 +412,8 @@ buf.toolchains(
     version = "v1.61.0",
 )
 use_repo(buf, "rules_buf_toolchains")
+
+register_toolchains("@envoy_toolshed//pgp:sq_toolchain")
 
 ####################################################################################
 # repo: Extensions

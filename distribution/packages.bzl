@@ -2,7 +2,8 @@ load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("//distribution/debian:packages.bzl", "envoy_pkg_debs")
 
-def _release_version_for(version):
+def release_version_for(version):
+    """The `<major>.<minor>` release version for a full Envoy `version`."""
     if "-" in version:
         version, version_suffix = version.split("-")
 
@@ -45,27 +46,17 @@ def envoy_pkg_distros(
         version = version,
         bin_files = ":envoy-bin-files",
         contrib_bin_files = ":envoy-contrib-bin-files",
-        release_version = _release_version_for(version),
+        release_version = release_version_for(version),
         maintainer = maintainer,
     )
 
     # bundle distro packages into a tarball
+    #
+    # NOTE: this is unsigned - the debs/.changes files are signed centrally
+    # when the release is assembled, see `//distribution:signed` and
+    # `distribution/changes.bzl`.
     pkg_tar(
-        name = "distro_packages",
-        extension = "tar",
-        deps = [":debs"],
-    )
-
-    # sign the packages
-    native.genrule(
         name = name,
-        cmd = """
-        $(location //tools/distribution:sign) \
-            --out $@ \
-            $(location :distro_packages)
-        """,
-        outs = ["%s.tar.gz" % name],
-        srcs = [":distro_packages"],
-        tools = ["//tools/distribution:sign"],
-        tags = ["no-remote"],
+        extension = "tar.gz",
+        deps = [":debs"],
     )
