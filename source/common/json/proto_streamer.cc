@@ -337,10 +337,14 @@ void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStream
   case Protobuf::Descriptor::WELLKNOWNTYPE_UINT32VALUE:
   case Protobuf::Descriptor::WELLKNOWNTYPE_STRINGVALUE:
   case Protobuf::Descriptor::WELLKNOWNTYPE_BYTESVALUE:
-  case Protobuf::Descriptor::WELLKNOWNTYPE_BOOLVALUE:
-    // A wrapper is spelled as the value of its only field.
-    emitValue(message, *descriptor.field(0), std::nullopt, level, is_sensitive);
+  case Protobuf::Descriptor::WELLKNOWNTYPE_BOOLVALUE: {
+    // A wrapper is spelled as the value of its only field, if the field is not set, don't redact
+    // anything.
+    const Field& wrapped = *descriptor.field(0);
+    emitValue(message, wrapped, std::nullopt, level,
+              is_sensitive && message.GetReflection()->HasField(message, &wrapped));
     return;
+  }
   case Protobuf::Descriptor::WELLKNOWNTYPE_DURATION:
     if (!is_sensitive) {
       // TimeUtil::ToString is only defined for the range the printer accepts.
