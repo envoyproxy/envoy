@@ -16,7 +16,6 @@ envoy_cc_extension(
         "lb_context.h",
     ],
     deps = [
-        "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",
         "//source/extensions/load_balancing_policies/common:load_balancer_lib",
