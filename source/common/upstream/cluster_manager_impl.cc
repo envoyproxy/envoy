@@ -1073,7 +1073,7 @@ void ClusterManagerImpl::updateClusterCounts() {
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   const bool all_clusters_initialized =
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
-  if (all_clusters_initialized && xds_manager_.adsMux()) {
+  if (all_clusters_initialized && !shutdown_ && xds_manager_.adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
     // Clusters whose SDS config has initial_fetch_timeout == 0 may wait indefinitely for a
     // secret. Holding the CDS pause for such clusters would deadlock ADS. Those clusters
