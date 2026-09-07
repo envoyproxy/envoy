@@ -285,6 +285,8 @@ impl ClusterLb for AsyncHostSelectionLb {
       return HostSelectionResult::NoHost;
     }
     let index = if self.select_by_header {
+      // The test sets x-upstream-index to 0 or 1 to select A or B in a fixed order.
+      // The argument 0 reads the first header value; its contents select the upstream.
       let index = context
         .and_then(|context| context.get_downstream_header("x-upstream-index", 0))
         .and_then(|(value, _)| {
