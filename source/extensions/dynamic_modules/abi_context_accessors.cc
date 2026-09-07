@@ -161,8 +161,9 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
     break;
   }
   case envoy_dynamic_module_type_attribute_id_XdsRouteName: {
-    const auto& name = stream_info.getRouteName();
-    if (!name.empty()) {
+    const auto route = stream_info.route();
+    if (route.has_value()) {
+      const auto& name = route->routeName();
       *result = {const_cast<char*>(name.data()), name.size()};
       ok = true;
     }
@@ -174,6 +175,23 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
       *result = {const_cast<char*>(name->data()), name->size()};
       ok = true;
     }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsClusterName: {
+    const auto cluster_info = stream_info.upstreamClusterInfo();
+    if (cluster_info) {
+      const auto& name = cluster_info->name();
+      *result = {const_cast<char*>(name.data()), name.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsFilterChainName: {
+    const auto filter_chain_info = stream_info.downstreamAddressProvider().filterChainInfo();
+    const absl::string_view name =
+        filter_chain_info.has_value() ? filter_chain_info->name() : absl::string_view{};
+    *result = {const_cast<char*>(name.data()), name.size()};
+    ok = true;
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestId: {
@@ -463,6 +481,14 @@ bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
   case envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount: {
     *result = stream_info.attemptCount().value_or(0);
     ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsListenerDirection: {
+    const auto listener_info = stream_info.downstreamAddressProvider().listenerInfo();
+    if (listener_info.has_value()) {
+      *result = static_cast<uint64_t>(listener_info->direction());
+      ok = true;
+    }
     break;
   }
   default:

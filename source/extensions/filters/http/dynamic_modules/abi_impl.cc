@@ -1911,15 +1911,6 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     }
     break;
   }
-  case envoy_dynamic_module_type_attribute_id_XdsRouteName: {
-    const auto stream_info = filter->streamInfo();
-    if (stream_info) {
-      const auto& route_name = stream_info->getRouteName();
-      *result = {route_name.data(), route_name.size()};
-      ok = true;
-    }
-    break;
-  }
   case envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion:
     return getSslInfo(
         filter->connection(),

@@ -18,6 +18,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -2425,8 +2426,9 @@ TEST(ABIImpl, GetAttributes) {
   StreamInfo::StreamIdProviderImpl id_provider("ffffffff-0012-0110-00ff-0c00400600ff");
   EXPECT_CALL(stream_info, getStreamIdProvider())
       .WillRepeatedly(testing::Return(makeOptRef<const StreamInfo::StreamIdProvider>(id_provider)));
-  const std::string route_name{"test_route"};
-  EXPECT_CALL(stream_info, getRouteName()).WillRepeatedly(testing::ReturnRef(route_name));
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  route->route_name_ = "test_route";
+  stream_info.route_ = route;
 
   NiceMock<StreamInfo::MockStreamInfo> info;
   EXPECT_CALL(stream_info, downstreamAddressProvider())
