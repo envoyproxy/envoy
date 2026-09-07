@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
@@ -237,11 +238,16 @@ public:
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   }
 
-  void verifySessionSequence(uint64_t first) {
+  struct SessionExpectation {
+    uint64_t upstream_index;
+    uint64_t sessions_reused;
+  };
+
+  void verifySessionSequence(const std::vector<SessionExpectation>& sequence) {
     const std::vector<std::string> hostnames{"a.lyft.com", "b.lyft.com"};
     initializeAsyncTls(hostnames);
-    for (uint64_t i = 0; i < 4; ++i) {
-      const uint64_t upstream_index = (first + i) % 2;
+    for (size_t i = 0; i < sequence.size(); ++i) {
+      const auto& [upstream_index, sessions_reused] = sequence[i];
       SCOPED_TRACE(testing::Message() << "request " << i << ", host " << hostnames[upstream_index]);
       Http::TestRequestHeaderMapImpl headers(default_request_headers_);
       headers.setHost("downstream.example");
@@ -255,7 +261,7 @@ public:
       EXPECT_EQ(hostnames[upstream_index], fake_upstream_connection_->connection().ssl()->sni());
       test_server_->waitForCounter("cluster.cluster_0.ssl.handshake", testing::Eq(i + 1));
       const auto reused = test_server_->counter("cluster.cluster_0.ssl.session_reused");
-      EXPECT_EQ(i < 2 ? 0 : i - 1, reused == nullptr ? 0 : reused->value());
+      EXPECT_EQ(sessions_reused, reused == nullptr ? 0 : reused->value());
 
       // Await Envoy observing the close before the next request; otherwise the pool could reuse
       // this connection and bypass the handshake that the next assertion is intended to exercise.
@@ -273,11 +279,12 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleAsyncTlsIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(DynamicModuleAsyncTlsIntegrationTest, SessionReuseFollowsLogicalHostname) {
-  verifySessionSequence(0);
+  // A and B each need an initial handshake before their own sessions can be resumed.
+  verifySessionSequence({{0, 0}, {1, 0}, {0, 1}, {1, 2}});
 }
 
 TEST_P(DynamicModuleAsyncTlsIntegrationTest, SessionReuseFollowsLogicalHostnameReverseOrder) {
-  verifySessionSequence(1);
+  verifySessionSequence({{1, 0}, {0, 0}, {1, 1}, {0, 2}});
 }
 
 TEST_P(DynamicModuleAsyncTlsIntegrationTest, RejectsMismatchedLogicalHostname) {
@@ -285,11 +292,18 @@ TEST_P(DynamicModuleAsyncTlsIntegrationTest, RejectsMismatchedLogicalHostname) {
   Http::TestRequestHeaderMapImpl headers(default_request_headers_);
   headers.addCopy("x-upstream-index", "0");
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  // Keep the decoder alive while closing any unfinished request after an assertion failure.
+  FakeRawConnectionPtr upstream_connection;
+  Cleanup cleanup([this]() { cleanupUpstreamAndDownstream(); });
+  // Consume the connection to enable reads so TLS can progress even when the handshake fails.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection,
+                                                       TestUtility::DefaultTimeout, *dispatcher_));
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
   test_server_->waitForCounter("cluster.cluster_0.ssl.fail_verify_san", testing::Eq(1));
   const auto requests = test_server_->counter("cluster.cluster_0.upstream_rq_total");
   EXPECT_TRUE(requests == nullptr || requests->value() == 0);
+  ASSERT_TRUE(upstream_connection->waitForDisconnect());
 }
 
 // Verifies that a cluster can use the scheduler to add hosts after initialization.

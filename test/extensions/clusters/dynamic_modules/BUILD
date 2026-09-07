@@ -63,6 +63,7 @@ envoy_cc_dyn_module_test(
     ],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/common:cleanup_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/tls:server_context_config_lib",
         "//source/common/tls:server_ssl_socket_lib",
