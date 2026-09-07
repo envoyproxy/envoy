@@ -46,7 +46,7 @@
   border-left: 2px solid transparent;
   color: var(--envoy-ink-muted);
   display: block;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   line-height: 1.45;
   margin-left: -1px;
   overflow-wrap: anywhere;
@@ -55,7 +55,7 @@
 }
 
 .envoy-page-toc ul ul a {
-  font-size: 0.78125rem;
+  font-size: 0.8rem;
   padding-left: 24px;
 }
 
@@ -76,7 +76,7 @@
 
 /* proto symbols read as an index, so they are set in mono */
 .envoy-page-toc.envoy-symbol-toc .envoy-page-toc-title {
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   letter-spacing: 0.02em;
   text-transform: none;
 }

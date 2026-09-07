@@ -41,7 +41,7 @@
   display: flex;
   flex-wrap: wrap;
   font-family: var(--envoy-font-mono);
-  font-size: 0.71875rem;
+  font-size: 0.7rem;
   gap: 0 4px;
   margin-bottom: 30px;
 }
@@ -69,7 +69,7 @@
 
 .envoy-content-main .wy-breadcrumbs-aside a {
   font-family: var(--envoy-font-sans);
-  font-size: 0.78125rem;
+  font-size: 0.8rem;
 }
 
 .envoy-content-main .rst-content .wy-breadcrumbs + hr {
@@ -101,7 +101,7 @@
 }
 
 .envoy-content-main .rst-content h2 {
-  font-size: 1.4375rem;
+  font-size: 1.45rem;
   line-height: 1.25;
   margin: 52px 0 14px;
 }
@@ -365,7 +365,7 @@
   border-bottom: 2px solid transparent;
   color: var(--envoy-ink-muted);
   font-family: var(--envoy-font-sans);
-  font-size: 0.84375rem;
+  font-size: 0.85rem;
   padding: 8px 14px;
 }
 
@@ -405,7 +405,7 @@
   border-radius: 6px;
   box-shadow: none;
   color: var(--envoy-ink);
-  font-size: 0.84375rem;
+  font-size: 0.85rem;
   font-weight: 500;
   padding: 10px 14px;
   text-decoration: none;
@@ -426,7 +426,7 @@
 .envoy-content-main .rst-content footer,
 .envoy-content-main .rst-content footer p {
   color: var(--envoy-ink-muted);
-  font-size: 0.78125rem;
+  font-size: 0.8rem;
 }
 
 .envoy-content-main footer hr {

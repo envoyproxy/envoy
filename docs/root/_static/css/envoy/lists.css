@@ -33,7 +33,7 @@
   border-bottom: 1px solid var(--envoy-rule);
   color: var(--envoy-ink);
   display: block;
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   font-weight: 600;
   margin: 0 0 6px;
   padding: 0 10px 8px;
@@ -55,7 +55,7 @@
   color: var(--envoy-ink);
   display: flex;
   font-family: var(--envoy-font-mono);
-  font-size: 0.78125rem;
+  font-size: 0.8rem;
   line-height: 1.5;
   /* the theme puts a 12px bottom margin on links inside a toctree, which on a
      74-row index is a third of the scroll */

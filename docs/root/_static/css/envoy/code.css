@@ -44,7 +44,7 @@
   color: var(--envoy-ink-body);
   display: flex;
   font-family: var(--envoy-font-mono);
-  font-size: 0.71875rem;
+  font-size: 0.7rem;
   gap: 10px;
   line-height: 1.5;
   min-height: 34px;
@@ -86,7 +86,7 @@
   border: 0;
   color: var(--envoy-code-text);
   font-family: var(--envoy-font-mono);
-  font-size: 0.84375rem;
+  font-size: 0.85rem;
   font-variant-ligatures: none;
   line-height: 1.75;
   margin: 0;

@@ -43,7 +43,7 @@
   color: var(--envoy-ground);
   display: inline-block;
   font-family: var(--envoy-font-mono);
-  font-size: 0.59375rem;
+  font-size: 0.6rem;
   font-weight: 500;
   letter-spacing: 0.15em;
   margin-bottom: 9px;
@@ -71,7 +71,7 @@
 .envoy-content-main .rst-content .envoy-proto-symbol > h4,
 .envoy-content-main .rst-content .envoy-proto-symbol > h5 {
   font-family: var(--envoy-font-mono);
-  font-size: 1.0625rem;
+  font-size: 1.05rem;
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.35;
@@ -102,7 +102,7 @@
 
 .envoy-content-main .rst-content .envoy-proto-symbol dl > dt {
   border-left: 0;
-  font-size: 0.84375rem;
+  font-size: 0.85rem;
   margin-top: 18px;
   padding-left: 0;
 }
@@ -120,7 +120,7 @@ em.envoy-proto-required {
   color: var(--envoy-critical);
   display: inline-block;
   font-family: var(--envoy-font-mono);
-  font-size: 0.59375rem;
+  font-size: 0.6rem;
   font-style: normal;
   font-weight: 500;
   letter-spacing: 0.1em;

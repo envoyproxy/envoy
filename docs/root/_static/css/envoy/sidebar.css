@@ -72,7 +72,7 @@
   color: var(--envoy-ink);
   cursor: pointer;
   display: flex;
-  font-size: 0.84375rem;
+  font-size: 0.85rem;
   font-weight: 600;
   gap: 10px;
   list-style: none;
@@ -147,7 +147,7 @@
   border-left: 2px solid transparent;
   color: var(--envoy-ink-body);
   display: block;
-  font-size: 0.84375rem;
+  font-size: 0.85rem;
   line-height: 1.45;
   padding: 5px 14px 5px 18px;
   text-decoration: none;
@@ -210,7 +210,7 @@
 .wy-menu-vertical li.toctree-l4 a,
 .wy-menu-vertical li.toctree-l5 a {
   background: transparent;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   margin-left: -1px;
 }
 

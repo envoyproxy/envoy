@@ -88,7 +88,7 @@ html[data-envoy-theme="dark"] .envoy-doc-logo .envoy-logo-dark {
   cursor: pointer;
   display: flex;
   font-family: var(--envoy-font-mono);
-  font-size: 0.71875rem;
+  font-size: 0.7rem;
   gap: 7px;
   list-style: none;
   padding: 4px 8px;
@@ -109,7 +109,7 @@ html[data-envoy-theme="dark"] .envoy-doc-logo .envoy-logo-dark {
   background: var(--envoy-ink);
   border-radius: 2px;
   color: var(--envoy-ground);
-  font-size: 0.59375rem;
+  font-size: 0.6rem;
   letter-spacing: 0.08em;
   padding: 0 4px;
   text-transform: uppercase;
@@ -133,7 +133,7 @@ html[data-envoy-theme="dark"] .envoy-doc-logo .envoy-logo-dark {
 .envoy-version-options a {
   border-radius: 4px;
   color: var(--envoy-ink-body);
-  font-size: 0.84375rem;
+  font-size: 0.85rem;
   padding: 6px 10px;
   text-decoration: none;
 }
@@ -147,7 +147,7 @@ html[data-envoy-theme="dark"] .envoy-doc-logo .envoy-logo-dark {
 .envoy-version-current {
   border-radius: 4px;
   color: var(--envoy-ink);
-  font-size: 0.84375rem;
+  font-size: 0.85rem;
   font-weight: 600;
   padding: 6px 10px;
 }
@@ -171,7 +171,7 @@ html[data-envoy-theme="dark"] .envoy-doc-logo .envoy-logo-dark {
   cursor: pointer;
   display: flex;
   flex: 0 1 320px;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   gap: 9px;
   height: 32px;
   margin-left: auto;
@@ -202,7 +202,7 @@ html[data-envoy-theme="dark"] .envoy-doc-logo .envoy-logo-dark {
   color: var(--envoy-ink-muted);
   font-family: var(--envoy-font-mono);
   flex: none;
-  font-size: 0.65625rem;
+  font-size: 0.65rem;
   margin-left: auto;
   padding: 1px 5px;
 }
@@ -240,7 +240,7 @@ html[data-envoy-theme="dark"] .envoy-doc-logo .envoy-logo-dark {
 }
 
 .envoy-action-label {
-  font-size: 0.84375rem;
+  font-size: 0.85rem;
 }
 
 .envoy-theme-icon-light,

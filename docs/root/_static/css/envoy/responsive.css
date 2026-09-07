@@ -86,7 +86,7 @@
 @media screen and (max-width: 640px) {
   body,
   body.wy-body-for-nav {
-    font-size: 0.96875rem;
+    font-size: 0.95rem;
   }
 
   .envoy-doc-topbar {
@@ -101,7 +101,7 @@
   }
 
   .envoy-content-main .rst-content h1 {
-    font-size: 1.6875rem;
+    font-size: 1.7rem;
   }
 
   .envoy-content-main .rst-content h2 {
@@ -111,7 +111,7 @@
 
   .envoy-content-main .rst-content .highlight pre,
   .envoy-content-main .rst-content pre.literal-block {
-    font-size: 0.8125rem;
+    font-size: 0.8rem;
   }
 
   .envoy-search-panel {

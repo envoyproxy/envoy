@@ -46,7 +46,7 @@
   caret-color: var(--envoy-accent);
   color: var(--envoy-ink);
   flex: 1;
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   min-width: 0;
   outline: 0;
 }
@@ -76,7 +76,7 @@
 .envoy-search-group {
   color: var(--envoy-ink-muted);
   font-family: var(--envoy-font-mono);
-  font-size: 0.59375rem;
+  font-size: 0.6rem;
   letter-spacing: 0.14em;
   margin: 0;
   padding: 10px 16px 6px;
@@ -100,7 +100,7 @@
 }
 
 .envoy-search-hit-title {
-  font-size: 0.84375rem;
+  font-size: 0.85rem;
   font-weight: 500;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -116,7 +116,7 @@
 
 .envoy-search-hit-symbol {
   font-family: var(--envoy-font-mono);
-  font-size: 0.78125rem;
+  font-size: 0.8rem;
   font-weight: 400;
 }
 
@@ -128,7 +128,7 @@
   color: var(--envoy-ink-muted);
   flex: none;
   font-family: var(--envoy-font-mono);
-  font-size: 0.65625rem;
+  font-size: 0.65rem;
   margin-left: auto;
   max-width: 45%;
   overflow: hidden;
@@ -138,7 +138,7 @@
 
 .envoy-search-empty {
   color: var(--envoy-ink-muted);
-  font-size: 0.84375rem;
+  font-size: 0.85rem;
   padding: 22px 16px;
 }
 
@@ -150,7 +150,7 @@
   display: flex;
   flex: none;
   font-family: var(--envoy-font-mono);
-  font-size: 0.65625rem;
+  font-size: 0.65rem;
   gap: 18px;
   padding: 9px 16px;
 }
