@@ -120,6 +120,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
+        "//source/common/network:address_lib",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",

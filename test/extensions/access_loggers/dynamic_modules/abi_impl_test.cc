@@ -2446,7 +2446,53 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringDestinationAddress) {
   envoy_dynamic_module_type_envoy_buffer result{};
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
       env_ptr, envoy_dynamic_module_type_attribute_id_DestinationAddress, &result));
-  EXPECT_EQ("127.0.0.1", absl::string_view(result.ptr, result.length));
+  EXPECT_EQ("127.0.0.1:8080", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeMissingConnectionValues) {
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(nullptr);
+  stream_info_.downstream_connection_info_provider_->setLocalAddress(nullptr);
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  uint64_t int_result = 0;
+
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_SourceAddress,
+                        envoy_dynamic_module_type_attribute_id_DestinationAddress}) {
+    EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(env_ptr, id,
+                                                                                  &string_result));
+  }
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_SourcePort,
+                        envoy_dynamic_module_type_attribute_id_DestinationPort,
+                        envoy_dynamic_module_type_attribute_id_ConnectionId}) {
+    EXPECT_FALSE(
+        envoy_dynamic_module_callback_access_logger_get_attribute_int(env_ptr, id, &int_result));
+  }
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeNonIpConnectionValues) {
+  auto pipe_or_error = Network::Address::PipeInstance::create("dynamic-module-attribute-test");
+  ASSERT_TRUE(pipe_or_error.ok());
+  Network::Address::InstanceConstSharedPtr pipe_address(std::move(pipe_or_error).value());
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(pipe_address);
+  stream_info_.downstream_connection_info_provider_->setLocalAddress(pipe_address);
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  uint64_t int_result = 0;
+
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_SourceAddress,
+                        envoy_dynamic_module_type_attribute_id_DestinationAddress}) {
+    EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(env_ptr, id,
+                                                                                 &string_result));
+    EXPECT_EQ("dynamic-module-attribute-test",
+              absl::string_view(string_result.ptr, string_result.length));
+  }
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_SourcePort,
+                        envoy_dynamic_module_type_attribute_id_DestinationPort}) {
+    EXPECT_FALSE(
+        envoy_dynamic_module_callback_access_logger_get_attribute_int(env_ptr, id, &int_result));
+  }
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamAddress) {
