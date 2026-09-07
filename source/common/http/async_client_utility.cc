@@ -12,7 +12,7 @@ AsyncClientRequestTracker::~AsyncClientRequestTracker() {
 }
 
 void AsyncClientRequestTracker::add(AsyncClient::Request& request) {
-  ASSERT(active_requests_.find(&request) == active_requests_.end(), "request is already tracked.");
+  ASSERT(!active_requests_.contains(&request), "request is already tracked.");
   active_requests_.insert(&request);
 }
 

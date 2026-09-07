@@ -24,6 +24,7 @@
 #include "test/common/tls/test_data/no_san_cert_info.h"
 #include "test/common/tls/test_data/san_dns3_cert_info.h"
 #include "test/common/tls/test_data/san_ip_cert_info.h"
+#include "test/common/tls/test_data/selfsigned_cert_info.h"
 #include "test/common/tls/test_data/unittest_cert_info.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -1648,9 +1649,8 @@ TEST_F(ServerContextConfigImplTest, TlsCertificateNonEmpty) {
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   auto server_context_config =
       *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
-  ContextManagerImpl manager(server_factory_context_);
-  Stats::IsolatedStoreImpl store;
-  EXPECT_EQ(manager.createSslServerContext(*store.rootScope(), *server_context_config, nullptr)
+  ContextManagerImpl manager(factory_context_.server_context_);
+  EXPECT_EQ(manager.createSslServerContext(*store_.rootScope(), *server_context_config, nullptr)
                 .status()
                 .message(),
             "Server TlsCertificates must have a certificate specified");
@@ -1752,12 +1752,11 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProviderFallbac
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()->add_tls_certificates();
-  Stats::IsolatedStoreImpl store;
   NiceMock<Ssl::MockContextManager> context_manager;
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  ContextManagerImpl manager(server_factory_context_);
+  ContextManagerImpl manager(factory_context_.server_context_);
   EXPECT_CALL(factory_context_.server_context_, sslContextManager())
       .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
@@ -1780,7 +1779,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   auto server_context_config =
       *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
-  EXPECT_EQ(manager.createSslServerContext(*store.rootScope(), *server_context_config, nullptr)
+  EXPECT_EQ(manager.createSslServerContext(*store_.rootScope(), *server_context_config, nullptr)
                 .status()
                 .message(),
             "Failed to get BoringSSL private key method from provider");
@@ -2127,9 +2126,13 @@ common_tls_context:
   std::string expected_metric_name =
       absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
 
+  auto cert_expiry =
+      TestUtility::parseTime(TEST_SELFSIGNED_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  uint64_t expected_expiry = absl::ToUnixSeconds(cert_expiry);
+
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), 1787339648);
+  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
 }
 
 TEST_F(CertificateExpirationMetricsTest, ClientCertificateExpirationMetrics) {
@@ -2160,9 +2163,13 @@ common_tls_context:
   std::string expected_metric_name =
       absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
 
+  auto cert_expiry =
+      TestUtility::parseTime(TEST_SELFSIGNED_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  uint64_t expected_expiry = absl::ToUnixSeconds(cert_expiry);
+
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), 1787339648);
+  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
 }
 
 } // namespace Tls

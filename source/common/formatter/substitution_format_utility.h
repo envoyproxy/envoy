@@ -35,10 +35,8 @@ class SubstitutionFormatUtils {
 public:
   // Optional references are not supported, but this method has large performance
   // impact, so using reference_wrapper.
-  static const std::optional<std::reference_wrapper<const std::string>>
-  protocolToString(const std::optional<Http::Protocol>& protocol);
-  static const std::string&
-  protocolToStringOrDefault(const std::optional<Http::Protocol>& protocol);
+  static std::optional<absl::string_view> protocolToString(std::optional<Http::Protocol> protocol);
+  static absl::string_view protocolToStringOrDefault(std::optional<Http::Protocol> protocol);
   static const std::optional<std::string> getHostname();
 
   /**

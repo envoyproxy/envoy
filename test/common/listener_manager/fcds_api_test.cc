@@ -211,9 +211,8 @@ TEST_F(FcdsApiTest, ErrorBadCounts) {
   removed_resources.Add("chain-2");
 
   EXPECT_CALL(init_watcher_, ready());
-  EXPECT_THAT(
-      fcds_callbacks_->onConfigUpdate({}, removed_resources, "v1"),
-      HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("must remove exactly one resource")));
+  EXPECT_THAT(fcds_callbacks_->onConfigUpdate({}, removed_resources, "v1"),
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("cannot add and remove")));
 }
 
 TEST_F(FcdsApiTest, ErrorRemoveBadName) {
@@ -243,6 +242,16 @@ TEST_F(FcdsApiTest, ErrorXdsFailureUnblocks) {
   EnvoyException dummy_ex("dummy exception");
   fcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                         &dummy_ex);
+}
+
+TEST_F(FcdsApiTest, HeartBeat) {
+  setup("chain-1");
+
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  EXPECT_OK(fcds_callbacks_->onConfigUpdate({}, removed_resources, "v1"));
+
+  // Destruction triggers readiness.
+  EXPECT_CALL(init_watcher_, ready());
 }
 
 } // namespace

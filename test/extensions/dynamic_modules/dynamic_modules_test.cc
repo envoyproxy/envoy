@@ -12,6 +12,7 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -28,8 +29,32 @@ using ::Envoy::StatusHelpers::HasStatusCode;
 using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(DynamicModuleTestGeneral, InvalidPath) {
-  absl::StatusOr<DynamicModulePtr> result = newDynamicModule("invalid_name", false);
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module invalid_name", {
+    EXPECT_THAT(newDynamicModule("invalid_name", false),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+  });
+}
+
+// A shared object that is truncated mid-copy has a valid ELF header but is unusable. The failure
+// must be logged so that a corrupt module can be told apart from a healthy one.
+TEST(DynamicModuleTestGeneral, TruncatedSharedObject) {
+  std::ifstream input(testSharedObjectPath("no_op", "c"), std::ios::binary);
+  ASSERT_TRUE(input.good());
+  std::string bytes((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+  ASSERT_GT(bytes.size(), 128);
+
+  const std::filesystem::path truncated =
+      std::filesystem::temp_directory_path() / "envoy_truncated_module.so";
+  {
+    std::ofstream out(truncated, std::ios::binary | std::ios::trunc);
+    out.write(bytes.data(), 128);
+  }
+
+  EXPECT_LOG_CONTAINS("error", absl::StrCat("Unable to load dynamic module ", truncated.string()), {
+    EXPECT_THAT(newDynamicModule(truncated, false),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+  });
+  std::filesystem::remove(truncated);
 }
 
 INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Values("c", "rust"),
@@ -113,20 +138,22 @@ TEST(DynamicModuleTestLanguages, LoadLibGlobally) {
 
 TEST_P(DynamicModuleTestLanguages, NoProgramInit) {
   std::string language = GetParam();
-  absl::StatusOr<DynamicModulePtr> result =
-      newDynamicModule(testSharedObjectPath("no_program_init", language), false);
-  EXPECT_THAT(result,
-              HasStatus(absl::StatusCode::kInvalidArgument,
-                        testing::HasSubstr(
-                            "Failed to resolve symbol envoy_dynamic_module_on_program_init")));
+  EXPECT_LOG_CONTAINS("error", "Failed to resolve symbol envoy_dynamic_module_on_program_init", {
+    EXPECT_THAT(newDynamicModule(testSharedObjectPath("no_program_init", language), false),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          testing::HasSubstr("Failed to resolve symbol "
+                                             "envoy_dynamic_module_on_program_"
+                                             "init")));
+  });
 }
 
 TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
   std::string language = GetParam();
-  absl::StatusOr<DynamicModulePtr> result =
-      newDynamicModule(testSharedObjectPath("program_init_fail", language), false);
-  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
-                                testing::HasSubstr("Failed to initialize dynamic module:")));
+  EXPECT_LOG_CONTAINS("error", "envoy_dynamic_module_on_program_init returned null", {
+    EXPECT_THAT(newDynamicModule(testSharedObjectPath("program_init_fail", language), false),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          testing::HasSubstr("Failed to initialize dynamic module:")));
+  });
 }
 
 TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
@@ -179,10 +206,24 @@ TEST(StaticModule, LoadSuccess) {
 
 TEST(StaticModule, SymbolNotFound) {
   // "nonexistent_module" has no prefixed symbols in the binary.
-  absl::StatusOr<DynamicModulePtr> result = newStaticModule("nonexistent_module");
-  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
-                                testing::HasSubstr("Failed to resolve symbol "
-                                                   "envoy_dynamic_module_on_program_init")));
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module nonexistent_module", {
+    EXPECT_THAT(newStaticModule("nonexistent_module"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          testing::HasSubstr("Failed to resolve symbol "
+                                             "envoy_dynamic_module_on_program_init")));
+  });
+}
+
+TEST(StaticModule, ProgramInitFail) {
+  EXPECT_LOG_CONTAINS("error",
+                      "Unable to load dynamic module program_init_fail_static: "
+                      "envoy_dynamic_module_on_program_init returned null",
+                      {
+                        EXPECT_THAT(
+                            newStaticModule("program_init_fail_static"),
+                            HasStatus(absl::StatusCode::kInvalidArgument,
+                                      testing::HasSubstr("Failed to initialize static module:")));
+                      });
 }
 
 TEST(StaticModule, MultipleLoads) {
@@ -196,12 +237,27 @@ TEST(StaticModule, MultipleLoads) {
 }
 
 TEST(CreateDynamicModulesByName, ModuleNotFound) {
-  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
-  EXPECT_THAT(
-      module,
-      HasStatus(absl::StatusCode::kInvalidArgument,
-                testing::HasSubstr(
-                    "Failed to load dynamic module: libno_op.so not found in any search path")));
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module", {
+    absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
+    EXPECT_THAT(
+        module,
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  testing::HasSubstr(
+                      "Failed to load dynamic module: libno_op.so not found in any search path")));
+  });
+}
+
+TEST(CreateDynamicModulesByName, ModuleNotFoundIncrementsCounter) {
+  Stats::IsolatedStoreImpl store;
+  Stats::Scope& scope = *store.rootScope();
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(scope));
+
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module", {
+    EXPECT_THAT(newDynamicModuleByName("no_op", false, false, context, "my-bridge"),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+  });
+  EXPECT_EQ(1U, failureCounter(scope, ModuleLoadErrorStat, "my-bridge"));
 }
 
 TEST(NewDynamicModuleFromBytes, Success) {
@@ -432,8 +488,11 @@ TEST_F(NewDynamicModuleByConfigTest, ByNameSuccess) {
 TEST_F(NewDynamicModuleByConfigTest, ByNameFailure) {
   ProtoDynamicModuleConfig config;
   config.set_name("nonexistent_module");
-  auto result = newDynamicModuleByConfig(config, "test_module");
-  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to load dynamic module")));
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module", {
+    auto result = newDynamicModuleByConfig(config, "test_module", context_);
+    EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to load dynamic module")));
+  });
+  EXPECT_EQ(1U, failureCounter(context_.scope(), ModuleLoadErrorStat, "test_module"));
 }
 
 // Local-file loading succeeds synchronously and requires no context (the context-less caller path).

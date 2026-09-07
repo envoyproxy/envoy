@@ -107,16 +107,16 @@ private:
 };
 
 class UpstreamCodecFilterFactory
-    : public Extensions::HttpFilters::Common::CommonFactoryBase<
-          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec>,
-      public Server::Configuration::UpstreamHttpFilterConfigFactory {
+    : public Extensions::HttpFilters::Common::UnifiedFactoryBase<
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec> {
 public:
-  UpstreamCodecFilterFactory() : CommonFactoryBase("envoy.filters.http.upstream_codec") {}
+  UpstreamCodecFilterFactory() : UnifiedFactoryBase("envoy.filters.http.upstream_codec") {}
 
   std::string category() const override { return "envoy.filters.http.upstream"; }
-  absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                               Server::Configuration::UpstreamFactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec&,
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
     };

@@ -16,15 +16,16 @@ namespace TestLogger {
 /**
  * Config registration for the TestLogger filter. @see NamedHttpFilterConfigFactory.
  */
-class Factory
-    : public Common::FactoryBase<envoymobile::extensions::filters::http::test_logger::TestLogger> {
+class Factory : public Common::UnifiedFactoryBase<
+                    envoymobile::extensions::filters::http::test_logger::TestLogger> {
 public:
-  Factory() : FactoryBase("test_logger") {}
+  Factory() : UnifiedFactoryBase("test_logger") {}
 
 private:
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoymobile::extensions::filters::http::test_logger::TestLogger& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 DECLARE_FACTORY(Factory);

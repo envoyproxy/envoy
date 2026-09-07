@@ -128,10 +128,13 @@ impl Cluster for FilterStateReaderCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(FilterStateReaderLb {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(FilterStateReaderLb {
       hosts: self.hosts.clone(),
-    })
+    }))
   }
 }
 
@@ -200,10 +203,13 @@ impl Cluster for FilterStateWriterCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(FilterStateWriterLb {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(FilterStateWriterLb {
       hosts: self.hosts.clone(),
-    })
+    }))
   }
 }
 

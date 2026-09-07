@@ -107,14 +107,15 @@ protoToSharedState(const ProtoConfig& config,
 }
 } // namespace
 
-class BandwidthShareFilterFactory : public Common::DualFactoryBase<ProtoConfig, ProtoConfig> {
+class BandwidthShareFilterFactory : public Common::UnifiedFactoryBase<ProtoConfig, ProtoConfig> {
 public:
   BandwidthShareFilterFactory();
 
 private:
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProtoTyped(const ProtoConfig&, const std::string& stats_prefix, DualInfo,
-                                    Server::Configuration::ServerFactoryContext&) override;
+  createHttpFilterFactoryFromProtoTyped(const ProtoConfig&,
+                                        Server::Configuration::ServerFactoryContext&,
+                                        Server::Configuration::ExtraFactoryContext&) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const ProtoConfig&,
@@ -123,12 +124,12 @@ private:
 };
 
 BandwidthShareFilterFactory::BandwidthShareFilterFactory()
-    : DualFactoryBase(BandwidthShare::filterName()) {}
+    : UnifiedFactoryBase(BandwidthShare::filterName()) {}
 
 absl::StatusOr<Http::FilterFactoryCb>
-BandwidthShareFilterFactory::createFilterFactoryFromProtoTyped(
-    const ProtoConfig& proto_config, const std::string&, DualInfo,
-    Server::Configuration::ServerFactoryContext& context) {
+BandwidthShareFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const ProtoConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
   auto shared_state = protoToSharedState(proto_config, context);
   if (!shared_state.ok()) {
     return shared_state.status();

@@ -3,6 +3,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Server {
@@ -54,7 +55,7 @@ HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch),
       parent_terminated_(restart_epoch == 0), parent_drained_(restart_epoch == 0),
       skip_hot_restart_on_no_parent_(skip_hot_restart_on_no_parent),
-      skip_parent_stats_(skip_parent_stats) {
+      skip_parent_stats_(skip_parent_stats), parent_stop_accepting_requested_(restart_epoch == 0) {
   main_rpc_stream_.initDomainSocketAddress(&parent_address_);
   std::string socket_path_udp = socket_path + "_udp";
   udp_forwarding_rpc_stream_.initDomainSocketAddress(&parent_address_udp_forwarding_);
@@ -165,13 +166,17 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
 }
 
 void HotRestartingChild::drainParentListeners() {
-  if (parent_terminated_) {
-    return;
+  if (!parent_terminated_) {
+    // No reply expected.
+    HotRestartMessage wrapped_request;
+    wrapped_request.mutable_request()->mutable_drain_listeners();
+    main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
   }
-  // No reply expected.
-  HotRestartMessage wrapped_request;
-  wrapped_request.mutable_request()->mutable_drain_listeners();
-  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+
+  // Latch that the drain-listeners request was sent. The parent stops its listeners synchronously
+  // when it processes the RPC, but delivery is asynchronous, so callers that must not race the
+  // parent's accept queue should wait briefly after this flips before dialing (see reverse_tunnel).
+  parent_stop_accepting_requested_.store(true);
 }
 
 void HotRestartingChild::registerUdpForwardingListener(
@@ -265,7 +270,35 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
       spans.push_back(Stats::DynamicSpan(span_proto.first(), span_proto.last()));
     }
   }
-  stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges(), dynamics);
+
+  // Convert the protobuf tag metadata into the store-neutral structure StatMerger consumes, so the
+  // programmatic tags the parent recorded are re-applied to the merged stats. Gated by a runtime
+  // flag so the prior name-derived behavior can be restored; when disabled the maps stay empty and
+  // StatMerger falls back to deriving tags from the name.
+  const auto convert_tags =
+      [](const Protobuf::Map<std::string, HotRestartMessage::Reply::Stats::MetricTags>&
+             proto_tags) {
+        Stats::StatMerger::TagsMap tags_map;
+        tags_map.reserve(proto_tags.size());
+        for (const auto& iter : proto_tags) {
+          Stats::StatMerger::ParentTags& parent_tags = tags_map[iter.first];
+          parent_tags.base_name_ = iter.second.base_name();
+          parent_tags.tags_.reserve(iter.second.tags_size());
+          for (const auto& tag : iter.second.tags()) {
+            parent_tags.tags_.emplace_back(tag.name(), tag.value());
+          }
+        }
+        return tags_map;
+      };
+  Stats::StatMerger::TagsMap counter_tags;
+  Stats::StatMerger::TagsMap gauge_tags;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hot_restart_propagate_stat_tags")) {
+    counter_tags = convert_tags(stats_proto.counter_tags());
+    gauge_tags = convert_tags(stats_proto.gauge_tags());
+  }
+
+  stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges(), dynamics,
+                           counter_tags, gauge_tags);
 }
 
 absl::Status HotRestartingChild::onSocketEventUdpForwarding() {

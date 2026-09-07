@@ -1,17 +1,17 @@
 """Bazel macros for bssl-compat library."""
 
 def patched_bssl_filegroup(name, srcs):
-    """Copy BoringSSL files from @boringssl into bssl-compat, applying patches.
+    """Copy BoringSSL files from @boringssl-source into bssl-compat, applying patches.
 
     Args:
         name: The name of the filegroup, containing the copied & patched files
-        srcs: List of source files relative to @boringssl e.g. ssl/ssl_x509.cc
+        srcs: List of source files relative to @boringssl-source e.g. ssl/ssl_x509.cc
     """
     targets = []
     for file in srcs:
         target_name = name + "_" + file.replace("/", "_").replace(".", "_")
         targets.append(":" + target_name)
-        src_file = "@boringssl//:" + file
+        src_file = "@boringssl-source//:" + file
         dst_file = file
         native.genrule(
             name = target_name,

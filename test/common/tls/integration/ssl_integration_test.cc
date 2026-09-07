@@ -496,7 +496,7 @@ typed_config:
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
       ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()),
-      *context_manager_, *api_);
+      *context_manager_, *api_, &server_factory_context_.serverScope());
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
@@ -552,7 +552,7 @@ typed_config:
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
       ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()),
-      *context_manager_, *api_);
+      *context_manager_, *api_, &server_factory_context_.serverScope());
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
@@ -602,7 +602,7 @@ typed_config:
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
       ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()),
-      *context_manager_, *api_);
+      *context_manager_, *api_, &server_factory_context_.serverScope());
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
@@ -649,8 +649,8 @@ protected:
       return false;
     };
 
-    auto client_transport_socket_factory_ptr =
-        createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+    auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
+        {}, *context_manager_, *api_, &server_factory_context_.serverScope());
     std::string response;
     auto connection = createConnectionDriver(
         lookupPort("http"), write_request_cb,

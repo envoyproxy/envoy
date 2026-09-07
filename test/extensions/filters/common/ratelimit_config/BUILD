@@ -20,7 +20,7 @@ envoy_proto_library(
 envoy_cc_test(
     name = "ratelimit_config_test",
     srcs = ["ratelimit_config_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":ratelimit_config_test_proto_cc_proto",
         "//source/common/formatter:formatter_extension_lib",

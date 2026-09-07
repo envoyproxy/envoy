@@ -44,8 +44,9 @@ public:
 
   void createVerifier() {
     absl::Status creation_status = absl::OkStatus();
-    filter_config_ =
-        std::make_shared<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_, creation_status);
+    filter_config_ = std::make_shared<FilterConfigImpl>(
+        proto_config_, "", mock_factory_ctx_.server_factory_context_, mock_factory_ctx_.scope(),
+        makeOptRef<Init::Manager>(mock_factory_ctx_.init_manager_), creation_status);
     ASSERT_TRUE(creation_status.ok());
     auto verifier_or = Verifier::create(proto_config_.rules(0).requires_(),
                                         proto_config_.providers(), *filter_config_);
@@ -157,6 +158,7 @@ TEST_F(ProviderVerifierTest, TestSpanPassedDown) {
   auto options = Http::AsyncClient::RequestOptions()
                      .setTimeout(std::chrono::milliseconds(5 * 1000))
                      .setParentSpan(parent_span_)
+                     .setSampled(std::nullopt)
                      .setChildSpanName("JWT Remote PubKey Fetch");
   EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
                   .async_client_,
@@ -185,7 +187,10 @@ TEST_F(ProviderVerifierTest, TestMissedJWT) {
   EXPECT_FALSE(headers.has("x-jwt-claim-nested"));
 }
 
-// This test verifies that JWT must be issued by the provider specified in the requirement.
+// Provider-scoped Extractors only sanitize headers for their own providers. The live filter path
+// additionally sanitizes the union of every provider's payload/claim headers in
+// Filter::decodeHeaders before verifier selection, so the spoofed headers below would already be
+// gone on a real request; this test pins Extractor/requirement scoping in isolation.
 TEST_F(ProviderVerifierTest, TestTokenRequirementProviderMismatch) {
   const char config[] = R"(
 providers:
@@ -264,7 +269,9 @@ TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
   proto_config_.mutable_rules(0)->mutable_requires_()->set_provider_name("nosuchprovider");
 
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigImpl filter_config(proto_config_, "", mock_factory_ctx_, creation_status);
+  FilterConfigImpl filter_config(
+      proto_config_, "", mock_factory_ctx_.server_factory_context_, mock_factory_ctx_.scope(),
+      makeOptRef<Init::Manager>(mock_factory_ctx_.init_manager_), creation_status);
   EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
                                          ::testing::HasSubstr("Required provider")));
 }

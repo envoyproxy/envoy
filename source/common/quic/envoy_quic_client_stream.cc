@@ -58,7 +58,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   // downstream codecs decode.
   RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
-  RETURN_IF_ERROR(Http::HeaderUtility::checkValidRequestHeaders(headers));
+  if (filterManagerConnection()->shouldValidateUpstreamHeaders()) {
+    RETURN_IF_ERROR(Http::HeaderUtility::checkValidRequestHeaders(headers));
+  }
 #endif
 
   if (write_side_closed()) {
@@ -565,7 +567,8 @@ bool EnvoyQuicClientStream::useCapsuleProtocol() {
     return false;
   }
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  http_datagram_handler_->setStreamDecoder(getResponseDecoder());
+  http_datagram_handler_->setStreamDecoderProvider(
+      [this]() -> Http::StreamDecoder* { return getResponseDecoder(); });
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
   return true;
 }

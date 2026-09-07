@@ -40,6 +40,8 @@ jobs:
         ERROR
         error:
         Error:
+        FAILED
+        FAIL:
       rbe: ${{ matrix.rbe }}
       target: ${{ matrix.target }}
       timeout-minutes: 180

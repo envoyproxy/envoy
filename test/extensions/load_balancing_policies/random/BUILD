@@ -19,7 +19,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.random"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/load_balancing_policies/random:config",
         "//test/mocks/server:server_factory_context_mocks",
@@ -35,7 +35,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.random"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/random:config",
@@ -57,7 +57,7 @@ envoy_cc_fuzz_test(
     name = "random_load_balancer_fuzz_test",
     srcs = ["random_load_balancer_fuzz_test.cc"],
     corpus = "random_load_balancer_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":random_load_balancer_fuzz_proto_cc_proto",
         "//source/extensions/load_balancing_policies/random:config",
@@ -69,7 +69,7 @@ envoy_cc_fuzz_test(
 envoy_cc_benchmark_binary(
     name = "random_lb_benchmark",
     srcs = ["random_lb_benchmark.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/load_balancing_policies/random:random_lb_lib",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
@@ -86,7 +86,7 @@ envoy_extension_cc_test(
     name = "random_lb_test",
     srcs = ["random_lb_test.cc"],
     extension_names = ["envoy.load_balancing_policies.random"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/load_balancing_policies/random:config",
         "//test/extensions/load_balancing_policies/common:load_balancer_base_test_lib",
@@ -97,7 +97,7 @@ envoy_extension_cc_test(
     name = "random_lb_simulation_test",
     srcs = ["random_lb_simulation_test.cc"],
     extension_names = ["envoy.load_balancing_policies.random"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/common/upstream:load_balancer_context_base_lib",

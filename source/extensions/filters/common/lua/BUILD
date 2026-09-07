@@ -13,7 +13,7 @@ envoy_cc_library(
     srcs = ["lua.cc"],
     hdrs = ["lua.h"],
     deps = [
-        "//bazel/foreign_cc:luajit",
+        "//bazel/deps:luajit",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -43,7 +44,7 @@ envoy_cc_library(
     hdrs = ["protobuf_converter.h"],
     deps = [
         ":lua_lib",
-        "//bazel/foreign_cc:luajit",
+        "//bazel/deps:luajit",
         "//source/common/protobuf",
         "//source/common/protobuf:create_reflectable_message_lib",
         "//source/common/protobuf:utility_lib",

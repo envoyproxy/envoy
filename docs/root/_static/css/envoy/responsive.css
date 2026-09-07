@@ -1,0 +1,154 @@
+/* Responsive, reduced motion, print.
+
+   Loaded last so its overrides win without needing extra specificity. */
+
+@media screen and (max-width: 1240px) {
+  :root {
+    --envoy-gutter: 40px;
+  }
+
+  .envoy-content-layout.envoy-has-page-toc {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .envoy-has-page-toc .envoy-page-toc {
+    display: none;
+  }
+}
+
+@media screen and (max-width: 960px) {
+  :root {
+    --envoy-gutter: 24px;
+  }
+
+  .envoy-doc-actions .envoy-nav-toggle {
+    display: inline-flex;
+  }
+
+  /* below this the label competes with the version menu; the icon is enough */
+  .envoy-search-button {
+    flex: none;
+    justify-content: center;
+    padding: 0;
+    width: 32px;
+  }
+
+  .envoy-search-button > span,
+  .envoy-search-button kbd {
+    display: none;
+  }
+
+  .envoy-action-label {
+    display: none;
+  }
+
+  .wy-nav-side {
+    box-shadow: var(--envoy-shadow);
+    transform: translateX(-100%);
+    transition: transform 160ms ease;
+    width: min(320px, 86vw);
+  }
+
+  body.envoy-nav-open .wy-nav-side {
+    transform: translateX(0);
+  }
+
+  .wy-nav-content-wrap {
+    margin-left: 0;
+  }
+
+  .envoy-sidebar-close {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: var(--envoy-ink-body);
+    cursor: pointer;
+    display: inline-flex;
+    height: 28px;
+    justify-content: center;
+    width: 28px;
+  }
+
+  .envoy-content-layout {
+    padding-top: 22px;
+  }
+}
+
+@media screen and (max-width: 1100px) {
+  /* below this the margin is too tight to hang the anchor in it */
+  .envoy-content-main .rst-content a.headerlink {
+    left: auto;
+    margin-left: 0.4em;
+    position: static;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  body,
+  body.wy-body-for-nav {
+    font-size: 15.5px;
+  }
+
+  .envoy-doc-topbar {
+    gap: 10px;
+    padding: 0 14px;
+  }
+
+  .envoy-version-menu,
+  .envoy-doc-logo::after,
+  .envoy-doc-wordmark {
+    display: none;
+  }
+
+  .envoy-content-main .rst-content h1 {
+    font-size: 27px;
+  }
+
+  .envoy-content-main .rst-content h2 {
+    font-size: 20px;
+    margin-top: 40px;
+  }
+
+  .envoy-content-main .rst-content .highlight pre,
+  .envoy-content-main .rst-content pre.literal-block {
+    font-size: 13px;
+  }
+
+  .envoy-search-panel {
+    top: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@media print {
+  .envoy-doc-topbar,
+  .wy-nav-side,
+  .envoy-page-toc,
+  .envoy-search-dialog,
+  .envoy-code-head,
+  .rst-footer-buttons {
+    display: none !important;
+  }
+
+  .wy-nav-content-wrap {
+    margin-left: 0;
+    padding-top: 0;
+  }
+
+  .envoy-content-layout {
+    padding: 0;
+  }
+
+  .envoy-content-main .rst-content {
+    max-width: none;
+  }
+}

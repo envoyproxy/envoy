@@ -453,9 +453,6 @@ private:
   Configuration::TransportSocketFactoryContext& factory_context_;
 };
 
-constexpr absl::string_view FcdsSharedFilterChainManagerName =
-    "fcds_shared_filter_chain_manager_singleton";
-
 class FcdsClientCallbacks {
 public:
   virtual ~FcdsClientCallbacks() = default;

@@ -366,7 +366,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
   const std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
 
-  if (api_state_.count(type_url) == 0) {
+  if (!api_state_.contains(type_url)) {
     // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
     // protocol violation
     ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
@@ -631,7 +631,7 @@ void GrpcMuxImpl::expiryCallback(absl::string_view type_url,
     Protobuf::RepeatedPtrField<std::string> found_resources_for_watch;
 
     for (const auto& resource : expired) {
-      if (all_expired.find(resource) != all_expired.end()) {
+      if (all_expired.contains(resource)) {
         found_resources_for_watch.Add(std::string(resource));
       }
     }

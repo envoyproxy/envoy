@@ -1,0 +1,191 @@
+/* Admonitions — hue says what kind, weight says how serious.
+
+   Counted across docs/root, the tree uses seven directives and ignores the
+   rest: note 197, attention 81, warning 30, tip 25, important 5, seealso 4,
+   deprecated 4, and zero uses of caution, danger, error or hint. So this maps
+   every directive onto four levels rather than styling nine in isolation.
+
+   Every level is a box: a 1px border in a softened hue, a 4%-tint ground and a
+   3px left edge at full strength. The tint is light enough that a page with six
+   notes does not stripe, and the boxes keep an aside visibly separate from the
+   prose around it.
+
+   Severity is carried by two cues, so neither is load-bearing alone: the hue,
+   and whether the label chip is outlined or filled. Outline versus fill still
+   separates the levels in greyscale and to a colour-blind reader, which hue
+   alone does not — and it puts the strongest treatment on the rarest levels
+   rather than on note, which is 197 of the 346 admonitions in the tree.
+
+   The border-color declarations are ordered so that a browser without
+   color-mix() falls back to the plain rule colour rather than dropping the
+   border entirely. */
+
+.envoy-content-main .rst-content .admonition,
+.envoy-content-main .rst-content .admonition-todo {
+  background: var(--envoy-info-tint);
+  border: 1px solid var(--envoy-rule);
+  border-color: color-mix(in srgb, var(--envoy-info) 32%, var(--envoy-rule));
+  border-left: 3px solid var(--envoy-info);
+  border-radius: 5px;
+  box-shadow: none;
+  color: var(--envoy-ink-body);
+  margin: 24px 0;
+  padding: 14px 16px;
+}
+
+/* Every level's label is a chip, because it is the thing you scan for down a
+   page and a coloured word does not hold against the body text. The low
+   levels — note, seealso, tip, important — are outlined; attention and above
+   are filled. That is the second encoding: it survives greyscale, and it means
+   a page of six notes does not shout as loudly as the one warning on it. */
+.envoy-content-main .rst-content .admonition > .admonition-title {
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: var(--envoy-info);
+  display: inline-block;
+  font-family: var(--envoy-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  line-height: 1.5;
+  margin: 0 0 9px;
+  padding: 2px 7px;
+  text-transform: uppercase;
+}
+
+/* the theme's icon font is not part of this design */
+.envoy-content-main .rst-content .admonition > .admonition-title::before {
+  content: none;
+}
+
+.envoy-content-main .rst-content .admonition p:last-child {
+  margin-bottom: 0;
+}
+
+/* --- affirm: tip, hint, important ---------------------------------------- */
+
+.envoy-content-main .rst-content .admonition.tip,
+.envoy-content-main .rst-content .admonition.hint,
+.envoy-content-main .rst-content .admonition.important {
+  background: var(--envoy-affirm-tint);
+  border-color: color-mix(in srgb, var(--envoy-affirm) 32%, var(--envoy-rule));
+  border-left-color: var(--envoy-affirm);
+}
+
+.envoy-content-main .rst-content .admonition.tip > .admonition-title,
+.envoy-content-main .rst-content .admonition.hint > .admonition-title,
+.envoy-content-main .rst-content .admonition.important > .admonition-title {
+  color: var(--envoy-affirm);
+}
+
+/* --- info: note, seealso ------------------------------------------------- */
+
+.envoy-content-main .rst-content .admonition.seealso {
+  background: var(--envoy-info-tint);
+  border-left-color: var(--envoy-info);
+}
+
+.envoy-content-main .rst-content .admonition.seealso > .admonition-title {
+  color: var(--envoy-info);
+}
+
+/* --- caution: attention, caution ----------------------------------------- */
+
+.envoy-content-main .rst-content .admonition.attention,
+.envoy-content-main .rst-content .admonition.caution {
+  background: var(--envoy-caution-tint);
+  border-color: color-mix(in srgb, var(--envoy-caution) 32%, var(--envoy-rule));
+  border-left-color: var(--envoy-caution);
+}
+
+.envoy-content-main .rst-content .admonition.attention > .admonition-title,
+.envoy-content-main .rst-content .admonition.caution > .admonition-title {
+  background: var(--envoy-caution);
+  border-color: var(--envoy-caution);
+  color: var(--envoy-ground);
+}
+
+/* --- critical: warning, danger, error ------------------------------------
+
+   In Envoy's prose a `warning` almost always means "this is unsafe or will
+   break" — confused-deputy attacks, unstable output, GODEBUG=cgocheck=0. It is
+   the only level with an inverted label, and 30 pages have earned it. */
+
+.envoy-content-main .rst-content .admonition.warning,
+.envoy-content-main .rst-content .admonition.danger,
+.envoy-content-main .rst-content .admonition.error {
+  background: var(--envoy-critical-tint);
+  /* A 2px frame is the third rung: outlined chip, filled chip, filled chip in
+     a heavy frame. Unlike the hue, it survives greyscale — without it warning
+     and attention are indistinguishable to a reader who cannot separate red
+     from amber. */
+  border-color: color-mix(in srgb, var(--envoy-critical) 55%, var(--envoy-rule));
+  border-left-color: var(--envoy-critical);
+  border-width: 2px;
+  border-left-width: 4px;
+  padding: 13px 15px;
+}
+
+.envoy-content-main .rst-content .admonition.warning > .admonition-title,
+.envoy-content-main .rst-content .admonition.danger > .admonition-title,
+.envoy-content-main .rst-content .admonition.error > .admonition-title {
+  background: var(--envoy-critical);
+  border-color: var(--envoy-critical);
+  color: var(--envoy-ground);
+}
+
+/* --- versionadded / versionchanged / deprecated --------------------------
+
+   These are not `.admonition` in the generated markup, but they read as the
+   same kind of aside, so they take the same treatment. */
+
+/* Sphinx puts the same class on the wrapper and on the label span inside it
+   (`<div class="deprecated"><span class="versionmodified deprecated">`), so
+   these are scoped to the div or the box is drawn twice. */
+.envoy-content-main .rst-content div.versionadded,
+.envoy-content-main .rst-content div.versionchanged,
+.envoy-content-main .rst-content div.deprecated {
+  background: var(--envoy-caution-tint);
+  border: 1px solid var(--envoy-rule);
+  border-color: color-mix(in srgb, var(--envoy-caution) 32%, var(--envoy-rule));
+  border-left: 3px solid var(--envoy-caution);
+  border-radius: 5px;
+  margin: 24px 0;
+  padding: 14px 16px;
+}
+
+.envoy-content-main .rst-content div.versionadded {
+  background: var(--envoy-affirm-tint);
+  border-color: color-mix(in srgb, var(--envoy-affirm) 32%, var(--envoy-rule));
+  border-left-color: var(--envoy-affirm);
+}
+
+/* Sphinx puts this label inside the paragraph rather than above it, so it
+   needs to be told to take its own line like every other level's chip. */
+.envoy-content-main .rst-content .versionmodified {
+  background: var(--envoy-caution);
+  border: 1px solid var(--envoy-caution);
+  border-radius: 3px;
+  color: var(--envoy-ground);
+  display: table;
+  font-family: var(--envoy-font-mono);
+  font-size: 10.5px;
+  font-style: normal;
+  letter-spacing: 0.14em;
+  margin-bottom: 9px;
+  padding: 2px 7px;
+  text-transform: uppercase;
+}
+
+.envoy-content-main .rst-content div.versionadded .versionmodified {
+  background: transparent;
+  border-color: currentColor;
+  color: var(--envoy-affirm);
+}
+
+.envoy-content-main .rst-content div.versionadded p:last-child,
+.envoy-content-main .rst-content div.versionchanged p:last-child,
+.envoy-content-main .rst-content div.deprecated p:last-child {
+  margin-bottom: 0;
+}

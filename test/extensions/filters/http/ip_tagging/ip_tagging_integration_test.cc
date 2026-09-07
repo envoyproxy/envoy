@@ -88,10 +88,7 @@ ip_tags:
  )EOF",
       true);
 
-  // Update the symlink to point to the new file.
-  TestEnvironment::renameFile(
-      TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"),
-      TestEnvironment::temporaryPath("ip_tagging_test/watcher_old_target.yaml"));
+  // Atomically rename the new file onto the watched target path.
   TestEnvironment::renameFile(
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
@@ -180,15 +177,12 @@ ip_tags:
  )EOF",
       true);
 
-  // Update the symlink to point to the new file.
-  TestEnvironment::renameFile(
-      TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"),
-      TestEnvironment::temporaryPath("ip_tagging_test/watcher_old_target.yaml"));
+  // Atomically rename the new file onto the watched target path.
   TestEnvironment::renameFile(
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
 
-  test_server_->waitForCounter("http.config_test.ip_tagging.reload_success", testing::Ge(2));
+  test_server_->waitForCounter("http.config_test.ip_tagging.reload_success", testing::Ge(1));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(

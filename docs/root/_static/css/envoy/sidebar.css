@@ -1,0 +1,373 @@
+/* Sidebar — one accordion section per toctree caption.
+
+   The Envoy tree has nine top-level areas and thousands of pages behind them.
+   Rendering all of it flat gives no sense of place, so each caption becomes a
+   disclosure and only the section you are in starts open. */
+
+.wy-nav-side {
+  background: var(--envoy-ground);
+  border-right: 1px solid var(--envoy-rule);
+  bottom: 0;
+  left: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+  top: var(--envoy-topbar-height);
+  width: var(--envoy-sidebar-width);
+  z-index: 195;
+}
+
+.wy-side-scroll {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  width: 100%;
+}
+
+.wy-side-nav-search {
+  background: transparent;
+  margin: 0;
+  padding: 0;
+}
+
+.envoy-sidebar-heading {
+  align-items: center;
+  color: var(--envoy-ink-muted);
+  display: flex;
+  font-family: var(--envoy-font-mono);
+  font-size: 10px;
+  justify-content: space-between;
+  letter-spacing: 0.14em;
+  padding: 20px 20px 10px;
+  text-transform: uppercase;
+}
+
+.envoy-sidebar-close {
+  display: none;
+}
+
+.wy-menu-vertical {
+  padding-bottom: 40px;
+  width: auto;
+}
+
+.wy-menu-vertical ul {
+  margin: 0;
+}
+
+.wy-menu-vertical li {
+  display: block;
+}
+
+/* --- accordion sections -------------------------------------------------- */
+
+.envoy-nav-section {
+  border-bottom: 1px solid var(--envoy-rule);
+}
+
+.envoy-nav-section > summary {
+  align-items: center;
+  color: var(--envoy-ink);
+  cursor: pointer;
+  display: flex;
+  font-size: 13.5px;
+  font-weight: 600;
+  gap: 10px;
+  list-style: none;
+  padding: 11px 20px;
+}
+
+.envoy-nav-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.envoy-nav-section > summary:hover {
+  background: var(--envoy-surface);
+}
+
+.envoy-nav-section > summary::after {
+  border-bottom: 1px solid var(--envoy-ink-muted);
+  border-right: 1px solid var(--envoy-ink-muted);
+  content: "";
+  height: 6px;
+  margin-left: auto;
+  transform: rotate(45deg) translate(-2px, -2px);
+  width: 6px;
+}
+
+.envoy-nav-section[open] > summary::after {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.envoy-nav-section > ul {
+  padding-bottom: 12px;
+}
+
+/* captions are consumed by the accordion; keep a style for any that are not */
+.wy-menu-vertical p.caption {
+  color: var(--envoy-ink-muted);
+  font-family: var(--envoy-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  margin: 22px 0 8px;
+  padding: 0 20px;
+  text-transform: uppercase;
+}
+
+.envoy-nav-section p.caption {
+  display: none;
+}
+
+/* --- links --------------------------------------------------------------- */
+
+/* sphinx_rtd_theme paints the current branch in four shades of grey, some of
+   them through descendant selectors. Clear the lot, then mark the current page
+   with a rail and a weight bump instead. */
+.wy-menu-vertical li.current,
+.wy-menu-vertical li.current > ul,
+.wy-menu-vertical li.on a,
+.wy-menu-vertical li.current > a,
+.wy-menu-vertical li.current > a:hover,
+.wy-menu-vertical li.toctree-l2.current > a,
+.wy-menu-vertical li.toctree-l2.current li.toctree-l3 > a,
+.wy-menu-vertical li.toctree-l3.current > a,
+.wy-menu-vertical li.toctree-l3.current li.toctree-l4 > a,
+.wy-menu-vertical li.toctree-l4.current > a,
+.wy-menu-vertical li.toctree-l4.current li.toctree-l5 > a {
+  background: transparent;
+}
+
+.wy-menu-vertical a,
+.wy-menu-vertical li.current a {
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+  color: var(--envoy-ink-body);
+  display: block;
+  font-size: 13.5px;
+  line-height: 1.45;
+  padding: 5px 14px 5px 18px;
+  text-decoration: none;
+}
+
+.wy-menu-vertical a:hover,
+.wy-menu-vertical li.current a:hover {
+  background: var(--envoy-surface);
+  color: var(--envoy-ink);
+}
+
+/* an ancestor of the current page: weight only */
+.wy-menu-vertical li.current > a,
+.wy-menu-vertical li.toctree-l1.current > a,
+.wy-menu-vertical li.toctree-l2.current > a,
+.wy-menu-vertical li.toctree-l3.current > a,
+.wy-menu-vertical li.toctree-l4.current > a,
+.wy-menu-vertical li.toctree-l5.current > a {
+  background: transparent;
+  /* the theme boxes the current branch with 1px rules top and bottom */
+  border-bottom: 0;
+  border-left-color: transparent;
+  border-top: 0;
+  color: var(--envoy-ink);
+  font-weight: 600;
+}
+
+/* The current page itself: weight plus the rail, in the accent. The page you
+   are on is also "where you are going", so it uses the link ink rather than a
+   second vocabulary for one idea. */
+.wy-menu-vertical a.current,
+.wy-menu-vertical li.current > a.current {
+  border-left-color: var(--envoy-accent);
+  color: var(--envoy-accent);
+  font-weight: 600;
+}
+
+/* Depth is shown by the guide line, not by the indent, so the step gets
+   smaller as it goes: the API tree is five levels deep, and a flat 20px each
+   time spent 80px of a 280px column before the title even started. */
+.wy-menu-vertical li.toctree-l2 {
+  border-left: 1px solid var(--envoy-rule);
+  margin-left: 18px;
+}
+
+.wy-menu-vertical li.toctree-l3,
+.wy-menu-vertical li.toctree-l4,
+.wy-menu-vertical li.toctree-l5 {
+  border-left: 1px solid var(--envoy-rule);
+  margin-left: 9px;
+}
+
+/* Deliberately not clamped. These titles are prose and their distinguishing
+   word is at the end — "Bootstrap settings for downstream reverse connection
+   socket interface" against "Upstream reverse connection socket interface" —
+   so truncating them hides the only part that tells them apart. The column is
+   widened instead. */
+.wy-menu-vertical li.toctree-l2 a,
+.wy-menu-vertical li.toctree-l3 a,
+.wy-menu-vertical li.toctree-l4 a,
+.wy-menu-vertical li.toctree-l5 a {
+  background: transparent;
+  font-size: 13px;
+  margin-left: -1px;
+}
+
+/* --- one indent system ---------------------------------------------------
+
+   The theme indents the *current* branch a second time, through a padding-left
+   that grows per level (2.427em, 4.045em, 5.663em …). Its own design can do
+   that because it never renders the branches you are not in — but this one
+   also indents with a margin on the li, to hang the guide line off. The two
+   stack, so a page you are inside sits 20px further right than its own
+   sibling: "v3 API reference" and "Supported API versions" are the same level
+   and did not look like it.
+
+   Depth is the margin. Being current is weight and the accent rail, never
+   position. These selectors mirror the theme's own so they meet it on
+   specificity; the right-hand value is the toggle gutter, applied to every row
+   so the text column is the same width whether a row has a toggle or not. */
+.wy-menu-vertical li a,
+.wy-menu-vertical li.current a,
+.wy-menu-vertical li.current > a,
+.wy-menu-vertical li.on a,
+.wy-menu-vertical li.toctree-l2.current > a,
+.wy-menu-vertical li.toctree-l3.current > a,
+.wy-menu-vertical li.toctree-l4.current > a,
+.wy-menu-vertical li.toctree-l5.current > a,
+.wy-menu-vertical li.toctree-l2.current li.toctree-l3 > a,
+.wy-menu-vertical li.toctree-l3.current li.toctree-l4 > a,
+.wy-menu-vertical li.toctree-l4.current li.toctree-l5 > a,
+.wy-menu-vertical li.toctree-l5.current li.toctree-l6 > a {
+  padding-left: 12px;
+  padding-right: 34px;
+}
+
+/* the nine areas are the one level that is not nested */
+.wy-menu-vertical li.toctree-l1 > a,
+.wy-menu-vertical li.toctree-l1.current > a {
+  padding-left: 18px;
+}
+
+/* --- top-level areas -----------------------------------------------------
+
+   Nine areas rendered as nine identical text rows read as a wall. A 14px line
+   icon gives the column a fixed left edge and something to recognise without
+   reading. Nested entries are files and symbols rather than areas, so they get
+   no icon — one on every row would be the noise this removes. */
+
+/* The area rows stick to the top of the scrolling column, so the icon and the
+   name of the section you are in stay visible however deep the tree goes. Each
+   one is pushed out by the next, which keeps this to a single pinned row
+   rather than nine of them eating the column.
+
+   Qualified through li.toctree-l1 so it outranks the theme's
+   `.wy-menu-vertical li.current > a { position: relative }`, which otherwise
+   un-sticks the one row that matters — the area you are currently inside. */
+.wy-menu-vertical li.toctree-l1 > a.envoy-nav-area {
+  align-items: center;
+  background: var(--envoy-ground);
+  display: flex;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* an opaque row over a scrolling list needs a foot, or the text underneath
+   appears to touch it */
+.wy-menu-vertical li.toctree-l1 > a.envoy-nav-area::after {
+  background: linear-gradient(var(--envoy-ground), transparent);
+  content: "";
+  height: 6px;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
+}
+
+.envoy-nav-icon {
+  color: var(--envoy-ink-muted);
+  flex: none;
+}
+
+.wy-menu-vertical li.toctree-l1 > a.envoy-nav-area:hover .envoy-nav-icon,
+.wy-menu-vertical li.toctree-l1 > a.envoy-nav-area.current .envoy-nav-icon {
+  color: var(--envoy-accent);
+}
+
+/* --- expand toggles ------------------------------------------------------
+
+   The theme hangs these off the left of the label with a float, so their x
+   position follows each level's indent and its content width — they moved
+   every time a branch opened. They now sit in one fixed column at the right
+   edge of the sidebar, at the same x for every level and every state.
+
+   The boxed plus/minus is a Font Awesome glyph; a chevron that rotates says
+   the same thing and makes the state change legible at 12px. */
+
+.wy-menu-vertical li > a {
+  position: relative;
+}
+
+/* Every toggle rule below is repeated for `li.current > a` and `li.on a`.
+   The theme styles those variants at a higher specificity than the plain
+   button selector, and they match exactly the rows that are open — so a rule
+   written only against `li button.toctree-expand` styles every toggle except
+   the ones you are looking at. */
+.wy-menu-vertical li button.toctree-expand,
+.wy-menu-vertical li.current > a button.toctree-expand,
+.wy-menu-vertical li.on a button.toctree-expand {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--envoy-ink-muted);
+  cursor: pointer;
+  display: grid;
+  float: none;
+  height: 22px;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+  place-items: center;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+}
+
+/* The boxed plus/minus is a Font Awesome character on ::before. Its `content`
+   is set by a theme selector that outranks anything scoped to the button, so
+   it is removed with `display`, which that selector does not set. */
+.wy-menu-vertical li button.toctree-expand::before,
+.wy-menu-vertical li.current > a button.toctree-expand::before,
+.wy-menu-vertical li.on a button.toctree-expand::before {
+  display: none;
+}
+
+.wy-menu-vertical li button.toctree-expand::after,
+.wy-menu-vertical li.current > a button.toctree-expand::after,
+.wy-menu-vertical li.on a button.toctree-expand::after {
+  border-bottom: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  content: "";
+  height: 6px;
+  transform: rotate(-45deg) translate(-1px, -1px);
+  width: 6px;
+}
+
+/* open: the chevron turns to point down */
+.wy-menu-vertical li.current > a button.toctree-expand::after,
+.wy-menu-vertical li.on a button.toctree-expand::after {
+  transform: rotate(45deg) translate(-2px, -2px);
+}
+
+.wy-menu-vertical li button.toctree-expand:hover,
+.wy-menu-vertical li.current > a button.toctree-expand:hover,
+.wy-menu-vertical li.on a button.toctree-expand:hover {
+  background: var(--envoy-surface-2);
+  color: var(--envoy-ink);
+}

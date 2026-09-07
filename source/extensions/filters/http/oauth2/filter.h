@@ -50,12 +50,26 @@ using OAuth2Headers = ConstSingleton<OAuth2HeaderValues>;
 
 class OAuth2Client;
 
+// Entry names used when ``token_secret`` is supplied as a multi-entry generic secret. This form is
+// only used with the ``PRIVATE_KEY_JWT`` auth type, where it allows the key ID to be distributed
+// together with the signing key so the two do not drift apart.
+constexpr absl::string_view PrivateKeySecretEntry = "private_key";
+constexpr absl::string_view KeyIdSecretEntry = "key_id";
+
 // Helper class used to fetch secrets (usually from SDS).
 class SecretReader {
 public:
   virtual ~SecretReader() = default;
+  // The OAuth client secret sent to the token endpoint by the auth types that use a shared
+  // secret. Only ever the single-value form of ``token_secret``.
   virtual const std::string& clientSecret() const PURE;
   virtual const std::string& hmacSecret() const PURE;
+  // The PEM-encoded key used to sign the JWT client assertion, taken from the ``private_key``
+  // entry of a multi-entry ``token_secret``, or from a single-value secret.
+  virtual const std::string& privateKey() const PURE;
+  // The key ID distributed alongside the signing key in a multi-entry ``token_secret``, or an
+  // empty string when the secret does not carry one.
+  virtual const std::string& keyId() const PURE;
 };
 
 class SDSSecretReader : public SecretReader {
@@ -78,6 +92,18 @@ public:
     return client_secret_ ? client_secret_->secret() : empty_client_secret_;
   }
   const std::string& hmacSecret() const override { return hmac_secret_->secret(); }
+  const std::string& privateKey() const override {
+    if (client_secret_ == nullptr) {
+      return empty_client_secret_;
+    }
+    // A single-value secret holds the key directly; a multi-entry secret holds it in a named
+    // entry alongside the key ID.
+    const std::string& value = client_secret_->secret();
+    return value.empty() ? client_secret_->secret(PrivateKeySecretEntry) : value;
+  }
+  const std::string& keyId() const override {
+    return client_secret_ ? client_secret_->secret(KeyIdSecretEntry) : empty_client_secret_;
+  }
 
 private:
   std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> client_secret_;
@@ -199,11 +225,19 @@ public:
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string hmacSecret() const { return secret_reader_->hmacSecret(); }
+  std::string privateKey() const { return secret_reader_->privateKey(); }
+  std::string keyId() const { return secret_reader_->keyId(); }
   // The secrets are loaded asynchronously if per-route configurations are used, so the filter needs
   // to check if the secrets are available before processing the request.
   bool requiredSecretsAvailable() const {
-    return !secret_reader_->hmacSecret().empty() &&
-           (auth_type_ == AuthType::TlsClientAuth || !secret_reader_->clientSecret().empty());
+    if (secret_reader_->hmacSecret().empty()) {
+      return false;
+    }
+    if (auth_type_ == AuthType::TlsClientAuth) {
+      return true;
+    }
+    return auth_type_ == AuthType::PrivateKeyJwt ? !secret_reader_->privateKey().empty()
+                                                 : !secret_reader_->clientSecret().empty();
   }
   FilterStats& stats() const { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
@@ -258,7 +292,7 @@ public:
   bool disableTokenEncryption() const { return disable_token_encryption_; }
   const std::string& jwtSigningAlgorithm() const { return jwt_signing_algorithm_; }
   std::chrono::seconds jwtAssertionLifetime() const { return jwt_assertion_lifetime_; }
-  const std::string& tokenEndpointUrl() const { return oauth_token_endpoint_.uri(); }
+  const std::string& jwtAssertionAudience() const { return jwt_assertion_audience_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix,
@@ -292,9 +326,10 @@ private:
   const std::chrono::seconds default_refresh_token_expires_in_;
   const std::chrono::seconds csrf_token_expires_in_;
   const std::chrono::seconds code_verifier_token_expires_in_;
-  // Always initialized even for non-JWT auth types; minimal overhead (a string + 8 bytes).
+  // Always initialized even for non-JWT auth types; minimal overhead (two strings + 8 bytes).
   const std::string jwt_signing_algorithm_;
   const std::chrono::seconds jwt_assertion_lifetime_;
+  const std::string jwt_assertion_audience_;
   const bool forward_bearer_token_ : 1;
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;

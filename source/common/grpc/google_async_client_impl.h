@@ -77,7 +77,7 @@ public:
   grpc::CompletionQueue& completionQueue() { return cq_; }
 
   void registerStream(GoogleAsyncStreamImpl* stream) {
-    ASSERT(streams_.find(stream) == streams_.end());
+    ASSERT(!streams_.contains(stream));
     streams_.insert(stream);
   }
 

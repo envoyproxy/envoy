@@ -22,7 +22,8 @@ void BaseTcpProxySslIntegrationTest::initialize() {
 
   context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
       server_factory_context_);
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
 }
 
 BaseTcpProxySslIntegrationTest::ClientSslConnection::ClientSslConnection(

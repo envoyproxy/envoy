@@ -363,6 +363,41 @@ json_format:
       response->headers().get(::Envoy::Http::LowerCaseString("foo"))[0]->value().getStringView());
 }
 
+// Verify that a local response policy can format the body of an existing local reply.
+TEST_P(CustomResponseIntegrationTest, ExistingLocalReplyBodyWithFormatter) {
+  custom_response_filter_config_ = TestUtility::parseYaml<CustomResponse>(R"EOF(
+custom_response_matcher:
+  matcher_list:
+    matchers:
+    - predicate:
+        single_predicate:
+          input:
+            name: local_reply
+            typed_config:
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseLocalReplyMatchInput
+          value_match:
+            exact: "true"
+      on_match:
+        action:
+          name: action
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+            body_format:
+              text_format_source:
+                inline_string: "formatted: %LOCAL_REPLY_BODY%"
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("default.host");
+  default_request_headers_.setPath("/default");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("201", response->headers().getStatusValue());
+  EXPECT_EQ("formatted: Response body", response->body());
+}
+
 // Verify we get the correct custom response using the redirect policy.
 // TODO(pradeepcrao): Add a test that returns a redirected response from an
 // upstream.

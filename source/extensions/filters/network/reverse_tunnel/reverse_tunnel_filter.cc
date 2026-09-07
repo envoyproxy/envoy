@@ -31,18 +31,6 @@ namespace ReverseTunnel {
 
 namespace {
 
-Extensions::Bootstrap::ReverseConnection::UpstreamSocketManager* getThreadLocalSocketManager() {
-  const auto* acceptor = getAcceptor();
-  if (acceptor == nullptr) {
-    return nullptr;
-  }
-  auto* tls_registry = acceptor->getLocalRegistry();
-  if (tls_registry == nullptr) {
-    return nullptr;
-  }
-  return tls_registry->socketManager();
-}
-
 class RequestDecoderHandleImpl : public Http::RequestDecoderHandle {
 public:
   explicit RequestDecoderHandleImpl(Http::RequestDecoder& decoder) : decoder_(decoder) {}
@@ -186,7 +174,8 @@ bool ReverseTunnelFilterConfig::validateConnectionLimit(absl::string_view node_i
     return true;
   }
 
-  if (auto socket_manager = getThreadLocalSocketManager()) {
+  if (auto socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
+          getThreadLocalSocketManager()) {
     return socket_manager->canAcceptConnection(node_id, tenant_id);
   }
   ENVOY_LOG(warn,
@@ -194,7 +183,7 @@ bool ReverseTunnelFilterConfig::validateConnectionLimit(absl::string_view node_i
   return false;
 }
 
-bool ReverseTunnelFilterConfig::validateIdentifiers(
+ReverseTunnelValidationResult ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id, absl::string_view tenant_id,
     const Http::RequestHeaderMap& request_headers,
     const StreamInfo::StreamInfo& stream_info) const {
@@ -202,12 +191,12 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
   if (!validateConnectionLimit(node_id, tenant_id)) {
     ENVOY_LOG(debug, "reverse_tunnel: connection limit reached. node_id: {}, tenant_id: {}",
               node_id, tenant_id);
-    return false;
+    return ReverseTunnelValidationResult::Rejected;
   }
 
   // If no validation configured, pass validation.
   if (!node_id_formatter_ && !cluster_id_formatter_ && !tenant_id_formatter_) {
-    return true;
+    return ReverseTunnelValidationResult::ValidationPassed;
   }
 
   // Give the formatter the parsed handshake headers so validation strings can read them with
@@ -215,44 +204,51 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
   // earlier in the handshake.
   const Formatter::Context context(&request_headers);
 
+  // Each check fails closed: an empty render, or the formatter's "-" placeholder for an absent
+  // value, means the configured binding could not be evaluated and must reject the handshake
+  // rather than skip the check. This mirrors the consumer side, where
+  // RevConCluster::LoadBalancer::chooseHost treats both values as underivable and returns
+  // nullptr.
+  auto binding_failed = [](const std::string& expected, absl::string_view actual) {
+    return expected.empty() || expected == "-" || expected != actual;
+  };
+
   // Validate node_id if formatter is configured.
   if (node_id_formatter_) {
     const std::string expected_node_id = node_id_formatter_->format(context, stream_info);
-    if (!expected_node_id.empty() && expected_node_id != node_id) {
+    if (binding_failed(expected_node_id, node_id)) {
       ENVOY_LOG(debug, "reverse_tunnel: node_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_node_id, node_id);
-      return false;
+      return ReverseTunnelValidationResult::ValidationFailed;
     }
   }
 
   // Validate cluster_id if formatter is configured.
   if (cluster_id_formatter_) {
     const std::string expected_cluster_id = cluster_id_formatter_->format(context, stream_info);
-    if (!expected_cluster_id.empty() && expected_cluster_id != cluster_id) {
+    if (binding_failed(expected_cluster_id, cluster_id)) {
       ENVOY_LOG(debug, "reverse_tunnel: cluster_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_cluster_id, cluster_id);
-      return false;
+      return ReverseTunnelValidationResult::ValidationFailed;
     }
   }
 
   // Validate tenant_id if formatter is configured.
   if (tenant_id_formatter_) {
     const std::string expected_tenant_id = tenant_id_formatter_->format(context, stream_info);
-    if (!expected_tenant_id.empty() && expected_tenant_id != tenant_id) {
+    if (binding_failed(expected_tenant_id, tenant_id)) {
       ENVOY_LOG(debug, "reverse_tunnel: tenant_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_tenant_id, tenant_id);
-      return false;
+      return ReverseTunnelValidationResult::ValidationFailed;
     }
   }
 
-  return true;
+  return ReverseTunnelValidationResult::ValidationPassed;
 }
 
-void ReverseTunnelFilterConfig::emitValidationMetadata(absl::string_view node_id,
-                                                       absl::string_view cluster_id,
-                                                       absl::string_view tenant_id,
-                                                       bool validation_passed,
-                                                       StreamInfo::StreamInfo& stream_info) const {
+void ReverseTunnelFilterConfig::emitValidationMetadata(
+    absl::string_view node_id, absl::string_view cluster_id, absl::string_view tenant_id,
+    ReverseTunnelValidationResult validation_result, StreamInfo::StreamInfo& stream_info) const {
   if (!emit_dynamic_metadata_) {
     return;
   }
@@ -266,7 +262,7 @@ void ReverseTunnelFilterConfig::emitValidationMetadata(absl::string_view node_id
   fields["tenant_id"].set_string_value(std::string(tenant_id));
 
   // Emit validation result.
-  fields["validation_result"].set_string_value(validation_passed ? "allowed" : "denied");
+  fields["validation_result"].set_string_value(toStringView(validation_result));
 
   // Set dynamic metadata on the stream info.
   stream_info.setDynamicMetadata(dynamic_metadata_namespace_, metadata);
@@ -275,7 +271,7 @@ void ReverseTunnelFilterConfig::emitValidationMetadata(absl::string_view node_id
             "reverse_tunnel: emitted dynamic metadata to namespace '{}': node_id={}, "
             "cluster_id={}, tenant_id={}, validation_result={}",
             dynamic_metadata_namespace_, node_id, cluster_id, tenant_id,
-            validation_passed ? "allowed" : "denied");
+            toStringView(validation_result));
 }
 
 // ReverseTunnelFilter implementation.
@@ -450,9 +446,25 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   const absl::string_view cluster_id = cluster_vals[0]->value().getStringView();
   const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
 
+  // Reject a present-but-empty tenant id the same way as a missing header. An empty tenant
+  // silently disables tenant scoping when the socket is registered, since
+  // maybeBuildTenantScopedIdentifier returns the bare identifier for an empty tenant, while
+  // empty node and cluster ids are already rejected at registration by
+  // UpstreamSocketManager::addConnectionSocket.
+  if (tenant_id.empty()) {
+    parent_.stats_.parse_error_.inc();
+    ENVOY_CONN_LOG(debug, "reverse_tunnel: empty tenant-id header value",
+                   parent_.read_callbacks_->connection());
+    sendLocalReply(Http::Code::BadRequest, "Empty tenant-id header value", nullptr, std::nullopt,
+                   "reverse_tunnel_empty_tenant_id");
+    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    return;
+  }
+
   // Get tenant isolation setting from socket manager (configured at bootstrap level).
   bool tenant_isolation_enabled = false;
-  if (auto* socket_manager = getThreadLocalSocketManager()) {
+  if (auto* socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
+          getThreadLocalSocketManager()) {
     tenant_isolation_enabled = socket_manager->tenantIsolationEnabled();
   }
 
@@ -535,20 +547,28 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   }
 
   // Validate node_id, cluster_id, and tenant_id if validation is configured.
-  const bool validation_passed = parent_.config_->validateIdentifiers(
+  const ReverseTunnelValidationResult validation_result = parent_.config_->validateIdentifiers(
       node_id, cluster_id, tenant_id, *headers_, connection.streamInfo());
 
   // Emit validation metadata if configured.
-  parent_.config_->emitValidationMetadata(node_id, cluster_id, tenant_id, validation_passed,
+  parent_.config_->emitValidationMetadata(node_id, cluster_id, tenant_id, validation_result,
                                           connection.streamInfo());
 
-  if (!validation_passed) {
-    parent_.stats_.validation_failed_.inc();
+  if (validation_result != ReverseTunnelValidationResult::ValidationPassed) {
+    if (validation_result == ReverseTunnelValidationResult::Rejected) {
+      parent_.stats_.rejected_.inc();
+    } else {
+      parent_.stats_.validation_failed_.inc();
+    }
     ENVOY_CONN_LOG(debug,
-                   "reverse_tunnel: validation failed for node '{}', cluster '{}', tenant '{}'",
-                   parent_.read_callbacks_->connection(), node_id, cluster_id, tenant_id);
-    sendLocalReply(Http::Code::Forbidden, "Validation failed", nullptr, std::nullopt,
-                   "reverse_tunnel_validation_failed");
+                   "reverse_tunnel: handshake denied for node '{}', cluster '{}', tenant '{}', "
+                   "result: {}",
+                   parent_.read_callbacks_->connection(), node_id, cluster_id, tenant_id,
+                   toStringView(validation_result));
+    sendLocalReply(
+        validation_result == ReverseTunnelValidationResult::Rejected ? Http::Code::TooManyRequests
+                                                                     : Http::Code::Forbidden,
+        toStringView(validation_result), nullptr, std::nullopt, toStringView(validation_result));
     parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
     return;
   }
@@ -623,7 +643,8 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   // Lookup the reverse tunnel acceptor socket interface to retrieve the TLS registry.
   // Note: This is a global lookup that should be thread-safe but may return nullptr
   // if the socket interface isn't registered or we're in a test environment.
-  auto* socket_manager = getThreadLocalSocketManager();
+  auto* socket_manager =
+      Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::getThreadLocalSocketManager();
   if (socket_manager == nullptr) {
     ENVOY_CONN_LOG(debug, "reverse_tunnel: socket manager not available, skipping socket reuse",
                    connection);
@@ -675,6 +696,7 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
           : std::string(cluster_id);
 
   ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
+  const int socket_fd = wrapped_socket->ioHandle().fdDoNotUse();
   socket_manager->addConnectionSocket(std::string(node_id), std::string(cluster_id),
                                       std::move(wrapped_socket), ping_seconds,
                                       /* rebalanced= */ config_->skipRebalancing(), tenant_id,
@@ -684,7 +706,8 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
 
   // Report the connection to the extension -> reporter.
   if (auto extension = socket_manager->getUpstreamExtension()) {
-    extension->reportConnection(socket_node_id, socket_cluster_id, tenant_id, initiation_time_ms);
+    extension->reportConnection(socket_node_id, socket_cluster_id, tenant_id, initiation_time_ms,
+                                socket_fd);
   }
 }
 

@@ -13,6 +13,8 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/server/instance.h"
+#include "envoy/server/listener_manager.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
@@ -29,6 +31,7 @@
 #include "test/test_common/network_utility.h"
 
 #include "absl/functional/any_invocable.h"
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -164,9 +167,8 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
   if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
-    static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
+        std::move(cfg), context_manager_, server_factory_context_.serverScope());
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
@@ -352,6 +354,21 @@ BaseIntegrationTest::makeTcpConnection(uint32_t port,
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
                                                 enableHalfClose(), options, source_address,
                                                 destination_address);
+}
+
+void BaseIntegrationTest::startServerDrain(Network::DrainDirection direction) {
+  absl::Notification drain_sequence_started;
+  test_server_->server().dispatcher().post([this, direction, &drain_sequence_started]() {
+    Server::Instance& server = test_server_->server();
+    // The start time and strategy are captured once, so every notified connection shares one
+    // drain timeline.
+    server.listenerManager().onServerDrainStart(
+        direction, Network::ConnectionDrainEvent{server.api().timeSource().monotonicTime(),
+                                                 server.options().drainStrategy()});
+    test_server_->drainManager().startDrainSequence(direction, [] {});
+    drain_sequence_started.Notify();
+  });
+  drain_sequence_started.WaitForNotification();
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -610,7 +627,8 @@ void BaseIntegrationTest::createXdsUpstream() {
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
 
-    upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
+    upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>(
+        server_factory_context_.serverScope().symbolTable());
     auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
         std::move(cfg), context_manager_, *upstream_stats_store_->rootScope());
     addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);

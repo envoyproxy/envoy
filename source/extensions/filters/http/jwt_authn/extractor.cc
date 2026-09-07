@@ -43,7 +43,7 @@ public:
     if (allow_all_) {
       return true;
     }
-    return specified_issuers_.find(jwt_issuer) != specified_issuers_.end();
+    return specified_issuers_.contains(jwt_issuer);
   }
 
 private:

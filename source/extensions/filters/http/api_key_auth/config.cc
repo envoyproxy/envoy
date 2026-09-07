@@ -21,17 +21,12 @@ ApiKeyAuthFilterFactory::createFilterFactory(const ApiKeyAuthProto& proto_config
   };
 }
 
-absl::StatusOr<Http::FilterFactoryCb> ApiKeyAuthFilterFactory::createFilterFactoryFromProtoTyped(
-    const ApiKeyAuthProto& proto_config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(proto_config, stats_prefix, context.scope());
-}
-
 absl::StatusOr<Http::FilterFactoryCb>
 ApiKeyAuthFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const ApiKeyAuthProto& proto_config, Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactory(proto_config, extra_context.stats_prefix, context.scope());
+  return createFilterFactory(proto_config, extra_context.stats_prefix,
+                             extra_context.scopeOr(context));
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

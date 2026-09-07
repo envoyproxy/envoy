@@ -2,6 +2,8 @@
 
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 
+#include "source/extensions/filters/http/mcp_json_rest_bridge/bridge_status.h"
+
 #include "absl/container/flat_hash_set.h"
 #include "nlohmann/json.hpp" // IWYU pragma: keep
 
@@ -26,15 +28,18 @@ struct HttpRequest {
 };
 
 // Builds an HttpRequest from `http_rule` and `arguments` from the JSON-RPC request body.
+// On success, returns HttpRequest. On failure, returns an error status and sets `bridge_status`.
 absl::StatusOr<HttpRequest> buildHttpRequest(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule& http_rule,
-    const nlohmann::json& arguments);
+    const nlohmann::json& arguments, BridgeStatus& bridge_status);
 
 // Constructs a base URL by replacing template variables with values from the arguments.
+// On success, returns the URL. On failure, returns an error status and sets `bridge_status`.
 // Exposed for testing.
 absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
                                              const absl::flat_hash_set<std::string>& templates,
-                                             const nlohmann::json& arguments);
+                                             const nlohmann::json& arguments,
+                                             BridgeStatus& bridge_status);
 
 } // namespace McpJsonRestBridge
 } // namespace HttpFilters

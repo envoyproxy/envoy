@@ -40,31 +40,34 @@ public:
     return provider.config_->countryDbPath();
   }
   static const std::optional<std::string>& countryHeader(const GeoipProvider& provider) {
-    return provider.config_->countryHeader();
+    return provider.config_->fieldKey(GeoField::Country);
   }
   static const std::optional<std::string>& cityHeader(const GeoipProvider& provider) {
-    return provider.config_->cityHeader();
+    return provider.config_->fieldKey(GeoField::City);
   }
   static const std::optional<std::string>& regionHeader(const GeoipProvider& provider) {
-    return provider.config_->regionHeader();
+    return provider.config_->fieldKey(GeoField::Region);
   }
   static const std::optional<std::string>& asnHeader(const GeoipProvider& provider) {
-    return provider.config_->asnHeader();
+    return provider.config_->fieldKey(GeoField::Asn);
+  }
+  static const std::optional<std::string>& anonHeader(const GeoipProvider& provider) {
+    return provider.config_->fieldKey(GeoField::Anon);
   }
   static const std::optional<std::string>& anonVpnHeader(const GeoipProvider& provider) {
-    return provider.config_->anonVpnHeader();
+    return provider.config_->fieldKey(GeoField::AnonVpn);
   }
   static const std::optional<std::string>& anonTorHeader(const GeoipProvider& provider) {
-    return provider.config_->anonTorHeader();
+    return provider.config_->fieldKey(GeoField::AnonTor);
   }
   static const std::optional<std::string>& anonProxyHeader(const GeoipProvider& provider) {
-    return provider.config_->anonProxyHeader();
+    return provider.config_->fieldKey(GeoField::AnonProxy);
   }
   static const std::optional<std::string>& anonHostingHeader(const GeoipProvider& provider) {
-    return provider.config_->anonHostingHeader();
+    return provider.config_->fieldKey(GeoField::AnonHosting);
   }
   static const std::optional<std::string>& ispHeader(const GeoipProvider& provider) {
-    return provider.config_->ispHeader();
+    return provider.config_->fieldKey(GeoField::Isp);
   }
   static bool isCityDbPathSet(const GeoipProvider& provider) {
     return provider.config_->isCityDbPathSet();
@@ -525,16 +528,12 @@ TEST_F(MaxmindProviderConfigTest,
   auto processed_provider_config_yaml = absl::StrFormat(provider_config_yaml, anon_db_path);
   TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
   MaxmindProviderFactory factory;
-  // Verify that is_anon field is read and used as anon_header_.
   EXPECT_LOG_CONTAINS("warning", "Using deprecated option",
                       Geolocation::DriverSharedPtr driver = factory.createGeoipProviderDriver(
                           provider_config, "maxmind", server_factory_context_);
                       auto provider = std::static_pointer_cast<GeoipProvider>(driver);
-                      auto anon_header = GeoipProviderPeer::countryHeader(*provider);
-                      // The is_anon fallback should populate the anon header.
-                      // Note: We can't directly test anon_header_ since there's no getter, but
-                      // we verify the config is accepted and driver is created successfully.
-                      EXPECT_NE(driver, nullptr););
+                      auto anon_header = GeoipProviderPeer::anonHeader(*provider);
+                      EXPECT_EQ(anon_header, std::optional<std::string>("x-geo-is-anon")););
 }
 
 TEST_F(MaxmindProviderConfigTest,

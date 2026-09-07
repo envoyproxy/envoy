@@ -1239,6 +1239,15 @@ TEST(HeaderIsValidTest, IsConnect) {
   EXPECT_FALSE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{}));
 }
 
+TEST(HeaderIsValidTest, IsQuery) {
+  EXPECT_TRUE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "QUERY"}}));
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "GET"}}));
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "POST"}}));
+  // Methods are case-sensitive.
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "query"}}));
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{}));
+}
+
 TEST(HeaderIsValidTest, IsConnectUdpRequest) {
   EXPECT_TRUE(HeaderUtility::isConnectUdpRequest(
       Http::TestRequestHeaderMapImpl{{"upgrade", "connect-udp"}}));

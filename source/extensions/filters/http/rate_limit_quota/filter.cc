@@ -114,7 +114,7 @@ RateLimitQuotaFilter::recordBucketUsage(const Matcher::ActionConstSharedPtr& mat
   // the request matching succeeds.
   const RateLimitOnMatchAction& match_action = matched->getTyped<RateLimitOnMatchAction>();
   absl::StatusOr<BucketId> ret =
-      match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
+      match_action.generateBucketId(*data_ptr_, validation_visitor_, visitor_);
   if (!ret.ok()) {
     // When it failed to generate the bucket id for this specific request, the
     // request is ALLOWED by default (i.e., fail-open).

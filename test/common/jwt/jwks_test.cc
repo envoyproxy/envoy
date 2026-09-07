@@ -6,7 +6,13 @@
 
 #include "test/common/jwt/test_common.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::Field;
+using testing::Pointee;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace JwtVerify {
@@ -1054,12 +1060,10 @@ TEST(JwksParseTest, JwksGoodX509) {
   auto jwks = Jwks::createFrom(kPublicKeyX509, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::Ok);
 
-  EXPECT_EQ(jwks->keys().size(), 2);
-
-  std::set<std::string> kids = {"62a93512c9ee4c7f8067b5a216dade2763d32a47",
-                                "b3319a147514df7ee5e4bcdee51350cc890cc89e"};
-  EXPECT_TRUE(kids.find(jwks->keys()[0]->kid_) != kids.end());
-  EXPECT_TRUE(kids.find(jwks->keys()[1]->kid_) != kids.end());
+  EXPECT_THAT(jwks->keys(),
+              UnorderedElementsAre(
+                  Pointee(Field(&Jwks::Pubkey::kid_, "62a93512c9ee4c7f8067b5a216dade2763d32a47")),
+                  Pointee(Field(&Jwks::Pubkey::kid_, "b3319a147514df7ee5e4bcdee51350cc890cc89e"))));
 }
 
 TEST(JwksParseTest, RealJwksX509) {

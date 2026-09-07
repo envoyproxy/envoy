@@ -6,7 +6,7 @@ didn't have to enumerate the files in the framework zip, but that isn't
 supported by 'apple_static_framework_import'.
 """
 
-load("@build_bazel_rules_apple//apple/internal:transition_support.bzl", "transition_support")
+load("@rules_apple//apple/internal:transition_support.bzl", "transition_support")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 
 def _framework_imports_extractor(ctx):

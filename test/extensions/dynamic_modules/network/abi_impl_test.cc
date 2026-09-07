@@ -2347,8 +2347,32 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamConnectionIdNullCal
 }
 
 // =============================================================================
-// Tests for startUpstreamSecureTransport (StartTLS).
+// Tests for StartTLS callbacks.
 // =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, StartDownstreamSecureTransportSuccess) {
+  EXPECT_CALL(connection_, startSecureTransport()).WillOnce(testing::Return(true));
+
+  bool result =
+      envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(filterPtr());
+  EXPECT_TRUE(result);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, StartDownstreamSecureTransportFailure) {
+  EXPECT_CALL(connection_, startSecureTransport()).WillOnce(testing::Return(false));
+
+  bool result =
+      envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(filterPtr());
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, StartDownstreamSecureTransportNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+
+  bool result = envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(
+      static_cast<void*>(filter.get()));
+  EXPECT_FALSE(result);
+}
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, StartUpstreamSecureTransportSuccess) {
   EXPECT_CALL(read_callbacks_, startUpstreamSecureTransport()).WillOnce(testing::Return(true));

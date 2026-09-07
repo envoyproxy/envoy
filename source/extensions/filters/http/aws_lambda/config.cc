@@ -91,14 +91,6 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
   };
 }
 
-absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-    const std::string& stats_prefix, DualInfo dual_info,
-    Server::Configuration::ServerFactoryContext& server_context) {
-  return createFilterFactoryFromProtoHelper(proto_config, stats_prefix, server_context,
-                                            dual_info.scope, dual_info.is_upstream);
-}
-
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig& per_route_config,
@@ -139,7 +131,8 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createHttpFilterFa
     Server::Configuration::ServerFactoryContext& server_context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
   return createFilterFactoryFromProtoHelper(proto_config, extra_context.stats_prefix,
-                                            server_context, server_context.scope(), false);
+                                            server_context, extra_context.scopeOr(server_context),
+                                            extra_context.is_upstream);
 }
 
 /*

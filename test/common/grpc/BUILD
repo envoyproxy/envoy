@@ -16,7 +16,7 @@ envoy_package()
 envoy_cc_test(
     name = "async_client_impl_test",
     srcs = ["async_client_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -32,7 +32,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "async_client_manager_impl_test",
     srcs = ["async_client_manager_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/grpc:async_client_manager_lib",
@@ -52,7 +52,7 @@ envoy_cc_fuzz_test(
     name = "codec_fuzz_test",
     srcs = ["codec_fuzz_test.cc"],
     corpus = "codec_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/grpc:codec_lib",
@@ -64,7 +64,7 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "codec_test",
     srcs = ["codec_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/grpc:codec_lib",
@@ -77,7 +77,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "common_test",
     srcs = ["common_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
@@ -90,7 +90,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "context_impl_test",
     srcs = ["context_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/grpc:common_lib",
         "//source/common/grpc:context_lib",
@@ -103,7 +103,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "google_grpc_utils_test",
     srcs = envoy_select_google_grpc(["google_grpc_utils_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
@@ -115,7 +115,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "google_async_client_impl_test",
     srcs = envoy_select_google_grpc(["google_async_client_impl_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
@@ -135,7 +135,7 @@ envoy_cc_test(
     name = "google_grpc_creds_test",
     srcs = envoy_select_google_grpc(["google_grpc_creds_test.cc"]),
     data = [":service_key.json"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":utility_lib",
         "//test/test_common:utility_lib",
@@ -184,7 +184,7 @@ envoy_cc_test(
     name = "grpc_client_integration_test",
     size = "large",
     srcs = ["grpc_client_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":grpc_client_integration_test_harness_lib",
         "//source/common/grpc:async_client_lib",
@@ -206,7 +206,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "buffered_async_client_test",
     srcs = ["buffered_async_client_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/grpc:async_client_lib",
         "//source/common/grpc:buffered_async_client_lib",
@@ -222,7 +222,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "buffered_message_ttl_manager_test",
     srcs = ["buffered_message_ttl_manager_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/grpc:buffered_message_ttl_manager_lib",
@@ -233,7 +233,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "async_client_manager_benchmark",
     srcs = ["async_client_manager_benchmark.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/grpc:async_client_manager_lib",

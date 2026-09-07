@@ -52,8 +52,8 @@ TEST_F(ScopeProviderSingletonTest, GetScopeCachesAndReturnsSameScope) {
 
   std::shared_ptr<Stats::MockScope> newly_created_scope;
 
-  EXPECT_CALL(mock_store_.mockScope(), createScope_(_))
-      .WillOnce(Invoke([&](const std::string& name) {
+  EXPECT_CALL(mock_store_.mockScope(), createScope_(_, _))
+      .WillOnce(Invoke([&](const std::string& name, const std::string&) {
         auto scope_name_storage =
             std::make_unique<Stats::StatNameDynamicStorage>(name, mock_store_.symbolTable());
         newly_created_scope = std::shared_ptr<Stats::MockScope>(
@@ -84,8 +84,8 @@ TEST_F(ScopeProviderSingletonTest, GetScopeCachesAndReturnsSameScope) {
   scope_config3.mutable_max_histograms()->set_value(30);
 
   std::shared_ptr<Stats::MockScope> newly_created_scope3;
-  EXPECT_CALL(mock_store_.mockScope(), createScope_(_))
-      .WillOnce(Invoke([&](const std::string& name) {
+  EXPECT_CALL(mock_store_.mockScope(), createScope_(_, _))
+      .WillOnce(Invoke([&](const std::string& name, const std::string&) {
         auto scope_name_storage =
             std::make_unique<Stats::StatNameDynamicStorage>(name, mock_store_.symbolTable());
         newly_created_scope3 = std::shared_ptr<Stats::MockScope>(
@@ -111,9 +111,9 @@ TEST_F(ScopeProviderSingletonTest, CleansUpExpiredScopesOnNextGetScope) {
   EXPECT_CALL(factory_context_, statsScope()).WillRepeatedly(ReturnRef(mock_store_.mockScope()));
 
   // First request should trigger createScope_
-  EXPECT_CALL(mock_store_.mockScope(), createScope_(_))
+  EXPECT_CALL(mock_store_.mockScope(), createScope_(_, _))
       .Times(1)
-      .WillOnce(Invoke([&](const std::string& name) {
+      .WillOnce(Invoke([&](const std::string& name, const std::string&) {
         auto scope_name_storage =
             std::make_unique<Stats::StatNameDynamicStorage>(name, mock_store_.symbolTable());
         return std::shared_ptr<Stats::Scope>(
@@ -124,7 +124,7 @@ TEST_F(ScopeProviderSingletonTest, CleansUpExpiredScopesOnNextGetScope) {
   EXPECT_NE(returned_scope, nullptr);
 
   // While returned_scope is alive, requesting again should not trigger createScope_
-  EXPECT_CALL(mock_store_.mockScope(), createScope_(_)).Times(0);
+  EXPECT_CALL(mock_store_.mockScope(), createScope_(_, _)).Times(0);
   auto returned_scope2 = Stats::ScopeProviderSingleton::getScope(factory_context_, scope_config);
   EXPECT_EQ(returned_scope, returned_scope2);
 
@@ -136,9 +136,9 @@ TEST_F(ScopeProviderSingletonTest, CleansUpExpiredScopesOnNextGetScope) {
   returned_scope2.reset();
 
   // Next request should trigger a new createScope_ because it was deleted
-  EXPECT_CALL(mock_store_.mockScope(), createScope_(_))
+  EXPECT_CALL(mock_store_.mockScope(), createScope_(_, _))
       .Times(1)
-      .WillOnce(Invoke([&](const std::string& name) {
+      .WillOnce(Invoke([&](const std::string& name, const std::string&) {
         auto scope_name_storage =
             std::make_unique<Stats::StatNameDynamicStorage>(name, mock_store_.symbolTable());
         return std::shared_ptr<Stats::Scope>(
@@ -159,9 +159,9 @@ TEST_F(ScopeProviderSingletonTest, GetScopeWithSharingDisabledDoesNotCache) {
   EXPECT_CALL(factory_context_, statsScope()).WillRepeatedly(ReturnRef(mock_store_.mockScope()));
 
   // First request should create scope
-  EXPECT_CALL(mock_store_.mockScope(), createScope_(_))
+  EXPECT_CALL(mock_store_.mockScope(), createScope_(_, _))
       .Times(1)
-      .WillOnce(Invoke([&](const std::string& name) {
+      .WillOnce(Invoke([&](const std::string& name, const std::string&) {
         auto scope_name_storage =
             std::make_unique<Stats::StatNameDynamicStorage>(name, mock_store_.symbolTable());
         return std::shared_ptr<Stats::Scope>(
@@ -172,9 +172,9 @@ TEST_F(ScopeProviderSingletonTest, GetScopeWithSharingDisabledDoesNotCache) {
   EXPECT_NE(returned_scope1, nullptr);
 
   // Second request should also create scope since sharing is disabled
-  EXPECT_CALL(mock_store_.mockScope(), createScope_(_))
+  EXPECT_CALL(mock_store_.mockScope(), createScope_(_, _))
       .Times(1)
-      .WillOnce(Invoke([&](const std::string& name) {
+      .WillOnce(Invoke([&](const std::string& name, const std::string&) {
         auto scope_name_storage =
             std::make_unique<Stats::StatNameDynamicStorage>(name, mock_store_.symbolTable());
         return std::shared_ptr<Stats::Scope>(
@@ -197,8 +197,8 @@ TEST_F(ScopeProviderSingletonTest, SupportsGetSharedAndCopying) {
   EXPECT_CALL(factory_context_.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(factory_context_.server_context_.dispatcher_));
 
-  EXPECT_CALL(mock_store_.mockScope(), createScope_(_))
-      .WillOnce(Invoke([&](const std::string& name) {
+  EXPECT_CALL(mock_store_.mockScope(), createScope_(_, _))
+      .WillOnce(Invoke([&](const std::string& name, const std::string&) {
         auto scope_name_storage =
             std::make_unique<Stats::StatNameDynamicStorage>(name, mock_store_.symbolTable());
         return std::shared_ptr<Stats::Scope>(

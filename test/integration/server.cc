@@ -44,7 +44,7 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
   test_options.setServiceClusterName(service_cluster);
   test_options.setServiceNodeName(service_node);
   test_options.setServiceZone(service_zone);
-  test_options.setLogLevel(spdlog::level::info);
+  test_options.setLogLevel(Logger::Levels::info);
 
   test_options.setConfigPath(config_path);
   test_options.setConfigYaml(config_yaml);
@@ -99,6 +99,23 @@ void IntegrationTestServer::waitUntilListenersReady() {
     listeners_cv_.wait(listeners_mutex_); // Safe since CondVar::wait won't throw.
   }
   ENVOY_LOG(info, "listener wait complete");
+}
+
+void IntegrationTestServer::waitForWorkerThreads() {
+  absl::Notification done;
+  ThreadLocal::TypedSlotPtr<> slot;
+  server().dispatcher().post([&] {
+    slot = ThreadLocal::TypedSlot<>::makeUnique(server().threadLocal());
+    slot->set([](Event::Dispatcher&) -> std::shared_ptr<ThreadLocal::ThreadLocalObject> {
+      return nullptr;
+    });
+    slot->runOnAllThreads([](OptRef<ThreadLocal::ThreadLocalObject>) {},
+                          [&] {
+                            slot.reset(nullptr);
+                            done.Notify();
+                          });
+  });
+  done.WaitForNotification();
 }
 
 void IntegrationTestServer::setDynamicContextParam(absl::string_view resource_type_url,

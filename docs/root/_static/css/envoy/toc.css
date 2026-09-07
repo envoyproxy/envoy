@@ -1,0 +1,89 @@
+/* Page table of contents.
+
+   On generated proto pages every entry used to repeat a namespace the reader
+   already knows, and the segment that identifies it wrapped mid-word across
+   four ragged lines. The outline shows one segment per entry and lets the
+   indentation carry the hierarchy; the package sits in the column heading. */
+
+.envoy-page-toc {
+  align-self: start;
+  border-left: 1px solid var(--envoy-rule);
+  display: none;
+  max-height: calc(100vh - var(--envoy-topbar-height) - 60px);
+  overflow-y: auto;
+  padding: 4px 0 20px;
+  position: sticky;
+  scrollbar-width: thin;
+  top: calc(var(--envoy-topbar-height) + 30px);
+}
+
+.envoy-has-page-toc .envoy-page-toc {
+  display: block;
+}
+
+.envoy-page-toc-title {
+  color: var(--envoy-ink-muted);
+  font-family: var(--envoy-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+  padding-left: 14px;
+  text-transform: uppercase;
+}
+
+.envoy-page-toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.envoy-page-toc li {
+  margin: 0;
+}
+
+.envoy-page-toc a {
+  border-left: 2px solid transparent;
+  color: var(--envoy-ink-muted);
+  display: block;
+  font-size: 13px;
+  line-height: 1.45;
+  margin-left: -1px;
+  overflow-wrap: anywhere;
+  padding: 4px 10px 4px 12px;
+  text-decoration: none;
+}
+
+.envoy-page-toc ul ul a {
+  font-size: 12.5px;
+  padding-left: 24px;
+}
+
+.envoy-page-toc ul ul ul a {
+  padding-left: 36px;
+}
+
+.envoy-page-toc a:hover {
+  color: var(--envoy-ink);
+}
+
+.envoy-page-toc a.is-current,
+.envoy-page-toc a[aria-current="location"] {
+  border-left-color: var(--envoy-accent);
+  color: var(--envoy-accent);
+  font-weight: 600;
+}
+
+/* proto symbols read as an index, so they are set in mono */
+.envoy-page-toc.envoy-symbol-toc .envoy-page-toc-title {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.envoy-page-toc.envoy-symbol-toc a {
+  font-family: var(--envoy-font-mono);
+  font-size: 12px;
+  letter-spacing: -0.012em;
+}
+

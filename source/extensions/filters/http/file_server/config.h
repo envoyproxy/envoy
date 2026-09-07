@@ -14,15 +14,14 @@ namespace FileServer {
 using ProtoFileServerConfig = envoy::extensions::filters::http::file_server::v3::FileServerConfig;
 
 class FileServerFilterFactory
-    : public Extensions::HttpFilters::Common::DualFactoryBase<ProtoFileServerConfig,
-                                                              ProtoFileServerConfig> {
+    : public Extensions::HttpFilters::Common::UnifiedFactoryBase<ProtoFileServerConfig,
+                                                                 ProtoFileServerConfig> {
 public:
   FileServerFilterFactory();
 
-  absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProtoTyped(const ProtoFileServerConfig& config,
-                                    const std::string& stats_prefix, DualInfo info,
-                                    Server::Configuration::ServerFactoryContext& context) override;
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const ProtoFileServerConfig& config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const ProtoFileServerConfig& config,

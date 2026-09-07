@@ -91,7 +91,7 @@ private:
   template <class StatType> const std::string getName(const StatType& metric) const;
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
 
-  const ThreadLocal::SlotPtr tls_;
+  const ThreadLocal::SlotSharedPtr tls_;
   const Network::Address::InstanceConstSharedPtr server_address_;
   const bool use_tag_;
   // Prefix for all flushed stats.
@@ -163,7 +163,7 @@ private:
   const std::string prefix_;
 
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotSharedPtr tls_;
   Upstream::ClusterManager& cluster_manager_;
   Stats::Counter& cx_overflow_stat_;
 };

@@ -25,7 +25,6 @@ filegroup(
             "root/configuration/listeners/network_filters/_include/geoip-network-filter.yaml",
             "root/configuration/http/http_filters/_include/http-cache-configuration-fs.yaml",
             "root/configuration/http/http_filters/_include/http-cache-v2-configuration-fs.yaml",
-            "root/configuration/other_features/_include/dlb.yaml",
             "root/configuration/other_features/_include/hyperscan_matcher.yaml",
             "root/configuration/other_features/_include/hyperscan_matcher_multiple.yaml",
             "root/configuration/other_features/_include/hyperscan_regex_engine.yaml",
@@ -158,6 +157,7 @@ pkg_files(
     name = "sphinx_root",
     srcs = glob([
         "root/**/*.css",
+        "root/**/*.html",
         "root/**/*.ico",
         "root/**/*.jpeg",
         "root/**/*.jpg",

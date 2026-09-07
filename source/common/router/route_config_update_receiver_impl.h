@@ -14,6 +14,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/rds/route_config_update_receiver_impl.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/router/vhds.h"
 
 namespace Envoy {
 namespace Router {
@@ -32,12 +33,20 @@ private:
   ProtobufMessage::ValidationVisitor& validator_;
 };
 
-class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
+class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver,
+                                      public VhdsConfigUpdateReceiver {
 public:
   RouteConfigUpdateReceiverImpl(Rds::ProtoTraits& proto_traits,
-                                Server::Configuration::ServerFactoryContext& factory_context)
+                                Server::Configuration::ServerFactoryContext& factory_context,
+                                const std::string& stat_prefix)
       : config_traits_(factory_context.messageValidationContext().dynamicValidationVisitor()),
-        base_(config_traits_, proto_traits, factory_context) {}
+        base_(config_traits_, proto_traits, factory_context), factory_context_(factory_context),
+        stat_prefix_(stat_prefix) {}
+  ~RouteConfigUpdateReceiverImpl() override {
+    base_.warmer_.setObserver({});
+    base_.warmer_.abortWarming();
+    vhds_subscription_.reset();
+  }
 
   using VirtualHostMap = std::map<std::string, envoy::config::route::v3::VirtualHost>;
 
@@ -46,12 +55,13 @@ public:
   bool updateVhosts(VirtualHostMap& vhosts, const VirtualHostRefVector& added_vhosts);
 
   // Router::RouteConfigUpdateReceiver
-  bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
+  absl::Status onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
   bool onVhdsUpdate(const VirtualHostRefVector& added_vhosts,
                     std::set<std::string>&& added_resource_ids,
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                     const std::string& version_info) override;
-  void setObserver(Rds::RouteConfigUpdateObserver& observer) override {
+  void onRdsFailure() override { base_.onRdsFailure(); }
+  void setObserver(OptRef<Rds::RouteConfigUpdateObserver> observer) override {
     base_.warmer_.setObserver(observer);
   }
   bool configWarming() const override { return base_.warmer_.warming(); }
@@ -59,8 +69,11 @@ public:
   const std::optional<Rds::RouteConfigProvider::ConfigInfo>& configInfo() const override {
     return base_.configInfo();
   }
-  bool vhdsConfigurationChanged() const override { return vhds_configuration_changed_; }
-  void clearVhdsConfigurationChanged() override { vhds_configuration_changed_ = false; }
+  void updateOnDemand(const std::string& alias) override {
+    if (vhds_subscription_ != nullptr) {
+      vhds_subscription_->updateOnDemand(alias);
+    }
+  }
   const Protobuf::Message& protobufConfiguration() const override {
     return base_.protobufConfiguration();
   }
@@ -84,17 +97,26 @@ private:
                                                     : *base_.route_config_proto_;
   }
 
+  absl::StatusOr<VhdsSubscriptionPtr>
+  createVhdsSubscription(const envoy::config::route::v3::RouteConfiguration& route_config,
+                         Init::Manager& init_manager);
+
   ConfigTraitsImpl config_traits_;
 
   Rds::RouteConfigUpdateReceiverImpl base_;
-
+  Server::Configuration::ServerFactoryContext& factory_context_;
+  const std::string stat_prefix_;
+  // The VHDS subscription of the currently published route configuration, if it configures VHDS.
+  // It is created and replaced by onRdsUpdate(), which is where the per-update init manager that
+  // its initial fetch warms up with lives.
+  VhdsSubscriptionPtr vhds_subscription_;
   uint64_t last_vhds_config_hash_{0ul};
+
   // vhosts supplied by RDS, to be merged with VHDS vhosts in onVhdsUpdate.
   std::unique_ptr<VirtualHostMap> rds_virtual_hosts_;
   // vhosts supplied by VHDS, to be merged with RDS vhosts in onRdsUpdate.
   std::unique_ptr<VirtualHostMap> vhds_virtual_hosts_;
   std::set<std::string> resource_ids_in_last_update_;
-  bool vhds_configuration_changed_{true};
 };
 
 } // namespace Router

@@ -1441,6 +1441,9 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
   body_req->set_end_of_stream(end_stream);
   body_req->set_body(data.toString());
   encodeProtocolConfig(req);
+  if (end_stream) {
+    state.setEosSentToServerWithBody(true);
+  }
   return req;
 }
 
@@ -1959,8 +1962,9 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
         on_processing_response_->afterReceivingImmediateResponse(
             response->immediate_response(), absl::OkStatus(), decoder_callbacks_->streamInfo());
       }
+      stats_.stream_msgs_received_.inc();
       sendImmediateResponse(response->immediate_response());
-      processing_status = absl::OkStatus();
+      return;
     }
     break;
   default:
@@ -1973,6 +1977,8 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
 
   if (processing_status.ok()) {
     stats_.stream_msgs_received_.inc();
+    // Close the gRPC stream if no more external processing needed.
+    closeGrpcStreamIfLastRespReceived(*response, eos_seen_in_body);
   } else if (absl::IsFailedPrecondition(processing_status)) {
     // Processing code uses this specific error code in the case that a
     // message was received out of order.
@@ -2002,9 +2008,6 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
     stats_.stream_msgs_received_.inc();
     handleErrorResponse(processing_status);
   }
-
-  // Close the gRPC stream if no more external processing needed.
-  closeGrpcStreamIfLastRespReceived(*response, eos_seen_in_body);
 }
 
 absl::Status Filter::handleStreamingImmediateResponse(

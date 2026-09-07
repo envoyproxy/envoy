@@ -23,18 +23,12 @@ absl::StatusOr<Http::FilterFactoryCb> BandwidthLimitFilterConfig::createFilterFa
   };
 }
 
-absl::StatusOr<Http::FilterFactoryCb> BandwidthLimitFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(proto_config, context.serverFactoryContext(), context.scope());
-}
-
 absl::StatusOr<Http::FilterFactoryCb>
 BandwidthLimitFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
     Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext&) {
-  return createFilterFactory(proto_config, context, context.scope());
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  return createFilterFactory(proto_config, context, extra_context.scopeOr(context));
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

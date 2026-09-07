@@ -256,6 +256,9 @@ private:
   // waiting for response headers.
   bool paused_for_connect_ : 1 = false;
   bool paused_for_websocket_ : 1 = false;
+  // True if generic (non-WebSocket) upgrade headers have been sent but proxying payload is
+  // paused waiting for the upstream to accept the upgrade.
+  bool paused_for_generic_upgrade_ : 1 = false;
   bool reset_stream_ : 1 = false;
 
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
@@ -377,6 +380,13 @@ public:
   }
   void setPausedForWebsocketUpgrade(bool value) override {
     upstream_request_.paused_for_websocket_ = value;
+  }
+
+  bool pausedForGenericUpgrade() const override {
+    return upstream_request_.paused_for_generic_upgrade_;
+  }
+  void setPausedForGenericUpgrade(bool value) override {
+    upstream_request_.paused_for_generic_upgrade_ = value;
   }
 
   void disableRouteTimeoutForWebsocketUpgrade() override;
