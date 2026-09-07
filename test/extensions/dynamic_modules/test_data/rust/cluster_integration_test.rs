@@ -37,8 +37,23 @@ fn new_cluster_config(
       metrics: envoy_cluster_metrics,
     })),
     "async_host_selection" => Some(Box::new(AsyncHostSelectionClusterConfig {
-      upstream_address: config_str.to_string(),
+      upstream_addresses: vec![config_str.to_string()],
+      logical_hostnames: Vec::new(),
     })),
+    "async_logical_hostnames" => {
+      let hosts: Option<Vec<_>> = config_str
+        .lines()
+        .map(|line| line.split_once(','))
+        .collect();
+      let (logical_hostnames, upstream_addresses) = hosts?
+        .into_iter()
+        .map(|(hostname, address)| (hostname.to_string(), address.to_string()))
+        .unzip();
+      Some(Box::new(AsyncHostSelectionClusterConfig {
+        upstream_addresses,
+        logical_hostnames,
+      }))
+    },
     "scheduler_host_update" => Some(Box::new(SchedulerHostUpdateClusterConfig {
       upstream_address: config_str.to_string(),
     })),
@@ -187,28 +202,39 @@ impl ClusterLb for SyncHostSelectionLb {
 // =============================================================================
 
 struct AsyncHostSelectionClusterConfig {
-  upstream_address: String,
+  upstream_addresses: Vec<String>,
+  logical_hostnames: Vec<String>,
 }
 
 impl ClusterConfig for AsyncHostSelectionClusterConfig {
   fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
     Box::new(AsyncHostSelectionCluster {
-      upstream_address: self.upstream_address.clone(),
+      upstream_addresses: self.upstream_addresses.clone(),
+      logical_hostnames: self.logical_hostnames.clone(),
       hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
     })
   }
 }
 
 struct AsyncHostSelectionCluster {
-  upstream_address: String,
+  upstream_addresses: Vec<String>,
+  logical_hostnames: Vec<String>,
   hosts: SharedHostList,
 }
 
 impl Cluster for AsyncHostSelectionCluster {
   fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
-    let addresses = vec![self.upstream_address.clone()];
-    let weights = vec![1u32];
-    if let Some(host_ptrs) = envoy_cluster.add_hosts(&addresses, &weights) {
+    let weights = vec![1u32; self.upstream_addresses.len()];
+    let host_ptrs = if self.logical_hostnames.is_empty() {
+      envoy_cluster.add_hosts(&self.upstream_addresses, &weights)
+    } else {
+      envoy_cluster.add_hosts_with_hostnames(
+        &self.upstream_addresses,
+        &self.logical_hostnames,
+        &weights,
+      )
+    };
+    if let Some(host_ptrs) = host_ptrs {
       self.hosts.lock().unwrap().0 = host_ptrs;
     }
     envoy_cluster.pre_init_complete();
@@ -220,6 +246,7 @@ impl Cluster for AsyncHostSelectionCluster {
   ) -> Option<Box<dyn ClusterLb>> {
     Some(Box::new(AsyncHostSelectionLb {
       hosts: self.hosts.clone(),
+      select_by_header: !self.logical_hostnames.is_empty(),
     }))
   }
 }
@@ -241,21 +268,38 @@ impl AsyncCompletionTask {
 
 struct AsyncHostSelectionLb {
   hosts: SharedHostList,
+  select_by_header: bool,
 }
 
 impl ClusterLb for AsyncHostSelectionLb {
   fn choose_host(
     &mut self,
-    _context: Option<&dyn ClusterLbContext>,
+    context: Option<&dyn ClusterLbContext>,
     async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
   ) -> HostSelectionResult {
     let hosts = self.hosts.lock().unwrap();
     if hosts.0.is_empty() {
       return HostSelectionResult::NoHost;
     }
+    let index = if self.select_by_header {
+      let index = context
+        .and_then(|context| context.get_downstream_header("x-upstream-index", 0))
+        .and_then(|(value, _)| {
+          std::str::from_utf8(value.as_slice())
+            .ok()?
+            .parse::<usize>()
+            .ok()
+        });
+      match index {
+        Some(index) if index < hosts.0.len() => index,
+        _ => return HostSelectionResult::NoHost,
+      }
+    } else {
+      0
+    };
     let task = AsyncCompletionTask {
       completion: async_completion,
-      host: hosts.0[0],
+      host: hosts.0[index],
     };
     // Spawn a background thread to complete the host selection asynchronously.
     // The ABI implementation posts the completion to the correct worker thread.
