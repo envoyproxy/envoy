@@ -1,6 +1,6 @@
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/7b38d27d192670d0ec16ef9309d875387c781de9
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/dd48349c76a2195c95ea1b0a859b1a285254090b
 
 # Java runtime configuration for bzlmod
 # Use remote JDK to avoid dependency on local Java installation

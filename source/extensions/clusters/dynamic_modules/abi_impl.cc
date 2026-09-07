@@ -312,6 +312,37 @@ envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
   return const_cast<Envoy::Upstream::Host*>(healthy_hosts[index].get());
 }
 
+bool envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* hosts_out, size_t hosts_capacity,
+    size_t* hosts_size_out) {
+  if (hosts_size_out == nullptr) {
+    return false;
+  }
+  *hosts_size_out = 0;
+  if (lb_envoy_ptr == nullptr) {
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return false;
+  }
+  const auto& healthy_hosts = host_sets[priority]->healthyHosts();
+  *hosts_size_out = healthy_hosts.size();
+  // Write nothing when the buffer is too small so a caller cannot act on a partial healthy set.
+  if (healthy_hosts.size() > hosts_capacity) {
+    return false;
+  }
+  // The fill loop writes through hosts_out, so reject a null buffer that claims nonzero capacity.
+  if (hosts_out == nullptr && !healthy_hosts.empty()) {
+    return false;
+  }
+  for (size_t i = 0; i < healthy_hosts.size(); i++) {
+    hosts_out[i] = const_cast<Envoy::Upstream::Host*>(healthy_hosts[i].get());
+  }
+  return true;
+}
+
 // =============================================================================
 // Cluster LB Host Information Callbacks
 // =============================================================================
@@ -1476,24 +1507,35 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
   // The module may invoke this callback on any thread and race the load balancer destructor.
   // Validate the raw pointer against the live registry and snapshot the state we need under the
   // registry lock.
-  std::shared_ptr<std::atomic<bool>> cancelled;
+  Envoy::Extensions::Clusters::DynamicModules::DynamicModuleAsyncHostSelectionRegistrySharedPtr
+      selections;
   Envoy::Event::Dispatcher* dispatcher = nullptr;
   DynamicModuleClusterHandleSharedPtr handle;
   const bool found = DynamicModuleLoadBalancer::withActiveInstance(
       lb_raw, [&](const DynamicModuleLoadBalancer& lb) {
-        cancelled = lb.activeAsyncCancelled();
-        dispatcher = lb.activeAsyncDispatcher();
+        selections = lb.asyncSelections();
+        dispatcher = lb.workerDispatcher();
         handle = lb.handle();
       });
   if (!found) {
     return;
   }
 
+  // Look the completing selection up by its own context. A load balancer serves many concurrent
+  // selections, so reading a single shared flag here would let a cancellation on one selection drop
+  // the completion of another. An absent entry means this selection was already completed or
+  // cancelled and its `cancelable` destroyed, so the context must not be touched.
+  std::shared_ptr<std::atomic<bool>> cancelled = selections->find(context_envoy_ptr);
+  if (cancelled == nullptr) {
+    return;
+  }
+
   if (dispatcher != nullptr) {
-    // Post to the worker thread. The handle keeps the cluster alive until the callback runs.
+    // Post to the worker thread. The handle keeps the cluster alive until the callback runs. The
+    // flag is re-read inside the post because the router may cancel between the post and the run.
     dispatcher->post([context_envoy_ptr, host, details_str = std::move(details_str),
                       cancelled = std::move(cancelled), handle = std::move(handle)]() {
-      if (cancelled != nullptr && cancelled->load(std::memory_order_acquire)) {
+      if (cancelled->load(std::memory_order_acquire)) {
         return;
       }
       auto* context = getContext(context_envoy_ptr);
@@ -1503,15 +1545,19 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
       }
       context->onAsyncHostSelection(std::move(host_shared), std::string(details_str));
     });
-  } else {
-    // No worker dispatcher. Complete inline on the calling thread.
-    auto* context = getContext(context_envoy_ptr);
-    Envoy::Upstream::HostConstSharedPtr host_shared;
-    if (host != nullptr) {
-      host_shared = handle->cluster()->findHost(host);
-    }
-    context->onAsyncHostSelection(std::move(host_shared), std::move(details_str));
+    return;
   }
+
+  // No worker dispatcher. Complete inline on the calling thread.
+  if (cancelled->load(std::memory_order_acquire)) {
+    return;
+  }
+  auto* context = getContext(context_envoy_ptr);
+  Envoy::Upstream::HostConstSharedPtr host_shared;
+  if (host != nullptr) {
+    host_shared = handle->cluster()->findHost(host);
+  }
+  context->onAsyncHostSelection(std::move(host_shared), std::move(details_str));
 }
 
 // =============================================================================

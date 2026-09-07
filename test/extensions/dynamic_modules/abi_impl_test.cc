@@ -404,6 +404,9 @@ WEAK_STUB(ClusterLbGetHealthyHostCount,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(nullptr, 0))
 WEAK_STUB(ClusterLbGetHealthyHost,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host(nullptr, 0, 0))
+WEAK_STUB(ClusterLbGetHealthyHosts,
+          envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(nullptr, 0, nullptr, 0,
+                                                                     nullptr))
 WEAK_STUB(ClusterLbContextComputeHashKey,
           envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(nullptr, nullptr))
 WEAK_STUB(ClusterLbContextGetDownstreamHeadersSize,

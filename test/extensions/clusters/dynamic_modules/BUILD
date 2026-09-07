@@ -12,6 +12,7 @@ envoy_cc_dyn_module_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/c:cluster_async_host_selection",
         "//test/extensions/dynamic_modules/test_data/c:cluster_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_no_op",
@@ -63,7 +64,10 @@ envoy_cc_dyn_module_test(
     ],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/common:cleanup_lib",
         "//source/common/router:string_accessor_lib",
+        "//source/common/tls:server_context_config_lib",
+        "//source/common/tls:server_ssl_socket_lib",
         "//source/extensions/clusters/dynamic_modules:cluster",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
@@ -72,6 +76,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules:util",
         "//test/integration:http_integration_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dynamic_modules/v3:pkg_cc_proto",
