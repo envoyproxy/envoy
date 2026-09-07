@@ -110,10 +110,20 @@ fn new_cluster_config(
       let fired_id = envoy_cluster_metrics
         .define_counter("timer_fired_total")
         .ok();
+      // Resolve a counter vec handle once so the timer records by handle from the worker thread.
+      let fired_handle = envoy_cluster_metrics
+        .define_counter_vec("timer_fired_by_outcome", &["outcome"])
+        .ok()
+        .and_then(|id| {
+          envoy_cluster_metrics
+            .resolve_counter_vec(id, &["fired"])
+            .ok()
+        });
       Some(Box::new(WorkerTimerClusterConfig {
         upstream_address: config_str.to_string(),
         armed_id,
         fired_id,
+        fired_handle,
         metrics: envoy_cluster_metrics,
       }))
     },
@@ -857,6 +867,7 @@ struct WorkerTimerClusterConfig {
   upstream_address: String,
   armed_id: Option<EnvoyCounterId>,
   fired_id: Option<EnvoyCounterId>,
+  fired_handle: Option<EnvoyResolvedCounter>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -867,6 +878,7 @@ impl ClusterConfig for WorkerTimerClusterConfig {
       hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
       armed_id: self.armed_id,
       fired_id: self.fired_id,
+      fired_handle: self.fired_handle,
       metrics: self.metrics.clone(),
     })
   }
@@ -877,6 +889,7 @@ struct WorkerTimerCluster {
   hosts: SharedHostList,
   armed_id: Option<EnvoyCounterId>,
   fired_id: Option<EnvoyCounterId>,
+  fired_handle: Option<EnvoyResolvedCounter>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -899,6 +912,7 @@ impl Cluster for WorkerTimerCluster {
       timer: None,
       armed_id: self.armed_id,
       fired_id: self.fired_id,
+      fired_handle: self.fired_handle,
       metrics: self.metrics.clone(),
     }))
   }
@@ -909,6 +923,7 @@ struct WorkerTimerLb {
   timer: Option<Box<dyn EnvoyClusterWorkerTimer>>,
   armed_id: Option<EnvoyCounterId>,
   fired_id: Option<EnvoyCounterId>,
+  fired_handle: Option<EnvoyResolvedCounter>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -950,6 +965,10 @@ impl ClusterLb for WorkerTimerLb {
   ) {
     if let Some(fired_id) = self.fired_id {
       let _ = self.metrics.increment_counter(fired_id, 1);
+    }
+    // Record the same fire through the resolved handle, which allocates nothing per call.
+    if let Some(fired_handle) = self.fired_handle {
+      fired_handle.add(1);
     }
     // Re-arm for periodic firing.
     timer.enable(std::time::Duration::from_millis(WORKER_TIMER_INTERVAL_MS));

@@ -860,6 +860,72 @@ pub trait EnvoyClusterScheduler: Send + Sync {
   fn commit(&self, event_id: u64);
 }
 
+/// A counter vec child already resolved for one label-value tuple.
+///
+/// Recording through this allocates nothing and builds no stat name, unlike the id-plus-labels
+/// callbacks which resolve on every call. Obtained from
+/// [`EnvoyClusterMetrics::resolve_counter_vec`] and valid until the cluster configuration is
+/// destroyed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EnvoyResolvedCounter(abi::envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr);
+
+// SAFETY: the handle is a `Stats::Counter*` whose `add` is atomic and whose lifetime is the
+// owning configuration's scope, so it is safe to send and share across the worker threads that
+// record on it.
+unsafe impl Send for EnvoyResolvedCounter {}
+unsafe impl Sync for EnvoyResolvedCounter {}
+
+impl EnvoyResolvedCounter {
+  /// Add `value` to this counter. Safe from any thread.
+  pub fn add(&self, value: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_cluster_metric_counter_add(self.0, value) }
+  }
+}
+
+/// A gauge vec child already resolved for one label-value tuple. See [`EnvoyResolvedCounter`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EnvoyResolvedGauge(abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr);
+
+// SAFETY: as for `EnvoyResolvedCounter`, the handle is a `Stats::Gauge*` with atomic mutators.
+unsafe impl Send for EnvoyResolvedGauge {}
+unsafe impl Sync for EnvoyResolvedGauge {}
+
+impl EnvoyResolvedGauge {
+  /// Set this gauge to `value`. Safe from any thread.
+  pub fn set(&self, value: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_cluster_metric_gauge_set(self.0, value) }
+  }
+
+  /// Add `value` to this gauge. Safe from any thread.
+  pub fn add(&self, value: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_cluster_metric_gauge_add(self.0, value) }
+  }
+
+  /// Subtract `value` from this gauge. Safe from any thread.
+  pub fn sub(&self, value: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_cluster_metric_gauge_sub(self.0, value) }
+  }
+}
+
+/// A histogram vec child already resolved for one label-value tuple. See [`EnvoyResolvedCounter`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EnvoyResolvedHistogram(
+  abi::envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr,
+);
+
+// SAFETY: the handle is a `Stats::Histogram*` whose lifetime is the owning configuration's scope.
+// `recordValue` is safe to call from any Envoy worker or main thread, where each thread records
+// into its own thread-local histogram.
+unsafe impl Send for EnvoyResolvedHistogram {}
+unsafe impl Sync for EnvoyResolvedHistogram {}
+
+impl EnvoyResolvedHistogram {
+  /// Record `value` on this histogram. Safe to call from any Envoy worker or main thread.
+  pub fn record(&self, value: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_cluster_metric_histogram_record(self.0, value) }
+  }
+}
+
 /// Envoy-side metrics interface for the cluster dynamic module.
 ///
 /// This trait provides the ability to define and record custom metrics (counters, gauges,
@@ -912,6 +978,43 @@ pub trait EnvoyClusterMetrics: Send + Sync {
     name: &str,
     labels: &[&'a str],
   ) -> Result<EnvoyHistogramVecId, abi::envoy_dynamic_module_type_metrics_result>;
+
+  // -------------------------------------------------------------------------
+  // Resolve a label-value tuple once, then record by handle.
+  // -------------------------------------------------------------------------
+
+  /// Resolve one label-value tuple of a counter vec to a handle.
+  ///
+  /// [`EnvoyClusterMetrics::increment_counter_vec`] resolves the tuple on every call, which
+  /// allocates per label value and rebuilds the tagged stat name. Resolving once and recording
+  /// through the returned handle allocates nothing per record, which is what matters for a metric
+  /// written on a per-request path.
+  ///
+  /// The handle is valid until the cluster configuration is destroyed, so resolve it once per
+  /// configuration and keep it.
+  fn resolve_counter_vec<'a>(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&'a str],
+  ) -> Result<EnvoyResolvedCounter, abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Resolve one label-value tuple of a gauge vec to a handle. See [`resolve_counter_vec`].
+  ///
+  /// [`resolve_counter_vec`]: EnvoyClusterMetrics::resolve_counter_vec
+  fn resolve_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+  ) -> Result<EnvoyResolvedGauge, abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Resolve one label-value tuple of a histogram vec to a handle. See [`resolve_counter_vec`].
+  ///
+  /// [`resolve_counter_vec`]: EnvoyClusterMetrics::resolve_counter_vec
+  fn resolve_histogram_vec<'a>(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&'a str],
+  ) -> Result<EnvoyResolvedHistogram, abi::envoy_dynamic_module_type_metrics_result>;
 
   // -------------------------------------------------------------------------
   // Record metrics (call at runtime, e.g., during cluster lifecycle).
@@ -1992,6 +2095,69 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
     Ok(EnvoyCounterVecId(id))
   }
 
+  fn resolve_counter_vec(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&str],
+  ) -> Result<EnvoyResolvedCounter, abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut handle: abi::envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr =
+      std::ptr::null_mut();
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_resolve_counter_vec(
+        self.raw,
+        id,
+        label_bufs.as_mut_ptr(),
+        labels.len(),
+        &mut handle,
+      )
+    })?;
+    Ok(EnvoyResolvedCounter(handle))
+  }
+
+  fn resolve_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+  ) -> Result<EnvoyResolvedGauge, abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut handle: abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr =
+      std::ptr::null_mut();
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec(
+        self.raw,
+        id,
+        label_bufs.as_mut_ptr(),
+        labels.len(),
+        &mut handle,
+      )
+    })?;
+    Ok(EnvoyResolvedGauge(handle))
+  }
+
+  fn resolve_histogram_vec(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&str],
+  ) -> Result<EnvoyResolvedHistogram, abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut handle: abi::envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr =
+      std::ptr::null_mut();
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec(
+        self.raw,
+        id,
+        label_bufs.as_mut_ptr(),
+        labels.len(),
+        &mut handle,
+      )
+    })?;
+    Ok(EnvoyResolvedHistogram(handle))
+  }
+
   fn define_gauge(
     &self,
     name: &str,
@@ -3035,6 +3201,64 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  // Drives the real wrappers against the stubs in `lib_test.rs`, so the resolve handshake and the
+  // record-by-handle path are both checked rather than mocked away.
+  #[test]
+  fn resolved_metric_handles_record_by_handle() {
+    crate::mod_test::MOCK_CLUSTER_METRIC_OPS
+      .lock()
+      .unwrap()
+      .clear();
+    let metrics = EnvoyClusterMetricsImpl { raw: 0x1 as _ };
+
+    let counter = metrics
+      .resolve_counter_vec(EnvoyCounterVecId(1), &["success", "dicer"])
+      .expect("a defined counter vec resolves");
+    let gauge = metrics
+      .resolve_gauge_vec(EnvoyGaugeVecId(2), &["warming"])
+      .expect("a defined gauge vec resolves");
+    let histogram = metrics
+      .resolve_histogram_vec(EnvoyHistogramVecId(3), &["l1"])
+      .expect("a defined histogram vec resolves");
+
+    counter.add(7);
+    gauge.set(1);
+    gauge.add(2);
+    gauge.sub(3);
+    histogram.record(42);
+
+    assert_eq!(
+      *crate::mod_test::MOCK_CLUSTER_METRIC_OPS.lock().unwrap(),
+      vec![
+        ("counter_add".to_owned(), 0x1001, 7),
+        ("gauge_set".to_owned(), 0x2002, 1),
+        ("gauge_add".to_owned(), 0x2002, 2),
+        ("gauge_sub".to_owned(), 0x2002, 3),
+        ("histogram_record".to_owned(), 0x3003, 42),
+      ]
+    );
+
+    // An undefined metric reports the ABI failure instead of handing back a null handle.
+    assert_eq!(
+      metrics
+        .resolve_counter_vec(EnvoyCounterVecId(0), &[])
+        .unwrap_err(),
+      abi::envoy_dynamic_module_type_metrics_result::MetricNotFound
+    );
+    assert_eq!(
+      metrics
+        .resolve_gauge_vec(EnvoyGaugeVecId(0), &[])
+        .unwrap_err(),
+      abi::envoy_dynamic_module_type_metrics_result::MetricNotFound
+    );
+    assert_eq!(
+      metrics
+        .resolve_histogram_vec(EnvoyHistogramVecId(0), &[])
+        .unwrap_err(),
+      abi::envoy_dynamic_module_type_metrics_result::MetricNotFound
+    );
+  }
 
   // Checks the wrapper flattens the `(&str, &str)` slice into the ABI pair array in order.
   #[test]
