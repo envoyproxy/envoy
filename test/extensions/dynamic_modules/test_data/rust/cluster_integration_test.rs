@@ -41,6 +41,9 @@ fn new_cluster_config(
       logical_hostnames: Vec::new(),
     })),
     "async_logical_hostnames" => {
+      // Each line is "<logical hostname>,<connection address>", for example:
+      // "a.lyft.com,127.0.0.1:10001" or "b.lyft.com,[::1]:10002".
+      // Split on the comma to keep the TLS hostname separate from the socket address.
       let hosts: Option<Vec<_>> = config_str
         .lines()
         .map(|line| line.split_once(','))
