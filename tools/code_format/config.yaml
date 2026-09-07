@@ -266,6 +266,19 @@ paths:
     - source/common/common/thread.h
     - source/exe/terminate_handler.cc
 
+  # luaL_check*()/luaL_opt*() raise the Lua error themselves, and raising unwinds the C++ stack
+  # past every local in the frames being unwound. Whether their destructors run depends on how
+  # LuaJIT was built, so a lua*() body must never raise while it owns anything -- and "owns
+  # nothing right here" is an invariant no reader or compiler can check, which is how it came to
+  # be broken more than once. The Lua extensions read arguments through the non-raising
+  # checkStringOrError()/checkIntegerOrError()/... helpers instead, which return a status
+  # carrying the same message LuaJIT would have raised. lua.h is the one place allowed to own
+  # the raise: its DECLARE_LUA_FUNCTION_EX() thunk turns that status into the Lua error once
+  # nothing with a destructor is left alive.
+  lua_raising_arg_read:
+    include:
+    - source/extensions/filters/common/lua/lua.h
+
   # Files matching these exact names can reference real-world time. These include the class
   # definitions for real-world time, the construction of them in main(), and perf annotation.
   # For now it includes the validation server but that really should be injected too.
@@ -401,6 +414,9 @@ re:
   for_each_n: for_each_n\(
   histogram_si_suffix: (?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)
   line_number: ^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$
+  # The luaL_check*()/luaL_opt*() argument readers raise the Lua error themselves. See the
+  # lua_raising_arg_read path list below for why that is banned.
+  lua_raising_arg_read: \bluaL_(check(any|int|integer|number|string|lstring|type)|opt(int|integer|number|string|lstring))\s*\(
   mangled_protobuf_name: envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}
   maintainers: .*github.com.(.*)\)\)
   old_mock_method: MOCK_METHOD\d

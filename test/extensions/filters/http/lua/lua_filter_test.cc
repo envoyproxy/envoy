@@ -1922,6 +1922,128 @@ TEST_F(LuaHttpFilterTest, HttpCallWithInvalidOption) {
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
 
+// A non-string key in the httpCall() header table is reported rather than raised from a frame
+// that owns the partially built request message.
+TEST_F(LuaHttpFilterTest, HttpCallNonStringHeaderKey) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+          [1234] = "numeric key",
+        },
+        "hello world",
+        5000)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_LOG_CONTAINS("error", "[string \"...\"]:3: header key must be a string, got number", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+  EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
+// Same for a header value that is neither a string nor a table of strings.
+TEST_F(LuaHttpFilterTest, HttpCallNonStringHeaderValue) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+          ["x-bad"] = true,
+        },
+        "hello world",
+        5000)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_LOG_CONTAINS("error", "[string \"...\"]:3: header value must be a string, got boolean", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+  EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
+// A non-string key in the httpCall() options table is reported rather than raised while the
+// options are being filled in.
+TEST_F(LuaHttpFilterTest, HttpCallNonStringOptionKey) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+        },
+        "hello world",
+        {
+          [1234] = 5000,
+        })
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("error",
+                      "[string \"...\"]:3: httpCall() options key must be a string, got number", {
+                        EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                  filter_->decodeHeaders(request_headers, false));
+                      });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+  EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
+// And for a 'timeout_ms' option that is not a number.
+TEST_F(LuaHttpFilterTest, HttpCallNonNumericTimeoutOption) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+        },
+        "hello world",
+        {
+          ["timeout_ms"] = true,
+        })
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("error",
+                      "[string \"...\"]:3: 'timeout_ms' option must be a number, got boolean", {
+                        EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                  filter_->decodeHeaders(request_headers, false));
+                      });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+  EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
 // Invalid HTTP call headers.
 TEST_F(LuaHttpFilterTest, HttpCallInvalidHeaders) {
   const std::string SCRIPT{R"EOF(

@@ -27,11 +27,13 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   }
 }
 
-int HeaderMapWrapper::luaGet(lua_State* state) {
-  absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+absl::StatusOr<int> HeaderMapWrapper::luaGet(lua_State* state) {
+  const absl::StatusOr<absl::string_view> key =
+      Filters::Common::Lua::checkStringOrError(state, 2, "get");
+  RETURN_IF_NOT_OK_REF(key.status());
   const Envoy::Http::HeaderUtility::GetAllOfHeaderAsStringResult value =
       Envoy::Http::HeaderUtility::getAllOfHeaderAsString(headers_,
-                                                         Envoy::Http::LowerCaseString(key));
+                                                         Envoy::Http::LowerCaseString(*key));
   if (value.result().has_value()) {
     lua_pushlstring(state, value.result().value().data(), value.result().value().size());
     return 1;
@@ -40,7 +42,7 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
   }
 }
 
-int ClusterWrapper::luaNumConnections(lua_State* state) {
+absl::StatusOr<int> ClusterWrapper::luaNumConnections(lua_State* state) {
   uint64_t count =
       cluster_->resourceManager(Upstream::ResourcePriority::Default).connections().count() +
       cluster_->resourceManager(Upstream::ResourcePriority::High).connections().count();
@@ -48,7 +50,7 @@ int ClusterWrapper::luaNumConnections(lua_State* state) {
   return 1;
 }
 
-int ClusterWrapper::luaNumRequests(lua_State* state) {
+absl::StatusOr<int> ClusterWrapper::luaNumRequests(lua_State* state) {
   uint64_t count =
       cluster_->resourceManager(Upstream::ResourcePriority::Default).requests().count() +
       cluster_->resourceManager(Upstream::ResourcePriority::High).requests().count();
@@ -56,7 +58,7 @@ int ClusterWrapper::luaNumRequests(lua_State* state) {
   return 1;
 }
 
-int ClusterWrapper::luaNumPendingRequests(lua_State* state) {
+absl::StatusOr<int> ClusterWrapper::luaNumPendingRequests(lua_State* state) {
   uint64_t count =
       cluster_->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().count() +
       cluster_->resourceManager(Upstream::ResourcePriority::High).pendingRequests().count();
@@ -64,7 +66,7 @@ int ClusterWrapper::luaNumPendingRequests(lua_State* state) {
   return 1;
 }
 
-int RouteHandleWrapper::luaHeaders(lua_State* state) {
+absl::StatusOr<int> RouteHandleWrapper::luaHeaders(lua_State* state) {
   if (headers_wrapper_.get() != nullptr) {
     headers_wrapper_.pushStack();
   } else {
@@ -73,11 +75,11 @@ int RouteHandleWrapper::luaHeaders(lua_State* state) {
   return 1;
 }
 
-int RouteHandleWrapper::luaGetCluster(lua_State* state) {
-  size_t cluster_name_len = 0;
-  const char* cluster_name = luaL_checklstring(state, 2, &cluster_name_len);
-  Upstream::ThreadLocalCluster* cluster =
-      cm_.getThreadLocalCluster(absl::string_view(cluster_name, cluster_name_len));
+absl::StatusOr<int> RouteHandleWrapper::luaGetCluster(lua_State* state) {
+  const absl::StatusOr<absl::string_view> cluster_name =
+      Filters::Common::Lua::checkStringOrError(state, 2, "getCluster");
+  RETURN_IF_NOT_OK_REF(cluster_name.status());
+  Upstream::ThreadLocalCluster* cluster = cm_.getThreadLocalCluster(*cluster_name);
   if (cluster == nullptr) {
     return 0;
   }
@@ -119,11 +121,13 @@ std::string LuaClusterSpecifierPlugin::startLua(const Http::HeaderMap& headers) 
     ENVOY_LOG(error, "script log: {}, use default cluster", status.message());
     return config_->defaultCluster();
   }
-  if (!lua_isstring(coroutine->luaState(), -1)) {
+  const absl::StatusOr<absl::string_view> cluster = Filters::Common::Lua::coercibleStringOrError(
+      coroutine->luaState(), -1, "cluster specifier return value");
+  if (!cluster.ok()) {
     ENVOY_LOG(error, "script log: return value is not string, use default cluster");
     return config_->defaultCluster();
   }
-  return std::string(Filters::Common::Lua::getStringViewFromLuaString(coroutine->luaState(), -1));
+  return std::string(*cluster);
 }
 
 Envoy::Router::RouteConstSharedPtr

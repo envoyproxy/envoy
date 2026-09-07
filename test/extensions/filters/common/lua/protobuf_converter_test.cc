@@ -1152,10 +1152,11 @@ TEST_F(LuaProtobufConverterTest, TypeURLEndingWithSlash) {
   lua_pushnil(lua_state_);
   lua_pushstring(lua_state_, "test.filter");
 
-  int result = ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(lua_state_,
-                                                                              typed_metadata_map);
+  const absl::StatusOr<int> result = ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
+      lua_state_, typed_metadata_map, "dynamicTypedMetadata");
 
-  EXPECT_EQ(result, 1);
+  ASSERT_TRUE(result.ok());
+  EXPECT_EQ(*result, 1);
   EXPECT_TRUE(lua_isnil(lua_state_, -1));
   lua_pop(lua_state_, 3); // Pop result + the 2 values we pushed
 }
@@ -1174,10 +1175,11 @@ TEST_F(LuaProtobufConverterTest, PrototypeNotFound) {
   lua_pushnil(lua_state_);
   lua_pushstring(lua_state_, "test.filter");
 
-  int result = ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(lua_state_,
-                                                                              typed_metadata_map);
+  const absl::StatusOr<int> result = ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
+      lua_state_, typed_metadata_map, "dynamicTypedMetadata");
 
-  EXPECT_EQ(result, 1);
+  ASSERT_TRUE(result.ok());
+  EXPECT_EQ(*result, 1);
   EXPECT_TRUE(lua_isnil(lua_state_, -1));
   lua_pop(lua_state_, 3); // Pop result + the 2 values we pushed
 }

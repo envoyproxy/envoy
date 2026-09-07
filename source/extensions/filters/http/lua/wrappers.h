@@ -114,7 +114,9 @@ private:
    */
   DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaSetHttp1ReasonPhrase);
 
-  void checkModifiable(lua_State* state);
+  // Returns a failed status if the header map may not be modified right now. Callers turn it
+  // into a Lua error; see DECLARE_LUA_FUNCTION_EX().
+  absl::Status checkModifiable();
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override {
