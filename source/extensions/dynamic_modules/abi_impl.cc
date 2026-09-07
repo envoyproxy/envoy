@@ -557,6 +557,14 @@ envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
   return nullptr;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) void envoy_dynamic_module_callback_cluster_lb_get_cluster_name(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_cluster_name: "

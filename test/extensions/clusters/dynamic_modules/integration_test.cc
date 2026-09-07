@@ -380,6 +380,25 @@ TEST_P(DynamicModuleClusterIntegrationTest, MemberUpdatePackedAddress) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Drives the bulk healthy-host getter end to end. Each worker load balancer rebuilds its routable
+// set from get_healthy_hosts, confirms it agrees with get_healthy_host_count, and routes a request
+// through a host pointer the bulk getter returned.
+TEST_P(DynamicModuleClusterIntegrationTest, HealthyHostsBulkRebuild) {
+  concurrency_ = 2;
+  initializeWithDecCluster("healthy_hosts_rebuild");
+
+  // Each worker increments the counter once its bulk read agrees with the per-host count.
+  test_server_->waitForCounter("dynamicmodulescustom.healthy_hosts_rebuilt_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Verifies that the cluster lifecycle callbacks fire correctly during cluster
 // initialization.
 TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {

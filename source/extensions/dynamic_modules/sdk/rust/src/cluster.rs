@@ -607,6 +607,23 @@ pub trait EnvoyClusterLoadBalancer: Send {
     index: usize,
   ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>;
 
+  /// Get every healthy host at the given priority level in one ABI crossing.
+  ///
+  /// This reads the whole partition at once. [`EnvoyClusterLoadBalancer::get_healthy_host`] instead
+  /// costs one crossing per host, which a module rebuilding its own view pays on every membership
+  /// update.
+  ///
+  /// `hosts` is cleared first, then filled in the same order [`get_healthy_host`] reports. Returns
+  /// `false` and leaves `hosts` empty when the priority level does not exist, or when the partition
+  /// grows between the internal sizing and fill passes.
+  ///
+  /// [`get_healthy_host`]: EnvoyClusterLoadBalancer::get_healthy_host
+  fn get_healthy_hosts(
+    &self,
+    priority: u32,
+    hosts: &mut Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>,
+  ) -> bool;
+
   /// Get a host by index within all hosts at the given priority level, regardless of health status.
   ///
   /// Unlike [`EnvoyClusterLoadBalancer::get_healthy_host`] which only returns healthy hosts, this
@@ -1335,6 +1352,55 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     } else {
       Some(host)
     }
+  }
+
+  fn get_healthy_hosts(
+    &self,
+    priority: u32,
+    hosts: &mut Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>,
+  ) -> bool {
+    hosts.clear();
+    let mut size: usize = 0;
+    // First call sizes the partition. An empty buffer is legal, so a priority with no healthy hosts
+    // succeeds here and needs no second call.
+    // SAFETY: `size` is a live local and the callback tolerates a null buffer when the capacity is
+    // zero.
+    let fitted = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+        self.raw,
+        priority,
+        std::ptr::null_mut(),
+        0,
+        &mut size,
+      )
+    };
+    if fitted {
+      return true;
+    }
+    if size == 0 {
+      // The priority level does not exist. `hosts` is already empty.
+      return false;
+    }
+    hosts.reserve(size);
+    // SAFETY: the spare capacity is at least `size` elements of the exact pointer type the callback
+    // writes, and the length is only committed once the callback reports it filled them all.
+    let filled = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+        self.raw,
+        priority,
+        hosts.as_mut_ptr(),
+        hosts.capacity(),
+        &mut size,
+      )
+    };
+    if !filled {
+      // A membership change between the two calls grew the partition. Leave `hosts` empty and let
+      // the caller decide, rather than reporting a partial healthy set.
+      return false;
+    }
+    // SAFETY: the callback wrote exactly `size` initialized elements, and `size <= capacity`.
+    unsafe { hosts.set_len(size) };
+    true
   }
 
   fn get_host(
@@ -2930,6 +2996,42 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  // The stub in `lib_test.rs` maps each priority to a scenario, so this drives the real wrapper's
+  // size-then-fill handshake rather than a mock.
+  #[test]
+  fn get_healthy_hosts_fills_the_whole_partition_in_one_pass() {
+    let lb = EnvoyClusterLoadBalancerImpl::new(std::ptr::null_mut());
+    let mut hosts = Vec::new();
+
+    // Priority 0 has two healthy hosts, filled in order through the size-then-fill handshake.
+    assert!(lb.get_healthy_hosts(0, &mut hosts));
+    assert_eq!(hosts.len(), 2);
+    assert_eq!(hosts[0] as usize, 0xAB);
+    assert_eq!(hosts[1] as usize, 0xCD);
+
+    // Priority 1 exists but is empty, so a single sizing pass succeeds and leaves the buffer empty.
+    hosts.push(std::ptr::null_mut());
+    assert!(lb.get_healthy_hosts(1, &mut hosts));
+    assert!(hosts.is_empty());
+
+    // Priority 2 never fits, modeling a partition that grows between the two calls, so the wrapper
+    // fails and leaves the buffer empty rather than reporting a partial set.
+    hosts.push(std::ptr::null_mut());
+    assert!(!lb.get_healthy_hosts(2, &mut hosts));
+    assert!(hosts.is_empty());
+
+    // A missing priority level reports failure and leaves the buffer empty, so a caller cannot
+    // mistake it for an empty healthy set.
+    assert!(!lb.get_healthy_hosts(7, &mut hosts));
+    assert!(hosts.is_empty());
+
+    // A reused buffer is cleared first, so a second call cannot append to a stale partition.
+    hosts.push(std::ptr::null_mut());
+    assert!(lb.get_healthy_hosts(0, &mut hosts));
+    assert_eq!(hosts.len(), 2);
+    assert!(hosts.iter().all(|host| !host.is_null()));
+  }
 
   #[test]
   fn add_hosts_with_hostnames_dispatches_and_validates_lengths() {
