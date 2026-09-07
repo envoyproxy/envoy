@@ -4,6 +4,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -301,8 +302,9 @@ TEST_F(DynamicModuleAccessLogAbiTest, IsNotHealthCheck) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetRouteName) {
-  ON_CALL(stream_info_, getRouteName())
-      .WillByDefault(testing::ReturnRefOfCopy(std::string("test_route")));
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  route->route_name_ = "test_route";
+  stream_info_.route_ = route;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -312,12 +314,15 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetRouteName) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetRouteNameEmpty) {
-  ON_CALL(stream_info_, getRouteName()).WillByDefault(testing::ReturnRefOfCopy(std::string("")));
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  route->route_name_.clear();
+  stream_info_.route_ = route;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_route_name(env_ptr, &result));
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_route_name(env_ptr, &result));
+  EXPECT_EQ(0, result.length);
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterName) {
@@ -2151,8 +2156,9 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringResponseCodeDetails) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringRouteName) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  ON_CALL(stream_info_, getRouteName())
-      .WillByDefault(testing::ReturnRefOfCopy(std::string("test_route")));
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  route->route_name_ = "test_route";
+  stream_info_.route_ = route;
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result{};
@@ -2163,13 +2169,66 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringRouteName) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringRouteNameEmpty) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  const std::string empty_route;
-  ON_CALL(stream_info_, getRouteName()).WillByDefault(testing::ReturnRef(empty_route));
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  route->route_name_.clear();
+  stream_info_.route_ = route;
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsRouteName, &result));
+  EXPECT_EQ(0, result.length);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringRouteNameNotSet) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  stream_info_.route_.reset();
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result{};
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
       env_ptr, envoy_dynamic_module_type_attribute_id_XdsRouteName, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeXdsScalars) {
+  auto cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  const std::string cluster_name = "service_cluster";
+  ON_CALL(*cluster_info, name()).WillByDefault(testing::ReturnRef(cluster_name));
+  stream_info_.upstream_cluster_info_ = cluster_info;
+
+  auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+  ON_CALL(*listener_info, direction())
+      .WillByDefault(testing::Return(envoy::config::core::v3::OUTBOUND));
+  stream_info_.downstream_connection_info_provider_->setListenerInfo(listener_info);
+
+  auto filter_chain_info = std::make_shared<NiceMock<Network::MockFilterChainInfo>>();
+  filter_chain_info->filter_chain_name_ = "service_filter_chain";
+  stream_info_.downstream_connection_info_provider_->setFilterChainInfo(filter_chain_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  uint64_t int_result = 0;
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsClusterName, &string_result));
+  EXPECT_EQ("service_cluster", absl::string_view(string_result.ptr, string_result.length));
+  stream_info_.upstream_cluster_info_.reset();
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsClusterName, &string_result));
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsFilterChainName, &string_result));
+  EXPECT_EQ("service_filter_chain", absl::string_view(string_result.ptr, string_result.length));
+  stream_info_.downstream_connection_info_provider_->setFilterChainInfo(nullptr);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsFilterChainName, &string_result));
+  EXPECT_EQ(0, string_result.length);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsListenerDirection, &int_result));
+  EXPECT_EQ(static_cast<uint64_t>(envoy::config::core::v3::OUTBOUND), int_result);
+  stream_info_.downstream_connection_info_provider_->setListenerInfo(nullptr);
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsListenerDirection, &int_result));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringRequestId) {
