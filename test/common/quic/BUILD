@@ -232,6 +232,7 @@ envoy_cc_test(
         "@quiche//:quic_test_tools_config_peer_lib",
         "@quiche//:quic_test_tools_stream_peer_lib",
         "@quiche//:quic_test_tools_server_session_base_peer",
+        "@quiche//:quic_test_tools_session_peer_lib",
         "@quiche//:quic_test_tools_test_utils_lib",
     ]),
 )
