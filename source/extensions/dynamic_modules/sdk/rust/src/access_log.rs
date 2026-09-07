@@ -590,7 +590,7 @@ impl LogContext {
 
   /// Get the virtual cluster name.
   pub fn virtual_cluster_name(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsVirtualHostName)
+    self.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsVirtualClusterName)
   }
 
   /// Check if this is a health check request.

@@ -170,6 +170,15 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
     break;
   }
   case envoy_dynamic_module_type_attribute_id_XdsVirtualHostName: {
+    const auto virtual_host = stream_info.virtualHost();
+    if (virtual_host.has_value()) {
+      const auto& name = virtual_host->name();
+      *result = {const_cast<char*>(name.data()), name.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName: {
     const auto& name = stream_info.virtualClusterName();
     if (name.has_value() && !name->empty()) {
       *result = {const_cast<char*>(name->data()), name->size()};

@@ -334,6 +334,16 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterName) {
   EXPECT_TRUE(
       envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(env_ptr, &result));
   EXPECT_EQ("test_vcluster", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName, &result));
+  EXPECT_EQ("test_vcluster", std::string(result.ptr, result.length));
+
+  uint64_t number_result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName, &number_result));
+  bool bool_result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName, &bool_result));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterNameEmpty) {
@@ -344,6 +354,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterNameEmpty) {
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(
       envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(env_ptr, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName, &result));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterNameNotSet) {
@@ -354,6 +366,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterNameNotSet) {
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(
       envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(env_ptr, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName, &result));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCount) {
@@ -2438,8 +2452,9 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringResponseCodeDetailsNotSe
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostName) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  std::optional<std::string> vhost = "my_vhost";
-  ON_CALL(stream_info_, virtualClusterName()).WillByDefault(testing::ReturnRef(vhost));
+  auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+  virtual_host->name_ = "my_vhost";
+  stream_info_.virtual_host_ = virtual_host;
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result{};
@@ -2450,19 +2465,20 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostName) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostNameEmpty) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  std::optional<std::string> vhost = "";
-  ON_CALL(stream_info_, virtualClusterName()).WillByDefault(testing::ReturnRef(vhost));
+  auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+  virtual_host->name_.clear();
+  stream_info_.virtual_host_ = virtual_host;
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result{};
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
       env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualHostName, &result));
+  EXPECT_EQ(0, result.length);
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostNameNotSet) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  std::optional<std::string> vhost = std::nullopt;
-  ON_CALL(stream_info_, virtualClusterName()).WillByDefault(testing::ReturnRef(vhost));
+  stream_info_.virtual_host_.reset();
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result{};

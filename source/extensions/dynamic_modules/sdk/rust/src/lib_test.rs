@@ -9915,6 +9915,10 @@ fn test_attribute_id_ordering() {
     68,
     abi::envoy_dynamic_module_type_attribute_id::UpstreamRequestedServerName as u32
   );
+  assert_eq!(
+    69,
+    abi::envoy_dynamic_module_type_attribute_id::XdsVirtualClusterName as u32
+  );
 }
 
 #[test]
