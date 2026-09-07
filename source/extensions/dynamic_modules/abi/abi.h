@@ -10101,6 +10101,30 @@ envoy_dynamic_module_type_cluster_host_envoy_ptr
 envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
 
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts writes every healthy host pointer at
+ * the given priority level into a module-owned array, in the same order
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host reports. It reads the whole partition
+ * in one ABI crossing instead of one crossing per host.
+ *
+ * Nothing is written unless every healthy host fits, so a caller whose buffer is too small sizes
+ * the retry from hosts_size_out rather than acting on a partial partition.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
+ * @param priority is the priority level.
+ * @param hosts_out is the array to fill, owned by the module. May be null only when hosts_capacity
+ * is zero.
+ * @param hosts_capacity is the number of elements hosts_out can hold.
+ * @param hosts_size_out is set to the number of healthy hosts at this priority level, whether or
+ * not they fit. Set to zero when the priority level does not exist. Must not be null.
+ * @return true when every healthy host was written, false when the priority level does not exist or
+ * hosts_capacity is smaller than hosts_size_out.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* hosts_out, size_t hosts_capacity,
+    size_t* hosts_size_out);
+
 // =============================================================================
 // Cluster LB Host Information Callbacks
 // =============================================================================
