@@ -39,6 +39,8 @@ Currently, dynamic modules are supported at the following extension points:
   (:ref:`configuration <config_health_checkers_dynamic_modules>`).
 * As a :ref:`cluster specifier <envoy_v3_api_msg_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier>`
   (:ref:`configuration <config_http_cluster_specifier_dynamic_modules>`).
+* As a :ref:`route provider <envoy_v3_api_msg_extensions.router.route_providers.dynamic_modules.v3.DynamicModuleRouteProvider>`
+  (:ref:`configuration <config_http_route_provider_dynamic_modules>`).
 * As a :ref:`DNS resolver <envoy_v3_api_msg_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig>`
   (:ref:`architecture <arch_overview_dns_resolution>`). The Hickory resolver is implemented as a
   builtin dynamic module; the ABI and SDKs also support custom DNS resolvers.

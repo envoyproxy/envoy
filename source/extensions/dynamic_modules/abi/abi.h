@@ -15463,6 +15463,519 @@ envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value);
 
+// =============================================================================
+// ============================== Route Provider ===============================
+// =============================================================================
+
+// =============================================================================
+// Route Provider Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_route_provider_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleRouteProviderConfig class in Envoy. This is passed to the module when creating a new
+ * in-module route provider configuration and may be used to access the route provider
+ * configuration-scoped information in the future.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_route_provider_config_module_ptr in
+ * the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_route_provider_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_route_provider_config_module_ptr is a pointer to an in-module route
+ * provider configuration created by envoy_dynamic_module_on_route_provider_config_new. A single
+ * configuration is shared by every request routed through the route provider.
+ *
+ * This has 1:1 correspondence with the DynamicModuleRouteProviderConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_route_provider_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_route_provider_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_route_provider_context_envoy_ptr is a raw pointer to the Envoy context
+ * of a single route selection. It provides read access to the request headers and the stream info,
+ * and it is the target of the setter callbacks that record the selection.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ *
+ * THREADING: This pointer is only valid on the worker thread handling the request, for the duration
+ * of a single envoy_dynamic_module_on_route_provider_select call, and it refers to storage that
+ * Envoy reuses once the call returns. Selection runs concurrently on multiple worker threads, so
+ * the module must not store this pointer, share it across threads, or use it after the hook
+ * returns. Every envoy_dynamic_module_callback_route_provider_* callback must be called with this
+ * pointer from inside that hook.
+ */
+typedef void* envoy_dynamic_module_type_route_provider_context_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_route_provider_header_mutation is how a header setter mutates a header.
+ * Append corresponds to Envoy's Http::HeaderMap::addCopy, Overwrite to setCopy, and Remove to
+ * remove.
+ */
+typedef enum envoy_dynamic_module_type_route_provider_header_mutation {
+  // Append the value to the header, keeping any existing values.
+  envoy_dynamic_module_type_route_provider_header_mutation_Append = 0,
+  // Overwrite the header with the value, replacing any existing values.
+  envoy_dynamic_module_type_route_provider_header_mutation_Overwrite = 1,
+  // Remove the header. The value is ignored.
+  envoy_dynamic_module_type_route_provider_header_mutation_Remove = 2,
+} envoy_dynamic_module_type_route_provider_header_mutation;
+
+// =============================================================================
+// Route Provider Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_route_provider_config_new is called on the main thread when a route
+ * provider referencing this module is configured. The module should parse the configuration and
+ * return a pointer to the in-module route provider configuration.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteProviderConfig object for the
+ * corresponding config.
+ * @param name is the route provider name used to select an implementation within the module. The
+ * buffer is owned by Envoy and is valid only during this call.
+ * @param config is the configuration bytes for the route provider. The buffer is owned by Envoy and
+ * is valid only during this call.
+ * @param route_template_count is the number of route templates the provider selects among. Indices
+ * passed to select_route must be below this count.
+ * @return a pointer to the in-module route provider configuration. Returning nullptr indicates a
+ * failure to initialize, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_route_provider_config_module_ptr
+envoy_dynamic_module_on_route_provider_config_new(
+    envoy_dynamic_module_type_route_provider_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config,
+    size_t route_template_count);
+
+/**
+ * envoy_dynamic_module_on_route_provider_config_destroy is called when the route provider
+ * configuration is destroyed.
+ *
+ * This may be called on any thread. The configuration is kept alive by the requests referencing it,
+ * so the last reference may be released on a worker thread after the route configuration is
+ * replaced. The module must not assume the main thread here.
+ *
+ * @param config_module_ptr is the pointer to the in-module route provider configuration.
+ */
+void envoy_dynamic_module_on_route_provider_config_destroy(
+    envoy_dynamic_module_type_route_provider_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_route_provider_select is called while the route is being resolved for a
+ * request. The module reads the request and selects one of the route templates with select_route,
+ * then records per-request overrides with the setter callbacks below.
+ *
+ * This may be called concurrently on multiple worker threads with the same in-module configuration,
+ * so the module must treat the configuration as read-only and avoid shared mutable state.
+ *
+ * @param config_module_ptr is the pointer to the in-module route provider configuration.
+ * @param context_envoy_ptr is the pointer to the Envoy route selection context, valid only during
+ * this call.
+ * @return true when the module selected a route, false when it has no route for the request, in
+ * which case Envoy resolves no route.
+ */
+bool envoy_dynamic_module_on_route_provider_select(
+    envoy_dynamic_module_type_route_provider_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr);
+
+// =============================================================================
+// Route Provider Callbacks
+// =============================================================================
+
+// ------------------- Route Provider Callbacks - Request State ----------------
+// The attribute callbacks share the envoy_dynamic_module_type_attribute_id enum with the access
+// logger. Route selection runs before the upstream request, so the response and upstream attributes
+// are not populated yet and the getters return false for them.
+
+/**
+ * envoy_dynamic_module_callback_route_provider_get_request_headers_size returns the number of
+ * request headers.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @return the number of request headers.
+ */
+size_t envoy_dynamic_module_callback_route_provider_get_request_headers_size(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_get_request_headers is called by the module to get
+ * all request headers.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param result_headers is the output array. The module must pre-allocate at least
+ * envoy_dynamic_module_callback_route_provider_get_request_headers_size entries. Envoy does not
+ * bounds check the array, so passing a shorter one is undefined behavior. The buffers in the
+ * entries are owned by Envoy and are valid until the end of the current event hook.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_provider_get_request_headers(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_get_request_header_value is called by the module to
+ * get a request header value by key.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param key is the header key to look up.
+ * @param result is the output buffer for the header value. The buffer is owned by Envoy and is
+ * valid until the end of the current event hook.
+ * @param index is the index for multi-value headers, 0 for the first value.
+ * @param total_count_out receives the total number of values for the key when non-null.
+ * @return true if the header exists at the given index, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_provider_get_request_header_value(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_get_attribute_string is called by the module to get
+ * a string attribute value from the stream info. If the attribute is not accessible or the value is
+ * not a string, this returns false.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the buffer where the string value will be stored. The buffer is
+ * owned by Envoy and is valid until the end of the current event hook.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_provider_get_attribute_string(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_get_attribute_int is called by the module to get an
+ * integer attribute value from the stream info. If the attribute is not accessible or the value is
+ * not an integer, this returns false.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_provider_get_attribute_int(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_get_attribute_bool is called by the module to get a
+ * boolean attribute value from the stream info. If the attribute is not accessible or the value is
+ * not a boolean, this returns false.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the boolean value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_provider_get_attribute_bool(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_get_random_value returns the random value that Envoy
+ * generated for route resolution. It is stable for the lifetime of the request, so a module can use
+ * it to split traffic by percentage without re-deriving a hash.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @return the random value for the request.
+ */
+uint64_t envoy_dynamic_module_callback_route_provider_get_random_value(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr);
+
+// ------------------- Route Provider Callbacks - Selection --------------------
+
+/**
+ * envoy_dynamic_module_callback_route_provider_select_route selects which route template the
+ * request resolves to by index. The index refers to the route_templates list of the route provider
+ * configuration, in order. The module must select a route for the setter overrides below to apply.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param index is the zero based index of the route template to select.
+ * @return true if the index is in range, false otherwise, in which case nothing is selected.
+ */
+bool envoy_dynamic_module_callback_route_provider_select_route(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_cluster_name sets the upstream cluster for the
+ * request, replacing the cluster of the selected route template. When the cluster does not exist,
+ * the request is failed with the cluster-not-found response code of the selected route.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param cluster_name is the name of the cluster to route to. Envoy copies the buffer. An empty
+ * name leaves the cluster of the selected route in effect.
+ */
+void envoy_dynamic_module_callback_route_provider_set_cluster_name(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_timeout sets the route timeout for the request,
+ * replacing the timeout of the selected route. Zero disables the timeout.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param timeout_ms is the timeout in milliseconds. Values above the ceiling that the timer
+ * implementation supports, which is 2147483647 seconds, are clamped to it.
+ */
+void envoy_dynamic_module_callback_route_provider_set_timeout(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    uint64_t timeout_ms);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_idle_timeout sets the stream idle timeout for
+ * the request, replacing the idle timeout of the selected route. Zero disables the idle timeout
+ * rather than deferring to the connection manager timeout.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param idle_timeout_ms is the idle timeout in milliseconds. Values above the ceiling that the
+ * timer implementation supports, which is 2147483647 seconds, are clamped to it.
+ */
+void envoy_dynamic_module_callback_route_provider_set_idle_timeout(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    uint64_t idle_timeout_ms);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_max_stream_duration sets the maximum stream
+ * duration for the request, replacing the max stream duration of the selected route. Zero disables
+ * the maximum stream duration.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param max_stream_duration_ms is the maximum stream duration in milliseconds. Values above the
+ * ceiling that the timer implementation supports, which is 2147483647 seconds, are clamped to it.
+ */
+void envoy_dynamic_module_callback_route_provider_set_max_stream_duration(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    uint64_t max_stream_duration_ms);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_priority sets the upstream resource priority for
+ * the request, replacing the priority of the selected route.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param priority is the resource priority to use. Any value other than
+ * envoy_dynamic_module_type_resource_priority_High is treated as
+ * envoy_dynamic_module_type_resource_priority_Default.
+ */
+void envoy_dynamic_module_callback_route_provider_set_priority(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_resource_priority priority);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_request_body_buffer_limit sets the request body
+ * buffer limit for the request, replacing the limit of the selected route.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param limit_bytes is the buffer limit in bytes. Envoy only raises the buffer limit of the
+ * stream, so a value below the limit already in effect does not shrink it, but it does cap the body
+ * buffered for retries.
+ */
+void envoy_dynamic_module_callback_route_provider_set_request_body_buffer_limit(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    uint64_t limit_bytes);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_route_action_override selects one of the route
+ * action overrides declared in the route provider configuration. The selected override replaces the
+ * retry policy, the hash policy, the subset load balancing metadata match criteria, the request
+ * mirroring policies and the rate limit policy of the selected route, for the properties that it
+ * sets.
+ *
+ * These properties are built and validated once when the route provider is configured because they
+ * are constructed from other extensions, so they cannot be passed as plain values on the request
+ * path.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param name is the key of the override in the route_action_overrides map.
+ * @return true if the override exists, false otherwise, in which case nothing changes.
+ */
+bool envoy_dynamic_module_callback_route_provider_set_route_action_override(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_per_route_config_override selects one of the
+ * per-route configuration overrides declared in the route provider configuration. The selected
+ * override replaces the per-filter configuration and the route-level tracing of the selected route,
+ * for the properties that it sets.
+ *
+ * These properties are built and validated once when the route provider is configured because they
+ * are constructed from other extensions, so they cannot be passed as plain values on the request
+ * path.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param name is the key of the override in the per_route_config_overrides map.
+ * @return true if the override exists, false otherwise, in which case nothing changes.
+ */
+bool envoy_dynamic_module_callback_route_provider_set_per_route_config_override(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
+// ------------------- Route Provider Callbacks - Route Metadata ---------------
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_route_metadata_number sets the number value of
+ * the route metadata under the given namespace and key. The entry is layered onto the metadata of
+ * the selected route, so consumers that read route metadata, such as the rate limit ROUTE_ENTRY
+ * action or the METADATA(ROUTE) formatter, observe it. An existing entry with the same namespace
+ * and key is overwritten, while the other entries of the selected route stay in effect.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the number value to set.
+ */
+void envoy_dynamic_module_callback_route_provider_set_route_metadata_number(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_route_metadata_string sets the string value of
+ * the route metadata under the given namespace and key. It behaves like
+ * envoy_dynamic_module_callback_route_provider_set_route_metadata_number but stores a string.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the string value to set. Envoy copies the buffer.
+ */
+void envoy_dynamic_module_callback_route_provider_set_route_metadata_string(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_route_metadata_bool sets the bool value of the
+ * route metadata under the given namespace and key. It behaves like
+ * envoy_dynamic_module_callback_route_provider_set_route_metadata_number but stores a bool.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the bool value to set.
+ */
+void envoy_dynamic_module_callback_route_provider_set_route_metadata_bool(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_route_metadata_struct merges a serialized
+ * google.protobuf.Struct into the route metadata under the given namespace. Existing entries with
+ * the same key are overwritten, while the others stay in effect. If the buffer does not parse as a
+ * google.protobuf.Struct, this is a no-op.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct value to set.
+ */
+void envoy_dynamic_module_callback_route_provider_set_route_metadata_struct(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_route_typed_metadata sets the typed route
+ * metadata under the given namespace from a serialized google.protobuf.Any, replacing an existing
+ * entry, so a typed metadata factory registered for the namespace can parse it out of
+ * typedMetadata(). If the buffer does not parse as a google.protobuf.Any, this is a no-op.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param serialized_any is the serialized google.protobuf.Any value to set.
+ */
+void envoy_dynamic_module_callback_route_provider_set_route_typed_metadata(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
+// ------------------- Route Provider Callbacks - Header Mutations -------------
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_request_header records a mutation applied to the
+ * request headers before they are forwarded upstream, on top of the mutations of the selected
+ * route. Mutations are applied in the order they are recorded.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param key is the header key to mutate. Envoy copies the buffer.
+ * @param value is the header value. Envoy copies the buffer. It is ignored when the mutation is
+ * Remove.
+ * @param mutation is how to mutate the header.
+ */
+void envoy_dynamic_module_callback_route_provider_set_request_header(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
+    envoy_dynamic_module_type_route_provider_header_mutation mutation);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_response_header records a mutation applied to
+ * the response headers before they are forwarded downstream, on top of the mutations of the
+ * selected route. Mutations are applied in the order they are recorded.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param key is the header key to mutate. Envoy copies the buffer.
+ * @param value is the header value. Envoy copies the buffer. It is ignored when the mutation is
+ * Remove.
+ * @param mutation is how to mutate the header.
+ */
+void envoy_dynamic_module_callback_route_provider_set_response_header(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
+    envoy_dynamic_module_type_route_provider_header_mutation mutation);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_path replaces the request path header verbatim,
+ * after the path rewrite of the selected route. The module supplies the full path, including the
+ * query string if one is wanted.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param path is the path to set. Envoy copies the buffer.
+ */
+void envoy_dynamic_module_callback_route_provider_set_path(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path);
+
+// ------------------- Route Provider Callbacks - Terminal ---------------------
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_direct_response makes the request resolve to a
+ * direct response with the given status code and body, instead of routing to an upstream cluster.
+ * This replaces any cluster or redirect the module set for the request.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param status_code is the HTTP status code to reply with. Only codes in the range [200, 600) are
+ * accepted.
+ * @param body is the response body. Envoy copies the buffer.
+ * @return true if the status code was accepted, false when it is out of range, in which case the
+ * call changes nothing.
+ */
+bool envoy_dynamic_module_callback_route_provider_set_direct_response(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    uint32_t status_code, envoy_dynamic_module_type_module_buffer body);
+
+/**
+ * envoy_dynamic_module_callback_route_provider_set_redirect makes the request resolve to a redirect
+ * to the given location, instead of routing to an upstream cluster. This replaces any cluster or
+ * direct response the module set for the request.
+ *
+ * @param context_envoy_ptr is the pointer to the route selection context.
+ * @param status_code is the HTTP status code to reply with. Only 3xx codes are accepted.
+ * @param location is the value of the Location header. Envoy copies the buffer.
+ * @return true if the status code was accepted, false when it is not a 3xx code, in which case the
+ * call changes nothing.
+ */
+bool envoy_dynamic_module_callback_route_provider_set_redirect(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr context_envoy_ptr,
+    uint32_t status_code, envoy_dynamic_module_type_module_buffer location);
+
 #ifdef __cplusplus
 }
 #endif

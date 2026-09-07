@@ -178,6 +178,34 @@ getClusterSpecifierPluginByTheProto(const envoy::config::route::v3::ClusterSpeci
   return factory->createClusterSpecifierPlugin(*config, factory_context);
 }
 
+absl::StatusOr<RouteProducerSharedPtr>
+createRouteProvider(const envoy::config::route::v3::RouteProvider& route_provider,
+                    const CommonVirtualHostSharedPtr& vhost,
+                    Server::Configuration::ServerFactoryContext& factory_context,
+                    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                    bool validate_clusters) {
+  std::vector<RouteEntryAndRouteConstSharedPtr> route_templates;
+  route_templates.reserve(route_provider.route_templates().size());
+  for (const auto& route : route_provider.route_templates()) {
+    auto route_or_error = RouteCreator::createAndValidateRoute(
+        route, vhost, factory_context, validator, init_manager, validate_clusters);
+    RETURN_IF_NOT_OK(route_or_error.status());
+    route_templates.push_back(std::move(route_or_error.value()));
+  }
+
+  auto* factory =
+      Envoy::Config::Utility::getFactory<RouteProviderFactory>(route_provider.resolver());
+  if (factory == nullptr) {
+    return absl::InvalidArgumentError(fmt::format(
+        "Didn't find a registered route provider for '{}' with type URL: '{}'",
+        route_provider.resolver().name(),
+        Envoy::Config::Utility::getFactoryType(route_provider.resolver().typed_config())));
+  }
+  auto config = Envoy::Config::Utility::translateToFactoryConfig(route_provider.resolver(),
+                                                                 validator, *factory);
+  return factory->createRouteProvider(*config, route_templates, factory_context, init_manager);
+}
+
 absl::StatusOr<std::unique_ptr<::Envoy::Http::Utility::RedirectConfig>>
 createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine& regex_engine) {
   std::unique_ptr<::Envoy::Http::Utility::RedirectConfig> redirect_config =
@@ -1676,6 +1704,13 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
     return;
   }
 
+  if (virtual_host.has_route_provider() &&
+      (virtual_host.has_matcher() || !virtual_host.routes().empty())) {
+    creation_status = absl::InvalidArgumentError(
+        "cannot set route_provider with matcher or routes on virtual host");
+    return;
+  }
+
   if (!virtual_host.virtual_clusters().empty()) {
     vcluster_scope_ = Stats::Utility::scopeFromStatNames(
         scope, {stat_name_storage_.statName(),
@@ -1798,7 +1833,13 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
   }
   ssl_redirect_route_ = std::make_shared<SslRedirectRoute>(shared_virtual_host_);
 
-  if (virtual_host.has_matcher()) {
+  if (virtual_host.has_route_provider()) {
+    auto provider_or_error =
+        createRouteProvider(virtual_host.route_provider(), shared_virtual_host_, factory_context,
+                            validator, init_manager, validate_clusters);
+    SET_AND_RETURN_IF_NOT_OK(provider_or_error.status(), creation_status);
+    route_provider_ = std::move(provider_or_error.value());
+  } else if (virtual_host.has_matcher()) {
     RouteActionContext context{shared_virtual_host_, factory_context, init_manager};
     RouteActionValidationVisitor validation_visitor;
     Matcher::MatchTreeFactory<Http::HttpMatchingData, RouteActionContext> factory(
@@ -1827,7 +1868,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
 RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
     const RouteCallback& cb, const RouteMatchContext& route_match_context,
     const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-    absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const {
+    absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) {
   for (auto route = routes.begin(); route != routes.end(); ++route) {
     if (!route_match_context.headers().Path() && !(*route)->supportsPathlessHeaders()) {
       continue;
@@ -1885,10 +1926,10 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     return ssl_redirect_route_;
   }
 
-  // Constructed once per request; derived values (query params, cookies, etc.) are computed
-  // lazily on first access and reused across all route entries evaluated for this request.
-  const RouteMatchContext route_match_context(
-      headers, shared_virtual_host_->globalRouteConfig().ignorePathParametersInPathMatching());
+  // A route provider owns both selection and overrides, so hand off the whole request.
+  if (route_provider_ != nullptr) {
+    return route_provider_->produceRoute(cb, headers, stream_info, random_value);
+  }
 
   if (matcher_) {
     Http::Matching::HttpMatchingDataImpl data(stream_info);
@@ -1899,16 +1940,12 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
 
     if (match_result.isMatch()) {
       const auto result = match_result.actionByMove();
-      if (result->typeUrl() == RouteMatchAction::staticTypeUrl()) {
-        return getRouteFromRoutes(
-            cb, route_match_context, stream_info, random_value,
-            {std::dynamic_pointer_cast<const RouteEntryImplBase>(std::move(result))});
-      } else if (result->typeUrl() == RouteListMatchAction::staticTypeUrl()) {
-        const RouteListMatchAction& action = result->getTyped<RouteListMatchAction>();
-        return getRouteFromRoutes(cb, route_match_context, stream_info, random_value,
-                                  action.routes());
+      const auto* producer = dynamic_cast<const RouteProducer*>(result.get());
+      if (producer == nullptr) {
+        IS_ENVOY_BUG("route matcher action is not a route producer");
+        return nullptr;
       }
-      PANIC("Action in router matcher should be Route or RouteList");
+      return producer->produceRoute(cb, headers, stream_info, random_value);
     }
 
     ENVOY_LOG(debug, "failed to match incoming request: {}",
@@ -1917,8 +1954,32 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     return nullptr;
   }
 
+  // Constructed once per request; derived values (query params, cookies, etc.) are computed
+  // lazily on first access and reused across all route entries evaluated for this request.
+  const RouteMatchContext route_match_context(
+      headers, shared_virtual_host_->globalRouteConfig().ignorePathParametersInPathMatching());
+
   // Check for a route that matches the request.
   return getRouteFromRoutes(cb, route_match_context, stream_info, random_value, routes_);
+}
+
+RouteConstSharedPtr RouteEntryImplBase::produceRoute(const RouteCallback& cb,
+                                                     const Http::RequestHeaderMap& headers,
+                                                     const StreamInfo::StreamInfo& stream_info,
+                                                     uint64_t random_value) const {
+  const RouteMatchContext route_match_context(
+      headers, vhost_->globalRouteConfig().ignorePathParametersInPathMatching());
+  return VirtualHostImpl::getRouteFromRoutes(cb, route_match_context, stream_info, random_value,
+                                             {shared_from_this()});
+}
+
+RouteConstSharedPtr RouteListMatchAction::produceRoute(const RouteCallback& cb,
+                                                       const Http::RequestHeaderMap& headers,
+                                                       const StreamInfo::StreamInfo& stream_info,
+                                                       uint64_t random_value) const {
+  const RouteMatchContext route_match_context(headers, ignore_path_parameters_in_path_matching_);
+  return VirtualHostImpl::getRouteFromRoutes(cb, route_match_context, stream_info, random_value,
+                                             routes_);
 }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
@@ -2285,7 +2346,8 @@ RouteListMatchActionFactory::createAction(const Protobuf::Message& config,
                                              validation_visitor, context.init_manager, false),
         RouteEntryImplBaseConstSharedPtr));
   }
-  return std::make_shared<RouteListMatchAction>(std::move(routes));
+  return std::make_shared<RouteListMatchAction>(
+      std::move(routes), context.vhost->globalRouteConfig().ignorePathParametersInPathMatching());
 }
 REGISTER_FACTORY(RouteListMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 

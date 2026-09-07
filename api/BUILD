@@ -421,6 +421,7 @@ proto_library(
         "//envoy/extensions/router/cluster_specifiers/dynamic_modules/v3:pkg",
         "//envoy/extensions/router/cluster_specifiers/lua/v3:pkg",
         "//envoy/extensions/router/cluster_specifiers/matcher/v3:pkg",
+        "//envoy/extensions/router/route_providers/dynamic_modules/v3:pkg",
         "//envoy/extensions/stat_sinks/dynamic_modules/v3:pkg",
         "//envoy/extensions/stat_sinks/graphite_statsd/v3:pkg",
         "//envoy/extensions/stat_sinks/open_telemetry/v3:pkg",

@@ -105,6 +105,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "route_producer_interface",
+    hdrs = ["route_producer.h"],
+    deps = [
+        ":router_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/init:manager_interface",
+        "//envoy/server:factory_context_interface",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
     name = "scopes_interface",
     hdrs = ["scopes.h"],
     deps = [

@@ -55,4 +55,5 @@ Extensions
   load_balancing_policies/load_balancing_policies
   queue_policy/queue_policy
   cluster_specifier/cluster_specifier
+  route_provider/route_provider
   local_address_selectors/local_address_selectors
