@@ -11030,6 +11030,27 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_strin
     envoy_dynamic_module_type_module_buffer value);
 
 /**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch sets multiple
+ * string-valued dynamic metadata entries on the request under a single namespace in one call. It is
+ * equivalent to calling
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string once per entry but
+ * resolves the namespace and merges into the metadata struct only once. Existing entries with the
+ * same key are overwritten. Within a single call, a later entry overwrites an earlier entry with
+ * the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ * @return true if the values were set, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
  * to deliver the result of an asynchronous host selection. This must be called exactly once for
  * each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless
