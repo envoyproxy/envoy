@@ -3220,7 +3220,7 @@ mod tests {
       abi::envoy_dynamic_module_type_metrics_result::MetricNotFound
     );
   }
-  
+
   // The stub in `lib_test.rs` maps each priority to a scenario, so this drives the real wrapper's
   // size-then-fill handshake rather than a mock.
   #[test]
