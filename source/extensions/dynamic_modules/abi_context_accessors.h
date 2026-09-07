@@ -26,6 +26,12 @@ using HeadersMapOptConstRef = OptRef<const Http::HeaderMap>;
  */
 class ContextAccessor {
 public:
+  struct HttpAttributeContext {
+    const Http::RequestHeaderMap* request_headers{};
+    const Http::ResponseHeaderMap* response_headers{};
+    const Http::ResponseTrailerMap* response_trailers{};
+  };
+
   // Resolve the header map for the given type from the formatting context. Supported types are
   // RequestHeader, ResponseHeader, and ResponseTrailer.
   static HeadersMapOptConstRef headerMapByType(const Formatter::Context& context,
@@ -51,6 +57,13 @@ public:
   // Get an integer attribute from the stream info. Returns false when the attribute is unavailable
   // or not an integer.
   static bool getAttributeInt(const StreamInfo::StreamInfo& stream_info,
+                              envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result,
+                              const HttpAttributeContext* http_context = nullptr);
+
+  // Get an integer attribute using the formatting context for HTTP header state. HTTP-only
+  // attributes are unavailable for non-HTTP streams.
+  static bool getAttributeInt(const StreamInfo::StreamInfo& stream_info,
+                              const Formatter::Context& context,
                               envoy_dynamic_module_type_attribute_id attribute_id,
                               uint64_t* result);
 

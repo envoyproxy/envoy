@@ -897,7 +897,8 @@ bool envoy_dynamic_module_callback_access_logger_get_attribute_int(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  return ContextAccessor::getAttributeInt(*logger->stream_info_, attribute_id, result);
+  return ContextAccessor::getAttributeInt(*logger->stream_info_, *logger->log_context_,
+                                          attribute_id, result);
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_attribute_bool(
