@@ -52,7 +52,7 @@ Protobuf::Value AccessLogTypeFormatter::formatValue(const Context& context,
 
 HeaderFormatter::HeaderFormatter(absl::string_view main_header,
                                  absl::string_view alternative_header,
-                                 std::optional<size_t> max_length, std::optional<bool> multi_value)
+                                 std::optional<size_t> max_length, bool multi_value)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length),
       multi_value_(multi_value) {}
 
@@ -79,10 +79,10 @@ std::optional<std::string> HeaderFormatter::format(OptRef<const Http::HeaderMap>
     return std::nullopt;
   }
 
-  if (multi_value_.has_value() && multi_value_.value()) {
+  if (multi_value_) {
     // we want to parse all occurrences of header key
     const auto multiVal =
-        Http::HeaderUtility::getAllOfHeaderAsString(headers.ref(), *headerName, ":");
+        Http::HeaderUtility::getAllOfHeaderAsString(headers.ref(), *headerName, *headerName);
     if (!multiVal.result().has_value()) {
       return std::nullopt;
     }
@@ -105,10 +105,10 @@ bool HeaderFormatter::formatTo(std::string& sink, OptRef<const Http::HeaderMap> 
     return false;
   }
 
-  if (multi_value_.has_value() && multi_value_.value()) {
+  if (multi_value_) {
     // we want to parse all occurrences of header key
     const auto multiVal =
-        Http::HeaderUtility::getAllOfHeaderAsString(headers.ref(), *headerName, ":");
+        Http::HeaderUtility::getAllOfHeaderAsString(headers.ref(), *headerName, *headerName);
     if (!multiVal.result().has_value()) {
       return false;
     }
@@ -133,10 +133,10 @@ Protobuf::Value HeaderFormatter::formatValue(OptRef<const Http::HeaderMap> heade
     return SubstitutionFormatUtils::unspecifiedValue();
   }
 
-  if (multi_value_.has_value() && multi_value_.value()) {
+  if (multi_value_) {
     // we want to parse all occurrences of header key
     const auto multiVal =
-        Http::HeaderUtility::getAllOfHeaderAsString(headers.ref(), *headerName, ":");
+        Http::HeaderUtility::getAllOfHeaderAsString(headers.ref(), *headerName, *headerName);
     if (!multiVal.result().has_value()) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
@@ -159,10 +159,10 @@ void HeaderFormatter::formatValueTo(ValueSink& sink, OptRef<const Http::HeaderMa
     return;
   }
 
-  if (multi_value_.has_value() && multi_value_.value()) {
+  if (multi_value_) {
     // we want to parse all occurrences of header key
     const auto multiVal =
-        Http::HeaderUtility::getAllOfHeaderAsString(headers.ref(), *headerName, ":");
+        Http::HeaderUtility::getAllOfHeaderAsString(headers.ref(), *headerName, *headerName);
     if (!multiVal.result().has_value()) {
       return;
     }
@@ -183,8 +183,7 @@ void HeaderFormatter::formatValueTo(ValueSink& sink, OptRef<const Http::HeaderMa
 
 ResponseHeaderFormatter::ResponseHeaderFormatter(absl::string_view main_header,
                                                  absl::string_view alternative_header,
-                                                 std::optional<size_t> max_length,
-                                                 std::optional<bool> multi_value)
+                                                 std::optional<size_t> max_length, bool multi_value)
     : HeaderFormatter(main_header, alternative_header, max_length, multi_value) {}
 
 std::optional<std::string> ResponseHeaderFormatter::format(const Context& context,
@@ -209,8 +208,7 @@ void ResponseHeaderFormatter::formatValueTo(ValueSink& sink, const Context& cont
 
 RequestHeaderFormatter::RequestHeaderFormatter(absl::string_view main_header,
                                                absl::string_view alternative_header,
-                                               std::optional<size_t> max_length,
-                                               std::optional<bool> multi_value)
+                                               std::optional<size_t> max_length, bool multi_value)
     : HeaderFormatter(main_header, alternative_header, max_length, multi_value) {}
 
 std::optional<std::string> RequestHeaderFormatter::format(const Context& context,
@@ -235,8 +233,9 @@ void RequestHeaderFormatter::formatValueTo(ValueSink& sink, const Context& conte
 
 ResponseTrailerFormatter::ResponseTrailerFormatter(absl::string_view main_header,
                                                    absl::string_view alternative_header,
-                                                   std::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length, false) {}
+                                                   std::optional<size_t> max_length,
+                                                   bool multi_value)
+    : HeaderFormatter(main_header, alternative_header, max_length, multi_value) {}
 
 std::optional<std::string> ResponseTrailerFormatter::format(const Context& context,
                                                             const StreamInfo::StreamInfo&) const {
@@ -682,8 +681,8 @@ BuiltInHttpCommandParser::getKnownFormatters() {
             std::optional<size_t> max_length) -> absl::StatusOr<FormatterProviderPtr> {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
            RETURN_IF_NOT_OK(result.status());
-           return std::make_unique<ResponseTrailerFormatter>(result.value().first,
-                                                             result.value().second, max_length);
+           return std::make_unique<ResponseTrailerFormatter>(
+               result.value().first, result.value().second, max_length, false);
          }}},
        {"RESPONSE_TRAILER",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
@@ -691,8 +690,26 @@ BuiltInHttpCommandParser::getKnownFormatters() {
             std::optional<size_t> max_length) -> absl::StatusOr<FormatterProviderPtr> {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
            RETURN_IF_NOT_OK(result.status());
-           return std::make_unique<ResponseTrailerFormatter>(result.value().first,
-                                                             result.value().second, max_length);
+           return std::make_unique<ResponseTrailerFormatter>(
+               result.value().first, result.value().second, max_length, false);
+         }}},
+       {"TRAILER_MULTI", // Same as RESPONSE_TRAILER and used for backward compatibility.
+        {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](absl::string_view format,
+            std::optional<size_t> max_length) -> absl::StatusOr<FormatterProviderPtr> {
+           auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
+           RETURN_IF_NOT_OK(result.status());
+           return std::make_unique<ResponseTrailerFormatter>(
+               result.value().first, result.value().second, max_length, true);
+         }}},
+       {"RESPONSE_TRAILER_MULTI",
+        {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](absl::string_view format,
+            std::optional<size_t> max_length) -> absl::StatusOr<FormatterProviderPtr> {
+           auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
+           RETURN_IF_NOT_OK(result.status());
+           return std::make_unique<ResponseTrailerFormatter>(
+               result.value().first, result.value().second, max_length, true);
          }}},
        {"LOCAL_REPLY_BODY",
         {CommandSyntaxChecker::COMMAND_ONLY,

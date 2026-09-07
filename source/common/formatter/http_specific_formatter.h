@@ -50,7 +50,7 @@ public:
 class HeaderFormatter {
 public:
   HeaderFormatter(absl::string_view main_header, absl::string_view alternative_header,
-                  std::optional<size_t> max_length, std::optional<bool> multi_value);
+                  std::optional<size_t> max_length, bool multi_value);
 
 protected:
   std::optional<std::string> format(OptRef<const Http::HeaderMap> headers) const;
@@ -64,7 +64,7 @@ private:
   Http::LowerCaseString main_header_;
   Http::LowerCaseString alternative_header_;
   std::optional<size_t> max_length_;
-  std::optional<bool> multi_value_;
+  bool multi_value_;
 };
 
 /**
@@ -95,7 +95,7 @@ private:
 class RequestHeaderFormatter : public FormatterProvider, HeaderFormatter {
 public:
   RequestHeaderFormatter(absl::string_view main_header, absl::string_view alternative_header,
-                         std::optional<size_t> max_length, std::optional<bool> multi_value);
+                         std::optional<size_t> max_length, bool multi_value);
 
   // FormatterProvider
   std::optional<std::string> format(const Context& context,
@@ -114,7 +114,7 @@ public:
 class ResponseHeaderFormatter : public FormatterProvider, HeaderFormatter {
 public:
   ResponseHeaderFormatter(absl::string_view main_header, absl::string_view alternative_header,
-                          std::optional<size_t> max_length, std::optional<bool> multi_value);
+                          std::optional<size_t> max_length, bool multi_value);
 
   // FormatterProvider
   std::optional<std::string> format(const Context& context,
@@ -133,7 +133,7 @@ public:
 class ResponseTrailerFormatter : public FormatterProvider, HeaderFormatter {
 public:
   ResponseTrailerFormatter(absl::string_view main_header, absl::string_view alternative_header,
-                           std::optional<size_t> max_length);
+                           std::optional<size_t> max_length, bool multi_value);
 
   // FormatterProvider
   std::optional<std::string> format(const Context& context,
