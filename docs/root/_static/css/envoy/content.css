@@ -41,7 +41,7 @@
   display: flex;
   flex-wrap: wrap;
   font-family: var(--envoy-font-mono);
-  font-size: 11.5px;
+  font-size: 0.71875rem;
   gap: 0 4px;
   margin-bottom: 30px;
 }
@@ -69,7 +69,7 @@
 
 .envoy-content-main .wy-breadcrumbs-aside a {
   font-family: var(--envoy-font-sans);
-  font-size: 12.5px;
+  font-size: 0.78125rem;
 }
 
 .envoy-content-main .rst-content .wy-breadcrumbs + hr {
@@ -94,20 +94,20 @@
 }
 
 .envoy-content-main .rst-content h1 {
-  font-size: 32px;
+  font-size: 2rem;
   letter-spacing: -0.025em;
   line-height: 1.15;
   margin: 0 0 20px;
 }
 
 .envoy-content-main .rst-content h2 {
-  font-size: 23px;
+  font-size: 1.4375rem;
   line-height: 1.25;
   margin: 52px 0 14px;
 }
 
 .envoy-content-main .rst-content h3 {
-  font-size: 18px;
+  font-size: 1.125rem;
   line-height: 1.35;
   margin: 36px 0 10px;
 }
@@ -116,7 +116,7 @@
 .envoy-content-main .rst-content h5,
 .envoy-content-main .rst-content h6,
 .envoy-content-main .rst-content .rubric {
-  font-size: 16px;
+  font-size: 1rem;
   margin: 28px 0 8px;
 }
 
@@ -234,7 +234,7 @@
   border-left: 2px solid var(--envoy-rule);
   color: var(--envoy-ink);
   font-family: var(--envoy-font-mono);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   margin: 22px 0 0;
   padding: 0 0 0 14px;
@@ -297,7 +297,7 @@
 .envoy-content-main .rst-content .sidebar .sidebar-title {
   background: transparent;
   color: var(--envoy-ink);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   margin: 0 0 8px;
   padding: 0;
@@ -321,7 +321,7 @@
 }
 
 .envoy-content-main .rst-content .toctree-wrapper > ul > li > a {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
   text-decoration: none;
 }
@@ -338,7 +338,7 @@
 
 .envoy-content-main .rst-content .toctree-wrapper ul ul a {
   color: var(--envoy-ink-body);
-  font-size: 14px;
+  font-size: 0.875rem;
   text-decoration: none;
 }
 
@@ -351,7 +351,7 @@
 .envoy-content-main .rst-content .toctree-wrapper .caption {
   color: var(--envoy-ink-muted);
   font-family: var(--envoy-font-mono);
-  font-size: 10px;
+  font-size: 0.625rem;
   letter-spacing: 0.14em;
   margin: 36px 0 6px;
   text-transform: uppercase;
@@ -365,7 +365,7 @@
   border-bottom: 2px solid transparent;
   color: var(--envoy-ink-muted);
   font-family: var(--envoy-font-sans);
-  font-size: 13.5px;
+  font-size: 0.84375rem;
   padding: 8px 14px;
 }
 
@@ -405,7 +405,7 @@
   border-radius: 6px;
   box-shadow: none;
   color: var(--envoy-ink);
-  font-size: 13.5px;
+  font-size: 0.84375rem;
   font-weight: 500;
   padding: 10px 14px;
   text-decoration: none;
@@ -426,7 +426,7 @@
 .envoy-content-main .rst-content footer,
 .envoy-content-main .rst-content footer p {
   color: var(--envoy-ink-muted);
-  font-size: 12.5px;
+  font-size: 0.78125rem;
 }
 
 .envoy-content-main footer hr {

@@ -45,7 +45,7 @@
   color: var(--envoy-info);
   display: inline-block;
   font-family: var(--envoy-font-mono);
-  font-size: 10.5px;
+  font-size: 0.65625rem;
   font-weight: 500;
   letter-spacing: 0.14em;
   line-height: 1.5;
@@ -170,7 +170,7 @@
   color: var(--envoy-ground);
   display: table;
   font-family: var(--envoy-font-mono);
-  font-size: 10.5px;
+  font-size: 0.65625rem;
   font-style: normal;
   letter-spacing: 0.14em;
   margin-bottom: 9px;
