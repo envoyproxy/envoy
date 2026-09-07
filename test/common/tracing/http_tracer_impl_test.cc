@@ -498,6 +498,48 @@ metadata:
                                             config);
 }
 
+TEST_F(HttpConnManFinalizerImplTest, SpanCustomTagsTypedValues) {
+  request_headers_ = Http::TestRequestHeaderMapImpl{{":path", "/test"}, {":method", "GET"}};
+  ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers_));
+
+  HttpTraceContext trace_context{request_headers_};
+  const CustomTagContext ctx{trace_context, stream_info, {&request_headers_}};
+
+  auto make_tag = [](const std::string& yaml) {
+    envoy::type::tracing::v3::CustomTag custom_tag;
+    TestUtility::loadFromYaml(yaml, custom_tag);
+    return CustomTagUtility::createCustomTag(custom_tag);
+  };
+
+  {
+    auto tag = make_tag("{ tag: int-ok, value: '42', value_type: INT }");
+    EXPECT_CALL(span, setIntTag(Eq("int-ok"), Eq(int64_t{42})));
+    tag->applySpan(span, ctx);
+  }
+  {
+    auto tag = make_tag("{ tag: double-ok, value: '3.5', value_type: DOUBLE }");
+    EXPECT_CALL(span, setDoubleTag(Eq("double-ok"), Eq(3.5)));
+    tag->applySpan(span, ctx);
+  }
+  {
+    auto tag = make_tag("{ tag: bool-ok, value: 'true', value_type: BOOL }");
+    EXPECT_CALL(span, setBoolTag(Eq("bool-ok"), Eq(true)));
+    tag->applySpan(span, ctx);
+  }
+  {
+    // A value that does not parse to the requested type falls back to a string tag.
+    auto tag = make_tag("{ tag: int-bad, value: 'not-a-number', value_type: INT }");
+    EXPECT_CALL(span, setTag(Eq("int-bad"), Eq("not-a-number")));
+    tag->applySpan(span, ctx);
+  }
+  {
+    // The default value type keeps emitting a string tag.
+    auto tag = make_tag("{ tag: str, value: '42' }");
+    EXPECT_CALL(span, setTag(Eq("str"), Eq("42")));
+    tag->applySpan(span, ctx);
+  }
+}
+
 TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}, {":scheme", "http"}};

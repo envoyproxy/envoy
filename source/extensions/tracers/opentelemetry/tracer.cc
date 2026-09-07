@@ -208,6 +208,12 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   setAttribute(name, value);
 }
 
+void Span::setIntTag(absl::string_view name, int64_t value) { setAttribute(name, value); }
+
+void Span::setDoubleTag(absl::string_view name, double value) { setAttribute(name, value); }
+
+void Span::setBoolTag(absl::string_view name, bool value) { setAttribute(name, value); }
+
 void Span::log(SystemTime timestamp, const std::string& event) {
   if (event.empty()) {
     return;

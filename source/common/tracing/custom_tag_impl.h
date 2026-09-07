@@ -80,6 +80,8 @@ protected:
 class FormatterCustomTag : public CustomTag {
 public:
   FormatterCustomTag(absl::string_view tag, absl::string_view value,
+                     envoy::type::tracing::v3::CustomTag::ValueType value_type =
+                         envoy::type::tracing::v3::CustomTag::STRING,
                      const Formatter::CommandParserPtrVector& command_parsers = {});
 
   absl::string_view tag() const override { return tag_; }
@@ -89,6 +91,7 @@ public:
 
 private:
   const std::string tag_;
+  const envoy::type::tracing::v3::CustomTag::ValueType value_type_;
   Formatter::FormatterPtr formatter_;
 };
 

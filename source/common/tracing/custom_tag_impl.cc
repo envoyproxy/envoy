@@ -7,6 +7,8 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/strings/numbers.h"
+
 namespace Envoy {
 namespace Tracing {
 namespace {
@@ -152,8 +154,9 @@ MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
 }
 
 FormatterCustomTag::FormatterCustomTag(absl::string_view tag, absl::string_view value,
+                                       envoy::type::tracing::v3::CustomTag::ValueType value_type,
                                        const Formatter::CommandParserPtrVector& command_parsers)
-    : tag_(tag) {
+    : tag_(tag), value_type_(value_type) {
   auto formatter_or = Formatter::FormatterImpl::create(value, true, command_parsers);
   THROW_IF_NOT_OK_REF(formatter_or.status());
   formatter_ = std::move(formatter_or.value());
@@ -162,9 +165,40 @@ FormatterCustomTag::FormatterCustomTag(absl::string_view tag, absl::string_view 
 void FormatterCustomTag::applySpan(Span& span, const CustomTagContext& ctx) const {
   // Apply the formatter to the span
   auto formatted_value = formatter_->format(ctx.formatter_context, ctx.stream_info);
-  if (!formatted_value.empty()) {
-    span.setTag(tag_, formatted_value);
+  if (formatted_value.empty()) {
+    return;
   }
+  // Emit a typed attribute when requested, falling back to a string tag if the
+  // value does not parse or the tracer has no typed-attribute support.
+  switch (value_type_) {
+  case envoy::type::tracing::v3::CustomTag::INT: {
+    int64_t int_value = 0;
+    if (absl::SimpleAtoi(formatted_value, &int_value)) {
+      span.setIntTag(tag_, int_value);
+      return;
+    }
+    break;
+  }
+  case envoy::type::tracing::v3::CustomTag::DOUBLE: {
+    double double_value = 0;
+    if (absl::SimpleAtod(formatted_value, &double_value)) {
+      span.setDoubleTag(tag_, double_value);
+      return;
+    }
+    break;
+  }
+  case envoy::type::tracing::v3::CustomTag::BOOL: {
+    bool bool_value = false;
+    if (absl::SimpleAtob(formatted_value, &bool_value)) {
+      span.setBoolTag(tag_, bool_value);
+      return;
+    }
+    break;
+  }
+  default:
+    break;
+  }
+  span.setTag(tag_, formatted_value);
 }
 
 void FormatterCustomTag::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
@@ -191,7 +225,7 @@ CustomTagUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag
     return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
   case envoy::type::tracing::v3::CustomTag::TypeCase::kValue:
     return std::make_shared<const Tracing::FormatterCustomTag>(tag.tag(), tag.value(),
-                                                               command_parsers);
+                                                               tag.value_type(), command_parsers);
   case envoy::type::tracing::v3::CustomTag::TypeCase::TYPE_NOT_SET:
     break; // Panic below.
   }
