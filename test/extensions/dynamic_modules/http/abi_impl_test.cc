@@ -9,6 +9,7 @@
 #include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
@@ -2690,6 +2691,50 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount, &result_number));
   EXPECT_EQ(result_number, 3);
+}
+
+TEST(ABIImpl, GetAttributesMissingAndNonIpAddresses) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(callbacks, connection()).WillRepeatedly(testing::Return(std::nullopt));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  uint64_t int_result = 0;
+  stream_info.downstream_connection_info_provider_->setRemoteAddress(nullptr);
+  stream_info.downstream_connection_info_provider_->setLocalAddress(nullptr);
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_SourceAddress,
+                        envoy_dynamic_module_type_attribute_id_DestinationAddress}) {
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(&filter, id,
+                                                                                &string_result));
+  }
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_SourcePort,
+                        envoy_dynamic_module_type_attribute_id_DestinationPort,
+                        envoy_dynamic_module_type_attribute_id_ConnectionId}) {
+    EXPECT_FALSE(
+        envoy_dynamic_module_callback_http_filter_get_attribute_int(&filter, id, &int_result));
+  }
+
+  auto pipe_or_error = Network::Address::PipeInstance::create("dynamic-module-attribute-test");
+  ASSERT_TRUE(pipe_or_error.ok());
+  Network::Address::InstanceConstSharedPtr pipe_address(std::move(pipe_or_error).value());
+  stream_info.downstream_connection_info_provider_->setRemoteAddress(pipe_address);
+  stream_info.downstream_connection_info_provider_->setLocalAddress(pipe_address);
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_SourceAddress,
+                        envoy_dynamic_module_type_attribute_id_DestinationAddress}) {
+    EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(&filter, id,
+                                                                               &string_result));
+    EXPECT_EQ("dynamic-module-attribute-test",
+              absl::string_view(string_result.ptr, string_result.length));
+  }
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_SourcePort,
+                        envoy_dynamic_module_type_attribute_id_DestinationPort}) {
+    EXPECT_FALSE(
+        envoy_dynamic_module_callback_http_filter_get_attribute_int(&filter, id, &int_result));
+  }
 }
 
 // When the request header map is present but a typed header is absent, the attribute must be

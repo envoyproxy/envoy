@@ -1808,20 +1808,24 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
   case envoy_dynamic_module_type_attribute_id_SourceAddress: {
     const auto stream_info = filter->streamInfo();
     if (stream_info) {
-      const auto addressProvider =
-          stream_info->downstreamAddressProvider().remoteAddress()->asStringView();
-      *result = {addressProvider.data(), addressProvider.size()};
-      ok = true;
+      const auto& address = stream_info->downstreamAddressProvider().remoteAddress();
+      if (address != nullptr) {
+        const auto address_string = address->asStringView();
+        *result = {address_string.data(), address_string.size()};
+        ok = true;
+      }
     }
     break;
   }
   case envoy_dynamic_module_type_attribute_id_DestinationAddress: {
     const auto stream_info = filter->streamInfo();
     if (stream_info) {
-      const auto addressProvider =
-          stream_info->downstreamAddressProvider().localAddress()->asStringView();
-      *result = {addressProvider.data(), addressProvider.size()};
-      ok = true;
+      const auto& address = stream_info->downstreamAddressProvider().localAddress();
+      if (address != nullptr) {
+        const auto address_string = address->asStringView();
+        *result = {address_string.data(), address_string.size()};
+        ok = true;
+      }
     }
     break;
   }
@@ -2034,9 +2038,9 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
   case envoy_dynamic_module_type_attribute_id_SourcePort: {
     const auto stream_info = filter->streamInfo();
     if (stream_info) {
-      const auto ip = stream_info->downstreamAddressProvider().remoteAddress()->ip();
-      if (ip) {
-        *result = ip->port();
+      const auto& address = stream_info->downstreamAddressProvider().remoteAddress();
+      if (address != nullptr && address->type() == Network::Address::Type::Ip) {
+        *result = address->ip()->port();
         ok = true;
       }
     }
@@ -2045,9 +2049,9 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
   case envoy_dynamic_module_type_attribute_id_DestinationPort: {
     const auto stream_info = filter->streamInfo();
     if (stream_info) {
-      const auto ip = stream_info->downstreamAddressProvider().localAddress()->ip();
-      if (ip) {
-        *result = ip->port();
+      const auto& address = stream_info->downstreamAddressProvider().localAddress();
+      if (address != nullptr && address->type() == Network::Address::Type::Ip) {
+        *result = address->ip()->port();
         ok = true;
       }
     }

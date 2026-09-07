@@ -187,9 +187,9 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
   }
   case envoy_dynamic_module_type_attribute_id_SourceAddress: {
     const auto& addr_provider = stream_info.downstreamAddressProvider();
-    if (addr_provider.remoteAddress() &&
-        addr_provider.remoteAddress()->type() == Network::Address::Type::Ip) {
-      const auto& addr_str = addr_provider.remoteAddress()->ip()->addressAsString();
+    const auto& address = addr_provider.remoteAddress();
+    if (address) {
+      const auto addr_str = address->asStringView();
       *result = {const_cast<char*>(addr_str.data()), addr_str.size()};
       ok = true;
     }
@@ -197,9 +197,9 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
   }
   case envoy_dynamic_module_type_attribute_id_DestinationAddress: {
     const auto& addr_provider = stream_info.downstreamAddressProvider();
-    if (addr_provider.localAddress() &&
-        addr_provider.localAddress()->type() == Network::Address::Type::Ip) {
-      const auto& addr_str = addr_provider.localAddress()->ip()->addressAsString();
+    const auto& address = addr_provider.localAddress();
+    if (address) {
+      const auto addr_str = address->asStringView();
       *result = {const_cast<char*>(addr_str.data()), addr_str.size()};
       ok = true;
     }
@@ -428,8 +428,11 @@ bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
     break;
   }
   case envoy_dynamic_module_type_attribute_id_ConnectionId: {
-    *result = stream_info.downstreamAddressProvider().connectionID().value_or(0);
-    ok = true;
+    const auto connection_id = stream_info.downstreamAddressProvider().connectionID();
+    if (connection_id.has_value()) {
+      *result = connection_id.value();
+      ok = true;
+    }
     break;
   }
   case envoy_dynamic_module_type_attribute_id_SourcePort: {
