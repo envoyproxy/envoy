@@ -242,6 +242,19 @@ TEST(MessageStreamerTest, MessageThePrinterRejects) {
   EXPECT_EQ(R"([{"structured":null}])", stream(message).first);
 }
 
+TEST(MessageStreamerTest, DurationThePrinterRejects) {
+  TestMessage message;
+  // Seconds this far out are outside the range TimeUtil covers.
+  message.mutable_duration()->set_seconds(std::numeric_limits<int64_t>::min());
+  EXPECT_EQ(R"([{"duration":null}])", stream(message).first);
+}
+
+TEST(MessageStreamerTest, TimestampThePrinterRejects) {
+  TestMessage message;
+  message.mutable_timestamp()->set_seconds(std::numeric_limits<int64_t>::max());
+  EXPECT_EQ(R"([{"timestamp":null}])", stream(message).first);
+}
+
 TEST(MessageStreamerTest, NonFiniteNumbers) {
   TestMessage message;
   message.add_repeated_double(std::numeric_limits<double>::quiet_NaN());

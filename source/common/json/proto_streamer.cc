@@ -339,7 +339,9 @@ void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStream
     return;
   case Protobuf::Descriptor::WELLKNOWNTYPE_DURATION:
     if (!is_sensitive) {
-      if (const auto* duration = Protobuf::DynamicCastMessage<Protobuf::Duration>(&message)) {
+      // TimeUtil::ToString is only defined for the range the printer accepts.
+      if (const auto* duration = Protobuf::DynamicCastMessage<Protobuf::Duration>(&message);
+          duration != nullptr && Protobuf::util::TimeUtil::IsDurationValid(*duration)) {
         level.addString(Protobuf::util::TimeUtil::ToString(*duration));
         return;
       }
@@ -348,7 +350,8 @@ void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStream
     return;
   case Protobuf::Descriptor::WELLKNOWNTYPE_TIMESTAMP:
     if (!is_sensitive) {
-      if (const auto* timestamp = Protobuf::DynamicCastMessage<Protobuf::Timestamp>(&message)) {
+      if (const auto* timestamp = Protobuf::DynamicCastMessage<Protobuf::Timestamp>(&message);
+          timestamp != nullptr && Protobuf::util::TimeUtil::IsTimestampValid(*timestamp)) {
         level.addString(Protobuf::util::TimeUtil::ToString(*timestamp));
         return;
       }
