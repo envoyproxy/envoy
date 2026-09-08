@@ -2995,7 +2995,8 @@ TEST_F(ClusterManagerImplTest, SdsZeroTimeoutClusterDoesNotBlockCdsForOtherWarmi
 // pause CDS. This exercises the combined_validation_context branch of
 // clusterHasSdsWithZeroTimeout, complementing WarmingClusterWithSdsZeroTimeoutDoesNotBlockCds
 // which covers the tls_certificate_sds_secret_configs branch.
-TEST_F(ClusterManagerImplTest, WarmingClusterWithCombinedValidationContextSdsZeroTimeoutDoesNotBlockCds) {
+TEST_F(ClusterManagerImplTest,
+       WarmingClusterWithCombinedValidationContextSdsZeroTimeoutDoesNotBlockCds) {
   expectSdsZeroTimeoutDoesNotBlockCds(*this, R"EOF(
     name: validation_sds_cluster
     connect_timeout: 0.250s
@@ -3027,7 +3028,8 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithCombinedValidationContextSdsZer
 
 // A cluster using transport_socket_matches with SDS initial_fetch_timeout == 0 must NOT
 // pause CDS.
-TEST_F(ClusterManagerImplTest, WarmingClusterWithTransportSocketMatchSdsZeroTimeoutDoesNotBlockCds) {
+TEST_F(ClusterManagerImplTest,
+       WarmingClusterWithTransportSocketMatchSdsZeroTimeoutDoesNotBlockCds) {
   expectSdsZeroTimeoutDoesNotBlockCds(*this, R"EOF(
     name: match_sds_cluster
     connect_timeout: 0.250s
