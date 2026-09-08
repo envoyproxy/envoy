@@ -19,6 +19,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/router/delegating_route_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/upstream_address.h"
@@ -4431,6 +4432,163 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
   EXPECT_THAT(creation_status_.message(), testing::ContainsRegex("route provider creation failed"));
+}
+
+// A route override used only in tests. It rewrites the cluster of the base route to
+// `overridden_cluster`, which is enough to exercise the route override wiring.
+class TestRouteOverride : public RouteOverride {
+public:
+  RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent, const Http::RequestHeaderMap&,
+                            const StreamInfo::StreamInfo&, uint64_t) const override {
+    return std::make_shared<DynamicRouteEntry>(std::move(parent), "overridden_cluster");
+  }
+};
+
+class TestRouteOverrideFactory : public RouteOverrideFactory {
+public:
+  absl::StatusOr<RouteOverrideSharedPtr>
+  createRouteOverride(const Protobuf::Message&,
+                      Server::Configuration::ServerFactoryContext&) override {
+    if (fail_) {
+      return absl::InvalidArgumentError("route override creation failed");
+    }
+    return std::make_shared<TestRouteOverride>();
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  std::string name() const override { return "envoy.router.route_override.test"; }
+
+  bool fail_{false};
+};
+
+TEST_F(RouteMatcherTest, RouteOverrideOverridesCluster) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match: {prefix: "/"}
+    route: {cluster: base}
+    route_override:
+      name: envoy.router.route_override.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteOverrideFactory factory;
+  Registry::InjectFactory<RouteOverrideFactory> registered(factory);
+  factory_context_.cluster_manager_.initializeClusters({"base"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  auto headers = genHeaders("some.domain", "/", "GET");
+  EXPECT_EQ("overridden_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteMatcherTest, RouteOverrideConflictsWithClusterSpecifier) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match: {prefix: "/"}
+    route:
+      weighted_clusters:
+        clusters:
+        - {name: c1, weight: 1}
+    route_override:
+      name: envoy.router.route_override.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteOverrideFactory factory;
+  Registry::InjectFactory<RouteOverrideFactory> registered(factory);
+  factory_context_.cluster_manager_.initializeClusters({"c1"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_THAT(
+      creation_status_.message(),
+      testing::ContainsRegex("cannot set both route_override and a cluster specifier plugin"));
+}
+
+TEST_F(RouteMatcherTest, RouteOverrideUnknownExtension) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match: {prefix: "/"}
+    route: {cluster: base}
+    route_override:
+      name: envoy.router.route_override.does_not_exist
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"base"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_THAT(creation_status_.message(),
+              testing::ContainsRegex("Didn't find a registered route override"));
+}
+
+TEST_F(RouteMatcherTest, RouteOverrideCreationFailure) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match: {prefix: "/"}
+    route: {cluster: base}
+    route_override:
+      name: envoy.router.route_override.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteOverrideFactory factory;
+  factory.fail_ = true;
+  Registry::InjectFactory<RouteOverrideFactory> registered(factory);
+  factory_context_.cluster_manager_.initializeClusters({"base"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_THAT(creation_status_.message(), testing::ContainsRegex("route override creation failed"));
+}
+
+TEST_F(RouteMatcherTest, RouteOverrideAppliesToProviderTemplate) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  route_provider:
+    route_templates:
+    - template_id: a
+      route:
+        match: {prefix: "/"}
+        route: {cluster: base}
+        route_override:
+          name: envoy.router.route_override.test
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory provider_factory;
+  Registry::InjectFactory<RouteProviderFactory> provider_registered(provider_factory);
+  TestRouteOverrideFactory override_factory;
+  Registry::InjectFactory<RouteOverrideFactory> override_registered(override_factory);
+  factory_context_.cluster_manager_.initializeClusters({"base"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  auto headers = genHeaders("some.domain", "/", "GET");
+  headers.addCopy("x-template", "a");
+  EXPECT_EQ("overridden_cluster", config.route(headers, 0)->routeEntry()->clusterName());
 }
 
 TEST_F(RouteMatcherTest, InlineClusterSpecifierPlugin) {

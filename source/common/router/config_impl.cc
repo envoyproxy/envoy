@@ -652,6 +652,28 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         std::make_shared<HeaderClusterSpecifierPlugin>(route.route().cluster_header());
   }
 
+  if (route.has_route_override()) {
+    if (cluster_specifier_plugin_ != nullptr) {
+      creation_status = absl::InvalidArgumentError(
+          "cannot set both route_override and a cluster specifier plugin on the same route");
+      return;
+    }
+    auto* factory =
+        Envoy::Config::Utility::getFactory<RouteOverrideFactory>(route.route_override());
+    if (factory == nullptr) {
+      creation_status = absl::InvalidArgumentError(fmt::format(
+          "Didn't find a registered route override for '{}' with type URL: '{}'",
+          route.route_override().name(),
+          Envoy::Config::Utility::getFactoryType(route.route_override().typed_config())));
+      return;
+    }
+    auto override_config = Envoy::Config::Utility::translateToFactoryConfig(route.route_override(),
+                                                                            validator, *factory);
+    auto override_or_error = factory->createRouteOverride(*override_config, factory_context);
+    SET_AND_RETURN_IF_NOT_OK(override_or_error.status(), creation_status);
+    route_override_plugin_ = std::move(override_or_error.value());
+  }
+
   for (const auto& query_parameter : route.match().query_parameters()) {
     config_query_parameters_.push_back(
         std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, factory_context));
@@ -1339,6 +1361,9 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMap& headers,
                                                      const StreamInfo::StreamInfo& stream_info,
                                                      uint64_t random_value) const {
+  if (route_override_plugin_ != nullptr) {
+    return route_override_plugin_->route(shared_from_this(), headers, stream_info, random_value);
+  }
   if (cluster_specifier_plugin_ != nullptr) {
     return cluster_specifier_plugin_->route(shared_from_this(), headers, stream_info, random_value);
   }
@@ -1350,6 +1375,9 @@ absl::Status RouteEntryImplBase::validateClusters(const Upstream::ClusterManager
     return !cm.hasCluster(cluster_name_) ? absl::InvalidArgumentError(fmt::format(
                                                "route: unknown cluster '{}'", cluster_name_))
                                          : absl::OkStatus();
+  }
+  if (route_override_plugin_ != nullptr) {
+    return route_override_plugin_->validateClusters(cm);
   }
   if (cluster_specifier_plugin_ != nullptr) {
     return cluster_specifier_plugin_->validateClusters(cm);
@@ -1841,10 +1869,9 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
             fmt::format("duplicate route provider template id '{}'", route_template.template_id()));
         return;
       }
-      auto route_or_error = RouteCreator::createAndValidateRoute(route_template.route(),
-                                                                shared_virtual_host_, factory_context,
-                                                                validator, init_manager,
-                                                                validate_clusters);
+      auto route_or_error = RouteCreator::createAndValidateRoute(
+          route_template.route(), shared_virtual_host_, factory_context, validator, init_manager,
+          validate_clusters);
       SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
       provider->templates.emplace(route_template.template_id(), std::move(route_or_error.value()));
     }
@@ -1865,8 +1892,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
           Envoy::Config::Utility::getFactoryType(provider_config.resolver().typed_config())));
       return;
     }
-    auto resolver_config = Envoy::Config::Utility::translateToFactoryConfig(provider_config.resolver(),
-                                                                           validator, *factory);
+    auto resolver_config = Envoy::Config::Utility::translateToFactoryConfig(
+        provider_config.resolver(), validator, *factory);
     auto resolver_or_error = factory->createRouteResolver(*resolver_config, factory_context);
     SET_AND_RETURN_IF_NOT_OK(resolver_or_error.status(), creation_status);
     provider->resolver = std::move(resolver_or_error.value());
@@ -1991,8 +2018,8 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromMatcherOrRoutes(
 
 namespace {
 // Compare the provider route and the baseline route for a shadow mode result. Routes are treated as
-// equivalent when both are absent, when they route to the same cluster, or when they are both direct
-// responses with the same status code.
+// equivalent when both are absent, when they route to the same cluster, or when they are both
+// direct responses with the same status code.
 bool routesEquivalent(const RouteConstSharedPtr& provider_route,
                       const RouteConstSharedPtr& baseline_route) {
   if (provider_route == nullptr || baseline_route == nullptr) {

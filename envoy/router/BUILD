@@ -175,6 +175,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "route_override_interface",
+    hdrs = ["route_override.h"],
+    deps = [
+        ":router_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "path_matcher_interface",
     hdrs = ["path_matcher.h"],
     deps = [

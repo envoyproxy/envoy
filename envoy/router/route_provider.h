@@ -68,8 +68,7 @@ public:
    * @param stream_info the stream info of the downstream request.
    */
   virtual void onShadowResult(RouteConstSharedPtr, RouteConstSharedPtr,
-                              const Http::RequestHeaderMap&,
-                              const StreamInfo::StreamInfo&) const {}
+                              const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&) const {}
 };
 
 using DynamicRouteResolverSharedPtr = std::shared_ptr<const DynamicRouteResolver>;

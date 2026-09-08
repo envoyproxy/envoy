@@ -54,6 +54,7 @@ envoy_cc_test_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/router:config_lib",
+        "//source/common/router:delegating_route_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
         "//source/common/stream_info:upstream_address_lib",

@@ -17,6 +17,7 @@
 #include "envoy/init/manager.h"
 #include "envoy/registry/registry.h"
 #include "envoy/router/cluster_specifier_plugin.h"
+#include "envoy/router/route_override.h"
 #include "envoy/router/route_provider.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
@@ -1037,6 +1038,7 @@ private:
   const std::string cluster_name_;
   RouteStatsContextPtr route_stats_context_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
+  RouteOverrideSharedPtr route_override_plugin_;
   const std::chrono::milliseconds timeout_;
   const OptionalTimeouts optional_timeouts_;
   Runtime::Loader& loader_;

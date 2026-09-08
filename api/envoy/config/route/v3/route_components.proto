@@ -324,7 +324,7 @@ message RouteProvider {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`.
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
 
@@ -463,6 +463,13 @@ message Route {
   // Only one of :ref:`per_request_buffer_limit_bytes <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>`
   // and ``request_body_buffer_limit`` may be set.
   google.protobuf.UInt64Value request_body_buffer_limit = 20;
+
+  // The route override extension runs at resolution time with this route as the base and may
+  // override the cluster, timeouts, retries, redirect, direct response, and other route fields
+  // based on the request. It is a superset of ``RouteAction.cluster_specifier_plugin`` and cannot be
+  // set together with a cluster specifier plugin on the same route.
+  // [#extension-category: envoy.router.route_override]
+  core.v3.TypedExtensionConfig route_override = 21;
 }
 
 // Compared to the :ref:`cluster <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` field that specifies a
