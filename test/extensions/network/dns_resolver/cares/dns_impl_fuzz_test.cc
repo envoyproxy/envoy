@@ -227,7 +227,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   const auto plan = makeQueryPlan(provider);
   const auto responseMutations = makeResponseMutations(provider);
 
-  // Use real (not simulated) time since the UDP server runs on a real background thread.
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("fuzz_thread");
 

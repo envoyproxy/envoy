@@ -15,7 +15,7 @@ namespace Test {
 // Responds to A/AAAA queries with configurable default addresses on loopback.
 //
 // All of the server's I/O is driven by the dispatcher handed to the constructor:
-// queries are read and responses written from a read event, so the server only
+// queries are read and responses written from a file event, so the server only
 // makes progress while that dispatcher is running. Passing the same dispatcher
 // the resolver under test uses keeps both sides of the exchange on one event
 // loop and one thread.
