@@ -214,7 +214,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - source/common/**/*
@@ -225,7 +224,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - source/common/**/*
@@ -237,7 +235,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -247,8 +244,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repositories.bzl
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -259,8 +254,6 @@ run:
     - .github/config.yml
     - api/**/*
     - bazel/external/quiche.BUILD
-    - bazel/repositories.bzl
-    - bazel/repository_locations.bzl
     - envoy/**/*
     - mobile/.bazelrc
     - mobile/**/*
@@ -275,8 +268,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repositories.bzl
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - test/run_envoy_bazel_coverage.sh
@@ -288,7 +279,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -298,7 +288,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - source/common/**/*
@@ -309,7 +298,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - source/common/**/*
@@ -321,7 +309,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -331,7 +318,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -342,8 +328,6 @@ run:
     - .github/config.yml
     - .github/workflows/mobile-python.yml
     - bazel/external/quiche.BUILD
-    - bazel/repositories.bzl
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -353,7 +337,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
@@ -363,8 +346,6 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
-    - bazel/repositories.bzl
-    - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py

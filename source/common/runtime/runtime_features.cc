@@ -39,6 +39,7 @@ RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_formatter_accept_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
 RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
+RUNTIME_GUARD(envoy_reloadable_features_composite_cluster_skip_clusters_without_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_fix_reentrancy);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_grid_early_return_on_teardown);
 RUNTIME_GUARD(envoy_reloadable_features_connectivity_grid_prevent_double_h2_scheduled);
@@ -54,7 +55,6 @@ RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 // the factory is rebuilt before the batched update is posted and a worker cannot snapshot a stale
 // factory after a transient health-check flap.
 RUNTIME_GUARD(envoy_reloadable_features_enable_batch_aware_update);
-RUNTIME_GUARD(envoy_reloadable_features_enable_cel_regex_precompilation);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_response_path_matching);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
@@ -63,7 +63,6 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_lrs_server_self_ads);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
-RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_user_retry_on);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
@@ -185,7 +184,6 @@ RUNTIME_GUARD(envoy_reloadable_features_websocket_allow_4xx_5xx_through_filter_c
 RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_response);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
-RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.

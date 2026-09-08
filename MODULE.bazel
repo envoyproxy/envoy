@@ -31,7 +31,7 @@ bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "emsdk", version = "4.0.23.envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.4.13.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.4.14.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19.envoy")
 bazel_dep(name = "fmt", version = "12.1.0")
 bazel_dep(name = "gazelle", version = "0.47.0")
@@ -331,8 +331,8 @@ go_deps.module(
 )
 go_deps.module(
     path = "google.golang.org/protobuf",
-    sum = "h1:AYd7cD/uASjIL6Q9LiTjz8JLcrh/88q5UObnmY3aOOE=",
-    version = "v1.36.10",
+    sum = "h1:fV6ZwhNocDyBLK0dj+fg8ektcVegBBuEolpbTQyBNVE=",
+    version = "v1.36.11",
 )
 use_repo(
     go_deps,
