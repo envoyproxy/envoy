@@ -71,15 +71,6 @@ message Mcp {
     HEADERS = 2;
   }
 
-  // Configures MCP protocol revisions accepted by the filter.
-  message ProtocolVersions {
-    // MCP protocol revisions accepted by the filter, for example
-    // "2025-11-25" or "2026-07-28".
-    //
-    // An unset or empty list accepts any protocol revision.
-    repeated string supported = 1;
-  }
-
   // Controls the format used for MCP protocol error responses.
   enum ErrorReplyFormat {
     // Returns the existing plain-text local reply format.
@@ -87,6 +78,15 @@ message Mcp {
 
     // Returns MCP protocol errors as JSON-RPC error responses.
     FORMAT_JSON_RPC = 1;
+  }
+
+  // Configures MCP protocol revisions accepted by the filter.
+  message ProtocolVersions {
+    // MCP protocol revisions accepted by the filter, for example
+    // "2025-11-25" or "2026-07-28".
+    //
+    // An unset or empty list accepts any protocol revision.
+    repeated string supported = 1;
   }
 
   message TraceContextPropagationConfig {
