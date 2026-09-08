@@ -130,6 +130,7 @@ private:
   AtomicTokenBucketImpl token_bucket_;
   const std::chrono::milliseconds fill_interval_;
   const bool shadow_mode_{false};
+  const bool preserve_one_request_;
 };
 using RateLimitTokenBucketSharedPtr = std::shared_ptr<RateLimitTokenBucket>;
 
