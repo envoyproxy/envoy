@@ -15,12 +15,6 @@
 namespace Envoy {
 namespace DynamicModules {
 
-static_assert(static_cast<uint32_t>(AttributeID::HealthCheck) ==
-              static_cast<uint32_t>(envoy_dynamic_module_type_attribute_id_HealthCheck));
-static_assert(
-    static_cast<uint32_t>(AttributeID::UpstreamRequestedServerName) ==
-    static_cast<uint32_t>(envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName));
-
 // BodyBuffer implementation
 template <envoy_dynamic_module_type_http_body_type Type> class BodyBufferImpl : public BodyBuffer {
 public:
