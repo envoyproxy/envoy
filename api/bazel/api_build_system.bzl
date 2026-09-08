@@ -1,11 +1,11 @@
-load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
-load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
-load("@com_github_grpc_grpc//bazel:python_rules.bzl", _py_proto_library = "py_proto_library")
-load("@com_google_protobuf//bazel:java_lite_proto_library.bzl", "java_lite_proto_library")
-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
-load("@io_bazel_rules_go//go:def.bzl", "go_test")
-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+load("@grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@grpc//bazel:python_rules.bzl", _py_proto_library = "py_proto_library")
+load("@protobuf//bazel:java_lite_proto_library.bzl", "java_lite_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
+load("@protoc-gen-validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_test")
+load("@rules_go//go:def.bzl", "go_test")
+load("@rules_go//proto:def.bzl", "go_proto_library")
 load(
     "//bazel:external_proto_deps.bzl",
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
@@ -28,18 +28,18 @@ _JAVA_PROTO_SUFFIX = "_java_proto"
 _IS_BZLMOD = str(Label("//:invalid")).startswith("@@")
 
 _COMMON_PROTO_DEPS = [
-    "@com_google_protobuf//:any_proto",
-    "@com_google_protobuf//:descriptor_proto",
-    "@com_google_protobuf//:duration_proto",
-    "@com_google_protobuf//:empty_proto",
-    "@com_google_protobuf//:struct_proto",
-    "@com_google_protobuf//:timestamp_proto",
-    "@com_google_protobuf//:wrappers_proto",
-    "@com_google_googleapis//google/api:http_proto",
-    "@com_google_googleapis//google/api:httpbody_proto",
-    "@com_google_googleapis//google/api:annotations_proto",
-    "@com_google_googleapis//google/rpc:status_proto",
-    "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
+    "@protobuf//:any_proto",
+    "@protobuf//:descriptor_proto",
+    "@protobuf//:duration_proto",
+    "@protobuf//:empty_proto",
+    "@protobuf//:struct_proto",
+    "@protobuf//:timestamp_proto",
+    "@protobuf//:wrappers_proto",
+    "@googleapis//google/api:http_proto",
+    "@googleapis//google/api:httpbody_proto",
+    "@googleapis//google/api:annotations_proto",
+    "@googleapis//google/rpc:status_proto",
+    "@protoc-gen-validate//validate:validate_proto",
 ]
 
 def _proto_mapping(dep, proto_dep_map, proto_suffix):
@@ -97,12 +97,14 @@ def api_cc_py_proto_library(
         name = cc_proto_library_name,
         linkstatic = linkstatic,
         cc_deps = [_cc_proto_mapping(dep) for dep in deps] + [
-            "@com_google_googleapis//google/api:http_cc_proto",
-            "@com_google_googleapis//google/api:httpbody_cc_proto",
-            "@com_google_googleapis//google/api:annotations_cc_proto",
-            "@com_google_googleapis//google/rpc:status_cc_proto",
+            "@googleapis//google/api:http_cc_proto",
+            "@googleapis//google/api:httpbody_cc_proto",
+            "@googleapis//google/api:annotations_cc_proto",
+            "@googleapis//google/rpc:status_cc_proto",
         ],
         deps = [relative_name],
+        protobuf = "@protobuf//:protobuf",
+        re2 = "@re2",
         visibility = ["//visibility:public"],
     )
 
@@ -159,14 +161,14 @@ def api_proto_package(
         has_services = has_services,
     )
 
-    compilers = ["@io_bazel_rules_go//proto:go_proto", "@com_envoyproxy_protoc_gen_validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
+    compilers = ["@rules_go//proto:go_proto", "@protoc-gen-validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
     if has_services:
-        compilers = ["@io_bazel_rules_go//proto:go_proto", "@io_bazel_rules_go//proto:go_grpc_v2", "@com_envoyproxy_protoc_gen_validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
+        compilers = ["@rules_go//proto:go_proto", "@rules_go//proto:go_grpc_v2", "@protoc-gen-validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
 
     deps = (
         [_go_proto_mapping(dep) for dep in deps] +
         [
-            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
+            "@protoc-gen-validate//validate:go_default_library",
             "@org_golang_google_genproto_googleapis_api//annotations:annotations",
             "@org_golang_google_genproto_googleapis_rpc//status:status",
             "@org_golang_google_protobuf//types/known/anypb:go_default_library",

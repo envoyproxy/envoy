@@ -97,10 +97,9 @@ common_tls_context:
   TestUtility::loadFromYaml(TestEnvironment::substitute(target), config);
   auto cfg =
       *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(config, factory_context_);
-  static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::UpstreamTransportSocketFactoryPtr{
       *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
-          std::move(cfg), *context_manager_, *client_stats_store->rootScope())};
+          std::move(cfg), *context_manager_, server_factory_context_.serverScope())};
 }
 
 Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {
@@ -114,9 +113,8 @@ Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstream
 
   auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
       tls_context, factory_context_, {}, false);
-  static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-      std::move(cfg), *context_manager_, *(upstream_stats_store->rootScope()));
+      std::move(cfg), *context_manager_, server_factory_context_.serverScope());
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeTcpClientConnection() {
@@ -241,6 +239,25 @@ TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubject) {
   initialize();
   testRequestAndResponseWithXfccHeader(previous_xfcc_,
                                        current_xfcc_by_hash_ + ";" + client_subject_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsSanitizeSetIssuer) {
+  fcc_ = envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      SANITIZE_SET;
+  sccd_.set_issuer(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader(previous_xfcc_,
+                                       current_xfcc_by_hash_ + ";" + client_issuer_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubjectIssuer) {
+  fcc_ = envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      SANITIZE_SET;
+  sccd_.mutable_subject()->set_value(true);
+  sccd_.set_issuer(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader(previous_xfcc_, current_xfcc_by_hash_ + ";" +
+                                                           client_subject_ + ";" + client_issuer_);
 }
 
 TEST_P(XfccIntegrationTest, MtlsSanitizeSetUri) {

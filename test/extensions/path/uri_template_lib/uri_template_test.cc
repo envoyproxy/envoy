@@ -19,9 +19,11 @@ namespace UriTemplate {
 
 namespace {
 
+using ::Envoy::StatusHelpers::IsOk;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
 using testing::HasSubstr;
+using ::testing::Not;
 
 // Capture regex for /{var1}/{var2}/{var3}/{var4}/{var5}
 static constexpr absl::string_view kCaptureRegex = "/(?P<var1>[a-zA-Z0-9-._~%!$&'()+,;:@]+)/"
@@ -157,53 +159,53 @@ TEST_P(PathPatternMatchAndRewrite, PathPatternMatchAndRewriteTest) {
 }
 
 TEST_P(PathPatternMatchAndRewrite, IsValidMatchPattern) {
-  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo}").ok());
-  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo}/{doo}").ok());
-  EXPECT_TRUE(isValidMatchPattern("/{hoo}/bar/{goo}").ok());
+  EXPECT_OK(isValidMatchPattern("/foo/bar/{goo}"));
+  EXPECT_OK(isValidMatchPattern("/foo/bar/{goo}/{doo}"));
+  EXPECT_OK(isValidMatchPattern("/{hoo}/bar/{goo}"));
 
-  EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo}").ok());
-  EXPECT_FALSE(isValidMatchPattern("//bar/{goo}").ok());
-  EXPECT_FALSE(isValidMatchPattern("/foo/bar/{goo}}").ok());
+  EXPECT_THAT(isValidMatchPattern("/foo//bar/{goo}"), Not(IsOk()));
+  EXPECT_THAT(isValidMatchPattern("//bar/{goo}"), Not(IsOk()));
+  EXPECT_THAT(isValidMatchPattern("/foo/bar/{goo}}"), Not(IsOk()));
 }
 
 TEST_P(PathPatternMatchAndRewrite, IsValidPathGlobMatchPattern) {
-  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo=*}").ok());
-  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo=*}/{doo=*}").ok());
-  EXPECT_TRUE(isValidMatchPattern("/{hoo=*}/bar/{goo=*}").ok());
+  EXPECT_OK(isValidMatchPattern("/foo/bar/{goo=*}"));
+  EXPECT_OK(isValidMatchPattern("/foo/bar/{goo=*}/{doo=*}"));
+  EXPECT_OK(isValidMatchPattern("/{hoo=*}/bar/{goo=*}"));
 
-  EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo=*}").ok());
-  EXPECT_FALSE(isValidMatchPattern("//bar/{goo=*}").ok());
-  EXPECT_FALSE(isValidMatchPattern("/foo/bar/{goo=*}}").ok());
+  EXPECT_THAT(isValidMatchPattern("/foo//bar/{goo=*}"), Not(IsOk()));
+  EXPECT_THAT(isValidMatchPattern("//bar/{goo=*}"), Not(IsOk()));
+  EXPECT_THAT(isValidMatchPattern("/foo/bar/{goo=*}}"), Not(IsOk()));
 }
 
 TEST_P(PathPatternMatchAndRewrite, IsValidTextGlobMatchPattern) {
-  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo=**}").ok());
-  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo=**}/doo").ok());
-  EXPECT_TRUE(isValidMatchPattern("/{foo=*}/bar/{goo=**}").ok());
-  EXPECT_TRUE(isValidMatchPattern("/*/bar/**").ok());
+  EXPECT_OK(isValidMatchPattern("/foo/bar/{goo=**}"));
+  EXPECT_OK(isValidMatchPattern("/foo/bar/{goo=**}/doo"));
+  EXPECT_OK(isValidMatchPattern("/{foo=*}/bar/{goo=**}"));
+  EXPECT_OK(isValidMatchPattern("/*/bar/**"));
 
-  EXPECT_FALSE(isValidMatchPattern("/{foo=**}/bar/{goo=*}").ok());
-  EXPECT_FALSE(isValidMatchPattern("/**/bar/*").ok());
+  EXPECT_THAT(isValidMatchPattern("/{foo=**}/bar/{goo=*}"), Not(IsOk()));
+  EXPECT_THAT(isValidMatchPattern("/**/bar/*"), Not(IsOk()));
 }
 
 TEST_P(PathPatternMatchAndRewrite, IsValidRewritePattern) {
-  EXPECT_TRUE(isValidRewritePattern("/foo/bar/{goo}").ok());
-  EXPECT_TRUE(isValidRewritePattern("/foo/bar/{goo}/{doo}").ok());
-  EXPECT_TRUE(isValidRewritePattern("/{hoo}/bar/{goo}").ok());
+  EXPECT_OK(isValidRewritePattern("/foo/bar/{goo}"));
+  EXPECT_OK(isValidRewritePattern("/foo/bar/{goo}/{doo}"));
+  EXPECT_OK(isValidRewritePattern("/{hoo}/bar/{goo}"));
 
-  EXPECT_FALSE(isValidRewritePattern("/foo//bar/{goo}").ok());
-  EXPECT_FALSE(isValidRewritePattern("//bar/{goo}").ok());
-  EXPECT_FALSE(isValidRewritePattern("/foo/bar/{goo}}").ok());
+  EXPECT_THAT(isValidRewritePattern("/foo//bar/{goo}"), Not(IsOk()));
+  EXPECT_THAT(isValidRewritePattern("//bar/{goo}"), Not(IsOk()));
+  EXPECT_THAT(isValidRewritePattern("/foo/bar/{goo}}"), Not(IsOk()));
 }
 
 TEST_P(PathPatternMatchAndRewrite, IsValidSharedVariableSet) {
-  EXPECT_TRUE(isValidSharedVariableSet("/foo/bar/{goo}", "/foo/bar/{goo}").ok());
-  EXPECT_TRUE(isValidSharedVariableSet("/foo/bar/{goo}/{doo}", "/foo/bar/{doo}/{goo}").ok());
-  EXPECT_TRUE(isValidSharedVariableSet("/bar/{goo}", "/bar/{goo}").ok());
+  EXPECT_OK(isValidSharedVariableSet("/foo/bar/{goo}", "/foo/bar/{goo}"));
+  EXPECT_OK(isValidSharedVariableSet("/foo/bar/{goo}/{doo}", "/foo/bar/{doo}/{goo}"));
+  EXPECT_OK(isValidSharedVariableSet("/bar/{goo}", "/bar/{goo}"));
 
-  EXPECT_FALSE(isValidSharedVariableSet("/foo/bar/{goo}/{goo}", "/foo/{bar}").ok());
-  EXPECT_FALSE(isValidSharedVariableSet("/foo/{goo}", "/foo/bar/").ok());
-  EXPECT_FALSE(isValidSharedVariableSet("/foo/bar/{goo}", "/{foo}").ok());
+  EXPECT_THAT(isValidSharedVariableSet("/foo/bar/{goo}/{goo}", "/foo/{bar}"), Not(IsOk()));
+  EXPECT_THAT(isValidSharedVariableSet("/foo/{goo}", "/foo/bar/"), Not(IsOk()));
+  EXPECT_THAT(isValidSharedVariableSet("/foo/bar/{goo}", "/{foo}"), Not(IsOk()));
 }
 
 } // namespace

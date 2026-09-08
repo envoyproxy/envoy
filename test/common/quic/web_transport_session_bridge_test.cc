@@ -298,7 +298,9 @@ TEST(WebTransportStreamBridgeTest, StartNoOpWhenStreamMissing) {
 TEST(WebTransportStreamBridgeTest, LocalVisitorShortCircuitsAfterPeerGone) {
   StreamBridgeHarness h;
   auto local_visitor = h.bridge->makeLocalVisitor();
-  { auto peer_visitor = h.bridge->makePeerVisitor(); } // Destroyed here; nulls bridge->peer_.
+  {
+    auto peer_visitor = h.bridge->makePeerVisitor();
+  } // Destroyed here; nulls bridge->peer_.
 
   EXPECT_CALL(h.local_stream, Read(A<absl::Span<char>>())).Times(0);
   EXPECT_CALL(h.peer_stream, ResetWithUserCode(_)).Times(0);
@@ -315,7 +317,9 @@ TEST(WebTransportStreamBridgeTest, LocalVisitorShortCircuitsAfterPeerGone) {
 TEST(WebTransportStreamBridgeTest, PeerVisitorShortCircuitsAfterLocalGone) {
   StreamBridgeHarness h;
   auto peer_visitor = h.bridge->makePeerVisitor();
-  { auto local_visitor = h.bridge->makeLocalVisitor(); } // Destroyed here; nulls bridge->local_.
+  {
+    auto local_visitor = h.bridge->makeLocalVisitor();
+  } // Destroyed here; nulls bridge->local_.
 
   EXPECT_CALL(h.peer_stream, Read(A<absl::Span<char>>())).Times(0);
   EXPECT_CALL(h.local_stream, ResetWithUserCode(_)).Times(0);

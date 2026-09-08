@@ -100,6 +100,12 @@ public:
    */
   explicit SimpleConnReadFilter(void* parent) : parent_(parent) {}
 
+  /**
+   * Clear the back-pointer to the owning wrapper. Called from RCConnectionWrapper::shutdown()
+   * so a late onData() after teardown cannot dispatch into a destroyed / half-destroyed codec.
+   */
+  void clearParent() { parent_ = nullptr; }
+
   // Network::ReadFilter overrides
   Network::FilterStatus onData(Buffer::Instance& buffer, bool end_stream) override;
 

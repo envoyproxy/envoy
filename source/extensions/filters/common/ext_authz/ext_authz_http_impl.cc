@@ -14,7 +14,6 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/retry_policy_impl.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 
 #include "absl/strings/str_cat.h"
@@ -130,16 +129,10 @@ absl::StatusOr<Router::RetryPolicyConstSharedPtr>
 createRetryPolicy(const envoy::config::core::v3::RetryPolicy& core_retry_policy,
                   Server::Configuration::CommonFactoryContext& context) {
   // Convert core retry policy to route retry policy and create the implementation.
-  // By default when runtime flag is true, pass empty string to respect user's configured
-  // retry_on, not override it. When flag is false, use hardcoded defaults for backwards
-  // compatibility.
-  const std::string default_retry_on =
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ext_authz_http_client_retries_respect_user_retry_on")
-          ? ""
-          : "5xx,gateway-error,connect-failure,reset";
+  // Pass an empty default retry_on so that the user's configured retry_on is respected rather
+  // than overridden.
   envoy::config::route::v3::RetryPolicy route_retry_policy =
-      Http::Utility::convertCoreToRouteRetryPolicy(core_retry_policy, default_retry_on);
+      Http::Utility::convertCoreToRouteRetryPolicy(core_retry_policy, "");
 
   return Router::RetryPolicyImpl::create(route_retry_policy, context.messageValidationVisitor(),
                                          context);
@@ -364,8 +357,9 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   if (thread_local_cluster == nullptr) {
     // TODO(dio): Add stats related to this.
     ENVOY_LOG(debug, "ext_authz cluster '{}' does not exist", cluster);
-    callbacks_->onComplete(errorResponse());
+    RequestCallbacks* callbacks = callbacks_;
     callbacks_ = nullptr;
+    callbacks->onComplete(errorResponse());
   } else {
     // Do not enforce a sampling decision on this span; instead keep the parent's sampling status.
     auto options = Http::AsyncClient::RequestOptions()
@@ -388,8 +382,9 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
 
 void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
                                   Http::ResponseMessagePtr&& message) {
-  callbacks_->onComplete(toResponse(std::move(message)));
+  RequestCallbacks* callbacks = callbacks_;
   callbacks_ = nullptr;
+  callbacks->onComplete(toResponse(std::move(message)));
 }
 
 void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
@@ -397,8 +392,9 @@ void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
   // TODO(botengyao): handle different failure reasons.
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
          reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
-  callbacks_->onComplete(errorResponse());
+  RequestCallbacks* callbacks = callbacks_;
   callbacks_ = nullptr;
+  callbacks->onComplete(errorResponse());
 }
 
 void RawHttpClientImpl::onBeforeFinalizeUpstreamSpan(

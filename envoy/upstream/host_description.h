@@ -114,10 +114,11 @@ public:
    * Please ensure that the implementation is thread-safe.
    *
    * @param report supplies the ORCA load report of this upstream host.
-   * @param stream_info supplies the downstream stream info.
+   * @param stream_info carries the downstream stream info for in-band reports and is empty for
+   *        out-of-band (OOB) reports.
    */
   virtual absl::Status onOrcaLoadReport(const OrcaLoadReport& /*report*/,
-                                        const StreamInfo::StreamInfo& /*stream_info*/) {
+                                        OptRef<const StreamInfo::StreamInfo> /*stream_info*/) {
     return absl::OkStatus();
   }
 };

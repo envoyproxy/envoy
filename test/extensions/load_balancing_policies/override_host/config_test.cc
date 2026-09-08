@@ -116,7 +116,7 @@ TEST(OverrideHostLbConfigTest, FirstValidFallbackPolicyIsUsed) {
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
 
   auto result = factory.loadConfig(context, config_msg);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 TEST(OverrideHostLbConfigTest, EmptyPrimaryOverrideSource) {
@@ -208,7 +208,7 @@ TEST(OverrideHostLbConfigTest, FallbackLbCalledToChooseHost) {
                      context.api_.random_, context.time_system_);
   EXPECT_NE(thread_aware_lb, nullptr);
 
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   auto thread_local_lb_factory = thread_aware_lb->factory();
   EXPECT_NE(thread_local_lb_factory, nullptr);
@@ -244,7 +244,7 @@ TEST(OverrideHostLbConfigTest, ValidSelectedHostKey) {
   std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
   auto result = factory.loadConfig(context, config_msg);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 } // namespace

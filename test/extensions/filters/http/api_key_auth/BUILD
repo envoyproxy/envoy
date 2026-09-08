@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     name = "api_key_auth_test",
     srcs = ["api_key_auth_test.cc"],
     extension_names = ["envoy.filters.http.api_key_auth"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/api_key_auth:api_key_auth_lib",
         "//test/mocks/server:server_mocks",
@@ -29,10 +29,11 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.api_key_auth"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/api_key_auth:config",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/filters/http/api_key_auth/v3:pkg_cc_proto",
     ],
 )
@@ -42,7 +43,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.filters.http.api_key_auth"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/api_key_auth:config",
         "//test/integration:http_protocol_integration_lib",
@@ -65,7 +66,7 @@ envoy_cc_fuzz_test(
     name = "api_key_auth_fuzz_test",
     srcs = ["api_key_auth_fuzz_test.cc"],
     corpus = "api_key_auth_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":api_key_auth_fuzz_proto_cc_proto",
         "//source/common/common:regex_lib",

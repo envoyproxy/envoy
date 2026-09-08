@@ -81,6 +81,10 @@ public:
               (MetricID id, uint64_t value, std::span<const BufferView> tags_values), (override));
   MOCK_METHOD(MetricsResult, incrementCounterValue,
               (MetricID id, uint64_t value, std::span<const BufferView> tags_values), (override));
+  MOCK_METHOD((std::optional<GenericSecretID>), subscribeGenericSecret,
+              (std::string_view name, std::string_view sds_config_source), (override));
+  MOCK_METHOD((std::optional<std::string_view>), getGenericSecret, (GenericSecretID id),
+              (override));
   MOCK_METHOD(bool, logEnabled, (LogLevel level), (override));
   MOCK_METHOD(void, log, (LogLevel level, std::string_view message), (override));
   MOCK_METHOD((std::pair<HttpCalloutInitResult, uint64_t>), httpCallout,
@@ -114,6 +118,10 @@ public:
   MOCK_METHOD(void, setMetadata, (std::string_view ns, std::string_view key, double value),
               (override));
   MOCK_METHOD(void, setMetadata, (std::string_view ns, std::string_view key, bool value),
+              (override));
+  MOCK_METHOD(void, setMetadataStruct, (std::string_view ns, std::string_view serialized_struct),
+              (override));
+  MOCK_METHOD(void, setTypedMetadata, (std::string_view ns, std::string_view serialized_any),
               (override));
   MOCK_METHOD(bool, addMetadataList, (std::string_view ns, std::string_view key, double value),
               (override));
@@ -215,6 +223,8 @@ public:
               (MetricID id, uint64_t value, std::span<const BufferView> tags_values), (override));
   MOCK_METHOD(MetricsResult, incrementCounterValue,
               (MetricID id, uint64_t value, std::span<const BufferView> tags_values), (override));
+  MOCK_METHOD((std::optional<std::string_view>), getGenericSecret, (GenericSecretID id),
+              (override));
   MOCK_METHOD(bool, logEnabled, (LogLevel level), (override));
   MOCK_METHOD(void, log, (LogLevel level, std::string_view message), (override));
 };

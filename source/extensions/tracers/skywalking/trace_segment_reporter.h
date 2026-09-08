@@ -30,7 +30,7 @@ public:
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
-  void onReceiveMessage(std::unique_ptr<skywalking::v3::Commands>&&) override {}
+  void onReceiveMessage(Grpc::ResponsePtr<skywalking::v3::Commands>&&) override {}
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override;
 

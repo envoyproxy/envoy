@@ -416,7 +416,7 @@ message MetadataOptions {
 
   // Describes which typed or untyped filter dynamic metadata namespaces to accept from
   // the external processing server. Set to empty or leave unset to disallow writing
-  // any received dynamic metadata. Receiving of typed metadata is not supported.
+  // any received dynamic metadata.
   MetadataNamespaces receiving_namespaces = 2;
 
   // Describes which cluster metadata namespaces to forward to

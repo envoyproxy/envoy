@@ -114,10 +114,14 @@ public:
   void onFilterChainDraining(const std::list<const Network::FilterChain*>&) override {
     IS_ENVOY_BUG("unexpected call to onFilterChainDraining");
   }
-  void onFilterChainDrainStart(const std::list<const Network::FilterChain*>&) override {
-    IS_ENVOY_BUG("unexpected call to onFilterChainDrainStart");
-  }
-  void onListenerDrainStart() override { IS_ENVOY_BUG("unexpected call to onListenerDrainStart"); }
+  // Drain notifications are broadcast to every listener owned by the connection handler, UDP
+  // listeners included, so these are reachable and must not be flagged as bugs. There is no
+  // connection-level state to notify for a raw UDP listener, so they are no-ops. Note that this
+  // differs from onFilterChainDraining() above, which is only invoked for listener types that
+  // support filter chain removal.
+  void onFilterChainDrainStart(const std::list<const Network::FilterChain*>&,
+                               Network::ConnectionDrainEvent) override {}
+  void onListenerDrainStart(Network::ConnectionDrainEvent) override {}
 
   // Network::UdpListenerFilterManager
   void addReadFilter(Network::UdpListenerReadFilterPtr&& filter) override;

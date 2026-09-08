@@ -4,8 +4,10 @@
 
 #include "source/extensions/filters/http/transform/transform.h"
 
+#include "test/common/formatter/formatter_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -26,9 +28,10 @@ TEST(BodyFormatterProviderTest, BodyFormatterProviderTest) {
   {
     // No BodyContextExtension present.
     Formatter::Context context;
-    const auto value = request_provider.format(context, stream_info);
+    const auto value = Envoy::Formatter::formatForTest(request_provider, context, stream_info);
     EXPECT_FALSE(value.has_value());
-    const auto proto_value = request_provider.formatValue(context, stream_info);
+    const auto proto_value =
+        Envoy::Formatter::formatValueForTest(request_provider, context, stream_info);
     EXPECT_EQ(proto_value.kind_case(), Protobuf::Value::KIND_NOT_SET);
   }
 
@@ -38,9 +41,10 @@ TEST(BodyFormatterProviderTest, BodyFormatterProviderTest) {
     BodyContextExtension extension;
     context.setExtension(extension);
 
-    const auto value = request_provider.format(context, stream_info);
+    const auto value = Envoy::Formatter::formatForTest(request_provider, context, stream_info);
     EXPECT_FALSE(value.has_value());
-    const auto proto_value = request_provider.formatValue(context, stream_info);
+    const auto proto_value =
+        Envoy::Formatter::formatValueForTest(request_provider, context, stream_info);
     EXPECT_EQ(proto_value.kind_case(), Protobuf::Value::KIND_NOT_SET);
   }
 
@@ -54,10 +58,11 @@ TEST(BodyFormatterProviderTest, BodyFormatterProviderTest) {
         .set_string_value("response-body-value");
     context.setExtension(extension);
 
-    const auto value = response_provider.format(context, stream_info);
+    const auto value = Envoy::Formatter::formatForTest(response_provider, context, stream_info);
     ASSERT_TRUE(value.has_value());
     EXPECT_EQ(value.value(), "response-body-value");
-    const auto proto_value = response_provider.formatValue(context, stream_info);
+    const auto proto_value =
+        Envoy::Formatter::formatValueForTest(response_provider, context, stream_info);
     EXPECT_EQ(proto_value.kind_case(), Protobuf::Value::kStringValue);
     EXPECT_EQ(proto_value.string_value(), "response-body-value");
   }
@@ -72,10 +77,11 @@ TEST(BodyFormatterProviderTest, BodyFormatterProviderTest) {
         .set_number_value(1);
     context.setExtension(extension);
 
-    const auto value = request_provider.format(context, stream_info);
+    const auto value = Envoy::Formatter::formatForTest(request_provider, context, stream_info);
     ASSERT_TRUE(value.has_value());
     EXPECT_EQ(value.value(), "1");
-    const auto proto_value = request_provider.formatValue(context, stream_info);
+    const auto proto_value =
+        Envoy::Formatter::formatValueForTest(request_provider, context, stream_info);
     EXPECT_EQ(proto_value.kind_case(), Protobuf::Value::kNumberValue);
     EXPECT_EQ(proto_value.number_value(), 1);
   }
@@ -90,10 +96,11 @@ TEST(BodyFormatterProviderTest, BodyFormatterProviderTest) {
         .set_bool_value(true);
     context.setExtension(extension);
 
-    const auto value = response_provider.format(context, stream_info);
+    const auto value = Envoy::Formatter::formatForTest(response_provider, context, stream_info);
     ASSERT_TRUE(value.has_value());
     EXPECT_EQ(value.value(), "true");
-    const auto proto_value = response_provider.formatValue(context, stream_info);
+    const auto proto_value =
+        Envoy::Formatter::formatValueForTest(response_provider, context, stream_info);
     EXPECT_EQ(proto_value.kind_case(), Protobuf::Value::kBoolValue);
     EXPECT_EQ(proto_value.bool_value(), true);
   }
@@ -110,14 +117,14 @@ protected:
     absl::Status status;
     config_ = std::make_shared<FilterConfig>(
         config, "test", factory_context_.serverFactoryContext(), factory_context_.scope(), status);
-    ASSERT_TRUE(status.ok()) << "Filter config creation failed: " << status.message();
+    ASSERT_OK(status) << "Filter config creation failed";
 
     if (!route_yaml_config.empty()) {
       envoy::extensions::filters::http::transform::v3::TransformConfig route_config;
       TestUtility::loadFromYaml(route_yaml_config, route_config);
       route_config_ = std::make_shared<TransformConfig>(
           route_config, factory_context_.server_factory_context_, status);
-      ASSERT_TRUE(status.ok()) << "TransformConfig of route creation failed: " << status.message();
+      ASSERT_OK(status) << "TransformConfig of route creation failed";
 
       ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
           .WillByDefault(Return(route_config_.get()));

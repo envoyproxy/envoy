@@ -17,6 +17,7 @@
 #include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -105,6 +106,7 @@ public:
   Api::Api& api() const { return api_; }
   const RadixTree<DnsVirtualDomainConfigSharedPtr>& getDnsTrie() const { return dns_lookup_trie_; }
   const AccessLog::InstanceSharedPtrVector& accessLogs() const { return access_logs_; }
+  bool caseInsensitive() const { return case_insensitive_; }
 
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
@@ -131,6 +133,7 @@ private:
   RadixTree<DnsVirtualDomainConfigSharedPtr> dns_lookup_trie_;
   absl::flat_hash_map<std::string, std::chrono::seconds> domain_ttl_;
   bool forward_queries_;
+  bool case_insensitive_;
   uint64_t retry_count_;
   std::chrono::milliseconds resolver_timeout_;
   Random::RandomGenerator& random_;
@@ -354,6 +357,18 @@ private:
     default:
       config_->stats().external_unsupported_answers_.inc();
       break;
+    }
+  }
+
+  // Populates lookup_name_ with a lowercase copy for case-insensitive matching; a no-op (no
+  // allocation) on the default case-sensitive path.
+  void maybeNormalizeQuery(DnsQueryRecord& query) const {
+    if (!config_->caseInsensitive()) {
+      return;
+    }
+    std::string lower = absl::AsciiStrToLower(query.name_);
+    if (lower != query.name_) {
+      query.lookup_name_ = std::move(lower);
     }
   }
 

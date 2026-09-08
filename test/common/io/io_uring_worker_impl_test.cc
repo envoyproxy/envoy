@@ -10,6 +10,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/io/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -175,7 +176,7 @@ TEST(IoUringWorkerImplTest, DelaySubmit) {
     worker.submitForTest();
     worker.submitForTest();
   }));
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
   EXPECT_CALL(dispatcher, deferredDelete_);
@@ -203,7 +204,7 @@ TEST(IoUringWorkerImplTest, OnFileEventReArmsWhenCompletionsRemain) {
   EXPECT_CALL(mock_io_uring, submit());
   EXPECT_CALL(mock_io_uring, hasReadyCompletions()).WillOnce(Return(true)).RetiresOnSaturation();
   EXPECT_CALL(*file_event, activate(Event::FileReadyType::Read));
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
 }
@@ -227,7 +228,7 @@ TEST(IoUringWorkerImplTest, OnFileEventDoesNotReArmWhenCompletionsDrained) {
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_));
   EXPECT_CALL(mock_io_uring, submit());
   EXPECT_CALL(*file_event, activate(_)).Times(0);
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
 }
@@ -275,7 +276,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
         cb(req, -EAGAIN, true);
       }));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   Buffer::OwnedImpl buf2;
   buf2.add(data);
@@ -307,7 +308,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
       .WillOnce(DoAll(SaveArg<1>(&close_req), Return<IoUringResult>(IoUringResult::Ok)))
       .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   // After the close request finished, the socket will be cleanup.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
@@ -316,7 +317,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
   EXPECT_CALL(dispatcher, deferredDelete_);
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_EQ(0, worker.getSockets().size());
 }
@@ -353,7 +354,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
         cb(req, -EAGAIN, true);
       }));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   // When close the socket, expect there still have a incomplete read
   // request, so it has to cancel the request first.
@@ -375,7 +376,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
       .WillOnce(DoAll(SaveArg<1>(&close_req), Return<IoUringResult>(IoUringResult::Ok)))
       .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   // After the close request finished, the socket will be cleanup.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
@@ -384,7 +385,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
   EXPECT_CALL(dispatcher, deferredDelete_);
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_EQ(0, worker.getSockets().size());
 }
@@ -478,7 +479,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
       .WillOnce(Invoke([&read_req](const CompletionCb& cb) { cb(read_req, -EAGAIN, false); }));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   Request* write_req = nullptr;
   EXPECT_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _))
@@ -504,7 +505,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
 
         cb(write_req, -EAGAIN, false);
       }));
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   // After the close request finished, the socket will be cleanup.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
@@ -513,7 +514,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
   EXPECT_CALL(dispatcher, deferredDelete_);
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_EQ(0, worker.getSockets().size());
 }

@@ -3,6 +3,7 @@
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
 
+AI
 Allshard
 FCS
 FLUSHALL
@@ -35,6 +36,7 @@ ARRAYSIZE
 ARN
 ASAN
 ASCII
+ASLR
 ASM
 ASN
 ASSERTed
@@ -64,6 +66,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+bzlmod
 CIO
 CBC
 cbc
@@ -77,6 +80,7 @@ DFP
 Dynatrace
 DOM
 DONTFRAG
+dotdot
 Gasd
 GiB
 IPTOS
@@ -198,6 +202,7 @@ ECDH
 ECDHE
 ECDS
 ECDSA
+sigalgs
 ECONNREFUSED
 ECONNRESET
 EDESTRUCTION
@@ -219,6 +224,7 @@ EVP
 EWOULDBLOCK
 EXPECTs
 EXPR
+FAPI
 FAQ
 FASTOPEN
 FB
@@ -607,6 +613,7 @@ XN
 XNOR
 XSS
 YAML
+YYYY
 ZXID
 absl
 accesslog
@@ -659,6 +666,9 @@ auths
 authz
 automata
 autoscale
+awaitable
+awaitables
+awaiter
 backend
 backends
 backgrounded
@@ -721,6 +731,7 @@ canonicalization
 canonicalize
 canonicalized
 canonicalizer
+canonicalizes
 canonicalizing
 cardinality
 casted
@@ -753,6 +764,7 @@ combinatorial
 comparator
 compat
 completable
+computable
 cond
 condvar
 conf
@@ -896,6 +908,7 @@ extrahelp
 faceplant
 facto
 failover
+faketime
 fallbacks
 fanout
 fastbuild
@@ -958,6 +971,7 @@ hackery
 hacky
 handoff
 handshaker
+hardcode
 hardcoded
 hardcodes
 hardcoding
@@ -1165,6 +1179,7 @@ netmask
 netns
 NLB
 NLMSG
+nodiscard
 nonblocking
 noncopyable
 nonresponsive
@@ -1185,6 +1200,7 @@ oauth
 observability
 observations
 ocagent
+offloadable
 offsetof
 oneof
 oneway
@@ -1234,6 +1250,7 @@ pfctl
 pipelined
 pipelining
 pkey
+pkix
 plaintext
 pluggable
 pointee
@@ -1363,6 +1380,7 @@ reperform
 repicked
 replayable
 repo
+repos
 representable
 reproducibility
 requirepass
@@ -1401,6 +1419,7 @@ rtest
 rtrim
 rtt
 ruleset
+runfile
 runfiles
 runtime
 runtimes
@@ -1425,6 +1444,7 @@ serializable
 serializer
 serv
 servercert
+setarch
 setenv
 SETNAME
 setsockopt
@@ -1445,6 +1465,7 @@ sim
 sinked
 sint
 sizeof
+skippable
 smatch
 snapshotted
 sockaddr
@@ -1501,6 +1522,7 @@ submatch
 submessages
 subnet
 subnets
+subobject
 suboptimal
 subprocess
 subsecond
@@ -1597,6 +1619,7 @@ udpa
 uint
 un-
 unacked
+uname
 unary
 unconfigurable
 undef
@@ -1669,6 +1692,7 @@ wildcard
 wildcards
 winsock
 workspace
+workspaces
 writev
 wrsq
 www
@@ -1682,6 +1706,9 @@ xid
 xmodem
 xxhash
 xxs
+xxxx
+xxxxxxxx
+xxxxxxxxxxxx
 xyz
 xyzwebservices
 yml
@@ -1720,6 +1747,7 @@ NXDOMAIN
 DNAT
 RSP
 EWMA
+fifo
 hotplug
 cgroup
 cgroupv1
@@ -1789,3 +1817,10 @@ acq
 interleavings
 millis
 msgs
+CRYSTALS
+encapsulation
+Kyber
+MLKEM
+PQC
+quantum
+X25519MLKEM768

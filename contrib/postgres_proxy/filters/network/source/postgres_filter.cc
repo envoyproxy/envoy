@@ -38,7 +38,6 @@ Network::FilterStatus PostgresFilter::onData(Buffer::Instance& data, bool) {
   frontend_buffer_.add(data);
   Network::FilterStatus result = doDecode(frontend_buffer_, true);
   if (result == Network::FilterStatus::StopIteration) {
-    ASSERT(frontend_buffer_.length() == 0);
     data.drain(data.length());
   }
   return result;

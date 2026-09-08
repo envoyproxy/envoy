@@ -1,3 +1,6 @@
+#include <thread>
+#include <vector>
+
 #include "source/extensions/common/aws/credential_providers/credentials_file_credentials_provider.h"
 
 #include "test/mocks/server/server_factory_context.h"
@@ -106,6 +109,50 @@ TEST_F(CredentialsFileCredentialsProviderTest, CustomProfileFromConfigWithWatche
   EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
   EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
   EXPECT_EQ("default_token", credentials.sessionToken().value());
+}
+
+// With a watched directory configured, needsRefresh() always returns true, so every
+// getCredentials() call re-parses the file and rewrites cached_credentials_/last_updated_.
+// Hammer getCredentials() from many threads concurrently; without a mutex protecting those
+// members this races and corrupts the heap (see issue #45667). This test is primarily a
+// TSAN regression guard.
+TEST_F(CredentialsFileCredentialsProviderTest, ConcurrentGetCredentialsWithWatched) {
+  auto file_path =
+      TestEnvironment::writeStringToFileForTest(CREDENTIALS_FILE, CREDENTIALS_FILE_CONTENTS);
+
+  envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider config = {};
+  config.mutable_credentials_data_source()->set_filename(file_path);
+  config.mutable_credentials_data_source()->mutable_watched_directory()->set_path(
+      TestEnvironment::temporaryPath("test"));
+  EXPECT_CALL(context_, api()).WillRepeatedly(ReturnRef(*api_));
+  EXPECT_CALL(context_, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+  EXPECT_CALL(dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([&] {
+    Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
+    EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
+        .WillRepeatedly(Return(absl::OkStatus()));
+    return mock_watcher;
+  }));
+
+  auto provider = CredentialsFileCredentialsProvider(context_, config);
+
+  constexpr int num_threads = 8;
+  constexpr int iterations = 100;
+  std::vector<std::thread> threads;
+  threads.reserve(num_threads);
+  for (int i = 0; i < num_threads; i++) {
+    threads.emplace_back([&provider]() {
+      for (int j = 0; j < iterations; j++) {
+        const auto credentials = provider.getCredentials();
+        EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
+        EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
+        EXPECT_EQ("default_token", credentials.sessionToken().value());
+      }
+    });
+  }
+  for (auto& thread : threads) {
+    thread.join();
+  }
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, CustomFilePathFromConfig) {

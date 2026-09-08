@@ -129,8 +129,8 @@ public:
         .WillByDefault(testing::ReturnRef(store_.mockScope()));
     ON_CALL(context_, serverScope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
 
-    EXPECT_CALL(store_.mockScope(), createScope_(_))
-        .WillRepeatedly(Invoke([this](const std::string& name) {
+    EXPECT_CALL(store_.mockScope(), createScope_(_, _))
+        .WillRepeatedly(Invoke([this](const std::string& name, const std::string&) {
           auto scope_name_storage =
               std::make_unique<Stats::StatNameDynamicStorage>(name, context_.store_.symbolTable());
           auto scope = std::make_shared<NiceMock<MockScopeWithGauge>>(
@@ -337,8 +337,7 @@ TEST_F(StatsAccessLoggerTest, NonNumberValueFormatted) {
   std::optional<std::string> not_a_number{"hello"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(not_a_number));
   EXPECT_CALL(store_, counter(_)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "Stats access logger formatted a string that isn't a number: hello",
-                      { logger_->log(formatter_context_, stream_info_); });
+  logger_->log(formatter_context_, stream_info_);
 }
 
 // Format string resolved to a number string.

@@ -88,6 +88,7 @@ private:
   bool verifyCertChainUsingTrustBundleStore(X509& leaf_cert, STACK_OF(X509)* cert_chain,
                                             X509_VERIFY_PARAM* verify_param,
                                             absl::string_view workload_trust_domain,
+                                            absl::Span<const std::string> verify_san_list,
                                             std::string& error_details,
                                             std::vector<bssl::UniquePtr<X509>>& validated_chain);
 

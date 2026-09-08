@@ -33,8 +33,9 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       *dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
-  Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);
-  EXPECT_NE(monitor, nullptr);
+  auto monitor_or_error = factory->createResourceMonitor(config, context);
+  EXPECT_TRUE(monitor_or_error.ok());
+  EXPECT_NE(monitor_or_error.value(), nullptr);
 }
 
 } // namespace

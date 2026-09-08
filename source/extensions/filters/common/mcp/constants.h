@@ -26,6 +26,7 @@ constexpr absl::string_view PARAMS_FIELD = "params";
 constexpr absl::string_view ARGUMENTS_FIELD = "arguments";
 constexpr absl::string_view ERROR_CODE_FIELD = "code";
 constexpr absl::string_view ERROR_MESSAGE_FIELD = "message";
+constexpr absl::string_view BACKEND_RESPONSE_CODE_FIELD = "backend_response_code";
 
 constexpr absl::string_view TYPE_FIELD = "type";
 constexpr absl::string_view TEXT_FIELD = "text";
@@ -66,6 +67,8 @@ constexpr absl::string_view BODY_TOO_LARGE = "mcp_body_too_large";
 // HTTP header names
 constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
 constexpr absl::string_view MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version";
+constexpr absl::string_view MCP_METHOD_HEADER = "mcp-method";
+constexpr absl::string_view MCP_NAME_HEADER = "mcp-name";
 
 // Method names
 namespace Methods {
@@ -92,6 +95,17 @@ constexpr absl::string_view LOGGING_SET_LEVEL = "logging/setLevel";
 
 // Lifecycle
 constexpr absl::string_view INITIALIZE = "initialize";
+
+// Discovery
+constexpr absl::string_view SERVER_DISCOVER = "server/discover";
+
+// Subscriptions
+constexpr absl::string_view SUBSCRIPTIONS_LISTEN = "subscriptions/listen";
+
+// Tasks
+constexpr absl::string_view TASKS_GET = "tasks/get";
+constexpr absl::string_view TASKS_UPDATE = "tasks/update";
+constexpr absl::string_view TASKS_CANCEL = "tasks/cancel";
 
 // Sampling
 constexpr absl::string_view SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
@@ -129,6 +143,9 @@ constexpr absl::string_view NOTIFICATION = "notification";
 constexpr absl::string_view LOGGING = "logging";
 constexpr absl::string_view SAMPLING = "sampling";
 constexpr absl::string_view COMPLETION = "completion";
+constexpr absl::string_view DISCOVERY = "discovery";
+constexpr absl::string_view SUBSCRIPTION = "subscription";
+constexpr absl::string_view TASK = "task";
 constexpr absl::string_view UNKNOWN = "unknown";
 } // namespace MethodGroups
 
@@ -136,6 +153,7 @@ constexpr absl::string_view UNKNOWN = "unknown";
 namespace Paths {
 constexpr absl::string_view PARAMS_NAME = "params.name";
 constexpr absl::string_view PARAMS_URI = "params.uri";
+constexpr absl::string_view PARAMS_TASK_ID = "params.taskId";
 constexpr absl::string_view PARAMS_LEVEL = "params.level";
 constexpr absl::string_view PARAMS_REF = "params.ref";
 constexpr absl::string_view PARAMS_PROTOCOL_VERSION = "params.protocolVersion";

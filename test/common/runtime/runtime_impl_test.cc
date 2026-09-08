@@ -23,6 +23,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 
 #include "absl/flags/declare.h"
 #include "gmock/gmock.h"
@@ -108,7 +109,7 @@ public:
 
   void updateDiskLayer(uint32_t layer) {
     ASSERT_LT(layer, on_changed_cbs_.size());
-    EXPECT_TRUE(on_changed_cbs_[layer](Filesystem::Watcher::Events::MovedTo).ok());
+    EXPECT_OK(on_changed_cbs_[layer](Filesystem::Watcher::Events::MovedTo));
   }
 
   Protobuf::Struct base_;
@@ -291,7 +292,7 @@ TEST_F(DiskLoaderImplTest, GetLayers) {
   EXPECT_NE(nullptr, dynamic_cast<const AdminLayer*>(layers.back().get()));
   EXPECT_TRUE(layers[3]->values().empty());
 
-  ASSERT_TRUE(loader_->mergeValues({{"foo", "bar"}}).ok());
+  ASSERT_OK(loader_->mergeValues({{"foo", "bar"}}));
   // The old snapshot and its layers should have been invalidated. Refetch.
   const auto& new_layers = loader_->snapshot().getLayers();
   EXPECT_EQ("bar", new_layers[3]->values().find("foo")->second.raw_string_value_);
@@ -353,7 +354,7 @@ TEST_F(DiskLoaderImplTest, PercentHandling) {
 
   // Smoke test integer value of 0, should be interpreted as 0%
   {
-    ASSERT_TRUE(loader_->mergeValues({{"foo", "0"}}).ok());
+    ASSERT_OK(loader_->mergeValues({{"foo", "0"}}));
 
     EXPECT_FALSE(loader_->snapshot().featureEnabled("foo", default_value, 0));
     EXPECT_FALSE(loader_->snapshot().featureEnabled("foo", default_value, 5));
@@ -361,7 +362,7 @@ TEST_F(DiskLoaderImplTest, PercentHandling) {
 
   // Smoke test integer value of 5, should be interpreted as 5%
   {
-    ASSERT_TRUE(loader_->mergeValues({{"foo", "5"}}).ok());
+    ASSERT_OK(loader_->mergeValues({{"foo", "5"}}));
     EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 0));
     EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 4));
     EXPECT_FALSE(loader_->snapshot().featureEnabled("foo", default_value, 5));
@@ -378,7 +379,7 @@ TEST_F(DiskLoaderImplTest, PercentHandling) {
     // not the uint32 conversion is handled properly.
     uint64_t high_value = 1ULL << 60;
     std::string high_value_str = std::to_string(high_value);
-    ASSERT_TRUE(loader_->mergeValues({{"foo", high_value_str}}).ok());
+    ASSERT_OK(loader_->mergeValues({{"foo", high_value_str}}));
     EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 0));
     EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 50));
     EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 100));
@@ -392,32 +393,32 @@ void testNewOverrides(Loader& loader, Stats::TestUtil::TestStore& store) {
       store.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport);
 
   // New string.
-  ASSERT_TRUE(loader.mergeValues({{"foo", "bar"}}).ok());
+  ASSERT_OK(loader.mergeValues({{"foo", "bar"}}));
   EXPECT_EQ("bar", loader.snapshot().get("foo").value().get());
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove new string.
-  ASSERT_TRUE(loader.mergeValues({{"foo", ""}}).ok());
+  ASSERT_OK(loader.mergeValues({{"foo", ""}}));
   EXPECT_FALSE(loader.snapshot().get("foo").has_value());
   EXPECT_EQ(0, admin_overrides_active.value());
 
   // New integer.
-  ASSERT_TRUE(loader.mergeValues({{"baz", "42"}}).ok());
+  ASSERT_OK(loader.mergeValues({{"baz", "42"}}));
   EXPECT_EQ(42, loader.snapshot().getInteger("baz", 0));
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove new integer.
-  ASSERT_TRUE(loader.mergeValues({{"baz", ""}}).ok());
+  ASSERT_OK(loader.mergeValues({{"baz", ""}}));
   EXPECT_EQ(0, loader.snapshot().getInteger("baz", 0));
   EXPECT_EQ(0, admin_overrides_active.value());
 
   // New double.
-  ASSERT_TRUE(loader.mergeValues({{"beep", "42.1"}}).ok());
+  ASSERT_OK(loader.mergeValues({{"beep", "42.1"}}));
   EXPECT_EQ(42.1, loader.snapshot().getDouble("beep", 1.2));
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove new double.
-  ASSERT_TRUE(loader.mergeValues({{"beep", ""}}).ok());
+  ASSERT_OK(loader.mergeValues({{"beep", ""}}));
   EXPECT_EQ(1.2, loader.snapshot().getDouble("beep", 1.2));
   EXPECT_EQ(0, admin_overrides_active.value());
 }
@@ -430,42 +431,42 @@ TEST_F(DiskLoaderImplTest, MergeValues) {
       store_.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport);
 
   // Override string
-  ASSERT_TRUE(loader_->mergeValues({{"file2", "new world"}}).ok());
+  ASSERT_OK(loader_->mergeValues({{"file2", "new world"}}));
   EXPECT_EQ("new world", loader_->snapshot().get("file2").value().get());
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden string
-  ASSERT_TRUE(loader_->mergeValues({{"file2", ""}}).ok());
+  ASSERT_OK(loader_->mergeValues({{"file2", ""}}));
   EXPECT_EQ("world", loader_->snapshot().get("file2").value().get());
   EXPECT_EQ(0, admin_overrides_active.value());
 
   // Override integer
-  ASSERT_TRUE(loader_->mergeValues({{"file3", "42"}}).ok());
+  ASSERT_OK(loader_->mergeValues({{"file3", "42"}}));
   EXPECT_EQ(42, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden integer
-  ASSERT_TRUE(loader_->mergeValues({{"file3", ""}}).ok());
+  ASSERT_OK(loader_->mergeValues({{"file3", ""}}));
   EXPECT_EQ(2, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(0, admin_overrides_active.value());
 
   // Override double
-  ASSERT_TRUE(loader_->mergeValues({{"file_with_double", "42.1"}}).ok());
+  ASSERT_OK(loader_->mergeValues({{"file_with_double", "42.1"}}));
   EXPECT_EQ(42.1, loader_->snapshot().getDouble("file_with_double", 1.1));
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden double
-  ASSERT_TRUE(loader_->mergeValues({{"file_with_double", ""}}).ok());
+  ASSERT_OK(loader_->mergeValues({{"file_with_double", ""}}));
   EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
   EXPECT_EQ(0, admin_overrides_active.value());
 
   // Override override string
-  ASSERT_TRUE(loader_->mergeValues({{"file1", "hello overridden override"}}).ok());
+  ASSERT_OK(loader_->mergeValues({{"file1", "hello overridden override"}}));
   EXPECT_EQ("hello overridden override", loader_->snapshot().get("file1").value().get());
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden override string
-  ASSERT_TRUE(loader_->mergeValues({{"file1", ""}}).ok());
+  ASSERT_OK(loader_->mergeValues({{"file1", ""}}));
   EXPECT_EQ("hello override", loader_->snapshot().get("file1").value().get());
   EXPECT_EQ(0, admin_overrides_active.value());
   EXPECT_EQ(0, store_.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport)
@@ -489,14 +490,14 @@ TEST_F(DiskLoaderImplTest, LayersOverride) {
   EXPECT_EQ("thing", loader_->snapshot().get("some").value().get());
   EXPECT_EQ("thang", loader_->snapshot().get("other").value().get());
   // Admin overrides disk and bootstrap.
-  ASSERT_TRUE(loader_->mergeValues({{"file2", "pluto"}, {"some", "day soon"}}).ok());
+  ASSERT_OK(loader_->mergeValues({{"file2", "pluto"}, {"some", "day soon"}}));
   EXPECT_EQ("pluto", loader_->snapshot().get("file2").value().get());
   EXPECT_EQ("day soon", loader_->snapshot().get("some").value().get());
   EXPECT_EQ("thang", loader_->snapshot().get("other").value().get());
   // Admin overrides stick over filesystem updates.
   EXPECT_EQ("Layer cake", loader_->snapshot().get("file14").value().get());
   EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15").value().get());
-  ASSERT_TRUE(loader_->mergeValues({{"file14", "Mega layer cake"}}).ok());
+  ASSERT_OK(loader_->mergeValues({{"file14", "Mega layer cake"}}));
   EXPECT_EQ("Mega layer cake", loader_->snapshot().get("file14").value().get());
   EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15").value().get());
   write("test/common/runtime/test_data/current/envoy/file14", "Sad cake");
@@ -815,7 +816,7 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
   setup();
 
   // Set up foo -> bar
-  ASSERT_TRUE(loader_->mergeValues({{"foo", "bar"}}).ok());
+  ASSERT_OK(loader_->mergeValues({{"foo", "bar"}}));
   EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo").value().get());
   const Snapshot* original_snapshot_pointer = loader_->threadsafeSnapshot().get();
 
@@ -852,7 +853,7 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
     if (!read_bar) {
       foo_read.wait(mutex);
     }
-    ASSERT_TRUE(loader_->mergeValues({{"foo", "eep"}}).ok());
+    ASSERT_OK(loader_->mergeValues({{"foo", "eep"}}));
     updated_eep = true;
   }
 
@@ -975,19 +976,18 @@ public:
   void doOnConfigUpdateVerifyNoThrow(const envoy::service::runtime::v3::Runtime& runtime,
                                      uint32_t callback_index = 0) {
     const auto decoded_resources = TestUtility::decodeResources({runtime});
-    EXPECT_TRUE(
-        rtds_callbacks_[callback_index]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    EXPECT_OK(rtds_callbacks_[callback_index]->onConfigUpdate(decoded_resources.refvec_, ""));
   }
 
   void doDeltaOnConfigUpdateVerifyNoThrow(const envoy::service::runtime::v3::Runtime& runtime) {
     const auto decoded_resources = TestUtility::decodeResources({runtime});
-    EXPECT_TRUE(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
+    EXPECT_OK(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, {}, ""));
   }
 
   void doDeltaOnConfigRemovalVerifyNoThrow(const std::string& resource_name) {
     Protobuf::RepeatedPtrField<std::string> removed_resources;
     *removed_resources.Add() = resource_name;
-    EXPECT_TRUE(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, "").ok());
+    EXPECT_OK(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, ""));
   }
 
   std::vector<std::string> layers_{"some_resource"};

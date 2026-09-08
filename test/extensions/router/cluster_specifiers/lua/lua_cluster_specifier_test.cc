@@ -287,6 +287,29 @@ TEST_F(LuaClusterSpecifierPluginTest, ClusterRef) {
   config_->perLuaCodeSetup()->runtimeGC();
 }
 
+// Calling headers() more than once should reuse the cached wrapper.
+TEST_F(LuaClusterSpecifierPluginTest, HeadersCalledTwice) {
+  const std::string config = R"EOF(
+  source_code:
+    inline_string: |
+      function envoy_on_route(route_handle)
+        route_handle:headers()
+        local headers = route_handle:headers()
+        return headers:get("header_key")
+      end
+  default_cluster: default_service
+  )EOF";
+  setUpTest(config);
+
+  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "some_service"}};
+  auto route = plugin_->route(mock_route, headers, stream_info_, 0);
+  EXPECT_EQ("some_service", route->routeEntry()->clusterName());
+
+  // Force the runtime to gc and destroy all the userdata.
+  config_->perLuaCodeSetup()->runtimeGC();
+}
+
 TEST_F(LuaClusterSpecifierPluginTest, Logging) {
   const std::string config = R"EOF(
   source_code:

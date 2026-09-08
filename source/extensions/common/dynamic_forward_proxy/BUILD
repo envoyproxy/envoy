@@ -30,6 +30,7 @@ envoy_cc_library(
     hdrs = ["dns_cache_manager_impl.h"],
     deps = [
         ":dns_cache_impl",
+        "//envoy/server:factory_context_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
@@ -43,6 +44,7 @@ envoy_cc_library(
         ":dns_cache_interface",
         ":dns_cache_resource_manager",
         "//envoy/network:dns_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/common:dns_utils_lib",
@@ -51,7 +53,6 @@ envoy_cc_library(
         "//source/common/matcher:address_matcher_lib",
         "//source/common/network:utility_lib",
         "//source/common/network/dns_resolver:dns_factory_util_lib",
-        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )

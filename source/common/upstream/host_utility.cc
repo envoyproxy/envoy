@@ -245,5 +245,15 @@ void HostUtility::forEachHostMetric(
   });
 }
 
+void HostUtility::forEachOrcaLoadReportRecipient(
+    const HostDescription& host, absl::FunctionRef<void(HostLbPolicyData&)> callback) {
+  for (size_t i = 0; i < host.lbPolicyDataCount(); ++i) {
+    OptRef<HostLbPolicyData> data = host.lbPolicyDataAt(i);
+    if (data.has_value() && data->receivesOrcaLoadReport()) {
+      callback(*data);
+    }
+  }
+}
+
 } // namespace Upstream
 } // namespace Envoy

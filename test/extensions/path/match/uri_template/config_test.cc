@@ -1,6 +1,7 @@
 #include "source/common/config/utility.h"
 #include "source/extensions/path/match/uri_template/config.h"
 
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -9,6 +10,8 @@ namespace Envoy {
 namespace Extensions {
 namespace UriTemplate {
 namespace Match {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(ConfigTest, TestEmptyConfig) {
   const std::string yaml_string = R"EOF(
@@ -62,10 +65,11 @@ TEST(ConfigTest, InvalidConfigSetup) {
   absl::StatusOr<Router::PathMatcherSharedPtr> config_or_error =
       factory->createPathMatcher(*message);
 
-  EXPECT_FALSE(config_or_error.ok());
-  EXPECT_EQ(config_or_error.status().message(),
-            "path_match_policy.path_template /bar/{lang}/{country is invalid: Unmatched variable "
-            "bracket in mixed pattern: \"{country\"");
+  EXPECT_THAT(
+      config_or_error,
+      HasStatusMessage(
+          "path_match_policy.path_template /bar/{lang}/{country is invalid: Unmatched variable "
+          "bracket in mixed pattern: \"{country\""));
 }
 
 // Followup on issue https://github.com/envoyproxy/envoy/issues/34507 -
@@ -95,11 +99,10 @@ TEST(ConfigTest, InvalidConfigSetupMoreInfo) {
   absl::StatusOr<Router::PathMatcherSharedPtr> config_or_error =
       factory->createPathMatcher(*message);
 
-  EXPECT_FALSE(config_or_error.ok());
-  EXPECT_EQ(
-      config_or_error.status().message(),
-      "path_match_policy.path_template /api/MyFunction[{id}] is invalid: Invalid prefix literal: "
-      "\"MyFunction[\"");
+  EXPECT_THAT(config_or_error,
+              HasStatusMessage("path_match_policy.path_template /api/MyFunction[{id}] is invalid: "
+                               "Invalid prefix literal: "
+                               "\"MyFunction[\""));
 }
 
 TEST(ConfigTest, TestConfigSetup) {
@@ -127,7 +130,7 @@ TEST(ConfigTest, TestConfigSetup) {
   absl::StatusOr<Router::PathMatcherSharedPtr> config_or_error =
       factory->createPathMatcher(*message);
 
-  EXPECT_TRUE(config_or_error.ok());
+  EXPECT_OK(config_or_error);
 }
 
 } // namespace Match

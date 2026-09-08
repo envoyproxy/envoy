@@ -40,6 +40,7 @@ struct RdsStats {
  * RDS config providers.
  */
 class RdsRouteConfigSubscription : Envoy::Config::SubscriptionCallbacks,
+                                   RouteConfigUpdateObserver,
                                    protected Logger::Loggable<Logger::Id::rds> {
 public:
   static absl::StatusOr<std::unique_ptr<RdsRouteConfigSubscription>>
@@ -82,10 +83,14 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
 
-  virtual absl::Status beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>&,
-                                            std::unique_ptr<Cleanup>&) {
-    return absl::OkStatus();
-  }
+  // Rds::RouteConfigUpdateObserver
+  // Called by the receiver when the route configuration that it built is warmed up. Publishes the
+  // new route configuration and signals that this subscription is ready.
+  void onConfigWarmed() override;
+
+  // Hooks that a derived subscription uses to react to a warmed up route configuration being
+  // published.
+  virtual absl::Status beforeProviderUpdate() { return absl::OkStatus(); }
   virtual absl::Status afterProviderUpdate() { return absl::OkStatus(); }
 
 protected:
@@ -103,6 +108,12 @@ protected:
   // Target which starts the RDS subscription.
   Init::TargetImpl local_init_target_;
   Init::ManagerImpl local_init_manager_;
+  // Result of the last publishing attempt. Publishing is deferred until the route configuration is
+  // warmed up, so a failure is only reported back to the xDS layer in the common case where there
+  // is nothing to warm up and the publishing therefore happens synchronously. It also gates
+  // whether this subscription signals readiness, so that nothing is told a route configuration is
+  // ready when publishing it failed.
+  absl::Status publish_status_;
   const std::string stat_prefix_;
   const std::string rds_type_;
   RdsStats stats_;

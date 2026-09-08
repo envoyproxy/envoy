@@ -77,19 +77,16 @@ absl::StatusOr<DecodeHeadersBehaviorPtr> createDecodeHeadersBehavior(
   // (odcds_config->resources_locator().empty())").
   if (odcds == nullptr) {
     if (odcds_config->resources_locator().empty()) {
-      // If the config-source is ADS, use a singleton-subscription mechanism,
-      // similar to xDS-TP based configs.
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.odcds_over_ads_fix")) {
-        if (odcds_config->source().config_source_specifier_case() ==
-            envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
-          auto odcds_or =
-              cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create, odcds_config->source(),
-                                  std::nullopt, validation_visitor);
-          RETURN_IF_NOT_OK_REF(odcds_or.status());
-          odcds = std::move(odcds_or.value());
-        }
-      }
-      if (odcds == nullptr) {
+      if (odcds_config->source().config_source_specifier_case() ==
+          envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
+        // If the config-source is ADS, use a singleton-subscription mechanism,
+        // similar to xDS-TP based configs.
+        auto odcds_or =
+            cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create, odcds_config->source(),
+                                std::nullopt, validation_visitor);
+        RETURN_IF_NOT_OK_REF(odcds_or.status());
+        odcds = std::move(odcds_or.value());
+      } else {
         auto odcds_or = cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create, odcds_config->source(),
                                             std::nullopt, validation_visitor);
         RETURN_IF_NOT_OK_REF(odcds_or.status());
@@ -253,14 +250,8 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     return;
   }
 
-  bool can_recreate_stream = false;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.on_demand_track_end_stream")) {
-    // New behavior: track end_stream state to support stream recreation with fully read bodies.
-    can_recreate_stream = downstream_end_stream_;
-  } else {
-    // Old behavior: reject all requests with bodies.
-    can_recreate_stream = !callbacks_->decodingBuffer();
-  }
+  // Track end_stream state to support stream recreation with fully read bodies.
+  const bool can_recreate_stream = downstream_end_stream_;
   if (route_exists &&        // route can be resolved after an on-demand
                              // VHDS update
       can_recreate_stream && // Redirects require fully read body.
@@ -290,14 +281,8 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     return;
   }
 
-  bool can_recreate_stream = false;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.on_demand_track_end_stream")) {
-    // New behavior: track end_stream state to support stream recreation with fully read bodies.
-    can_recreate_stream = downstream_end_stream_;
-  } else {
-    // Old behavior: reject all requests with bodies.
-    can_recreate_stream = !callbacks_->decodingBuffer();
-  }
+  // Track end_stream state to support stream recreation with fully read bodies.
+  const bool can_recreate_stream = downstream_end_stream_;
   if (cluster_status == Upstream::ClusterDiscoveryStatus::Available && can_recreate_stream) {
     // Redirects require fully read body.
     const Http::ResponseHeaderMap* headers = nullptr;

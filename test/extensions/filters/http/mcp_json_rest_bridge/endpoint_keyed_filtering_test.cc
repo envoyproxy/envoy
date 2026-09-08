@@ -6,11 +6,13 @@
 #include "source/extensions/filters/http/mcp_json_rest_bridge/mcp_json_rest_bridge_filter.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
+#include "ocpdiag/core/testing/status_matchers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,22 +20,36 @@ namespace HttpFilters {
 namespace McpJsonRestBridge {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatus;
+using ::testing::HasSubstr;
+
 using testing::_;
 using testing::Eq;
 using testing::Return;
 
 class EndpointKeyedFilteringTest : public testing::Test {
 public:
-  void setupRouteConfig(const std::string& yaml_config) {
+  absl::Status setupRouteConfig(const std::string& yaml_config) {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
         proto_config;
     TestUtility::loadFromYaml(yaml_config, proto_config);
 
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge filter_proto;
-    filter_config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(filter_proto);
-    per_route_config_ = std::make_unique<McpJsonRestBridgePerRouteConfig>(proto_config);
+    absl::StatusOr<McpJsonRestBridgeFilterConfigSharedPtr> filter_config_or =
+        McpJsonRestBridgeFilterConfig::create(filter_proto);
+    if (!filter_config_or.ok()) {
+      return filter_config_or.status();
+    }
+    filter_config_ = filter_config_or.value();
+    absl::StatusOr<McpJsonRestBridgePerRouteConfigSharedPtr> per_route_config_or =
+        McpJsonRestBridgePerRouteConfig::create(proto_config);
+    if (!per_route_config_or.ok()) {
+      return per_route_config_or.status();
+    }
+    per_route_config_ = per_route_config_or.value();
 
     recreateFilter();
+    return absl::OkStatus();
   }
 
   void recreateFilter() {
@@ -50,7 +66,7 @@ public:
   }
 
   McpJsonRestBridgeFilterConfigSharedPtr filter_config_;
-  std::unique_ptr<McpJsonRestBridgePerRouteConfig> per_route_config_;
+  std::shared_ptr<McpJsonRestBridgePerRouteConfig> per_route_config_;
   std::unique_ptr<McpJsonRestBridgeFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -64,7 +80,7 @@ TEST_F(EndpointKeyedFilteringTest, PrecedenceFourStepMatching) {
   // 2. Host match (a.com, "")
   // 3. Path match ("", /mcp)
   // 4. Global match ("", "")
-  setupRouteConfig(R"yaml(
+  ASSERT_OK(setupRouteConfig(R"yaml(
 tool_config:
   - tools:
       - name: tool_exact
@@ -101,7 +117,7 @@ tool_config:
         tool_list_config:
           description: "Global"
     tool_list_local: {}
-)yaml");
+                              )yaml"));
 
   // Case 1: Exact match request (a.com, /mcp)
   // Should return tool_exact, tool_host_only, tool_path_only, and tool_global (via precedence
@@ -152,7 +168,7 @@ tool_config:
 }
 
 TEST_F(EndpointKeyedFilteringTest, ToolCallUsesPrecedenceMatching) {
-  setupRouteConfig(R"yaml(
+  ASSERT_OK(setupRouteConfig(R"yaml(
 tool_config:
   - tools:
       - name: tool_name
@@ -165,7 +181,7 @@ tool_config:
       - name: tool_name
         http_rule:
           get: "/global"
-)yaml");
+                              )yaml"));
 
   // Exact match request (a.com, /mcp) should select /exact route
   {
@@ -212,7 +228,7 @@ tool_config:
 )yaml",
                             filter_proto);
 
-  auto filter_config = std::make_shared<McpJsonRestBridgeFilterConfig>(filter_proto);
+  ASSERT_OK_AND_ASSIGN(auto filter_config, McpJsonRestBridgeFilterConfig::create(filter_proto));
 
   EXPECT_FALSE(filter_config->textContentStreamingEnabled("tool_no_stream", "a.com", "/mcp"));
   EXPECT_FALSE(filter_config->textContentStreamingEnabled("non_existent_tool", "a.com", "/mcp"));
@@ -230,32 +246,10 @@ tool_config:
 )yaml",
                             route_proto);
 
-  auto per_route_config = std::make_unique<McpJsonRestBridgePerRouteConfig>(route_proto);
+  ASSERT_OK_AND_ASSIGN(auto per_route_config, McpJsonRestBridgePerRouteConfig::create(route_proto));
 
   EXPECT_FALSE(per_route_config->textContentStreamingEnabled("tool_no_stream", "a.com", "/mcp"));
   EXPECT_FALSE(per_route_config->textContentStreamingEnabled("non_existent_tool", "a.com", "/mcp"));
-}
-
-TEST_F(EndpointKeyedFilteringTest, ToolListLocalToolsHandlesDuplicateNames) {
-  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge filter_proto;
-  TestUtility::loadFromYaml(R"yaml(
-tool_config:
-  tools:
-    - name: duplicate_tool
-      http_rule:
-        get: "/exact"
-  default_server_info:
-    host: ""
-    path: ""
-  tool_list_local: {}
-)yaml",
-                            filter_proto);
-
-  auto filter_config = std::make_shared<McpJsonRestBridgeFilterConfig>(filter_proto);
-
-  auto tools = filter_config->toolListLocalTools("", "/mcp");
-  ASSERT_EQ(tools.size(), 1);
-  EXPECT_EQ(tools[0]->name(), "duplicate_tool");
 }
 
 TEST_F(EndpointKeyedFilteringTest, PerRouteToolListLocalReturnsFalse) {
@@ -272,14 +266,14 @@ tool_config:
 )yaml",
                             route_proto);
 
-  auto per_route_config = std::make_unique<McpJsonRestBridgePerRouteConfig>(route_proto);
+  ASSERT_OK_AND_ASSIGN(auto per_route_config, McpJsonRestBridgePerRouteConfig::create(route_proto));
 
   EXPECT_FALSE(per_route_config->toolListLocal("a.com", "/mcp"));
   EXPECT_FALSE(per_route_config->toolListLocal("b.com", "/other"));
 }
 
 TEST_F(EndpointKeyedFilteringTest, CustomAndDefaultEndpointPathMatching) {
-  setupRouteConfig(R"yaml(
+  ASSERT_OK(setupRouteConfig(R"yaml(
 tool_config:
   - tools:
       - name: custom_tool
@@ -292,7 +286,7 @@ tool_config:
       - name: default_tool
         http_rule:
           get: "/default_response"
-)yaml");
+                              )yaml"));
 
   // Case 1: Match the specific path "/custom_path" with host "a.com" (verifying port stripping
   // works)

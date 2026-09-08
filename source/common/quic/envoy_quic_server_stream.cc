@@ -208,7 +208,8 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #ifndef ENVOY_ENABLE_UHV
   // These checks are now part of UHV
   if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
-      Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus() ||
+      (filterManagerConnection()->shouldValidateUpstreamHeaders() &&
+       Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus()) ||
       (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(std::nullopt);
@@ -487,14 +488,6 @@ void EnvoyQuicServerStream::OnClose() {
   stats_gatherer_ = nullptr;
 }
 
-void EnvoyQuicServerStream::clearWatermarkBuffer() {
-  if (BufferedDataBytes() > 0) {
-    // If the stream is closed without sending out all buffered data, regard
-    // them as sent now and adjust connection buffer book keeping.
-    updateBytesBuffered(BufferedDataBytes(), 0);
-  }
-}
-
 void EnvoyQuicServerStream::OnCanWrite() {
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   quic::QuicSpdyServerStreamBase::OnCanWrite();
@@ -609,9 +602,16 @@ bool EnvoyQuicServerStream::useCapsuleProtocol() {
     return false;
   }
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  Http::RequestDecoder* decoder = requestDecoderOrNull();
-  ASSERT(decoder != nullptr);
-  http_datagram_handler_->setStreamDecoder(decoder);
+  if (request_decoder_ && request_decoder_->get().has_value()) {
+    std::shared_ptr<Http::RequestDecoderHandle> handle =
+        request_decoder_->get().ptr()->getRequestDecoderHandle();
+    http_datagram_handler_->setStreamDecoderProvider([handle]() -> Http::StreamDecoder* {
+      if (handle && handle->get().has_value()) {
+        return handle->get().ptr();
+      }
+      return nullptr;
+    });
+  }
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
   return true;
 }

@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     srcs = ["cluster_test.cc"],
     data = ["//test/common/tls/test_data:certs"],
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
@@ -35,6 +35,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/common/dns/v3:pkg_cc_proto",

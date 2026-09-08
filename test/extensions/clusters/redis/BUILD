@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     name = "redis_cluster_test",
     srcs = ["redis_cluster_test.cc"],
     extension_names = ["envoy.clusters.redis"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -45,6 +45,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:health_check_event_logger_mocks",
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:priority_set_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/redis/v3:pkg_cc_proto",
@@ -56,7 +57,7 @@ envoy_extension_cc_test(
     name = "redis_cluster_lb_test",
     srcs = ["redis_cluster_lb_test.cc"],
     extension_names = ["envoy.clusters.redis"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/event:dispatcher_lib",
@@ -82,6 +83,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -91,7 +93,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["redis_cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.redis"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/clusters/redis:redis_cluster",
         "//source/extensions/clusters/redis:redis_cluster_lb",
@@ -122,6 +124,6 @@ envoy_cc_mock(
 envoy_cc_test(
     name = "crc16_test",
     srcs = ["crc16_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = ["//source/extensions/clusters/redis:crc16_lib"],
 )

@@ -85,8 +85,8 @@ Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getStaticFieldIdFromCache(JNIEn
 
 #define DEFINE_JNI_GET_FIELD(JAVA_TYPE, JNI_TYPE)                                                  \
   extern "C" JNIEXPORT JNI_TYPE JNICALL                                                            \
-      Java_io_envoyproxy_envoymobile_jni_JniHelperTest_get##JAVA_TYPE##Field(                      \
-          JNIEnv* env, jclass, jclass clazz, jobject object, jstring name, jstring signature) {    \
+  Java_io_envoyproxy_envoymobile_jni_JniHelperTest_get##JAVA_TYPE##Field(                          \
+      JNIEnv* env, jclass, jclass clazz, jobject object, jstring name, jstring signature) {        \
     Envoy::JNI::JniHelper jni_helper(env);                                                         \
     Envoy::JNI::StringUtfUniquePtr name_ptr = jni_helper.getStringUtfChars(name, nullptr);         \
     Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);     \
@@ -226,8 +226,8 @@ Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getArrayLength(JNIEnv* env, jcl
 
 #define DEFINE_JNI_NEW_ARRAY(JAVA_TYPE, JNI_TYPE)                                                  \
   extern "C" JNIEXPORT JNI_TYPE JNICALL                                                            \
-      Java_io_envoyproxy_envoymobile_jni_JniHelperTest_new##JAVA_TYPE##Array(JNIEnv* env, jclass,  \
-                                                                             jsize length) {       \
+  Java_io_envoyproxy_envoymobile_jni_JniHelperTest_new##JAVA_TYPE##Array(JNIEnv* env, jclass,      \
+                                                                         jsize length) {           \
     Envoy::JNI::JniHelper jni_helper(env);                                                         \
     return jni_helper.new##JAVA_TYPE##Array(length).release();                                     \
   }
@@ -251,8 +251,8 @@ Java_io_envoyproxy_envoymobile_jni_JniHelperTest_newObjectArray(JNIEnv* env, jcl
 
 #define DEFINE_JNI_GET_ARRAY_ELEMENTS(JAVA_TYPE, JNI_TYPE, VALUE)                                  \
   extern "C" JNIEXPORT JNI_TYPE JNICALL                                                            \
-      Java_io_envoyproxy_envoymobile_jni_JniHelperTest_get##JAVA_TYPE##ArrayElements(              \
-          JNIEnv* env, jclass, JNI_TYPE array) {                                                   \
+  Java_io_envoyproxy_envoymobile_jni_JniHelperTest_get##JAVA_TYPE##ArrayElements(                  \
+      JNIEnv* env, jclass, JNI_TYPE array) {                                                       \
     Envoy::JNI::JniHelper jni_helper(env);                                                         \
     auto array_elements = jni_helper.get##JAVA_TYPE##ArrayElements(array, nullptr);                \
     jsize length = jni_helper.getArrayLength(array);                                               \
@@ -289,8 +289,8 @@ Java_io_envoyproxy_envoymobile_jni_JniHelperTest_setObjectArrayElement(JNIEnv* e
 
 #define DEFINE_JNI_SET_ARRAY_REGION(JAVA_TYPE, JNI_TYPE)                                           \
   extern "C" JNIEXPORT void JNICALL                                                                \
-      Java_io_envoyproxy_envoymobile_jni_JniHelperTest_set##JAVA_TYPE##ArrayRegion(                \
-          JNIEnv* env, jclass, JNI_TYPE array, jsize start, jsize length, JNI_TYPE buffer) {       \
+  Java_io_envoyproxy_envoymobile_jni_JniHelperTest_set##JAVA_TYPE##ArrayRegion(                    \
+      JNIEnv* env, jclass, JNI_TYPE array, jsize start, jsize length, JNI_TYPE buffer) {           \
     Envoy::JNI::JniHelper jni_helper(env);                                                         \
     auto c_buffer = jni_helper.get##JAVA_TYPE##ArrayElements(buffer, nullptr);                     \
     env->Set##JAVA_TYPE##ArrayRegion(array, start, length, c_buffer.get());                        \
@@ -307,8 +307,8 @@ DEFINE_JNI_SET_ARRAY_REGION(Boolean, jbooleanArray)
 
 #define DEFINE_JNI_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                                \
   extern "C" JNIEXPORT JNI_TYPE JNICALL                                                            \
-      Java_io_envoyproxy_envoymobile_jni_JniHelperTest_call##JAVA_TYPE##Method(                    \
-          JNIEnv* env, jclass, jclass clazz, jobject object, jstring name, jstring signature) {    \
+  Java_io_envoyproxy_envoymobile_jni_JniHelperTest_call##JAVA_TYPE##Method(                        \
+      JNIEnv* env, jclass, jclass clazz, jobject object, jstring name, jstring signature) {        \
     Envoy::JNI::JniHelper jni_helper(env);                                                         \
     Envoy::JNI::StringUtfUniquePtr name_ptr = jni_helper.getStringUtfChars(name, nullptr);         \
     Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);     \
@@ -347,8 +347,8 @@ Java_io_envoyproxy_envoymobile_jni_JniHelperTest_callObjectMethod(JNIEnv* env, j
 
 #define DEFINE_JNI_CALL_STATIC_METHOD(JAVA_TYPE, JNI_TYPE)                                         \
   extern "C" JNIEXPORT JNI_TYPE JNICALL                                                            \
-      Java_io_envoyproxy_envoymobile_jni_JniHelperTest_callStatic##JAVA_TYPE##Method(              \
-          JNIEnv* env, jclass, jclass clazz, jstring name, jstring signature) {                    \
+  Java_io_envoyproxy_envoymobile_jni_JniHelperTest_callStatic##JAVA_TYPE##Method(                  \
+      JNIEnv* env, jclass, jclass clazz, jstring name, jstring signature) {                        \
     Envoy::JNI::JniHelper jni_helper(env);                                                         \
     Envoy::JNI::StringUtfUniquePtr name_ptr = jni_helper.getStringUtfChars(name, nullptr);         \
     Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);     \

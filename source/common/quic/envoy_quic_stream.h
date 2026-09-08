@@ -205,6 +205,13 @@ protected:
   onStreamError(std::optional<bool> should_close_connection,
                 quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) PURE;
 
+  // Drain the stream's contribution to the connection-level bytes_to_send_ counter on close.
+  void clearWatermarkBuffer() {
+    if (reported_buffered_bytes_ > 0) {
+      updateBytesBuffered(reported_buffered_bytes_, 0);
+    }
+  }
+
   // TODO(danzh) remove this once QUICHE enforces content-length consistency.
   void updateReceivedContentBytes(size_t payload_length, bool end_stream) {
     received_content_bytes_ += payload_length;

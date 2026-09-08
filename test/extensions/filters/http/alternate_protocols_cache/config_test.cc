@@ -31,8 +31,10 @@ TEST(AlternateProtocolsCacheFilterConfigTest, AlternateProtocolsCacheFilterWithS
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AlternateProtocolsCacheFilterFactory factory;
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
+      factory.createHttpFilterFactoryFromProto(proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(filter_callback, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));

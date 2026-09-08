@@ -9,6 +9,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/missing_cluster_notifier.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -77,8 +78,8 @@ TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnConfigUpdate) {
       *cm_.subscription_factory_.subscription_,
       requestOnDemandUpdate(UnorderedElementsAre("another_cluster_1", "another_cluster_2")));
   auto result = odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0");
-  ASSERT_TRUE(result.ok()) << result.message();
-  //  ASSERT_TRUE(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0").ok());
+  ASSERT_OK(result);
+  //  ASSERT_OK(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0"));
 }
 
 // Check that the awaiting list is processed when we receive a failure response for the initial
@@ -135,7 +136,7 @@ TEST_F(OdCdsApiImplTest, OnDemandUpdateIsRequestedAfterInitialFetch) {
   envoy::config::cluster::v3::Cluster cluster;
   cluster.set_name("fake_cluster");
   const auto decoded_resources = TestUtility::decodeResources({cluster});
-  ASSERT_TRUE(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0").ok());
+  ASSERT_OK(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0"));
   EXPECT_CALL(*cm_.subscription_factory_.subscription_,
               requestOnDemandUpdate(UnorderedElementsAre("another_cluster")));
   odcds_->updateOnDemand("another_cluster");
@@ -162,7 +163,7 @@ TEST_F(OdCdsApiImplTest, NotifierGetsUsed) {
   EXPECT_CALL(notifier_, notifyMissingCluster("missing_cluster"));
   std::vector<std::string> v{"missing_cluster"};
   Protobuf::RepeatedPtrField<std::string> removed(v.begin(), v.end());
-  ASSERT_TRUE(odcds_callbacks_->onConfigUpdate({}, removed, "").ok());
+  ASSERT_OK(odcds_callbacks_->onConfigUpdate({}, removed, ""));
 }
 
 // Check that notifier won't be used for a requested cluster that did
@@ -184,10 +185,10 @@ TEST_F(OdCdsApiImplTest, NotifierNotUsed) {
   odcds_->updateOnDemand("cluster");
   EXPECT_CALL(notifier_, notifyMissingCluster(_)).Times(2);
   EXPECT_CALL(notifier_, notifyMissingCluster("cluster")).Times(0);
-  ASSERT_TRUE(odcds_callbacks_->onConfigUpdate(some_cluster_resource.refvec_, {}, "").ok());
-  ASSERT_TRUE(odcds_callbacks_->onConfigUpdate({}, removed, "").ok());
-  ASSERT_TRUE(odcds_callbacks_->onConfigUpdate({}, {}, "").ok());
-  ASSERT_TRUE(odcds_callbacks_->onConfigUpdate(some_cluster2_resource.refvec_, removed2, "").ok());
+  ASSERT_OK(odcds_callbacks_->onConfigUpdate(some_cluster_resource.refvec_, {}, ""));
+  ASSERT_OK(odcds_callbacks_->onConfigUpdate({}, removed, ""));
+  ASSERT_OK(odcds_callbacks_->onConfigUpdate({}, {}, ""));
+  ASSERT_OK(odcds_callbacks_->onConfigUpdate(some_cluster2_resource.refvec_, removed2, ""));
 }
 
 } // namespace

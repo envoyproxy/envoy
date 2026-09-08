@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.reverse_tunnel.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/extensions/filters/common/jwks/v3/jwt_handshake.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -96,7 +97,7 @@ message Validation {
 // Configuration for the reverse tunnel network filter.
 // This filter handles reverse tunnel connection acceptance and rejection by processing
 // HTTP requests where required identification values are provided via HTTP headers.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message ReverseTunnel {
   // Ping interval for health checks on established reverse tunnel connections.
   // If not specified, defaults to ``2 seconds``.
@@ -145,6 +146,32 @@ message ReverseTunnel {
   // This avoids the cross-worker lock in pickLeastLoadedSocketManager.
   // Default: false (rebalancing enabled).
   bool skip_rebalancing = 8;
+
+  // Optional JWT authentication for the handshake. When set, the bearer token carried in the
+  // handshake request is verified before the connection is accepted or its socket registered, so a
+  // forged or expired token can never produce a usable reverse tunnel. This runs on the real
+  // accepted socket, before registration, so it does not interfere with socket reuse. A missing or
+  // invalid token rejects the handshake with HTTP ``401 Unauthorized`` unless
+  // ``allow_missing_or_failed`` is set.
+  //
+  // On success, the verified claims are published as dynamic metadata (default namespace
+  // ``envoy.filters.network.reverse_tunnel.jwt``) so the :ref:`Validation
+  // <envoy_v3_api_msg_extensions.filters.network.reverse_tunnel.v3.Validation>` block can bind a
+  // claimed handshake identifier to a verified claim, e.g.::
+  //
+  //    tenant_id_format: "%DYNAMIC_METADATA(envoy.filters.network.reverse_tunnel.jwt:tenant)%"
+  //
+  // forces the ``x-envoy-reverse-tunnel-tenant-id`` header to equal the verified ``tenant`` claim.
+  // Without such a binding, a token minted for one tenant can open a tunnel claiming another.
+  //
+  // Token verification is synchronous. With ``remote_jwks`` the keys are fetched and refreshed in the
+  // background (at startup and every ``cache_duration``) and cached, never on the accept path. Before
+  // the first successful fetch, or while a refresh is failing with nothing cached, every token is
+  // rejected. ``token_header`` defaults to ``authorization`` and ``clock_skew_seconds`` to 60.
+  //
+  // See :ref:`JwtHandshakeValidator
+  // <envoy_v3_api_msg_extensions.filters.common.jwks.v3.JwtHandshakeValidator>`.
+  common.jwks.v3.JwtHandshakeValidator jwt_validator = 10;
 
   // Enforces the per-node concurrent connection cap (``max_connections_per_node``, configured on
   // the ``UpstreamReverseConnectionSocketInterface`` bootstrap extension) for tunnels accepted by

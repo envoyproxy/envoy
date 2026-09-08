@@ -18,6 +18,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
+#include "source/common/router/vhds.h"
 
 namespace Envoy {
 namespace Router {
@@ -54,61 +55,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() { config_update_info_.release(); }
 
-absl::Status RdsRouteConfigSubscription::beforeProviderUpdate(
-    std::unique_ptr<Init::ManagerImpl>& noop_init_manager, std::unique_ptr<Cleanup>& resume_rds) {
-  if (config_update_info_->protobufConfigurationCast().has_vhds() &&
-      config_update_info_->vhdsConfigurationChanged()) {
-    ENVOY_LOG(debug,
-              "rds: vhds configuration present/changed, (re)starting vhds: config_name={} hash={}",
-              route_config_name_, routeConfigUpdate()->configHash());
-    ASSERT(config_update_info_->configInfo().has_value());
-    maybeCreateInitManager(routeConfigUpdate()->configInfo().value().version_, noop_init_manager,
-                           resume_rds);
-    auto subscription_or_error = VhdsSubscription::createVhdsSubscription(
-        config_update_info_, factory_context_, stat_prefix_, route_config_provider_);
-    RETURN_IF_NOT_OK_REF(subscription_or_error.status());
-    vhds_subscription_ = std::move(subscription_or_error.value());
-    vhds_subscription_->registerInitTargetWithInitManager(
-        noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);
-  }
-  return absl::OkStatus();
-}
-
 absl::Status RdsRouteConfigSubscription::afterProviderUpdate() {
-  // RDS update removed VHDS configuration
-  if (!config_update_info_->protobufConfigurationCast().has_vhds()) {
-    vhds_subscription_.release();
-  }
-
   return update_callback_manager_.runCallbacks();
-}
-
-// Initialize a no-op InitManager in case the one in the factory_context has completed
-// initialization. This can happen if an RDS config update for an already established RDS
-// subscription contains VHDS configuration.
-void RdsRouteConfigSubscription::maybeCreateInitManager(
-    const std::string& version_info, std::unique_ptr<Init::ManagerImpl>& init_manager,
-    std::unique_ptr<Cleanup>& init_vhds) {
-  if (local_init_manager_.state() == Init::Manager::State::Initialized) {
-    init_manager = std::make_unique<Init::ManagerImpl>(
-        fmt::format("VHDS {}:{}", route_config_name_, version_info));
-    init_vhds = std::make_unique<Cleanup>([this, &init_manager, version_info] {
-      // For new RDS subscriptions created after listener warming up, we don't wait for them to warm
-      // up.
-      Init::WatcherImpl noop_watcher(
-          // Note: we just throw it away.
-          fmt::format("VHDS ConfigUpdate watcher {}:{}", route_config_name_, version_info),
-          []() { /*Do nothing.*/ });
-      init_manager->initialize(noop_watcher);
-    });
-  }
-}
-
-void RdsRouteConfigSubscription::updateOnDemand(const std::string& aliases) {
-  if (vhds_subscription_.get() == nullptr) {
-    return;
-  }
-  vhds_subscription_->updateOnDemand(aliases);
 }
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
@@ -198,8 +146,8 @@ RouteConfigProviderSharedPtr RdsFactoryImpl::createRdsRouteConfigProvider(
   auto provider = manager.addDynamicProvider(
       rds, rds.route_config_name(), init_manager,
       [&factory_context, &rds, &stat_prefix, &manager, &proto_traits](uint64_t manager_identifier) {
-        auto config_update =
-            std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits, factory_context);
+        auto config_update = std::make_unique<RouteConfigUpdateReceiverImpl>(
+            proto_traits, factory_context, stat_prefix + "rds.");
         auto resource_decoder = std::make_shared<
             Envoy::Config::OpaqueResourceDecoderImpl<envoy::config::route::v3::RouteConfiguration>>(
             factory_context.messageValidationContext().dynamicValidationVisitor(), "name");

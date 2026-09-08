@@ -82,7 +82,7 @@ public:
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _, _, _))
         .WillByDefault(
             Invoke([&](Network::IoHandle& io_handle, Stats::Scope& scope, Envoy::Event::Dispatcher&,
-                       absl::AnyInvocable<void()&&>) -> Network::UdpPacketWriterPtr {
+                       absl::AnyInvocable<void() &&>) -> Network::UdpPacketWriterPtr {
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
               return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
 #else
@@ -193,6 +193,17 @@ TEST_P(ActiveUdpListenerTest, MultipleFiltersOnReceiveErrorStopIteration) {
 
   Network::UdpRecvData data;
   active_listener_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
+}
+
+// Drain notifications are broadcast to every listener the connection handler owns, so a UDP
+// listener receives them on any server drain or hot restart. They must be silent no-ops rather
+// than ENVOY_BUGs. See ListenerManagerImpl::onServerDrainStart().
+TEST_P(ActiveUdpListenerTest, DrainNotificationsAreNoOps) {
+  setup();
+
+  active_listener_->onListenerDrainStart(Network::ConnectionDrainEvent{});
+  const std::list<const Network::FilterChain*> filter_chains;
+  active_listener_->onFilterChainDrainStart(filter_chains, Network::ConnectionDrainEvent{});
 }
 
 } // namespace

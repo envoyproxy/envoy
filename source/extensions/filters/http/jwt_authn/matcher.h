@@ -34,7 +34,7 @@ public:
    * @param rule  the proto rule match message.
    * @return the matcher instance.
    */
-  static MatcherConstPtr
+  static absl::StatusOr<MatcherConstPtr>
   create(const envoy::extensions::filters::http::jwt_authn::v3::RequirementRule& rule,
          Server::Configuration::CommonFactoryContext& context);
 };

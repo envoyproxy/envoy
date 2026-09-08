@@ -4,7 +4,9 @@
 
 #include "test/common/tls/mock_ssl_handshaker.h"
 #include "test/mocks/common.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 
@@ -16,6 +18,7 @@
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -48,6 +51,35 @@ TEST_F(ReverseConnectionUtilityTest, IsPingMessageInvalidData) {
   EXPECT_FALSE(ReverseConnectionUtility::isPingMessage("RPIN"));
   EXPECT_FALSE(ReverseConnectionUtility::isPingMessage("RPINGG"));
   EXPECT_FALSE(ReverseConnectionUtility::isPingMessage("Hello World"));
+}
+
+// Test RPING prefix classification.
+using RpingPrefixMatch = ReverseConnectionUtility::RpingPrefixMatch;
+
+TEST_F(ReverseConnectionUtilityTest, ClassifyRpingPrefixComplete) {
+  // Exactly RPING, or RPING followed by trailing application bytes: both are Complete since only
+  // the first PING_MESSAGE.size() bytes are considered.
+  EXPECT_EQ(RpingPrefixMatch::Complete, ReverseConnectionUtility::classifyRpingPrefix("RPING"));
+  EXPECT_EQ(RpingPrefixMatch::Complete,
+            ReverseConnectionUtility::classifyRpingPrefix("RPINGhello"));
+}
+
+TEST_F(ReverseConnectionUtilityTest, ClassifyRpingPrefixPartial) {
+  // Empty input and every proper prefix of RPING are viable partials.
+  EXPECT_EQ(RpingPrefixMatch::PartialPrefix, ReverseConnectionUtility::classifyRpingPrefix(""));
+  EXPECT_EQ(RpingPrefixMatch::PartialPrefix, ReverseConnectionUtility::classifyRpingPrefix("R"));
+  EXPECT_EQ(RpingPrefixMatch::PartialPrefix, ReverseConnectionUtility::classifyRpingPrefix("RP"));
+  EXPECT_EQ(RpingPrefixMatch::PartialPrefix, ReverseConnectionUtility::classifyRpingPrefix("RPI"));
+  EXPECT_EQ(RpingPrefixMatch::PartialPrefix, ReverseConnectionUtility::classifyRpingPrefix("RPIN"));
+}
+
+TEST_F(ReverseConnectionUtilityTest, ClassifyRpingPrefixNotRping) {
+  // A short non-prefix, and a full-length non-match, are both classified as not-RPING.
+  EXPECT_EQ(RpingPrefixMatch::NotRping, ReverseConnectionUtility::classifyRpingPrefix("X"));
+  EXPECT_EQ(RpingPrefixMatch::NotRping, ReverseConnectionUtility::classifyRpingPrefix("RPX"));
+  EXPECT_EQ(RpingPrefixMatch::NotRping, ReverseConnectionUtility::classifyRpingPrefix("PING"));
+  EXPECT_EQ(RpingPrefixMatch::NotRping,
+            ReverseConnectionUtility::classifyRpingPrefix("Hello World"));
 }
 
 // Test createPingResponse functionality

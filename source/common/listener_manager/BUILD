@@ -19,7 +19,7 @@ envoy_cc_library(
         "listener_impl.h",
         "listener_manager_impl.h",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":active_raw_udp_listener_config",
         ":connection_handler_lib",
@@ -29,6 +29,7 @@ envoy_cc_library(
         "//envoy/access_log:access_log_interface",
         "//envoy/config:typed_metadata_interface",
         "//envoy/network:connection_interface",
+        "//envoy/network:drain_decision_interface",
         "//envoy/network:listener_interface",
         "//envoy/network:udp_packet_writer_factory_factory_interface",
         "//envoy/server:api_listener_interface",
@@ -98,12 +99,40 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "fcds_api_lib",
+    srcs = [
+        "fcds_api.cc",
+    ],
+    hdrs = [
+        "fcds_api.h",
+    ],
+    deps = [
+        ":filter_chain_factory_context_callback",
+        "//envoy/config:subscription_factory_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/init:manager_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/server:listener_manager_interface",
+        "//envoy/server:transport_socket_config_interface",
+        "//source/common/config:resource_type_helper_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/init:manager_lib",
+        "//source/common/init:target_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_chain_manager_lib",
     srcs = ["filter_chain_manager_impl.cc"],
     hdrs = ["filter_chain_manager_impl.h"],
     deps = [
+        ":fcds_api_lib",
         ":filter_chain_factory_context_callback",
         "//envoy/config:typed_metadata_interface",
+        "//envoy/init:manager_interface",
         "//envoy/matcher:matcher_interface",
         "//envoy/network:filter_interface",
         "//envoy/server:instance_interface",
@@ -119,6 +148,9 @@ envoy_cc_library(
         "//source/common/network/matching:inputs_lib",
         "//source/server:configuration_lib",
         "//source/server:factory_context_lib",
+        "//source/server:generic_factory_context_lib",
+        "//source/server:transport_socket_config_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([

@@ -155,7 +155,7 @@ ScopedResume NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
 }
 
 void NewGrpcMuxImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
+    ResponseProtoPtr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());

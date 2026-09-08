@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.wrr_locality"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/wrr_locality:config",
@@ -32,7 +32,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.wrr_locality"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/wrr_locality:config",

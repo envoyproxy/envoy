@@ -357,6 +357,53 @@ TEST(FineGrainLog, listFineGrainLoggersExcludesGroups) {
   EXPECT_THAT(loggers, testing::Not(HasSubstr(group_key)));
 }
 
+TEST(FineGrainLog, listFineGrainLoggersWithColonsInPath) {
+  Logger::Context::enableFineGrainLogger();
+  std::atomic<spdlog::logger*> flogger{nullptr};
+  const std::string file_path = "path/with:colon/file.cc";
+
+  getFineGrainLogContext().initFineGrainLogger(file_path, "", flogger);
+
+  std::string loggers = getFineGrainLogContext().listFineGrainLoggers();
+  EXPECT_THAT(loggers, HasSubstr(file_path));
+
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(file_path);
+}
+
+TEST(FineGrainLog, listFineGrainLoggersWithColonsAndGroups) {
+  Logger::Context::enableFineGrainLogger();
+  std::atomic<spdlog::logger*> flogger1{nullptr};
+  std::atomic<spdlog::logger*> flogger2{nullptr};
+  const std::string file_path = "path/with:colon/file.cc";
+  const std::string group_name = "my_group";
+  const std::string combined_key = "path/with:colon/file.cc:my_group";
+
+  getFineGrainLogContext().initFineGrainLogger(file_path, "", flogger1);
+  getFineGrainLogContext().initFineGrainLogger(file_path, group_name, flogger2);
+
+  std::string loggers = getFineGrainLogContext().listFineGrainLoggers();
+
+  // The base file logger should be listed
+  EXPECT_THAT(loggers, HasSubstr(file_path));
+  // The combined group logger key should NOT be listed
+  EXPECT_THAT(loggers, testing::Not(HasSubstr(combined_key)));
+
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(file_path);
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(combined_key);
+}
+
+TEST(FineGrainLog, parseKeyFallbackWithoutRegistry) {
+  Logger::Context::enableFineGrainLogger();
+  const std::string synthetic_key = "unregistered/file.cc:some_group";
+
+  // Setting verbosity using pattern matching triggers getLogLevel which relies on parseKey fallback
+  getFineGrainLogContext().updateVerbositySetting(
+      {{synthetic_key, static_cast<int>(spdlog::level::warn), false}});
+
+  // Verify updates didn't crash and were registered properly
+  getFineGrainLogContext().updateVerbositySetting({});
+}
+
 TEST(FineGrainLog, getFineGrainLogEntryForFlush) {
   Logger::Context::enableFineGrainLogger();
 

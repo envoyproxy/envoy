@@ -59,7 +59,7 @@ private:
   // in a backlog and flushes them on the next submission, so they are reaped on a later pass.
   void checkCqOverflow();
 
-  struct io_uring ring_ {};
+  struct io_uring ring_{};
   std::vector<struct io_uring_cqe*> cqes_;
   os_fd_t event_fd_{INVALID_SOCKET};
   std::list<InjectedCompletion> injected_completions_;

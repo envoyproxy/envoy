@@ -18,11 +18,11 @@ using ConfigSharedPtr = std::shared_ptr<LanguageFilterConfig>;
 
 class ConfigTest : public testing::Test {
 public:
-  void initializeFilter(const std::string& yaml) {
+  absl::Status initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::language::v3alpha::Language proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
 
-    factory_.createFilterFactoryFromProtoTyped(proto_config, "stats", factory_context_);
+    return factory_.createFilterFactoryFromProto(proto_config, "stats", factory_context_).status();
   }
 
 private:
@@ -36,7 +36,7 @@ default_language: en
 supported_languages: [fr, en-uk]
 )EOF";
 
-  EXPECT_NO_THROW(initializeFilter(yaml));
+  EXPECT_TRUE(initializeFilter(yaml).ok());
 }
 
 } // namespace Language

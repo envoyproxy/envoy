@@ -82,6 +82,7 @@ spdlog::logger* FineGrainLogContext::initFineGrainLogger(absl::string_view file,
   }
 
   absl::WriterMutexLock l(fine_grain_log_lock_);
+  logger_keys_[key] = {std::string(file), std::string(name)};
   auto it = fine_grain_log_map_->find(key);
   spdlog::logger* target;
   if (it == fine_grain_log_map_->end()) {
@@ -302,7 +303,12 @@ level_enum FineGrainLogContext::getLogLevel(absl::string_view key) const {
 }
 
 std::pair<absl::string_view, absl::string_view>
-FineGrainLogContext::parseKey(absl::string_view key) {
+FineGrainLogContext::parseKey(absl::string_view key) const {
+  auto it = logger_keys_.find(key);
+  if (it != logger_keys_.end()) {
+    return {it->second.first, it->second.second};
+  }
+
   absl::string_view file = key;
   absl::string_view name;
   size_t colon = key.rfind(':');

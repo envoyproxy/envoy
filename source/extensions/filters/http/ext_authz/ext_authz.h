@@ -22,6 +22,7 @@
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
@@ -587,7 +588,7 @@ private:
   bool initiating_call_{};
   bool buffer_data_{};
   bool skip_check_{false};
-  envoy::service::auth::v3::CheckRequest check_request_;
+  ArenaWrappedProto<envoy::service::auth::v3::CheckRequest> check_request_;
 };
 
 } // namespace ExtAuthz

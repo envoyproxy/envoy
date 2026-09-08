@@ -25,7 +25,7 @@ std::string buildQueryFromBytes(const char* bytes, const size_t count) {
 std::string buildQueryForDomain(const std::string& name, uint16_t rec_type, uint16_t rec_class,
                                 const uint16_t query_id) {
   Random::RandomGeneratorImpl random_;
-  struct DnsHeader query {};
+  struct DnsHeader query{};
   uint16_t id = query_id ? query_id : (random_.random() % 0xFFFF) + 1;
 
   // Generate a random query ID

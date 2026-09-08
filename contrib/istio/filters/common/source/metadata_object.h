@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 
 #include "envoy/common/hashable.h"
@@ -147,6 +148,8 @@ public:
   std::vector<std::pair<std::string, std::string>> labels_;
 };
 
+using WorkloadMetadataObjectConstSharedPtr = std::shared_ptr<const WorkloadMetadataObject>;
+
 // Parse string workload type.
 WorkloadType fromSuffix(absl::string_view suffix);
 
@@ -157,14 +160,14 @@ WorkloadType parseOwner(absl::string_view owner, absl::string_view workload);
 Envoy::Protobuf::Struct convertWorkloadMetadataToStruct(const WorkloadMetadataObject& obj);
 
 // Convert struct to a metadata object.
-std::unique_ptr<WorkloadMetadataObject>
+WorkloadMetadataObjectConstSharedPtr
 convertStructToWorkloadMetadata(const Envoy::Protobuf::Struct& metadata);
 
-std::unique_ptr<WorkloadMetadataObject>
+WorkloadMetadataObjectConstSharedPtr
 convertStructToWorkloadMetadata(const Envoy::Protobuf::Struct& metadata,
                                 const absl::flat_hash_set<std::string>& additional_labels);
 
-std::unique_ptr<WorkloadMetadataObject>
+WorkloadMetadataObjectConstSharedPtr
 convertStructToWorkloadMetadata(const Envoy::Protobuf::Struct& metadata,
                                 const absl::flat_hash_set<std::string>& additional_labels,
                                 const std::optional<envoy::config::core::v3::Locality> locality);
@@ -178,9 +181,9 @@ std::optional<WorkloadMetadataObject> convertEndpointMetadata(const std::string&
 std::string serializeToStringDeterministic(const Envoy::Protobuf::Struct& metadata);
 
 // Convert from baggage encoding.
-std::unique_ptr<WorkloadMetadataObject> convertBaggageToWorkloadMetadata(absl::string_view data);
-std::unique_ptr<WorkloadMetadataObject>
-convertBaggageToWorkloadMetadata(absl::string_view baggage, absl::string_view identity);
+WorkloadMetadataObjectConstSharedPtr convertBaggageToWorkloadMetadata(absl::string_view data);
+WorkloadMetadataObjectConstSharedPtr convertBaggageToWorkloadMetadata(absl::string_view baggage,
+                                                                      absl::string_view identity);
 
 } // namespace Common
 } // namespace Istio

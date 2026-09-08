@@ -380,7 +380,11 @@ modify different aspects of the server:
 
 .. http:post:: /drain_listeners
 
-   :ref:`Drains <arch_overview_draining>` all listeners.
+   :ref:`Drains <arch_overview_draining>` all listeners. The listeners are stopped immediately and
+   a drain sequence is started, so that connection-level drain logic (configurable via
+   :option:`--drain-strategy`) applies to the connections the listeners own. Draining the
+   connections can be temporarily reverted by setting the runtime guard
+   ``envoy.reloadable_features.non_graceful_drain_notifies_connections`` to ``false``.
 
    .. http:post:: /drain_listeners?inboundonly
 
@@ -395,9 +399,11 @@ modify different aspects of the server:
    This behaviour and duration is configurable via server options or CLI
    (:option:`--drain-time-s` and :option:`--drain-strategy`).
 
-   .. http:post:: /drain_listeners?graceful&skip_exit
+   .. http:post:: /drain_listeners?skip_exit
 
-   When draining listeners, do not exit after the drain period. This must be used with `graceful`.
+   When draining listeners, do not stop them: the existing connections are drained while the
+   listeners keep accepting new ones. Since the drain period only delays stopping the listeners,
+   adding ``graceful`` makes no difference when ``skip_exit`` is set.
 
 .. attention::
 
@@ -499,15 +505,15 @@ modify different aspects of the server:
   Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
   least once, and histograms added to at least once).
 
-  .. http::get:: /stats?hidden=showonly
+  .. http:get:: /stats?hidden=only
 
   Only outputs statistics that are internally marked as hidden.
 
-  .. http::get:: /stats?hidden=include
+  .. http:get:: /stats?hidden=include
 
   Hidden stats will be shown along side non-hidden stats.
 
-  .. http::get:: /stats?hidden=exclude
+  .. http:get:: /stats?hidden=exclude
 
   Hidden stats will be excluded from the output. This is the default behavior.
 

@@ -244,7 +244,9 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
   // Check the case where WebSockets are off in the HCM, and no router config is present.
-  { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks)); }
+  {
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks));
+  }
 
   // Check the case where WebSockets are off in the HCM and in router config.
   {

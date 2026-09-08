@@ -38,9 +38,7 @@ public:
   void clearReadable() {
     // Read the data from the socket so it is no longer readable.
     char buffer[10];
-    struct iovec vec {
-      buffer, sizeof(buffer)
-    };
+    struct iovec vec{buffer, sizeof(buffer)};
     const Api::SysCallSizeResult result = os_sys_calls_.readv(fds_[0], &vec, 1);
     EXPECT_LT(0, static_cast<size_t>(result.return_value_));
     EXPECT_GT(sizeof(buffer), static_cast<size_t>(result.return_value_));

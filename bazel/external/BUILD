@@ -3,7 +3,6 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 licenses(["notice"])  # Apache 2
 
 exports_files([
-    "aws_lc.genrule_cmd",
     "boringssl_fips.genrule_cmd",
 ])
 

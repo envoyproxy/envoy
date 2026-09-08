@@ -9,6 +9,7 @@
 
 #include "test/common/upstream/cluster_manager_impl_test_common.h"
 #include "test/mocks/upstream/od_cds_api.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -126,8 +127,7 @@ TEST_F(ODCDTest, TestClusterRediscovered) {
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(2);
   auto handle =
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1").ok());
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1"));
   EXPECT_EQ(callback_call_count_, 1);
   handle.reset();
   cluster_manager_->removeCluster("cluster_foo");
@@ -187,9 +187,8 @@ TEST_F(ODCDTest, TestDiscoveryManagerIgnoresIrrelevantClusters) {
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
   auto handle =
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_irrelevant"), "version1")
-          .ok());
+  ASSERT_OK(
+      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_irrelevant"), "version1"));
 }
 
 // Start a couple of discoveries and drop the discovery handles in different order, make sure no
@@ -221,14 +220,10 @@ TEST_F(ODCDTest, TestDroppingHandles) {
   handle1.reset();
   handle4.reset();
 
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo1"), "version1").ok());
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo2"), "version1").ok());
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo3"), "version1").ok());
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo4"), "version1").ok());
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo1"), "version1"));
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo2"), "version1"));
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo3"), "version1"));
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo4"), "version1"));
 }
 
 // Checks that dropping discovery handles will result in callbacks not being invoked.
@@ -253,8 +248,7 @@ TEST_F(ODCDTest, TestHandles) {
   handle2.reset();
   handle3.reset();
 
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1").ok());
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1"));
   EXPECT_EQ(callback_call_count_, 2);
 }
 
@@ -262,8 +256,7 @@ TEST_F(ODCDTest, TestHandles) {
 // not call into ODCDS in such case.
 TEST_F(ODCDTest, TestCallbackWithExistingCluster) {
   auto cb = createCallback(ClusterDiscoveryStatus::Available);
-  ASSERT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1").ok());
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1"));
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(0);
   auto handle =
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);

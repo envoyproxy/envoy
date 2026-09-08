@@ -26,7 +26,8 @@ private:
   // FactoryBase
   DriverSharedPtr createGeoipProviderDriverTyped(
       const envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig& proto_config,
-      const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stat_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(MaxmindProviderFactory);

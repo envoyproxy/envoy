@@ -68,7 +68,7 @@ void GrpcExternalAuthClient::authenticateExternal(AuthenticateCallback& callback
 
 // Callback method called when the request is successful.
 void GrpcExternalAuthClient::onSuccess(
-    std::unique_ptr<envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>&& response,
+    Grpc::ResponsePtr<envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>&& response,
     Tracing::Span& span) {
   ENVOY_LOG(trace, "Received response for external Redis authentication. Status: {}",
             response->status().code());

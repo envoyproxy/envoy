@@ -1719,8 +1719,9 @@ public:
     return absl::InvalidArgumentError("boom");
   }
   absl::StatusOr<Http::FilterFactoryCb>
-  createHttpFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                                   Server::Configuration::ServerFactoryContext&) override {
+  createHttpFilterFactoryFromProto(const Protobuf::Message&,
+                                   Server::Configuration::ServerFactoryContext&,
+                                   Server::Configuration::ExtraFactoryContext&) override {
     return nullptr;
   }
 };

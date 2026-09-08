@@ -16,6 +16,7 @@ envoy_cc_mock(
     deps = [
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
+        "//envoy/event:evwatch_observer_manager_interface",
         "//envoy/event:file_event_interface",
         "//envoy/event:scaled_range_timer_manager_interface",
         "//envoy/event:signal_interface",

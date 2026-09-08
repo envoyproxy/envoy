@@ -171,6 +171,17 @@ TEST(HttpUtility, stripQueryString) {
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar/?x=1&y=2")), "/foo/bar/");
 }
 
+TEST(HttpUtility, stripQueryStringView) {
+  EXPECT_EQ(Utility::stripQueryStringView(""), "");
+  EXPECT_EQ(Utility::stripQueryStringView("?"), "");
+  EXPECT_EQ(Utility::stripQueryStringView("/"), "/");
+  EXPECT_EQ(Utility::stripQueryStringView("/?"), "/");
+  EXPECT_EQ(Utility::stripQueryStringView("/?x=1"), "/");
+  EXPECT_EQ(Utility::stripQueryStringView("/foo"), "/foo");
+  EXPECT_EQ(Utility::stripQueryStringView("/foo/bar?a=b&b=c"), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryStringView("/foo/bar/?x=1&y=2"), "/foo/bar/");
+}
+
 TEST(HttpUtility, replaceQueryString) {
   // Replace with nothing
   auto params = Utility::QueryParamsMulti();
@@ -218,6 +229,9 @@ TEST(HttpUtility, testQueryParamModification) {
   EXPECT_EQ(params.getFirstValue("a").value(), "1");
   EXPECT_EQ(params.getFirstValue("b").value(), "foo");
   EXPECT_FALSE(params.getFirstValue("d").has_value());
+  EXPECT_EQ(params.getFirstValueView("a").value(), "1");
+  EXPECT_EQ(params.getFirstValueView("b").value(), "foo");
+  EXPECT_FALSE(params.getFirstValueView("d").has_value());
   params.remove("b");
   EXPECT_EQ(params.toString(), "?a=1&a=2&c=4");
   params.overwrite("a", "bar");
@@ -640,32 +654,6 @@ TEST(HttpUtility, parseHttp2Settings) {
     EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE,
               http2_options.initial_stream_window_size().value());
     EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
-              http2_options.initial_connection_window_size().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES,
-              http2_options.max_outbound_frames().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES,
-              http2_options.max_outbound_control_frames().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD,
-              http2_options.max_consecutive_inbound_frames_with_empty_payload().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM,
-              http2_options.max_inbound_priority_frames_per_stream().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT,
-              http2_options.max_inbound_window_update_frames_per_data_frame_sent().value());
-  }
-
-  {
-
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.safe_http2_options", "false"}});
-
-    using ::Envoy::Http2::Utility::OptionsLimits;
-    auto http2_options = parseHttp2OptionsFromV3Yaml("{}");
-    EXPECT_EQ(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE, http2_options.hpack_table_size().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS_LEGACY,
-              http2_options.max_concurrent_streams().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE_LEGACY,
-              http2_options.initial_stream_window_size().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE_LEGACY,
               http2_options.initial_connection_window_size().value());
     EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES,
               http2_options.max_outbound_frames().value());
@@ -2001,6 +1989,9 @@ TEST(Utility, isSafeRequest) {
   request_headers.setMethod("DELETE");
   EXPECT_FALSE(Utility::isSafeRequest(request_headers));
   request_headers.setMethod("PATCH");
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+  // QUERY is safe per RFC 10008 but deliberately excluded; see the TODO in isSafeRequest().
+  request_headers.setMethod("QUERY");
   EXPECT_FALSE(Utility::isSafeRequest(request_headers));
 
   request_headers.setMethod("GET");

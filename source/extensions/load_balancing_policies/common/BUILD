@@ -66,7 +66,6 @@ envoy_cc_library(
     srcs = ["orca_oob_manager.cc"],
     hdrs = ["orca_oob_manager.h"],
     deps = [
-        ":orca_weight_manager_lib",
         "//envoy/common:random_generator_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
@@ -91,6 +90,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
+        "//source/common/upstream:host_utility_lib",
         "@abseil-cpp//absl/container:node_hash_map",
         "@abseil-cpp//absl/status",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

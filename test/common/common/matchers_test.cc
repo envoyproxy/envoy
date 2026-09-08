@@ -10,6 +10,8 @@
 #include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -331,6 +333,16 @@ TEST_F(MetadataTest, InvertMatch) {
 
 class StringMatcher : public BaseTest {};
 
+TEST_F(StringMatcher, CreateExactMatcher) {
+  const auto matcher = Matchers::StringMatcherImpl::createExactMatcher("envoy_test");
+
+  EXPECT_TRUE(matcher.match("envoy_test"));
+  EXPECT_FALSE(matcher.match("envoy"));
+  EXPECT_FALSE(matcher.match("envoy_test_extra"));
+  EXPECT_FALSE(matcher.match("nginx"));
+  EXPECT_FALSE(matcher.match("ENVOY_TEST"));
+}
+
 TEST_F(StringMatcher, ExactMatchIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("exact");
@@ -435,6 +447,31 @@ TEST_F(StringMatcher, SafeRegexValue) {
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("foo"));
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("foobar"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("bar"));
+}
+
+TEST_F(StringMatcher, SafeRegexValueLatin1) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_safe_regex()->set_regex(".*bar=foo.*");
+  // UTF-8 should still match in Latin1 mode
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("\"bar=foo\", \"beep=\uc38b\""));
+  // Non UTF-8 should also match in Latin1 mode
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("\"bar=foo\", \"beep=\xFF\""));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("\"zzz=foo\", \"beep=\xFF\""));
+}
+
+TEST_F(StringMatcher, SafeRegexValueUtf8) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.re2_use_latin1_mode", "false"}});
+
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_safe_regex()->set_regex(".*bar=foo.*");
+  // UTF-8 should still match in Latin1 mode
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("\"bar=foo\", \"beep=\uc38b\""));
+  // Non UTF-8 does not match in UTF-8 mode
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("\"bar=foo\", \"beep=\xFF\""));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("\"zzz=foo\", \"beep=\xFF\""));
 }
 
 TEST_F(StringMatcher, SafeRegexValueIgnoreCase) {
@@ -632,7 +669,7 @@ TEST_F(FilterStateMatcher, MatchAbsentFilterState) {
   matcher.mutable_string_match()->set_exact("exact");
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -653,7 +690,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateWithoutString) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(key, std::make_shared<TestObject>(std::nullopt));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -667,7 +704,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateDifferentString) {
   filter_state.setData(key,
                        std::make_shared<TestObject>(std::make_optional<std::string>("different")));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -680,7 +717,7 @@ TEST_F(FilterStateMatcher, MatchFilterState) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(key, std::make_shared<TestObject>(std::make_optional<std::string>(value)));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -702,7 +739,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv4) {
                Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.7", 456, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -724,7 +761,7 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv4) {
                Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.8", 456, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -746,7 +783,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv6) {
                Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db8::1", 8080, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -768,7 +805,7 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv6) {
                Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db7::1", 8080, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -853,7 +890,7 @@ TEST_F(FilterStateMatcher, AddressMatchWithInvertMatch) {
                                       test_case.test_ip, 456, false)));
 
     auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-    ASSERT_TRUE(filter_state_matcher.ok());
+    ASSERT_OK(filter_state_matcher);
     EXPECT_EQ(test_case.expected_match, (*filter_state_matcher)->match(filter_state));
   }
 }

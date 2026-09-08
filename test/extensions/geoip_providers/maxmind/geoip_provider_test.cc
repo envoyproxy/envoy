@@ -147,9 +147,7 @@ public:
 
   void initializeProvider(const std::string& yaml,
                           std::optional<ConditionalInitializer>& conditional) {
-    EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*scope_));
-    EXPECT_CALL(context_, serverFactoryContext())
-        .WillRepeatedly(ReturnRef(server_factory_context_));
+    EXPECT_CALL(server_factory_context_, scope()).WillRepeatedly(ReturnRef(*scope_));
     EXPECT_CALL(server_factory_context_, api()).WillRepeatedly(ReturnRef(*api_));
     EXPECT_CALL(dispatcher_, createFilesystemWatcher_())
         .WillRepeatedly(Invoke([this, &conditional] {
@@ -173,7 +171,8 @@ public:
         .WillRepeatedly(ReturnRef(dispatcher_));
     envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
-    provider_ = provider_factory_->createGeoipProviderDriver(config, "prefix.", context_);
+    provider_ =
+        provider_factory_->createGeoipProviderDriver(config, "prefix.", server_factory_context_);
   }
 
   void expectStats(const absl::string_view& db_type, const uint32_t total_count = 1,
@@ -573,6 +572,25 @@ TEST_F(GeoipProviderTest, ValidConfigAnonHostingSuccessfulLookup) {
   EXPECT_EQ("true", anon_it->second);
   const auto& anon_hosting_it = captured_lookup_response_.find("x-geo-anon-hosting");
   EXPECT_EQ("true", anon_hosting_it->second);
+  expectStats("anon_db");
+}
+
+TEST_F(GeoipProviderTest, ValidConfigAnonHostingOnlySuccessfulLookup) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        anon_hosting: "x-geo-anon-hosting"
+    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("71.160.223.45");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), lookup_cb.AsStdFunction());
+  EXPECT_THAT(captured_lookup_response_,
+              testing::UnorderedElementsAre(testing::Pair("x-geo-anon-hosting", "true")));
   expectStats("anon_db");
 }
 

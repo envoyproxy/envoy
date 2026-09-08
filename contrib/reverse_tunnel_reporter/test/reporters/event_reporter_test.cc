@@ -33,6 +33,8 @@ public:
   MOCK_METHOD(void, receiveEvents, (ReverseTunnelEvent::TunnelUpdates), (override));
 };
 
+constexpr int kTestSocketFd = 42;
+
 class EventReporterTest : public testing::Test {
 protected:
   void SetUp() override {
@@ -61,12 +63,13 @@ protected:
 
   void createTestConnection(const std::string& node_id, const std::string& cluster_id,
                             const std::string& tenant_id = "tenant1",
-                            int64_t initiation_time_ms = 0) {
-    reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id, initiation_time_ms);
+                            int64_t initiation_time_ms = 0, int fd = kTestSocketFd) {
+    reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id, initiation_time_ms, fd);
   }
 
-  void createTestDisconnection(const std::string& node_id, const std::string& cluster_id) {
-    reporter_->reportDisconnectionEvent(node_id, cluster_id);
+  void createTestDisconnection(const std::string& node_id, const std::string& cluster_id,
+                               int fd = kTestSocketFd) {
+    reporter_->reportDisconnectionEvent(node_id, cluster_id, fd);
   }
 
   void runDispatcher() { dispatcher_->run(Event::Dispatcher::RunType::NonBlock); }
@@ -172,14 +175,14 @@ TEST_F(EventReporterTest, DuplicateConnectionHandling) {
 
   EXPECT_CALL(*mock_client2_, receiveEvents(_)).Times(2);
 
-  createTestConnection("node1", "cluster1");
+  createTestConnection("node1", "cluster1", "tenant1", 0, 1);
   runDispatcher();
 
   EXPECT_EQ(1, getCounterValue("reverse_tunnel_established_total"));
   EXPECT_EQ(1, getGaugeValue("reverse_tunnel_active"));
   EXPECT_EQ(1, getGaugeValue("reverse_tunnel_unique_active"));
 
-  createTestConnection("node1", "cluster1");
+  createTestConnection("node1", "cluster1", "tenant1", 0, 2);
   runDispatcher();
 
   EXPECT_EQ(2, getCounterValue("reverse_tunnel_established_total"));
@@ -191,7 +194,7 @@ TEST_F(EventReporterTest, DuplicateConnectionHandling) {
   EXPECT_EQ("node1", connections[0]->node_id);
   EXPECT_EQ(1, getCounterValue("reverse_tunnel_full_pulls_total"));
 
-  createTestDisconnection("node1", "cluster1");
+  createTestDisconnection("node1", "cluster1", 1);
   runDispatcher();
 
   EXPECT_EQ(1, getCounterValue("reverse_tunnel_closed_total"));
@@ -203,7 +206,7 @@ TEST_F(EventReporterTest, DuplicateConnectionHandling) {
   EXPECT_EQ("node1", connections[0]->node_id);
   EXPECT_EQ(2, getCounterValue("reverse_tunnel_full_pulls_total"));
 
-  createTestDisconnection("node1", "cluster1");
+  createTestDisconnection("node1", "cluster1", 2);
   runDispatcher();
 
   EXPECT_EQ(2, getCounterValue("reverse_tunnel_closed_total"));
@@ -213,6 +216,82 @@ TEST_F(EventReporterTest, DuplicateConnectionHandling) {
   connections = reporter_->getAllConnections();
   EXPECT_EQ(0, connections.size());
   EXPECT_EQ(3, getCounterValue("reverse_tunnel_full_pulls_total"));
+}
+
+TEST_F(EventReporterTest, MultipleConnectionsSameNodeDifferentFds) {
+  EXPECT_CALL(*mock_client1_, receiveEvents(_))
+      .Times(2)
+      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+        EXPECT_EQ(1, updates.connections.size());
+        EXPECT_EQ(0, updates.disconnections.size());
+      }))
+      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+        EXPECT_EQ(0, updates.connections.size());
+        EXPECT_EQ(1, updates.disconnections.size());
+      }));
+  EXPECT_CALL(*mock_client2_, receiveEvents(_)).Times(2);
+
+  reporter_->reportConnectionEvent("node1", "cluster1", "tenant1", 0, 1);
+  runDispatcher();
+  reporter_->reportConnectionEvent("node1", "cluster1", "tenant1", 0, 2);
+  runDispatcher();
+
+  EXPECT_EQ(2, getGaugeValue("reverse_tunnel_active"));
+  EXPECT_EQ(1, getGaugeValue("reverse_tunnel_unique_active"));
+  EXPECT_EQ(1, reporter_->getAllConnections().size());
+
+  reporter_->reportDisconnectionEvent("node1", "cluster1", 1);
+  runDispatcher();
+
+  EXPECT_EQ(1, getGaugeValue("reverse_tunnel_active"));
+  EXPECT_EQ(1, getGaugeValue("reverse_tunnel_unique_active"));
+  EXPECT_EQ(1, reporter_->getAllConnections().size());
+
+  reporter_->reportDisconnectionEvent("node1", "cluster1", 2);
+  runDispatcher();
+
+  EXPECT_EQ(0, getGaugeValue("reverse_tunnel_active"));
+  EXPECT_EQ(0, getGaugeValue("reverse_tunnel_unique_active"));
+  EXPECT_EQ(0, reporter_->getAllConnections().size());
+}
+
+TEST_F(EventReporterTest, RemoveUnknownFdForKnownNode) {
+  EXPECT_CALL(*mock_client1_, receiveEvents(_));
+  EXPECT_CALL(*mock_client2_, receiveEvents(_));
+
+  reporter_->reportConnectionEvent("node1", "cluster1", "tenant1", 0, 42);
+  runDispatcher();
+
+  reporter_->reportDisconnectionEvent("node1", "cluster1", 99);
+  runDispatcher();
+
+  EXPECT_EQ(1, getGaugeValue("reverse_tunnel_active"));
+  EXPECT_EQ(1, getGaugeValue("reverse_tunnel_unique_active"));
+  EXPECT_EQ(0, getCounterValue("reverse_tunnel_closed_total"));
+  EXPECT_EQ(1, reporter_->getAllConnections().size());
+}
+
+TEST_F(EventReporterTest, ReportGoAwayEventRemovesTrackedFd) {
+  EXPECT_CALL(*mock_client1_, receiveEvents(_))
+      .Times(2)
+      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+        EXPECT_EQ(1, updates.connections.size());
+      }))
+      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+        EXPECT_EQ(1, updates.disconnections.size());
+      }));
+  EXPECT_CALL(*mock_client2_, receiveEvents(_)).Times(2);
+
+  reporter_->reportConnectionEvent("node1", "cluster1", "tenant1", 0, 42);
+  runDispatcher();
+
+  reporter_->reportGoAwayEvent("node1", "cluster1", 42);
+  runDispatcher();
+
+  EXPECT_EQ(0, getGaugeValue("reverse_tunnel_active"));
+  EXPECT_EQ(0, getGaugeValue("reverse_tunnel_unique_active"));
+  EXPECT_EQ(1, getCounterValue("reverse_tunnel_closed_total"));
+  EXPECT_EQ(0, reporter_->getAllConnections().size());
 }
 
 TEST_F(EventReporterTest, PullsBeforeConnectionEvents) {
@@ -301,7 +380,7 @@ TEST_F(EventReporterTest, DefaultStatPrefix) {
   EXPECT_CALL(*mock_client1_, receiveEvents(_));
   EXPECT_CALL(*mock_client2_, receiveEvents(_));
 
-  default_reporter->reportConnectionEvent("node1", "cluster1", "tenant1", 0);
+  default_reporter->reportConnectionEvent("node1", "cluster1", "tenant1", 0, kTestSocketFd);
   runDispatcher();
 
   EXPECT_EQ(
@@ -352,13 +431,13 @@ TEST_F(EventReporterTest, MixedScenario) {
 
   EXPECT_CALL(*mock_client2_, receiveEvents(_)).Times(4);
 
-  createTestConnection("node1", "cluster1", "tenant_A");
+  createTestConnection("node1", "cluster1", "tenant_A", 0, 100);
   runDispatcher();
   EXPECT_EQ(1, getCounterValue("reverse_tunnel_established_total"));
   EXPECT_EQ(1, getGaugeValue("reverse_tunnel_active"));
   EXPECT_EQ(1, getGaugeValue("reverse_tunnel_unique_active"));
 
-  createTestConnection("node2", "cluster2", "tenant_B");
+  createTestConnection("node2", "cluster2", "tenant_B", 0, 200);
   runDispatcher();
   EXPECT_EQ(2, getCounterValue("reverse_tunnel_established_total"));
   EXPECT_EQ(2, getGaugeValue("reverse_tunnel_active"));
@@ -368,19 +447,19 @@ TEST_F(EventReporterTest, MixedScenario) {
   EXPECT_EQ(2, connections.size());
   EXPECT_EQ(1, getCounterValue("reverse_tunnel_full_pulls_total"));
 
-  createTestConnection("node1", "cluster1", "tenant_A");
+  createTestConnection("node1", "cluster1", "tenant_A", 0, 101);
   runDispatcher();
   EXPECT_EQ(3, getCounterValue("reverse_tunnel_established_total"));
   EXPECT_EQ(3, getGaugeValue("reverse_tunnel_active"));
   EXPECT_EQ(2, getGaugeValue("reverse_tunnel_unique_active"));
 
-  createTestConnection("node2", "cluster2", "tenant_B");
+  createTestConnection("node2", "cluster2", "tenant_B", 0, 201);
   runDispatcher();
   EXPECT_EQ(4, getCounterValue("reverse_tunnel_established_total"));
   EXPECT_EQ(4, getGaugeValue("reverse_tunnel_active"));
   EXPECT_EQ(2, getGaugeValue("reverse_tunnel_unique_active"));
 
-  createTestDisconnection("node1", "cluster1");
+  createTestDisconnection("node1", "cluster1", 100);
   runDispatcher();
   EXPECT_EQ(1, getCounterValue("reverse_tunnel_closed_total"));
   EXPECT_EQ(3, getGaugeValue("reverse_tunnel_active"));
@@ -390,19 +469,19 @@ TEST_F(EventReporterTest, MixedScenario) {
   EXPECT_EQ(2, connections.size());
   EXPECT_EQ(2, getCounterValue("reverse_tunnel_full_pulls_total"));
 
-  createTestDisconnection("node2", "cluster2");
+  createTestDisconnection("node2", "cluster2", 200);
   runDispatcher();
   EXPECT_EQ(2, getCounterValue("reverse_tunnel_closed_total"));
   EXPECT_EQ(2, getGaugeValue("reverse_tunnel_active"));
   EXPECT_EQ(2, getGaugeValue("reverse_tunnel_unique_active"));
 
-  createTestDisconnection("node2", "cluster2");
+  createTestDisconnection("node2", "cluster2", 201);
   runDispatcher();
   EXPECT_EQ(3, getCounterValue("reverse_tunnel_closed_total"));
   EXPECT_EQ(1, getGaugeValue("reverse_tunnel_active"));
   EXPECT_EQ(1, getGaugeValue("reverse_tunnel_unique_active"));
 
-  createTestConnection("node3", "cluster3", "tenant_C");
+  createTestConnection("node3", "cluster3", "tenant_C", 0, 300);
   runDispatcher();
   EXPECT_EQ(5, getCounterValue("reverse_tunnel_established_total"));
   EXPECT_EQ(2, getGaugeValue("reverse_tunnel_active"));
@@ -438,7 +517,7 @@ TEST_F(EventReporterTest, LargeDuplicateCount) {
   const int DUPLICATE_COUNT = 50;
 
   for (int i = 0; i < DUPLICATE_COUNT; i++) {
-    createTestConnection("node1", "cluster1", "tenant_A");
+    createTestConnection("node1", "cluster1", "tenant_A", 0, i + 1);
     runDispatcher();
   }
 
@@ -451,7 +530,7 @@ TEST_F(EventReporterTest, LargeDuplicateCount) {
   EXPECT_EQ(1, getCounterValue("reverse_tunnel_full_pulls_total"));
 
   for (int i = 0; i < DUPLICATE_COUNT - 1; i++) {
-    createTestDisconnection("node1", "cluster1");
+    createTestDisconnection("node1", "cluster1", i + 1);
     runDispatcher();
   }
 
@@ -463,7 +542,7 @@ TEST_F(EventReporterTest, LargeDuplicateCount) {
   EXPECT_EQ(1, connections.size());
   EXPECT_EQ(2, getCounterValue("reverse_tunnel_full_pulls_total"));
 
-  createTestDisconnection("node1", "cluster1");
+  createTestDisconnection("node1", "cluster1", DUPLICATE_COUNT);
   runDispatcher();
 
   EXPECT_EQ(DUPLICATE_COUNT, getCounterValue("reverse_tunnel_established_total"));

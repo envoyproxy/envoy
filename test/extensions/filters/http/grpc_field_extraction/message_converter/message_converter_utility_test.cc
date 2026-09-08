@@ -23,6 +23,7 @@ namespace GrpcFieldExtraction {
 namespace {
 
 using ::apikeys::CreateApiKeyRequest;
+using ::Envoy::StatusHelpers::HasStatus;
 using ::google::grpc::transcoding::kGrpcDelimiterByteSize;
 
 CreateApiKeyRequest getCreateApiKeyRequest() {
@@ -195,10 +196,9 @@ TEST(ParseGrpcMessage, ParseZeroLengthMessage) {
 
 TEST(SizeToDelimiter, Oversize) {
   auto delimiter = sizeToDelimiter(std::numeric_limits<uint64_t>::max());
-  ASSERT_FALSE(delimiter.ok());
-  EXPECT_EQ(delimiter.status().ToString(),
-            "FAILED_PRECONDITION: Current input message size 18446744073709551615 is larger than "
-            "max allowed gRPC message length of 4294967295");
+  ASSERT_THAT(delimiter, HasStatus(absl::StatusCode::kFailedPrecondition,
+                                   "Current input message size 18446744073709551615 is larger than "
+                                   "max allowed gRPC message length of 4294967295"));
 }
 
 } // namespace

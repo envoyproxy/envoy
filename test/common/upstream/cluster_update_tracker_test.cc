@@ -48,7 +48,9 @@ TEST_F(ClusterUpdateTrackerTest, ShouldProperlyHandleUpdateCallbacks) {
 
   ClusterUpdateTracker cluster_tracker(cm_, cluster_name_);
 
-  { EXPECT_FALSE(cluster_tracker.threadLocalCluster().has_value()); }
+  {
+    EXPECT_FALSE(cluster_tracker.threadLocalCluster().has_value());
+  }
 
   {
     // Simulate addition of an irrelevant cluster.

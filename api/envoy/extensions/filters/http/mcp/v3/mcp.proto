@@ -21,7 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.mcp]
 
 // This filter will inspect and get attributes from MCP traffic.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Mcp {
   // Traffic handling mode for non-MCP traffic.
   enum TrafficMode {
@@ -35,6 +35,11 @@ message Mcp {
     // - GET requests for SSE streams (with Accept: text/event-stream)
     // - DELETE requests for session termination (with MCP-Session-Id header)
     REJECT_NO_MCP = 1;
+
+    // Disables MCP processing entirely. The filter performs no inspection,
+    // attribute extraction, trace context propagation, or rejection; all
+    // traffic is proxied as-is.
+    NOOP = 2;
   }
 
   // Where to store parsed MCP request attributes.
@@ -51,6 +56,20 @@ message Mcp {
 
     // Store request attributes in both dynamic metadata and filter state.
     DYNAMIC_METADATA_AND_FILTER_STATE = 3;
+  }
+
+  // Source used to obtain MCP request attributes.
+  enum AttributeSource {
+    // Parse attributes from the request body and ignore MCP attribute headers.
+    BODY = 0;
+
+    // Use MCP attribute headers and verify that values parsed from the body agree.
+    VERIFY = 1;
+
+    // Trust MCP attribute headers for ``method`` and the method-specific
+    // identifier carried by ``Mcp-Name`` (``params.name``, ``params.uri``, or
+    // ``params.taskId``), and avoid parsing the body when nothing else requires it.
+    HEADERS = 2;
   }
 
   message TraceContextPropagationConfig {
@@ -115,6 +134,12 @@ message Mcp {
   // nesting level. RFC 8259 Section 4 states that names within an object SHOULD be
   // unique. Defaults to false (last-key-wins / last-win).
   google.protobuf.BoolValue reject_duplicate_keys = 8;
+
+  // Controls whether MCP request attributes are obtained from the request body
+  // or from MCP request headers. Header-based extraction is limited to ``method``
+  // and the method-specific identifier carried by ``Mcp-Name``; other configured
+  // extraction rules still require body parsing.
+  AttributeSource attribute_source = 9 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Parser configuration with method-specific rules.
@@ -156,12 +181,25 @@ message ParserConfig {
 }
 
 // Per-route override configuration for MCP filter
+// [#next-free-field: 7]
 message McpOverride {
-  // Optional per-route traffic mode override
+  // Overrides the global traffic mode for this route.
   Mcp.TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Optional per-route max request body size override.
   // When set, this overrides the global max_request_body_size for this route.
   // It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
   google.protobuf.UInt32Value max_request_body_size = 2 [(validate.rules).uint32 = {lte: 10485760}];
+
+  // Overrides the global clear_route_cache setting for this route.
+  bool clear_route_cache = 3;
+
+  // Overrides the global parser config for this route.
+  ParserConfig parser_config = 4;
+
+  // Overrides the global request storage mode for this route.
+  Mcp.RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
+
+  // Overrides the global reject_duplicate_keys setting for this route.
+  bool reject_duplicate_keys = 6;
 }

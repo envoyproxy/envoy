@@ -297,6 +297,56 @@ typed_config:
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
 }
 
+// A trailing newline in the secret (common in file-based secrets) is stripped before the
+// credential is injected, so the resulting header is valid.
+TEST_P(CredentialInjectorIntegrationTestAllProtocols, InjectCredentialStripsTrailingNewline) {
+  TestEnvironment::writeStringToFileForTest("credential_newline.yaml", R"EOF(
+resources:
+  - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+    name: credential_newline
+    generic_secret:
+      secret:
+        inline_string: "dXNlcjpwYXNz\n")EOF",
+                                            false);
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: basic_auth
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic
+      header: Authorization
+      header_value_prefix: "Basic "
+      credential:
+        name: credential_newline
+        sds_config:
+          path_config_source:
+            path: "{{ test_tmpdir }}/credential_newline.yaml"
+)EOF";
+  config_helper_.prependFilter(TestEnvironment::substitute(filter_config));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("Basic dXNlcjpwYXNz", upstream_request_->headers()
+                                      .get(Http::LowerCaseString("Authorization"))[0]
+                                      ->value()
+                                      .getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
+}
+
 } // namespace
 } // namespace CredentialInjector
 } // namespace HttpFilters

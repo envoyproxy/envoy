@@ -4,6 +4,7 @@ load(
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_PACKAGE_VISIBILITY",
 )
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 
 # The main Envoy bazel file. Load this file for all Envoy-specific build macros
 # and rules that you'd like to use in your BUILD files.
@@ -27,6 +28,7 @@ load(
     _envoy_mobile_defines = "envoy_mobile_defines",
 )
 load(":envoy_pch.bzl", _envoy_pch_library = "envoy_pch_library")
+load(":envoy_proto_descriptor.bzl", "envoy_proto_descriptor_rule")
 load(
     ":envoy_select.bzl",
     _envoy_select_admin_functionality = "envoy_select_admin_functionality",
@@ -55,6 +57,8 @@ load(
     ":envoy_test.bzl",
     _envoy_benchmark_test = "envoy_benchmark_test",
     _envoy_cc_benchmark_binary = "envoy_cc_benchmark_binary",
+    _envoy_cc_benchmark_dyn_module_binary = "envoy_cc_benchmark_dyn_module_binary",
+    _envoy_cc_dyn_module_test = "envoy_cc_dyn_module_test",
     _envoy_cc_fuzz_test = "envoy_cc_fuzz_test",
     _envoy_cc_mock = "envoy_cc_mock",
     _envoy_cc_test = "envoy_cc_test",
@@ -170,37 +174,42 @@ def envoy_cc_platform_specific_dep(name):
         "//conditions:default": [name + "_posix"],
     })
 
+# Shorthand names for commonly used bundles of external proto_library deps,
+# for use with the `external_deps` arg of `envoy_proto_descriptor`.
+_ENVOY_PROTO_DESCRIPTOR_EXTERNAL_DEPS = {
+    "api_httpbody_protos": ["@googleapis//google/api:httpbody_proto"],
+    "http_api_protos": [
+        "@googleapis//google/api:annotations_proto",
+        "@googleapis//google/api:http_proto",
+    ],
+    "well_known_protos": [
+        "@protobuf//:any_proto",
+        "@protobuf//:descriptor_proto",
+        "@protobuf//:duration_proto",
+        "@protobuf//:empty_proto",
+        "@protobuf//:struct_proto",
+        "@protobuf//:timestamp_proto",
+        "@protobuf//:wrappers_proto",
+    ],
+}
+
 # Envoy proto descriptor targets should be specified with this function.
 # This is used for testing only.
 def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
-    input_files = ["$(location " + src + ")" for src in srcs]
-    include_paths = [".", native.package_name()]
+    deps = []
+    for external_dep in external_deps:
+        deps.extend(_ENVOY_PROTO_DESCRIPTOR_EXTERNAL_DEPS[external_dep])
 
-    if "api_httpbody_protos" in external_deps:
-        srcs.append("@com_google_googleapis//google/api:httpbody.proto")
-        include_paths.append("external/com_google_googleapis")
-
-    if "http_api_protos" in external_deps:
-        srcs.append("@com_google_googleapis//google/api:annotations.proto")
-        srcs.append("@com_google_googleapis//google/api:http.proto")
-        include_paths.append("external/com_google_googleapis")
-
-    if "well_known_protos" in external_deps:
-        srcs.append("@com_google_protobuf//:well_known_type_protos")
-        srcs.append("@com_google_protobuf//:descriptor_proto_srcs")
-        include_paths.append("external/com_google_protobuf/src")
-
-    options = ["--include_imports"]
-    options.extend(["-I" + include_path for include_path in include_paths])
-    options.append("--descriptor_set_out=$@")
-
-    cmd = "$(location @com_google_protobuf//:protoc) " + " ".join(options + input_files)
-    native.genrule(
-        name = name,
+    proto_library(
+        name = name + "_proto_lib",
         srcs = srcs,
-        outs = [out],
-        cmd = cmd,
-        tools = ["@com_google_protobuf//:protoc"],
+        deps = deps,
+        visibility = ["//visibility:private"],
+    )
+    envoy_proto_descriptor_rule(
+        name = name,
+        out = out,
+        deps = [":%s_proto_lib" % name],
     )
 
 # Dependencies on Google grpc should be wrapped with this function.
@@ -252,12 +261,14 @@ envoy_proto_library = _envoy_proto_library
 envoy_pch_library = _envoy_pch_library
 
 # Test wrappers (from envoy_test.bzl)
+envoy_cc_dyn_module_test = _envoy_cc_dyn_module_test
 envoy_cc_fuzz_test = _envoy_cc_fuzz_test
 envoy_cc_mock = _envoy_cc_mock
 envoy_cc_test = _envoy_cc_test
 envoy_cc_test_binary = _envoy_cc_test_binary
 envoy_cc_test_library = _envoy_cc_test_library
 envoy_cc_benchmark_binary = _envoy_cc_benchmark_binary
+envoy_cc_benchmark_dyn_module_binary = _envoy_cc_benchmark_dyn_module_binary
 envoy_benchmark_test = _envoy_benchmark_test
 envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary

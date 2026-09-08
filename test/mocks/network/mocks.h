@@ -131,6 +131,7 @@ public:
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
   MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const));
+  MOCK_METHOD(void, setAbortiveClose, ());
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion), (const));
@@ -402,6 +403,7 @@ public:
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
   MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const));
+  MOCK_METHOD(void, setAbortiveClose, ());
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr& option));
@@ -499,11 +501,13 @@ public:
 
 class MockListenerInfo : public ListenerInfo {
 public:
+  MOCK_METHOD(absl::string_view, name, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(bool, isQuic, (), (const));
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
+  MOCK_METHOD(envoy::config::listener::v3::Listener::DrainType, drainType, (), (const));
 };
 
 class MockListenerConfig : public ListenerConfig {
@@ -580,8 +584,10 @@ public:
               (uint64_t listener_tag, const Network::ExtraShutdownListenerOptions& options));
   MOCK_METHOD(void, stopListeners, ());
   MOCK_METHOD(void, onFilterChainDrain,
-              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains));
-  MOCK_METHOD(void, onListenerDrain, (uint64_t listener_tag));
+              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
+               Network::ConnectionDrainEvent drain_event));
+  MOCK_METHOD(void, onListenerDrain,
+              (uint64_t listener_tag, Network::ConnectionDrainEvent drain_event));
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));

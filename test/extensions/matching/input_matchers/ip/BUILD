@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.matching.matchers.ip"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/matching/input_matchers/ip:config",
         "//test/mocks/server:server_factory_context_mocks",
@@ -26,7 +26,7 @@ envoy_extension_cc_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
     extension_names = ["envoy.matching.matchers.ip"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/matching/input_matchers/ip:ip_lib",
     ],

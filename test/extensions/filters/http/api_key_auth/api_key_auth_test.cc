@@ -269,7 +269,7 @@ TEST_F(FilterTest, UnkonwnApiKey) {
                                                  {":path", "/path"},
                                                  {"Authorization", "Bearer key2"}};
   EXPECT_CALL(decoder_filter_callbacks_,
-              sendLocalReply(Http::Code::Unauthorized, _, _, _, "unkonwn_api_key"));
+              sendLocalReply(Http::Code::Unauthorized, _, _, _, "unknown_api_key"));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
@@ -313,7 +313,7 @@ TEST_F(FilterTest, RouteConfigOverrideCredentials) {
                                                    {":path", "/path"},
                                                    {"Authorization", "Bearer key1"}};
     EXPECT_CALL(decoder_filter_callbacks_,
-                sendLocalReply(Http::Code::Unauthorized, _, _, _, "unkonwn_api_key"));
+                sendLocalReply(Http::Code::Unauthorized, _, _, _, "unknown_api_key"));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers, true));
     EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.unauthorized").value(), 1);
@@ -404,7 +404,7 @@ TEST_F(FilterTest, RouteConfigOverrideKeySourceAndCredentials) {
     Http::TestRequestHeaderMapImpl request_headers{
         {":authority", "host"}, {":method", "GET"}, {":path", "/path?api_key=key1"}};
     EXPECT_CALL(decoder_filter_callbacks_,
-                sendLocalReply(Http::Code::Unauthorized, _, _, _, "unkonwn_api_key"));
+                sendLocalReply(Http::Code::Unauthorized, _, _, _, "unknown_api_key"));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers, true));
     EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.unauthorized").value(), 2);

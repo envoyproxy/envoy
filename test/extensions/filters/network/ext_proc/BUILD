@@ -19,11 +19,34 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "matching_utils_test",
+    srcs = ["matching_utils_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    deps = [
+        "//source/common/protobuf",
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/filters/network/ext_proc:matching_utils_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "ext_proc_test",
     srcs = ["ext_proc_test.cc"],
     deps = [
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/common/expr:cel_state_lib",
+        "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/network/ext_proc:ext_proc_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",

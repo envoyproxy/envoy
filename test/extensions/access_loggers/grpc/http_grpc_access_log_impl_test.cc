@@ -64,7 +64,7 @@ TEST(HttpGrpcAccessLog, TlsLifetimeCheck) {
                          common_config,
                      Common::GrpcAccessLoggerType type) {
           // This is a part of the actual getOrCreateLogger code path and shouldn't crash.
-          std::make_pair(MessageUtil::hash(common_config), type);
+          std::ignore = std::make_pair(MessageUtil::hash(common_config), type);
           return nullptr;
         });
     // Set tls callback in the HttpGrpcAccessLog constructor,
@@ -202,6 +202,15 @@ public:
           Protobuf::Value val;
           val.set_string_value("custom_resolved_value");
           return val;
+        }
+        bool formatTo(std::string& sink, const Formatter::Context&,
+                      const StreamInfo::StreamInfo&) const override {
+          sink.append("custom_resolved_value");
+          return true;
+        }
+        void formatValueTo(Formatter::ValueSink& sink, const Formatter::Context&,
+                           const StreamInfo::StreamInfo&) const override {
+          sink.addString("custom_resolved_value");
         }
       };
       return std::make_unique<TestProvider>();

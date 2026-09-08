@@ -10,12 +10,16 @@
 #include "source/common/common/debug_recursion_checker.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/linked_object.h"
+#include "source/common/conn_pool/pending_stream.h"
+#include "source/common/queue_policy/queue_policy_base.h"
 
 #include "absl/strings/string_view.h"
 #include "fmt/ostream.h"
 
 namespace Envoy {
 namespace ConnectionPool {
+
+using PendingStreamQueuePtr = Envoy::Extensions::QueuePolicy::QueuePolicyUniquePtr<PendingStream>;
 
 class ConnPoolImplBase;
 
@@ -61,11 +65,11 @@ public:
   // Returns the application protocol, or std::nullopt for TCP.
   virtual std::optional<Http::Protocol> protocol() const PURE;
 
-  virtual int64_t currentUnusedCapacity() const {
-    int64_t remaining_concurrent_streams =
-        static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
-
-    return std::min<int64_t>(remaining_streams_, remaining_concurrent_streams);
+  virtual uint32_t currentUnusedCapacity() const {
+    if (concurrent_stream_limit_ <= numActiveStreams()) {
+      return 0;
+    }
+    return std::min(remaining_streams_, concurrent_stream_limit_ - numActiveStreams());
   }
 
   // Initialize upstream read filters. Called when connected.
@@ -138,6 +142,11 @@ public:
   // and can be adjusted by SETTINGS frame, but the max value of it can't exceed
   // `configured_stream_limit_`.
   uint32_t concurrent_stream_limit_;
+  // When a SETTINGS frame reduces concurrent_stream_limit_ below the active stream count,
+  // the raw capacity would be negative. This debt tracks that negative portion which is NOT
+  // reflected in the pool-level connecting_and_connected_stream_capacity_, preventing that
+  // aggregate from going negative and confusing preconnect logic.
+  uint32_t capacity_debt_{0};
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
   Stats::TimespanPtr conn_length_;
@@ -155,27 +164,6 @@ protected:
 private:
   State state_{State::Connecting};
 };
-
-// PendingStream is the base class tracking streams for which a connection has been created but not
-// yet established.
-class PendingStream : public LinkedObject<PendingStream>, public ConnectionPool::Cancellable {
-public:
-  PendingStream(ConnPoolImplBase& parent, bool can_send_early_data);
-  ~PendingStream() override;
-
-  // ConnectionPool::Cancellable
-  void cancel(Envoy::ConnectionPool::CancelPolicy policy) override;
-
-  // The context here returns a pointer to whatever context is provided with newStream(),
-  // which will be passed back to the parent in onPoolReady or onPoolFailure.
-  virtual AttachContext& context() PURE;
-
-  ConnPoolImplBase& parent_;
-  // The request can be sent as early data.
-  bool can_send_early_data_;
-};
-
-using PendingStreamPtr = std::unique_ptr<PendingStream>;
 
 using ActiveClientPtr = std::unique_ptr<ActiveClient>;
 
@@ -209,7 +197,7 @@ public:
   // If anticipate_incoming_stream is true this assumes a call to newStream is
   // pending, which is true for global preconnect.
   static bool shouldConnect(size_t pending_streams, size_t active_streams,
-                            int64_t connecting_and_connected_capacity, float preconnect_ratio,
+                            uint64_t connecting_and_connected_capacity, float preconnect_ratio,
                             bool anticipate_incoming_stream = false);
 
   // Envoy::ConnectionPool::Instance implementation helpers
@@ -280,9 +268,10 @@ public:
   const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() {
     return transport_socket_options_;
   }
-  bool hasPendingStreams() const { return !pending_streams_.empty(); }
+  bool hasPendingStreams() const { return pendingStreamCount() != 0; }
 
   void decrClusterStreamCapacity(uint32_t delta) {
+    ASSERT(connecting_and_connected_stream_capacity_ >= delta);
     cluster_connectivity_state_.decrConnectingAndConnectedStreamCapacity(delta);
     connecting_and_connected_stream_capacity_ -= delta;
   }
@@ -351,9 +340,13 @@ protected:
 
   ConnectionPool::Cancellable*
   addPendingStream(Envoy::ConnectionPool::PendingStreamPtr&& pending_stream) {
-    LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
+    PendingStream& stream = *pending_stream;
+    LinkedList::moveIntoListBack(std::move(pending_stream), pending_streams_);
+    pending_stream_queue_->add(stream, {dispatcher_.timeSource().monotonicTime()});
+    ASSERT(pending_stream_queue_->size() == pending_streams_.size());
     cluster_connectivity_state_.incrPendingStreams(1);
-    return pending_streams_.front().get();
+    updateQueueOverloadedGauge();
+    return &stream;
   }
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
@@ -399,14 +392,23 @@ private:
   void drainClients(std::list<ActiveClientPtr>& clients);
 
   void assertCapacityCountsAreCorrect();
+  void updateQueueOverloadedGauge();
+  void clearQueueOverloadedGauge();
+  size_t pendingStreamCount() const;
+  PendingStreamPtr popPendingStream();
+  PendingStreamPtr removePendingStream(PendingStream& stream);
 
   Upstream::ClusterConnectivityState& cluster_connectivity_state_;
 
+  // Owns every stream represented in pending_stream_queue_.
   std::list<PendingStreamPtr> pending_streams_;
+  // Non-owning policy that determines the order in which pending streams are dispatched.
+  PendingStreamQueuePtr pending_stream_queue_;
+  bool queue_overloaded_{false};
 
   // The number of streams that can be immediately dispatched from the current
   // `ready_clients_` plus `connecting_stream_capacity_`.
-  int64_t connecting_and_connected_stream_capacity_{0};
+  uint64_t connecting_and_connected_stream_capacity_{0};
 
   // The number of streams currently attached to clients.
   uint32_t num_active_streams_{0};

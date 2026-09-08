@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/common/platform.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
@@ -51,7 +52,9 @@ namespace TcpProxy {
 namespace {
 
 using ::testing::_;
+using testing::AnyOf;
 using ::testing::DoAll;
+using testing::HasSubstr;
 using ::testing::Invoke;
 using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
@@ -275,6 +278,8 @@ TEST_P(TcpProxyTest, DrainCloseIgnoredWhenFlagDisabled) {
 }
 
 TEST_P(TcpProxyTest, DrainCloseAfterDownstreamRead) {
+  // This test covers the legacy path where drain-close is decided by polling the DrainDecision.
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto config = defaultConfig();
   config.mutable_check_drain_close()->set_value(true);
   setup(1, config);
@@ -293,6 +298,8 @@ TEST_P(TcpProxyTest, DrainCloseAfterDownstreamRead) {
 }
 
 TEST_P(TcpProxyTest, DrainCloseUsesInboundOnlyScopeForInboundListeners) {
+  // This test covers the legacy path where drain-close is decided by polling the DrainDecision.
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto config = defaultConfig();
   config.mutable_check_drain_close()->set_value(true);
   EXPECT_CALL(factory_context_.listener_info_, direction())
@@ -313,6 +320,8 @@ TEST_P(TcpProxyTest, DrainCloseUsesInboundOnlyScopeForInboundListeners) {
 }
 
 TEST_P(TcpProxyTest, DrainCloseAfterDownstreamWrite) {
+  // This test covers the legacy path where drain-close is decided by polling the DrainDecision.
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto config = defaultConfig();
   config.mutable_check_drain_close()->set_value(true);
   setup(1, config);
@@ -327,6 +336,98 @@ TEST_P(TcpProxyTest, DrainCloseAfterDownstreamWrite) {
               close(Network::ConnectionCloseType::FlushWrite,
                     StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
   upstream_callbacks_->onUpstreamData(buffer, false);
+}
+
+// Equivalent of DrainCloseAfterDownstreamRead using the connection-level drain path: the connection
+// is notified via onDrain() (Immediate strategy) and the drain-close decision is derived from that
+// event instead of polling the DrainDecision (which must not be consulted).
+TEST_P(TcpProxyTest, DrainCloseAfterDownstreamReadViaConnectionDrain) {
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  setup(1, config);
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+}
+
+// Equivalent of DrainCloseAfterDownstreamWrite using the connection-level drain path.
+TEST_P(TcpProxyTest, DrainCloseAfterDownstreamWriteViaConnectionDrain) {
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  setup(1, config);
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&buffer), false));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+}
+
+// A failing health check (/healthcheck/fail) drain-closes a DEFAULT-drain-type listener's
+// connections even though no drain sequence has been started and thus no onDrain() notification was
+// delivered. This is polled rather than pushed precisely because /healthcheck/ok reverses it.
+TEST_P(TcpProxyTest, DrainCloseOnHealthCheckFailure) {
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  setup(1, config);
+
+  // The DrainDecision must not be consulted, and no drain notification is delivered.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
+  ON_CALL(factory_context_.server_factory_context_, healthCheckFailed())
+      .WillByDefault(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+}
+
+// A MODIFY_ONLY-drain-type listener ignores the health check state, matching
+// Server::DrainManagerImpl::drainClose(). The drain type is read from the listener that accepted
+// the connection, so setting it on the connection is what flips the behavior.
+TEST_P(TcpProxyTest, HealthCheckFailureIgnoredForModifyOnlyListener) {
+  auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+  ON_CALL(*listener_info, drainType())
+      .WillByDefault(Return(envoy::config::listener::v3::Listener::MODIFY_ONLY));
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setListenerInfo(
+      listener_info);
+
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  setup(1, config);
+
+  // MODIFY_ONLY suppresses the connection-level decision, and the DrainDecision is not polled.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
+  ON_CALL(factory_context_.server_factory_context_, healthCheckFailed())
+      .WillByDefault(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
 }
 
 // Test with an explicitly configured upstream.
@@ -1033,7 +1134,43 @@ TEST_P(TcpProxyTest, DownstreamDisconnectRemote) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _));
+  EXPECT_CALL(
+      *upstream_connections_.at(0),
+      close(Network::ConnectionCloseType::FlushWrite,
+            StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
+TEST_P(TcpProxyTest, DownstreamRemoteResetPropagatesAbortReset) {
+  setup(1);
+
+  raiseEventUpstreamConnected(0);
+
+  filter_callbacks_.connection_.stream_info_.setDownstreamDetectedCloseType(
+      StreamInfo::DetectedCloseType::RemoteReset);
+  EXPECT_CALL(
+      *upstream_connections_.at(0),
+      close(Network::ConnectionCloseType::AbortReset,
+            StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamResetClose));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+#endif
+
+TEST_P(TcpProxyTest, DownstreamRemoteResetUsesFinWhenRuntimeGuardDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.propagate_downstream_rst_to_upstream", "false"}});
+  setup(1);
+
+  raiseEventUpstreamConnected(0);
+
+  filter_callbacks_.connection_.stream_info_.setDownstreamDetectedCloseType(
+      StreamInfo::DetectedCloseType::RemoteReset);
+  EXPECT_CALL(
+      *upstream_connections_.at(0),
+      close(Network::ConnectionCloseType::FlushWrite,
+            StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -2649,8 +2786,7 @@ TEST_P(TcpProxyTest, SetDynamicTLVWithStartTime) {
   const std::string timestamp_value(tlvs[0].value.begin(), tlvs[0].value.end());
   EXPECT_FALSE(timestamp_value.empty());
   // Should contain date-like characters.
-  EXPECT_TRUE(timestamp_value.find('-') != std::string::npos ||
-              timestamp_value.find(':') != std::string::npos);
+  EXPECT_THAT(timestamp_value, AnyOf(HasSubstr("-"), HasSubstr(":")));
 }
 
 // Test buffer overflow behavior - should only readDisable, not re-trigger connection.
@@ -2771,6 +2907,137 @@ TEST_P(TcpProxyTest, EmptyDataWithEndStreamDoesNotTriggerConnection) {
 
   // No connection should be established.
   EXPECT_TRUE(conn_pool_callbacks_.empty());
+}
+
+// Test load shedding in onData() when receive_before_connect is enabled.
+TEST_P(TcpProxyTest, OnDataLoadShedPointCanCloseConnection) {
+  // Mock load shed point
+  Server::MockLoadShedPoint on_data_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(&on_data_loadshed_point));
+
+  // Configure TCP Proxy
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+  setupOnDownstreamDataMode(config, true);
+
+  // Verify if TCP filter ready to receive downstream data
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Mock TCP memory overload
+  EXPECT_CALL(on_data_loadshed_point, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush,
+                    StreamInfo::LocalCloseReasons::get().OverloadManagerClose));
+
+  // Mock TCP package data
+  Buffer::OwnedImpl data("hello");
+
+  // Verify TCP connection dropped when memory overloaded
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(1U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+}
+
+// Test that early downstream data triggers upstream connection when not overloaded.
+TEST_P(TcpProxyTest, OnDataLoadShedPointNotTriggeredWhenNotOverloaded) {
+  Server::MockLoadShedPoint on_data_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(&on_data_loadshed_point));
+
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+  setupOnDownstreamDataMode(config, true);
+
+  // Verify if TCP filter ready to receive downstream data
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(on_data_loadshed_point, shouldShedLoad()).WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  Buffer::OwnedImpl data("hello");
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  // Verify that the load shedding is not triggered and the TCP connection is not dropped
+  EXPECT_EQ(0U, config_->stats().downstream_cx_overload_close_.value());
+  // Verifies that the connection was not flagged with an overload failure
+  EXPECT_FALSE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+  EXPECT_EQ(conn_pool_callbacks_.size(), 1);
+}
+
+// Test load shedding in onData() when upstream is already connected.
+TEST_P(TcpProxyTest, OnDataLoadShedPointCanCloseConnectionWhenUpstreamConnected) {
+  Server::MockLoadShedPoint on_data_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(&on_data_loadshed_point));
+
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(on_data_loadshed_point, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush,
+                    StreamInfo::LocalCloseReasons::get().OverloadManagerClose));
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(1U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+}
+
+// Test that overload manager is bypassed when context.shouldBypassOverloadManager() returns true.
+TEST_P(TcpProxyTest, OnDataLoadShedPointBypassedWhenOverloadManagerBypassed) {
+  EXPECT_CALL(factory_context_, shouldBypassOverloadManager()).WillRepeatedly(Return(true));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_, getLoadShedPoint(_))
+      .Times(0);
+
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+  setupOnDownstreamDataMode(config, true);
+
+  EXPECT_EQ(nullptr, config_->tcpProxyOnDataLoadShedPoint());
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(0U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_FALSE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+  EXPECT_EQ(conn_pool_callbacks_.size(), 1);
 }
 
 // Test that StopIteration in ON_DOWNSTREAM_DATA mode still allows reading.

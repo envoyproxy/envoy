@@ -6,6 +6,7 @@
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,6 +20,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
+
+using StatusHelpers::HasStatus;
 
 TEST(HttpJwtAuthnFilterFactoryTest, GoodRemoteJwks) {
   FilterFactory factory;
@@ -57,8 +60,9 @@ TEST(HttpJwtAuthnFilterFactoryTest, BadLocalJwks) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterFactory factory;
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).value(),
-               EnvoyException);
+  auto factory_cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_THAT(factory_cb_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                       ::testing::HasSubstr("invalid local jwks")));
 }
 
 TEST(HttpJwtAuthnFilterFactoryTest, ProviderWithoutIssuer) {

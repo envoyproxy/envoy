@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the downstream reverse connection socket interface.
 // This interface initiates reverse connections to upstream Envoys and provides
 // them as socket connections for downstream requests.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message DownstreamReverseConnectionSocketInterface {
   // HTTP handshake settings for initiator envoy initiated reverse tunnels.
   message HttpHandshakeConfig {
@@ -70,4 +70,10 @@ message DownstreamReverseConnectionSocketInterface {
   // that schedule.
   google.protobuf.Duration max_reconnect_backoff = 5
       [(validate.rules).duration = {gte {seconds: 1}}];
+
+  // How often the initiator re-checks each host and dials any missing reverse tunnels.
+  // Defaults to 10s. The re-check is jittered upward so agents that start together do not
+  // redial in lockstep. The minimum value is 100ms.
+  google.protobuf.Duration maintain_interval = 6
+      [(validate.rules).duration = {gte {nanos: 100000000}}];
 }

@@ -33,7 +33,7 @@ public:
                    const std::string& request_vcluster_name = EMPTY_STRING,
                    const std::string& from_az = EMPTY_STRING,
                    const std::string& to_az = EMPTY_STRING) {
-    Stats::StatName prefix = pool_.add("prefix");
+    Stats::StatName prefix = pool_.add(prefix_);
     Stats::StatName from_zone = pool_.add(from_az);
     Stats::StatName to_zone = pool_.add(to_az);
     Stats::StatName vhost_name = pool_.add(request_vhost_name);
@@ -59,6 +59,8 @@ public:
   Stats::TestUtil::TestStore cluster_store_;
   Http::CodeStatsImpl code_stats_;
   Stats::StatNamePool pool_;
+  // ResponseStatInfo::prefix_; empty for the router, ext_authz and ratelimit call sites.
+  std::string prefix_{"prefix"};
 };
 
 TEST_F(CodeUtilityTest, GroupStrings) {
@@ -98,6 +100,29 @@ TEST_F(CodeUtilityTest, NoCanary) {
   EXPECT_EQ(2U, cluster_store_.counter("prefix.internal.upstream_rq_completed").value());
 
   EXPECT_EQ(19U, cluster_store_.counters().size());
+}
+
+// The router, ext_authz and ratelimit all charge response stats with an empty prefix. The
+// resulting names must match the non-empty-prefix shape minus the prefix, with no stray dot.
+TEST_F(CodeUtilityTest, EmptyPrefix) {
+  prefix_.clear();
+  addResponse(201, false, false);
+  addResponse(301, false, true);
+
+  EXPECT_EQ(1U, cluster_store_.counter("upstream_rq_2xx").value());
+  EXPECT_EQ(1U, cluster_store_.counter("upstream_rq_201").value());
+  EXPECT_EQ(1U, cluster_store_.counter("external.upstream_rq_2xx").value());
+  EXPECT_EQ(1U, cluster_store_.counter("external.upstream_rq_201").value());
+  EXPECT_EQ(1U, cluster_store_.counter("upstream_rq_3xx").value());
+  EXPECT_EQ(1U, cluster_store_.counter("upstream_rq_301").value());
+  EXPECT_EQ(1U, cluster_store_.counter("internal.upstream_rq_3xx").value());
+  EXPECT_EQ(1U, cluster_store_.counter("internal.upstream_rq_301").value());
+
+  EXPECT_EQ(2U, cluster_store_.counter("upstream_rq_completed").value());
+  EXPECT_EQ(1U, cluster_store_.counter("external.upstream_rq_completed").value());
+  EXPECT_EQ(1U, cluster_store_.counter("internal.upstream_rq_completed").value());
+
+  EXPECT_EQ(11U, cluster_store_.counters().size());
 }
 
 TEST_F(CodeUtilityTest, Canary) {

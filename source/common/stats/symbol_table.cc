@@ -674,7 +674,7 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
   }
 }
 
-SymbolTable::StoragePtr SymbolTable::join(const StatNameVec& stat_names) const {
+SymbolTable::StoragePtr SymbolTable::join(absl::Span<const StatName> stat_names) const {
   size_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
     if (!stat_name.empty()) {
@@ -688,6 +688,31 @@ SymbolTable::StoragePtr SymbolTable::join(const StatNameVec& stat_names) const {
   }
   ASSERT(mem_block.capacityRemaining() == 0);
   return mem_block.release();
+}
+
+void StatNameJoiner::join(absl::Span<const StatName> stat_names, const SymbolTable& symbol_table) {
+  // A join with at most one non-empty name produces bytes identical to that name, so the
+  // allocation can be skipped and the name referenced directly.
+  StatName sole_name;
+  bool needs_join = false;
+  for (StatName stat_name : stat_names) {
+    if (stat_name.empty()) {
+      continue;
+    }
+    if (!sole_name.empty()) {
+      needs_join = true;
+      break;
+    }
+    sole_name = stat_name;
+  }
+
+  if (needs_join) {
+    storage_ = symbol_table.join(stat_names);
+    stat_name_ = StatName(storage_.get());
+  } else {
+    storage_.reset();
+    stat_name_ = sole_name;
+  }
 }
 
 void SymbolTable::populateList(const StatName* names, uint32_t num_names, StatNameList& list) {
@@ -714,6 +739,40 @@ void SymbolTable::populateList(const StatName* names, uint32_t num_names, StatNa
   // total_size_bytes. After appending all the encoded data into the
   // allocated byte array, we should have exhausted all the memory
   // we though we needed.
+  ASSERT(mem_block.capacityRemaining() == 0);
+  list.moveStorageIntoList(mem_block.release());
+}
+
+void SymbolTable::populateList(StatName tagged_name, StatName base_name, StatNameTagSpan name_tags,
+                               StatNameList& list) {
+  const size_t stat_name_count = name_tags.size() * 2 + 2;
+
+  RELEASE_ASSERT(stat_name_count < 256, "Maximum number elements in a StatNameList exceeded");
+
+  // One byte for the number of names, plus the size of each name.
+  size_t total_size_bytes = 1;
+  total_size_bytes += tagged_name.size() + base_name.size();
+  for (const auto& tag : name_tags) {
+    total_size_bytes += tag.first.size() + tag.second.size();
+  }
+
+  // Now allocate the exact number of bytes required and move the encodings into storage.
+  MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
+  mem_block.appendOne(stat_name_count);
+  Encoding::appendToMemBlock(tagged_name, mem_block);
+  Encoding::appendToMemBlock(base_name, mem_block);
+  incRefCount(tagged_name);
+  incRefCount(base_name);
+  for (const auto& tag : name_tags) {
+    Encoding::appendToMemBlock(tag.first, mem_block);
+    Encoding::appendToMemBlock(tag.second, mem_block);
+    incRefCount(tag.first);
+    incRefCount(tag.second);
+  }
+
+  // This assertion double-checks the arithmetic where we computed total_size_bytes. After appending
+  // all the encoded data into the allocated byte array, we should have exhausted all the memory we
+  // thought we needed.
   ASSERT(mem_block.capacityRemaining() == 0);
   list.moveStorageIntoList(mem_block.release());
 }

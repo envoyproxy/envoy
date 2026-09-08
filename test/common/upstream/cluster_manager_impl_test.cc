@@ -2695,7 +2695,7 @@ TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
       *cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(added_via_api_yaml), "v1"));
 
   EXPECT_EQ(2, cluster_manager_->clusters().active_clusters_.size());
-  EXPECT_TRUE(cluster_manager_->checkActiveStaticCluster("good").ok());
+  EXPECT_OK(cluster_manager_->checkActiveStaticCluster("good"));
   EXPECT_EQ(cluster_manager_->checkActiveStaticCluster("nonexist").message(),
             "Unknown gRPC client cluster 'nonexist'");
   EXPECT_EQ(cluster_manager_->checkActiveStaticCluster("added_via_api").message(),
@@ -2741,7 +2741,7 @@ TEST_F(ClusterManagerImplTest, ClusterIgnoreRemoval) {
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster, "v1", true));
 
   EXPECT_EQ(2, cluster_manager_->clusters().active_clusters_.size());
-  EXPECT_TRUE(cluster_manager_->checkActiveStaticCluster("good").ok());
+  EXPECT_OK(cluster_manager_->checkActiveStaticCluster("good"));
 
   // This should not remove the cluster as remove_ignored is set to false
   EXPECT_FALSE(cluster_manager_->removeCluster("added_via_api"));

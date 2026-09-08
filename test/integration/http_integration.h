@@ -15,6 +15,7 @@
 #include "test/common/http/http2/http2_frame.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
+#include "test/mocks/http/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 

@@ -1,10 +1,13 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/protobuf/message_validator.h"
 #include "envoy/server/instance.h"
 
 #include "source/common/protobuf/protobuf.h"

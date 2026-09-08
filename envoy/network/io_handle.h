@@ -58,6 +58,11 @@ public:
   virtual os_fd_t fdDoNotUse() const PURE;
 
   /**
+   * Requests RST on a subsequent close().
+   */
+  virtual void setAbortiveClose() PURE;
+
+  /**
    * Clean up IoHandle resources
    */
   virtual Api::IoCallUint64Result close() PURE;
@@ -113,6 +118,16 @@ public:
    * shouldn't be used.
    */
   virtual Api::IoCallUint64Result write(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Send data on a connected socket.
+   * @param buffer points to the data to be sent.
+   * @param length is the length of the data to be sent. A zero length is passed to the underlying
+   * socket operation and is not treated as a no-op.
+   * @return a Api::IoCallUint64Result with err_ = an Api::IoError instance or
+   * err_ = nullptr and rc_ = the bytes written for success.
+   */
+  virtual Api::IoCallUint64Result send(const void* buffer, size_t length) PURE;
 
   /**
    * Send a message to the address.

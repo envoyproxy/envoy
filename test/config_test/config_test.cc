@@ -11,6 +11,7 @@
 #include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/server/config_validation/server.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/options_impl.h"
@@ -22,6 +23,7 @@
 #include "test/mocks/server/worker_factory.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -67,6 +69,7 @@ public:
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
     ON_CALL(server_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
+    ON_CALL(server_.api_, customStatNamespaces()).WillByDefault(ReturnRef(custom_stat_namespaces_));
     ON_CALL(server_.api_, threadFactory()).WillByDefault(Invoke([&]() -> Thread::ThreadFactory& {
       return api_->threadFactory();
     }));
@@ -100,10 +103,8 @@ public:
         .Times(AtLeast(0));
 
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
-    EXPECT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
-                    bootstrap, options_,
-                    server_.messageValidationContext().staticValidationVisitor(), *api_)
-                    .ok());
+    EXPECT_OK(Server::InstanceUtil::loadBootstrapConfig(
+        bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_));
     absl::Status creation_status;
     Server::Configuration::InitialImpl initial_config(bootstrap, creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
@@ -182,6 +183,7 @@ public:
   Server::ListenerManagerImpl listener_manager_{server_, std::move(component_factory_ptr_),
                                                 worker_factory_, false, server_.quic_stat_names_};
   Random::RandomGeneratorImpl random_;
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces_;
   std::shared_ptr<Runtime::MockSnapshot> snapshot_{
       std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
@@ -214,9 +216,8 @@ void testMerge() {
   OptionsImplBase options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
                                                         Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  ASSERT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
-                  bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
-                  .ok());
+  ASSERT_OK(Server::InstanceUtil::loadBootstrapConfig(
+      bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api));
   EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
 }
 
@@ -241,9 +242,8 @@ uint32_t run(const std::string& directory) {
           Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
       ConfigTest test1(options);
       envoy::config::bootstrap::v3::Bootstrap bootstrap;
-      EXPECT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
-                      bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
-                      .ok());
+      EXPECT_OK(Server::InstanceUtil::loadBootstrapConfig(
+          bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api));
       ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
       OptionsImplBase config = asConfigYaml(options, *api);
       ConfigTest test2(config);

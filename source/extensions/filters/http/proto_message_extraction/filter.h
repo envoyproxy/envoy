@@ -7,7 +7,6 @@
 #include "envoy/extensions/filters/http/proto_message_extraction/v3/config.pb.validate.h"
 #include "envoy/http/filter.h"
 
-#include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 #include "source/extensions/filters/http/proto_message_extraction/extraction_util/proto_extractor_interface.h"
@@ -78,15 +77,6 @@ private:
   bool response_extraction_done_ = false;
 };
 
-class FilterFactory : public Envoy::Extensions::HttpFilters::Common::FactoryBase<
-                          envoy::extensions::filters::http::proto_message_extraction::v3::
-                              ProtoMessageExtractionConfig> {
-private:
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::proto_message_extraction::v3::
-          ProtoMessageExtractionConfig& proto_config,
-      const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
-};
 } // namespace ProtoMessageExtraction
 } // namespace HttpFilters
 } // namespace Extensions

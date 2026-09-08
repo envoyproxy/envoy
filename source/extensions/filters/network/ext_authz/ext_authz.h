@@ -15,6 +15,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/matchers.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
@@ -162,7 +163,7 @@ private:
   FilterReturn filter_return_{FilterReturn::Stop};
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool calling_check_{};
-  envoy::service::auth::v3::CheckRequest check_request_;
+  ArenaWrappedProto<envoy::service::auth::v3::CheckRequest> check_request_;
 };
 } // namespace ExtAuthz
 } // namespace NetworkFilters
