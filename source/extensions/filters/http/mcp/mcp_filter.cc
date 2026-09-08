@@ -397,6 +397,19 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  if (shouldValidateNewSpecHeaders()) {
+    if (isValidMcpDeleteRequest(headers)) {
+      sendMethodNotAllowedReply("MCP DELETE is not supported for protocol version 2026-07-28");
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+
+    if (isValidMcpSseRequest(headers)) {
+      sendMethodNotAllowedReply(
+          "MCP GET with SSE is not supported for protocol version 2026-07-28");
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+  }
+
   if (isValidMcpDeleteRequest(headers)) {
     is_mcp_request_ = true;
     ENVOY_LOG(debug, "valid MCP DELETE session-termination request, passing through");
@@ -625,6 +638,11 @@ void McpFilter::sendHeaderMismatchReply(absl::string_view error_msg) {
         headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
       },
       std::nullopt, "");
+}
+
+void McpFilter::sendMethodNotAllowedReply(absl::string_view error_msg) {
+  decoder_callbacks_->sendLocalReply(Http::Code::MethodNotAllowed, error_msg, nullptr, std::nullopt,
+                                     "");
 }
 
 bool McpFilter::headerAttributesMatch() const {
