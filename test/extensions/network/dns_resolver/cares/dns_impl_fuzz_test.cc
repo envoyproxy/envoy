@@ -235,7 +235,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   dns_server.setDefaultAResponse("127.0.0.1");
   dns_server.setDefaultAAAAResponse("::1");
 
+  auto* previous_random_source = ares_rand_bytes_source;
   ares_rand_bytes_source = &provider;
+  Envoy::Cleanup restore_random_source([=]() { ares_rand_bytes_source = previous_random_source; });
 
   auto resolver = makeDnsResolver(*dispatcher, *api, dns_server.port());
 
