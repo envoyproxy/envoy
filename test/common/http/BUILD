@@ -145,6 +145,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

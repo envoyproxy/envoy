@@ -4556,6 +4556,54 @@ TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProc
   EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(1, 3));
 }
 
+// Regression test for reentrant encoding during connection-level low watermark callbacks. This
+// test intentionally fails until onUnderlyingConnectionBelowWriteBufferLowWatermark() tolerates an
+// encode operation reordering active_streams_ while it is traversing the list.
+TEST_P(Http2CodecImplTest, LowWatermarkCallbackCanReorderActiveStreams) {
+  initialize();
+
+  RequestEncoder* request_encoder1 = request_encoder_;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder1->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder2->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  RequestEncoder* request_encoder3 = &client_->newStream(response_decoder_);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder3->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(5, 3, 1));
+
+  MockStreamCallbacks callbacks1;
+  MockStreamCallbacks callbacks2;
+  MockStreamCallbacks callbacks3;
+  request_encoder1->getStream().addCallbacks(callbacks1);
+  request_encoder2->getStream().addCallbacks(callbacks2);
+  request_encoder3->getStream().addCallbacks(callbacks3);
+
+  EXPECT_CALL(callbacks1, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(callbacks3, onAboveWriteBufferHighWatermark());
+  client_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+
+  Buffer::OwnedImpl data("a");
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  EXPECT_CALL(callbacks1, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([&]() {
+    request_encoder1->encodeData(data, false);
+  }));
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
+  client_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+  driveToCompletion();
+}
+
 TEST_P(Http2CodecImplTest, ChunksLargeBodyDuringDeferredProcessing) {
   server_settings_.emplace(smallWindowHttp2Settings());
   // We must initialize before dtor, otherwise we'll touch uninitialized
