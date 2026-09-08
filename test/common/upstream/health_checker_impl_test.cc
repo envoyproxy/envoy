@@ -1914,36 +1914,6 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionTimeout) {
   EXPECT_EQ(Http::CodecType::HTTP2, test_sessions_[0]->requested_codec_type_);
 }
 
-// A transport socket that reports the handshake as complete via ConnectedZeroRtt is handled the
-// same as Connected; otherwise the session would sit on the negotiating connection until it timed
-// out.
-TEST_F(HttpHealthCheckerImplTest, AlpnConnectedZeroRttSelectsNegotiatedCodec) {
-  setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
-  expectSessionCreate();
-  expectTlsConnection(0, "h2");
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::ConnectedZeroRtt);
-  EXPECT_EQ(Http::CodecType::HTTP2, test_sessions_[0]->requested_codec_type_);
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-              enableTimer(std::chrono::milliseconds(45000), _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond(0, "200", false, false, true);
-  EXPECT_EQ(Host::Health::Healthy,
-            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
-}
-
 // A locally closed negotiating connection is reported as a network failure, same as a remote close.
 TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionLocalClose) {
   setupNoServiceValidationHCOneUnhealthy();

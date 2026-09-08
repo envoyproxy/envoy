@@ -259,7 +259,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::resetNegotiatingConnec
   }
   negotiating_connection_->removeConnectionCallbacks(negotiating_connection_callback_impl_);
   negotiating_connection_->close(Network::ConnectionCloseType::Abort);
-  negotiating_host_description_.reset();
   parent_.dispatcher_.deferredDelete(std::move(negotiating_connection_));
 }
 
@@ -306,10 +305,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     ASSERT(negotiating_connection_ == nullptr);
-    // Nothing about what the connection advertises changes: the health check offers whatever the
-    // cluster's TLS context or `tls_options` configure, as it always has. What is new is that the
-    // protocol the peer selects from that list is used to choose the codec.
-    const bool negotiate_codec = parent_.negotiateCodec();
     Upstream::Host::CreateConnectionData conn =
         host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
                                            parent_.transportSocketMatchMetadata().get());
@@ -324,18 +319,15 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
     // Two ways to send the probe, depending on whether the codec is known yet.
     //
     // Not negotiating (plaintext, non-TLS, or a pinned codec): the codec is fixed, so build the
-    // codec client now and send immediately below. The request buffers until the socket connects,
-    // as it always has.
+    // codec client now and send immediately below; the codec client handles establishing the
+    // connection.
     //
     // Negotiating over TLS: the codec comes from the ALPN protocol, unknown until the handshake
     // completes. So only connect here and return; onNegotiatingConnectionEvent() then chooses the
     // codec and sends the request once Connected arrives.
-    if (negotiate_codec && conn.connection_->ssl() != nullptr) {
-      // Reset these before connecting: a leftover `expect_reset_` from a previous timeout would
-      // otherwise suppress the failure for this attempt.
+    if (parent_.negotiateCodec() && conn.connection_->ssl() != nullptr) {
       expect_reset_ = false;
       reuse_connection_ = parent_.reuse_connection_;
-      negotiating_host_description_ = conn.host_description_;
       negotiating_connection_ = std::move(conn.connection_);
       negotiating_connection_->addConnectionCallbacks(negotiating_connection_callback_impl_);
       // Apply the connection settings that the codec client would otherwise have applied before
@@ -349,7 +341,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       return;
     }
 
-    attachCodecClient(conn, parent_.codec_client_type_);
+    initCodecClient(conn, parent_.codec_client_type_);
     expect_reset_ = false;
     reuse_connection_ = parent_.reuse_connection_;
   }
@@ -357,7 +349,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   sendRequest();
 }
 
-void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::attachCodecClient(
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::initCodecClient(
     Upstream::Host::CreateConnectionData& data, Http::CodecType codec_type) {
   client_.reset(parent_.createCodecClient(data, codec_type));
   client_->addConnectionCallbacks(connection_callback_impl_);
@@ -375,7 +367,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onNegotiatingConnectio
                    negotiating_connection_->transportFailureReason(),
                    HostUtility::healthFlagsToString(*host_));
     negotiating_connection_->removeConnectionCallbacks(negotiating_connection_callback_impl_);
-    negotiating_host_description_.reset();
     parent_.dispatcher_.deferredDelete(std::move(negotiating_connection_));
     if (!expect_reset_) {
       // handleFailure() may deferred delete this session, so nothing may be touched afterwards.
@@ -384,13 +375,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onNegotiatingConnectio
     return;
   }
 
-  // Connected means the handshake completed. ConnectedZeroRtt means only that early data may be
-  // sent, so the protocol read below is the one from the resumed session rather than a freshly
-  // negotiated one, and it is not revisited when the handshake does complete. Handling it here
-  // still beats leaving the session waiting for its timeout. In practice only QUIC raises it, and
-  // HTTP/3 is excluded above; a dynamic module transport socket may raise it on a TCP connection.
-  if (event != Network::ConnectionEvent::Connected &&
-      event != Network::ConnectionEvent::ConnectedZeroRtt) {
+  // Proceed once the handshake has completed and the negotiated protocol is known.
+  if (event != Network::ConnectionEvent::Connected) {
     return;
   }
 
@@ -404,9 +390,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onNegotiatingConnectio
   // The handshake completed, so the negotiated protocol is finally known. Choose the codec from
   // it, hand the live connection to a codec client, and send the request.
   negotiating_connection_->removeConnectionCallbacks(negotiating_connection_callback_impl_);
-  Upstream::Host::CreateConnectionData data{std::move(negotiating_connection_),
-                                            std::move(negotiating_host_description_)};
-  attachCodecClient(data, codec_type);
+  Upstream::Host::CreateConnectionData data{std::move(negotiating_connection_), host_};
+  initCodecClient(data, codec_type);
   sendRequest();
 }
 

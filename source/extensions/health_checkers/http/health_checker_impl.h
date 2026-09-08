@@ -88,11 +88,13 @@ private:
     enum class HealthCheckResult { Succeeded, Degraded, Failed, Retriable };
     HealthCheckResult healthCheckResult(uint64_t response_code);
     bool shouldClose() const;
-    // Attaches a codec client of `codec_type` to `data`'s connection and wires up the callbacks.
-    void attachCodecClient(Upstream::Host::CreateConnectionData& data, Http::CodecType codec_type);
-    // Encodes the health check request on `client_`. Requires `client_ != nullptr`.
+    // Creates the session's codec client of `codec_type` on `data`'s connection and wires up the
+    // callbacks. Called only when there is no client yet; the client is then reused across
+    // intervals.
+    void initCodecClient(Upstream::Host::CreateConnectionData& data, Http::CodecType codec_type);
+    // Encodes the health check request on `client_`.
     void sendRequest();
-    // Handles events on a connection that has not been handed to a codec client yet.
+    // Handles events on `negotiating_connection_` before it has a codec client.
     void onNegotiatingConnectionEvent(Network::ConnectionEvent event);
     // Aborts and disposes of `negotiating_connection_`, if any.
     void resetNegotiatingConnection();
@@ -135,9 +137,8 @@ private:
       HttpActiveHealthCheckSession& parent_;
     };
 
-    // Callbacks for a connection that is still being established and has no codec client yet.
-    // Deliberately distinct from ConnectionCallbackImpl so that every codec-driven callback can
-    // continue to assume `client_ != nullptr`.
+    // Callbacks for `negotiating_connection_` (ALPN negotiation path) before its codec client
+    // exists. Distinct from ConnectionCallbackImpl, whose callbacks assume `client_ != nullptr`.
     class NegotiatingConnectionCallbackImpl : public Network::ConnectionCallbacks {
     public:
       NegotiatingConnectionCallbackImpl(HttpActiveHealthCheckSession& parent) : parent_(parent) {}
@@ -170,14 +171,12 @@ private:
     // Set while a connection is being established and the codec has not been chosen yet. Mutually
     // exclusive with `client_`.
     Network::ClientConnectionPtr negotiating_connection_;
-    HostDescriptionConstSharedPtr negotiating_host_description_;
     Http::ResponseHeaderMapPtr response_headers_;
     Buffer::InstancePtr response_body_;
     const std::string& hostname_;
     Network::ConnectionInfoProviderSharedPtr local_connection_info_provider_;
     // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-    // Not const: when the codec is chosen from the negotiated ALPN protocol this is updated to
-    // match what the connection actually speaks.
+    // The protocol used for the health check request.
     Http::Protocol protocol_;
     bool expect_reset_ : 1 = false;
     bool reuse_connection_ : 1 = false;
