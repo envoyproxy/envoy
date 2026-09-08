@@ -460,26 +460,6 @@ case $CI_TARGET in
         # fi
         ;;
 
-    cache-create)
-        if [[ -z "${ENVOY_CACHE_TARGETS}" ]]; then
-            echo "ENVOY_CACHE_TARGETS not set" >&2
-            exit 1
-        fi
-        if [[ -z "${ENVOY_CACHE_ROOT}" ]]; then
-            echo "ENVOY_CACHE_ROOT not set" >&2
-            exit 1
-        fi
-        ENVOY_CACHE_OUTPUT_BASE="${ENVOY_CACHE_OUTPUT_BASE:-base}"
-        # TODO(phlax): Cache priming is temporarily disabled - the bzlmod
-        # `aquery deps(//...)` walk is too slow/flaky to be useful. Create an
-        # empty output base so the prime/upload/restore plumbing is unchanged.
-        echo "Bazel cache priming disabled, creating empty cache (${ENVOY_CACHE_TARGETS})"
-        mkdir -p "${ENVOY_CACHE_ROOT}/${ENVOY_CACHE_OUTPUT_BASE}"
-        touch "${ENVOY_CACHE_ROOT}/${ENVOY_CACHE_OUTPUT_BASE}/.keep"
-        TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
-        echo "Generated cache: ${TOTAL_SIZE}"
-        ;;
-
     deflake)
         ENVOY_DEFLAKE_RUNS=${ENVOY_DEFLAKE_RUNS:-1000}
         if [[ -z "$ENVOY_DEFLAKE_TARGET" || -z "$ENVOY_DEFLAKE_TEST" ]]; then
