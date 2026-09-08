@@ -206,6 +206,7 @@ private:
 
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
   void sendUnsupportedProtocolVersionReply(absl::string_view requested_version);
+  void sendHeaderMismatchReply(absl::string_view error_msg);
   bool needsBody() const;
   bool hasCompleteHeaderAttributes() const;
   bool headerAttributesMatch() const;
