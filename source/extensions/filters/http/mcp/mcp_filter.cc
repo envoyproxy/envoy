@@ -392,10 +392,8 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
     }
   }
 
-  if (protocol_version_headers.empty() &&
-      shouldValidateNewSpecHeaders()) {
-    sendHeaderMismatchReply(
-        "Missing required MCP-Protocol-Version header");
+  if (protocol_version_headers.empty() && shouldValidateNewSpecHeaders()) {
+    sendHeaderMismatchReply("Missing required MCP-Protocol-Version header");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -605,8 +603,7 @@ void McpFilter::sendUnsupportedProtocolVersionReply(absl::string_view requested_
 }
 
 void McpFilter::sendHeaderMismatchReply(absl::string_view error_msg) {
-  if (config_->errorReplyFormat() ==
-      envoy::extensions::filters::http::mcp::v3::Mcp::FORMAT_TEXT) {
+  if (config_->errorReplyFormat() == envoy::extensions::filters::http::mcp::v3::Mcp::FORMAT_TEXT) {
     sendErrorReply(error_msg, Filters::Common::Mcp::Status::NotJsonRpc);
     return;
   }
@@ -615,20 +612,17 @@ void McpFilter::sendHeaderMismatchReply(absl::string_view error_msg) {
   (*reply.mutable_fields())["jsonrpc"].set_string_value("2.0");
   (*reply.mutable_fields())["id"].set_null_value(Protobuf::NULL_VALUE);
 
-  auto* error =
-      (*reply.mutable_fields())["error"].mutable_struct_value();
+  auto* error = (*reply.mutable_fields())["error"].mutable_struct_value();
 
   (*error->mutable_fields())["code"].set_number_value(-32020);
   (*error->mutable_fields())["message"].set_string_value(error_msg);
 
-  const std::string body =
-      MessageUtil::getJsonStringFromMessageOrError(reply);
+  const std::string body = MessageUtil::getJsonStringFromMessageOrError(reply);
 
   decoder_callbacks_->sendLocalReply(
       Http::Code::BadRequest, body,
       [](Http::ResponseHeaderMap& headers) {
-        headers.setContentType(
-            Http::Headers::get().ContentTypeValues.Json);
+        headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
       },
       std::nullopt, "");
 }
@@ -661,8 +655,7 @@ bool McpFilter::verifyHeaderAttributes() const {
     return true;
   }
 
-  if (config_->attributeSource() !=
-      envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY) {
+  if (config_->attributeSource() != envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY) {
     return true;
   }
 
@@ -721,12 +714,10 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   const auto version_validation = validateProtocolVersion();
 
-  if (version_validation ==
-      ProtocolVersionValidationResult::Mismatch) {
+  if (version_validation == ProtocolVersionValidationResult::Mismatch) {
     config_->stats().header_mismatch_.inc();
 
-    sendHeaderMismatchReply(
-        "MCP-Protocol-Version header does not match request body");
+    sendHeaderMismatchReply("MCP-Protocol-Version header does not match request body");
 
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
@@ -734,8 +725,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   if (!verifyHeaderAttributes()) {
     config_->stats().header_mismatch_.inc();
 
-    sendHeaderMismatchReply(
-        "MCP header attributes do not match request body");
+    sendHeaderMismatchReply("MCP header attributes do not match request body");
 
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
