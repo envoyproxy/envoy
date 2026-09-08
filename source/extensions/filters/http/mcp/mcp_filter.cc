@@ -427,18 +427,15 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
     is_json_post_request_ = true;
     ENVOY_LOG(debug, "valid MCP Post request");
     if (shouldValidateNewSpecHeaders() ||
-        config_->attributeSource() !=
-            envoy::extensions::filters::http::mcp::v3::Mcp::BODY) {
+        config_->attributeSource() != envoy::extensions::filters::http::mcp::v3::Mcp::BODY) {
       const auto method_headers = headers.get(kMcpMethod);
       if (!method_headers.empty()) {
-        header_method_ =
-            std::string(method_headers[0]->value().getStringView());
+        header_method_ = std::string(method_headers[0]->value().getStringView());
       }
 
       const auto name_headers = headers.get(kMcpName);
       if (!name_headers.empty()) {
-        header_name_ =
-            std::string(name_headers[0]->value().getStringView());
+        header_name_ = std::string(name_headers[0]->value().getStringView());
       }
     }
 
@@ -449,8 +446,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
         return Http::FilterHeadersStatus::StopIteration;
       }
 
-      const std::string name_path =
-          parserConfig().getNameAttributePath(header_method_);
+      const std::string name_path = parserConfig().getNameAttributePath(header_method_);
 
       if (!name_path.empty() && header_name_.empty()) {
         config_->stats().header_mismatch_.inc();
@@ -572,8 +568,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   return Http::FilterDataStatus::StopIterationAndWatermark;
 }
 
-void McpFilter::recordErrorState(absl::string_view error_msg,
-                                 Filters::Common::Mcp::Status status) {
+void McpFilter::recordErrorState(absl::string_view error_msg, Filters::Common::Mcp::Status status) {
   ENVOY_STREAM_LOG(debug, "MCP error: {}, status: {}", *decoder_callbacks_, error_msg,
                    statusToString(status));
 
@@ -584,8 +579,8 @@ void McpFilter::recordErrorState(absl::string_view error_msg,
     std::string method = parser_ ? parser_->getMethod() : "";
     Protobuf::Struct metadata = parser_ ? parser_->metadata() : Protobuf::Struct();
 
-    auto filter_state_obj = std::make_shared<FilterStateObject>(
-        method, metadata, is_mcp_request_, is_exceeding_limit_, status_);
+    auto filter_state_obj = std::make_shared<FilterStateObject>(method, metadata, is_mcp_request_,
+                                                                is_exceeding_limit_, status_);
 
     decoder_callbacks_->streamInfo().filterState()->setData(
         std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
@@ -599,14 +594,12 @@ void McpFilter::recordErrorState(absl::string_view error_msg,
   }
 }
 
-void McpFilter::sendErrorReply(absl::string_view error_msg,
-                               Filters::Common::Mcp::Status status) {
+void McpFilter::sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status) {
   recordErrorState(error_msg, status);
 
   decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, error_msg, nullptr, std::nullopt,
                                      statusToString(status));
 }
-
 
 void McpFilter::sendUnsupportedProtocolVersionReply(absl::string_view requested_version) {
   const std::string error_msg =
@@ -660,7 +653,20 @@ void McpFilter::sendHeaderMismatchReply(absl::string_view error_msg) {
 
   Protobuf::Struct reply;
   (*reply.mutable_fields())["jsonrpc"].set_string_value("2.0");
-  (*reply.mutable_fields())["id"].set_null_value(Protobuf::NULL_VALUE);
+  auto& id = (*reply.mutable_fields())["id"];
+
+  if (parser_ != nullptr) {
+    const Protobuf::Value* request_id =
+        parser_->getNestedValue(Filters::Common::Mcp::McpConstants::ID_FIELD);
+
+    if (request_id != nullptr) {
+      id.CopyFrom(*request_id);
+    } else {
+      id.set_null_value(Protobuf::NULL_VALUE);
+    }
+  } else {
+    id.set_null_value(Protobuf::NULL_VALUE);
+  }
 
   auto* error = (*reply.mutable_fields())["error"].mutable_struct_value();
 

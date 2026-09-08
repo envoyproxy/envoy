@@ -222,6 +222,417 @@ typed_config:
   EXPECT_EQ(nullptr, upstream_request_);
 }
 
+TEST_P(McpFilterIntegrationTest, RejectsProtocolVersionHeaderBodyMismatch) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/protocolVersion":"2025-11-25"}}})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-protocol-version", "2026-07-28"},
+                                     {"mcp-method", "tasks/get"},
+                                     {"mcp-name", "task-123"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+
+  // The upstream should not receive the request because the filter rejects it locally.
+  EXPECT_EQ(nullptr, upstream_request_);
+}
+
+TEST_P(McpFilterIntegrationTest, RejectsProtocolVersionHeaderBodyMismatchWithJsonRpcReply) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  protocol_versions:
+    supported:
+    - "2026-07-28"
+  error_reply_format: FORMAT_JSON_RPC
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/protocolVersion":"2025-11-25"}}})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-protocol-version", "2026-07-28"},
+                                     {"mcp-method", "tasks/get"},
+                                     {"mcp-name", "task-123"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_EQ("application/json", response->headers().getContentTypeValue());
+
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"jsonrpc\":\"2.0\""));
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"code\":-32020"));
+  EXPECT_THAT(response->body(),
+              testing::HasSubstr("MCP-Protocol-Version header does not match request body"));
+
+  EXPECT_EQ(nullptr, upstream_request_);
+}
+
+TEST_P(McpFilterIntegrationTest, NewSpecRejectsMissingMethodHeader) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  protocol_versions:
+    supported:
+    - "2026-07-28"
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-protocol-version", "2026-07-28"},
+                                     {"mcp-name", "task-123"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("Missing required Mcp-Method header"));
+
+  EXPECT_EQ(nullptr, upstream_request_);
+}
+
+TEST_P(McpFilterIntegrationTest, NewSpecRejectsMissingNameHeader) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  protocol_versions:
+    supported:
+    - "2026-07-28"
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-protocol-version", "2026-07-28"},
+                                     {"mcp-method", "tasks/get"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("Missing required Mcp-Name header"));
+
+  EXPECT_EQ(nullptr, upstream_request_);
+}
+
+TEST_P(McpFilterIntegrationTest, NewSpecAllowsMethodWithoutNameHeader) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  protocol_versions:
+    supported:
+    - "2026-07-28"
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"logging/setLevel","params":{"level":"info"}})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-protocol-version", "2026-07-28"},
+                                     {"mcp-method", "logging/setLevel"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(McpFilterIntegrationTest, NewSpecOnlyRejectsMissingProtocolVersionHeader) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  protocol_versions:
+    supported:
+    - "2026-07-28"
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-method", "tasks/get"},
+                                     {"mcp-name", "task-123"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+
+  // The upstream should not receive the request because the new-spec-only
+  // configuration requires MCP-Protocol-Version.
+  EXPECT_EQ(nullptr, upstream_request_);
+}
+
+TEST_P(McpFilterIntegrationTest, RejectsUnsupportedProtocolVersion) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  protocol_versions:
+    supported:
+    - "2026-07-28"
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-protocol-version", "2025-11-25"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+
+  EXPECT_EQ(nullptr, upstream_request_);
+}
+
+TEST_P(McpFilterIntegrationTest, RejectsUnsupportedProtocolVersionWithJsonRpcReply) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  protocol_versions:
+    supported:
+    - "2026-07-28"
+  error_reply_format: FORMAT_JSON_RPC
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-protocol-version", "2025-11-25"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_EQ("application/json", response->headers().getContentTypeValue());
+
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"jsonrpc\":\"2.0\""));
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"code\":-32022"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"requested\":\"2025-11-25\""));
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"2026-07-28\""));
+
+  EXPECT_EQ(nullptr, upstream_request_);
+}
+
+TEST_P(McpFilterIntegrationTest, NewSpecRejectsDeleteWithMethodNotAllowed) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  protocol_versions:
+    supported:
+    - "2026-07-28"
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "DELETE"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"mcp-session-id", "session-123"},
+                                     {"mcp-protocol-version", "2026-07-28"}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("405", response->headers().getStatusValue());
+
+  // The legacy DELETE transport is rejected locally for the new protocol.
+  EXPECT_EQ(nullptr, upstream_request_);
+}
+
+TEST_P(McpFilterIntegrationTest, NewSpecRejectsSseGetWithMethodNotAllowed) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  protocol_versions:
+    supported:
+    - "2026-07-28"
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "text/event-stream"},
+                                     {"mcp-protocol-version", "2026-07-28"}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("405", response->headers().getStatusValue());
+
+  // The legacy GET + SSE transport is rejected locally for the new protocol.
+  EXPECT_EQ(nullptr, upstream_request_);
+}
+
+TEST_P(McpFilterIntegrationTest, LegacyProtocolAllowsDelete) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  protocol_versions:
+    supported:
+    - "2025-11-25"
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "DELETE"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"mcp-session-id", "session-123"},
+                                     {"mcp-protocol-version", "2025-11-25"}});
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(McpFilterIntegrationTest, LegacyProtocolAllowsSseGet) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  protocol_versions:
+    supported:
+    - "2025-11-25"
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "text/event-stream"},
+                                     {"mcp-protocol-version", "2025-11-25"}});
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Test that an MCP request with malformed JSON is rejected with a 400.
 TEST_P(McpFilterIntegrationTest, InvalidJsonBodyRejected) {
   FakeAccessLogFactory factory;
