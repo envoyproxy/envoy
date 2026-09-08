@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -212,8 +213,13 @@ envoy_cc_library(
         "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+        # The QUIC proof source is only referenced under #ifdef ENVOY_ENABLE_QUIC
+        # in context_impl.h. Gate the dependency the same way so that builds with
+        # HTTP/3 disabled (e.g. --config=openssl, where QUIC is unsupported) do
+        # not link QUICHE and, transitively, a second SSL implementation.
+    ] + envoy_select_enable_http3([
         "@quiche//:quic_core_crypto_proof_source_lib",
-    ],
+    ]),
 )
 
 envoy_cc_library(

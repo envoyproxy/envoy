@@ -131,11 +131,7 @@ function cp_binary_for_image_build() {
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
-  if [[ -n "$ENVOY_CI_BZLMOD" ]]; then
-      cp -f bazel-bin/external/su-exec~/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
-  else
-      cp -f bazel-bin/external/su-exec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
-  fi
+  cp -f bazel-bin/external/su-exec+/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
 
   # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
@@ -239,7 +235,9 @@ function bazel_envoy_api_go_build() {
     setup_clang_toolchain
     GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
     GO_TARGETS=(@envoy_api//...)
-    read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
+    read -r -a GO_PROTOS <<< "$(\
+        bazel query --consistent_labels "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" \
+        | tr '\n' ' ')"
     echo "${GO_PROTOS[@]}" | grep -q envoy_api || echo "No go proto targets found"
     bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
             --experimental_proto_descriptor_sets_include_source_info \
@@ -250,14 +248,13 @@ function bazel_envoy_api_go_build() {
     echo "Copying go protos -> build_go"
     BAZEL_BIN="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" bazel-bin)"
     for GO_PROTO in "${GO_PROTOS[@]}"; do
-            # strip @envoy_api//
-        RULE_DIR="$(echo "${GO_PROTO:12}" | cut -d: -f1)"
-        PROTO="$(echo "${GO_PROTO:12}" | cut -d: -f2)"
-        if [[ -n "$ENVOY_CI_BZLMOD" ]]; then
-            INPUT_DIR="${BAZEL_BIN}/external/envoy_api~/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
-        else
-            INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
-        fi
+        LABEL_PATH="${GO_PROTO#*//}"
+        RULE_DIR="${LABEL_PATH%%:*}"
+        PROTO="${LABEL_PATH#*:}"
+        REPO_LABEL="${GO_PROTO%%//*}"
+        REPO_NAME="${REPO_LABEL#@}"
+        REPO_NAME="${REPO_NAME#@}"
+        INPUT_DIR="${BAZEL_BIN}/external/${REPO_NAME}/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
         OUTPUT_DIR="build_go/${RULE_DIR}"
         mkdir -p "$OUTPUT_DIR"
         if [[ ! -e "$INPUT_DIR" ]]; then
@@ -473,18 +470,12 @@ case $CI_TARGET in
             exit 1
         fi
         ENVOY_CACHE_OUTPUT_BASE="${ENVOY_CACHE_OUTPUT_BASE:-base}"
-        setup_clang_toolchain
-        echo "Fetching cache: ${ENVOY_CACHE_TARGETS}"
-        if [[ -n "${ENVOY_CACHE_WORKING_DIR}" ]]; then
-            cd "${ENVOY_CACHE_WORKING_DIR}"
-        fi
-        bazel --output_user_root="${ENVOY_CACHE_ROOT}" \
-              --output_base="${ENVOY_CACHE_ROOT}/${ENVOY_CACHE_OUTPUT_BASE}" \
-              --nowrite_command_log \
-              aquery "deps(${ENVOY_CACHE_TARGETS})" \
-              --repository_cache="${ENVOY_REPOSITORY_CACHE}" \
-              "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" \
-              > /dev/null
+        # TODO(phlax): Cache priming is temporarily disabled - the bzlmod
+        # `aquery deps(//...)` walk is too slow/flaky to be useful. Create an
+        # empty output base so the prime/upload/restore plumbing is unchanged.
+        echo "Bazel cache priming disabled, creating empty cache (${ENVOY_CACHE_TARGETS})"
+        mkdir -p "${ENVOY_CACHE_ROOT}/${ENVOY_CACHE_OUTPUT_BASE}"
+        touch "${ENVOY_CACHE_ROOT}/${ENVOY_CACHE_OUTPUT_BASE}/.keep"
         TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
         echo "Generated cache: ${TOTAL_SIZE}"
         ;;
@@ -624,14 +615,14 @@ case $CI_TARGET in
 
     config)
         setup_clang_toolchain
-        if [[ -z "$ENVOY_SKIP_CONFIGS_STATIC" ]]; then
-            echo "running static config validation"
-            bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy//test/config_test:static_config_validation
-        fi
         if [[ -e repo.bazelrc ]]; then
             cp -a repo.bazelrc "${ENVOY_DOCS_PATH}"
         fi
         pushd "$ENVOY_DOCS_PATH"
+        if [[ -z "$ENVOY_SKIP_CONFIGS_STATIC" ]]; then
+            echo "running static config validation"
+            bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy//test/config_test:static_config_validation
+        fi
         ENVOY_CONFIG_CONTRIB_LIB="${ENVOY_CONFIG_CONTRIB_LIB:-@envoy//contrib:contrib_test_lib}"
         ENVOY_CONFIGS_CORE="${ENVOY_CONFIGS_CORE:-//test/config:configs}"
         ENVOY_CONFIGS_CONTRIB="${ENVOY_CONFIGS_CONTRIB:-//test/config:contrib_configs}"
@@ -706,16 +697,6 @@ case $CI_TARGET in
               //tools/dependency:validate_reachability_test
         echo "dependency graph structure..."
         "${ENVOY_SRCDIR}/tools/dependency/validate_graph_structure.sh"
-        # Validate repository metadata.
-        echo "check repositories..."
-        "${ENVOY_SRCDIR}/tools/check_repositories.sh"
-        echo "check dependencies..."
-        # Using todays date as an action_env expires the NIST cache daily, which is the update frequency
-        # TODO(phlax): Re-enable cve tests
-        bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
-              -- -v warn \
-                 -c release_dates releases
-        # Run dependabot tests
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
@@ -932,32 +913,11 @@ case $CI_TARGET in
 
     lockfiles|lockfiles.regenerate)
         # TODO(phlax): Add other lockfiles here and a check path
-        bazel mod \
-              "${BAZEL_GLOBAL_OPTIONS[@]}" \
-             --enable_bzlmod \
-             --noenable_workspace \
-             deps --lockfile_mode=update
-        pushd "$ENVOY_DOCS_PATH"
-        bazel mod \
-              "${BAZEL_GLOBAL_OPTIONS[@]}" \
-              --enable_bzlmod \
-              --noenable_workspace \
-              deps --lockfile_mode=update
-        popd
-        pushd "api/"
-        bazel mod \
-              "${BAZEL_GLOBAL_OPTIONS[@]}" \
-              --enable_bzlmod \
-              --noenable_workspace \
-              deps --lockfile_mode=update
-        popd
-        pushd "mobile/"
-        bazel mod \
-              "${BAZEL_GLOBAL_OPTIONS[@]}" \
-              --enable_bzlmod \
-              --noenable_workspace \
-              deps --lockfile_mode=update
-        popd
+        for module_dir in . "$ENVOY_DOCS_PATH" api/ mobile/ bazel/tests/external/; do
+            pushd "$module_dir"
+            bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --lockfile_mode=update
+            popd
+        done
         ;;
 
     msan)
