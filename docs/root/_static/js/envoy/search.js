@@ -6,7 +6,7 @@
  * The index is loaded on first open, not on page load.
  *
  * The overlay searches page and section titles, which is what a quick switcher
- * is for. Full-text search stays on /search.html, one Enter away, and remains
+ * is for. Full-text search stays on /search, one Enter away, and remains
  * the only search when JavaScript is unavailable.
  */
 
@@ -41,6 +41,10 @@ function areaOf(docname) {
     return 'Documentation';
   }
   return segment.replace(/[-_]/g, ' ').replace(/^./, (c) => c.toUpperCase());
+}
+
+function docUrl(docname) {
+  return `${docname}${DOCUMENTATION_OPTIONS.LINK_SUFFIX}`;
 }
 
 function loadIndex(url) {
@@ -279,7 +283,7 @@ export function init() {
         const link = document.createElement('a');
         link.className = 'envoy-search-hit';
         link.href =
-          `${root}${entry.docname}.html${entry.anchor ? `#${entry.anchor}` : ''}`;
+          `${root}${docUrl(entry.docname)}${entry.anchor ? `#${entry.anchor}` : ''}`;
 
         const path = document.createElement('span');
         path.className = 'envoy-search-hit-path';

@@ -395,6 +395,12 @@ html_js_files = [
 # This is the file name suffix for HTML files (e.g. ".xhtml").
 #html_file_suffix = None
 
+# Files are still written as `foo.html`, but generated links are `foo`,
+# matching the "Pretty URLs" scheme the published docs have always used
+# (previously produced by Netlify post-processing, now by an edge function
+# on envoyproxy.io that serves `/foo` from `foo.html`).
+html_link_suffix = ''
+
 # Language to be used for generating the HTML full-text search index.
 # Sphinx supports the following languages:
 #   'da', 'de', 'en', 'es', 'fi', 'fr', 'hu', 'it', 'ja'
