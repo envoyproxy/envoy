@@ -222,7 +222,7 @@ private:
   Http::FilterDataStatus completeParsing();
   void setDynamicMetadataStatus(Protobuf::Struct metadata);
   void populateMetadataFromHeaders();
-  bool shouldValidateNewSpecHeaders() const;
+  bool shouldUseNewSpecSemantics() const;
 
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

@@ -16,6 +16,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
@@ -48,6 +49,29 @@ const Http::LowerCaseString kMcpName{
 
 const Http::LowerCaseString kMcpProtocolVersion{
     Filters::Common::Mcp::McpConstants::MCP_PROTOCOL_VERSION_HEADER};
+
+constexpr absl::string_view kBase64SentinelPrefix = "=?base64?";
+constexpr absl::string_view kBase64SentinelSuffix = "?=";
+
+std::optional<std::string> decodeMcpHeaderValue(absl::string_view value) {
+  if (!absl::StartsWith(value, kBase64SentinelPrefix) ||
+      !absl::EndsWith(value, kBase64SentinelSuffix)) {
+    return std::string(value);
+  }
+
+  const absl::string_view encoded =
+      value.substr(kBase64SentinelPrefix.size(),
+                   value.size() - kBase64SentinelPrefix.size() - kBase64SentinelSuffix.size());
+
+  const std::string decoded = Base64::decode(encoded);
+
+  // Base64::decode() returns an empty string for malformed non-empty input.
+  if (!encoded.empty() && decoded.empty()) {
+    return std::nullopt;
+  }
+
+  return decoded;
+}
 
 void setNestedStringValue(Protobuf::Struct& metadata, absl::string_view path,
                           absl::string_view value) {
@@ -313,7 +337,7 @@ bool McpFilter::needsBody() const {
     return true;
   }
 
-  if (!shouldValidateNewSpecHeaders()) {
+  if (!shouldUseNewSpecSemantics()) {
     return true;
   }
 
@@ -338,7 +362,7 @@ bool McpFilter::needsBody() const {
   return false;
 }
 
-bool McpFilter::shouldValidateNewSpecHeaders() const {
+bool McpFilter::shouldUseNewSpecSemantics() const {
   if (protocol_version_.has_value() &&
       *protocol_version_ == Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28) {
     return true;
@@ -392,21 +416,24 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
     }
   }
 
-  if (protocol_version_headers.empty() && shouldValidateNewSpecHeaders()) {
+  if (protocol_version_headers.empty() && shouldUseNewSpecSemantics()) {
     config_->stats().header_mismatch_.inc();
     sendHeaderMismatchReply("Missing required MCP-Protocol-Version header");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  if (shouldValidateNewSpecHeaders()) {
+  if (shouldUseNewSpecSemantics()) {
     if (isValidMcpDeleteRequest(headers)) {
-      sendMethodNotAllowedReply("MCP DELETE is not supported for protocol version 2026-07-28");
+      sendMethodNotAllowedReply(
+          absl::StrCat("MCP DELETE is not supported for protocol version ",
+                       Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28));
       return Http::FilterHeadersStatus::StopIteration;
     }
 
     if (isValidMcpSseRequest(headers)) {
       sendMethodNotAllowedReply(
-          "MCP GET with SSE is not supported for protocol version 2026-07-28");
+          absl::StrCat("MCP GET with SSE is not supported for protocol version ",
+                       Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28));
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
@@ -426,7 +453,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
   if (isValidMcpPostRequest(headers)) {
     is_json_post_request_ = true;
     ENVOY_LOG(debug, "valid MCP Post request");
-    if (shouldValidateNewSpecHeaders() ||
+    if (shouldUseNewSpecSemantics() ||
         config_->attributeSource() != envoy::extensions::filters::http::mcp::v3::Mcp::BODY) {
       const auto method_headers = headers.get(kMcpMethod);
       if (!method_headers.empty()) {
@@ -435,11 +462,24 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
 
       const auto name_headers = headers.get(kMcpName);
       if (!name_headers.empty()) {
-        header_name_ = std::string(name_headers[0]->value().getStringView());
+        const absl::string_view name_value = name_headers[0]->value().getStringView();
+
+        if (shouldUseNewSpecSemantics()) {
+          const auto decoded_name = decodeMcpHeaderValue(name_value);
+          if (!decoded_name.has_value()) {
+            config_->stats().header_mismatch_.inc();
+            sendHeaderMismatchReply("Invalid Base64-encoded Mcp-Name header");
+            return Http::FilterHeadersStatus::StopIteration;
+          }
+
+          header_name_ = *decoded_name;
+        } else {
+          header_name_ = std::string(name_value);
+        }
       }
     }
 
-    if (shouldValidateNewSpecHeaders()) {
+    if (shouldUseNewSpecSemantics()) {
       if (header_method_.empty()) {
         config_->stats().header_mismatch_.inc();
         sendHeaderMismatchReply("Missing required Mcp-Method header");
@@ -716,7 +756,7 @@ bool McpFilter::headerAttributesMatch() const {
 }
 
 bool McpFilter::verifyHeaderAttributes() const {
-  if (!shouldValidateNewSpecHeaders()) {
+  if (!shouldUseNewSpecSemantics()) {
     return true;
   }
 
@@ -724,7 +764,7 @@ bool McpFilter::verifyHeaderAttributes() const {
 }
 
 McpFilter::ProtocolVersionValidationResult McpFilter::validateProtocolVersion() const {
-  if (!shouldValidateNewSpecHeaders()) {
+  if (!shouldUseNewSpecSemantics()) {
     return ProtocolVersionValidationResult::Ok;
   }
 
@@ -743,8 +783,12 @@ McpFilter::ProtocolVersionValidationResult McpFilter::validateProtocolVersion() 
   const auto it =
       fields.find(std::string(Filters::Common::Mcp::McpConstants::PROTOCOL_VERSION_META_KEY));
 
-  if (it == fields.end() || it->second.kind_case() != Protobuf::Value::kStringValue) {
+  if (it == fields.end()) {
     return ProtocolVersionValidationResult::Missing;
+  }
+
+  if (it->second.kind_case() != Protobuf::Value::kStringValue) {
+    return ProtocolVersionValidationResult::Mismatch;
   }
 
   if (it->second.string_value() != *protocol_version_) {
