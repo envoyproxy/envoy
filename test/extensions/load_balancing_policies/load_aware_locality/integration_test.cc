@@ -32,7 +32,8 @@ public:
                         int smoothing_time_constant_seconds = 1,
                         std::vector<std::string> remote_zones = {"zone-b"},
                         uint32_t endpoints_per_zone = 2) {
-    num_upstreams_ = endpoints_per_zone * static_cast<uint32_t>(1 + remote_zones.size());
+    endpoints_per_zone_ = endpoints_per_zone;
+    num_upstreams_ = endpoints_per_zone_ * static_cast<uint32_t>(1 + remote_zones.size());
     setUpstreamCount(num_upstreams_);
 
     const auto ip_version = GetParam();
@@ -177,15 +178,15 @@ public:
   }
 
   uint64_t zoneTraffic(const std::vector<uint64_t>& usage, size_t zone_index) const {
-    const size_t start = zone_index * 2;
-    return usage[start] + usage[start + 1];
+    const size_t start = zone_index * endpoints_per_zone_;
+    return std::accumulate(usage.begin() + start, usage.begin() + start + endpoints_per_zone_, 0u);
   }
 
   uint64_t localTraffic(const std::vector<uint64_t>& usage) const { return zoneTraffic(usage, 0); }
 
   uint64_t remoteTraffic(const std::vector<uint64_t>& usage) const {
     uint64_t total = 0;
-    for (size_t zone = 1; zone < num_upstreams_ / 2; ++zone) {
+    for (size_t zone = 1; zone < num_upstreams_ / endpoints_per_zone_; ++zone) {
       total += zoneTraffic(usage, zone);
     }
     return total;
@@ -193,6 +194,7 @@ public:
 
 protected:
   uint32_t num_upstreams_{4};
+  uint32_t endpoints_per_zone_{2};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, LoadAwareLocalityIntegrationTest,
