@@ -162,6 +162,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "route_provider_interface",
+    hdrs = ["route_provider.h"],
+    deps = [
+        ":router_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
     name = "path_matcher_interface",
     hdrs = ["path_matcher.h"],
     deps = [

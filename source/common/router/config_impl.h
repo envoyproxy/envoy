@@ -17,9 +17,11 @@
 #include "envoy/init/manager.h"
 #include "envoy/registry/registry.h"
 #include "envoy/router/cluster_specifier_plugin.h"
+#include "envoy/router/route_provider.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -468,6 +470,20 @@ private:
 };
 
 /**
+ * All route provider stats. @see stats_macros.h
+ */
+#define ALL_ROUTE_PROVIDER_STATS(COUNTER)                                                          \
+  COUNTER(shadow_match)                                                                            \
+  COUNTER(shadow_mismatch)
+
+/**
+ * Struct definition for all route provider stats. @see stats_macros.h
+ */
+struct RouteProviderStats {
+  ALL_ROUTE_PROVIDER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * Virtual host that holds a collection of routes.
  */
 class VirtualHostImpl : Logger::Loggable<Logger::Id::router> {
@@ -493,6 +509,39 @@ public:
 private:
   enum class SslRequirements : uint8_t { None, ExternalOnly, All };
 
+  // Route selection state for a virtual host that configures a route provider. The resolver picks a
+  // template for each request, and in shadow mode the provider route is compared against the
+  // baseline built from `routes_` or `matcher_`.
+  struct RouteProvider {
+    DynamicRouteResolverSharedPtr resolver;
+    absl::flat_hash_map<std::string, RouteEntryImplBaseConstSharedPtr> templates;
+    std::string default_template_id;
+    Stats::ScopeSharedPtr scope;
+    std::unique_ptr<RouteProviderStats> stats;
+    bool shadow_mode{false};
+  };
+
+  // Resolve the route through the configured route provider, running the shadow comparison when the
+  // provider is in shadow mode.
+  RouteConstSharedPtr getRouteFromProvider(const RouteCallback& cb,
+                                           const Http::RequestHeaderMap& headers,
+                                           const StreamInfo::StreamInfo& stream_info,
+                                           uint64_t random_value) const;
+
+  // Resolve the route from the `matcher_` or `routes_` baseline.
+  RouteConstSharedPtr getRouteFromMatcherOrRoutes(const RouteCallback& cb,
+                                                  const Http::RequestHeaderMap& headers,
+                                                  const StreamInfo::StreamInfo& stream_info,
+                                                  uint64_t random_value) const;
+
+  // Build the route for a resolver decision by selecting the template and applying its overrides.
+  RouteConstSharedPtr materializeProviderRoute(const RouteDecision& decision,
+                                               const Http::RequestHeaderMap& headers,
+                                               const StreamInfo::StreamInfo& stream_info,
+                                               uint64_t random_value) const;
+
+  bool hasBaseline() const { return matcher_ != nullptr || !routes_.empty(); }
+
   CommonVirtualHostSharedPtr shared_virtual_host_;
 
   std::shared_ptr<const SslRedirectRoute> ssl_redirect_route_;
@@ -500,6 +549,7 @@ private:
 
   absl::InlinedVector<RouteEntryImplBaseConstSharedPtr, 2> routes_;
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
+  std::unique_ptr<RouteProvider> route_provider_;
 };
 
 using VirtualHostImplSharedPtr = std::shared_ptr<VirtualHostImpl>;
@@ -675,6 +725,9 @@ class RouteEntryImplBase : public RouteEntryAndRoute,
                            public Matcher::ActionBase<envoy::config::route::v3::Route>,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            Logger::Loggable<Logger::Id::router> {
+  // Allow the virtual host to materialize a selected route provider template via clusterEntry().
+  friend class VirtualHostImpl;
+
 protected:
   /**
    * @throw EnvoyException or sets creation_status if the route configuration contains any errors

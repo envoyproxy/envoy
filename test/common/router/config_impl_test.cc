@@ -4027,6 +4027,412 @@ TEST_F(RouteMatcherTest, WeightedClusterWithProvidedRandomValue) {
   EXPECT_EQ("cluster2", config.route(headers, 60)->routeEntry()->clusterName());
 }
 
+// A resolver used only in tests. It selects the template named by the `x-template` header, returns
+// the use-default decision for the `x-default` header, and otherwise continues matching. Shadow
+// results are recorded so tests can assert on the comparison.
+class TestRouteResolver : public DynamicRouteResolver {
+public:
+  RouteDecision resolve(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo&,
+                        uint64_t) const override {
+    const auto template_header = headers.get(Http::LowerCaseString("x-template"));
+    if (!template_header.empty()) {
+      return {RouteDecision::Kind::SelectTemplate,
+              std::string(template_header[0]->value().getStringView())};
+    }
+    if (!headers.get(Http::LowerCaseString("x-default")).empty()) {
+      return {RouteDecision::Kind::UseDefault, ""};
+    }
+    return {RouteDecision::Kind::ContinueMatching, ""};
+  }
+
+  void onShadowResult(RouteConstSharedPtr provider_route, RouteConstSharedPtr baseline_route,
+                      const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&) const override {
+    shadow_called_ = true;
+    shadow_provider_route_ = std::move(provider_route);
+    shadow_baseline_route_ = std::move(baseline_route);
+  }
+
+  mutable bool shadow_called_{false};
+  mutable RouteConstSharedPtr shadow_provider_route_;
+  mutable RouteConstSharedPtr shadow_baseline_route_;
+};
+
+class TestRouteProviderFactory : public RouteProviderFactory {
+public:
+  absl::StatusOr<DynamicRouteResolverSharedPtr>
+  createRouteResolver(const Protobuf::Message&,
+                      Server::Configuration::ServerFactoryContext&) override {
+    if (fail_) {
+      return absl::InvalidArgumentError("route provider creation failed");
+    }
+    resolver_ = std::make_shared<TestRouteResolver>();
+    return resolver_;
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  std::string name() const override { return "envoy.router.route_provider.test"; }
+
+  std::shared_ptr<TestRouteResolver> resolver_;
+  bool fail_{false};
+};
+
+TEST_F(RouteMatcherTest, RouteProviderSelectsTemplate) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  route_provider:
+    route_templates:
+    - template_id: a
+      route:
+        match: {prefix: "/"}
+        route: {cluster: cluster_a}
+    - template_id: b
+      route:
+        match: {prefix: "/"}
+        route: {cluster: cluster_b}
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+  factory_context_.cluster_manager_.initializeClusters({"cluster_a", "cluster_b"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  auto select_a = genHeaders("some.domain", "/", "GET");
+  select_a.addCopy("x-template", "a");
+  EXPECT_EQ("cluster_a", config.route(select_a, 0)->routeEntry()->clusterName());
+
+  auto select_b = genHeaders("some.domain", "/", "GET");
+  select_b.addCopy("x-template", "b");
+  EXPECT_EQ("cluster_b", config.route(select_b, 0)->routeEntry()->clusterName());
+
+  auto select_missing = genHeaders("some.domain", "/", "GET");
+  select_missing.addCopy("x-template", "missing");
+  EXPECT_LOG_CONTAINS("debug", "route provider selected unknown template 'missing'",
+                      { EXPECT_EQ(nullptr, config.route(select_missing, 0).route); });
+}
+
+TEST_F(RouteMatcherTest, RouteProviderUsesDefaultTemplate) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  route_provider:
+    default_template_id: a
+    route_templates:
+    - template_id: a
+      route:
+        match: {prefix: "/"}
+        route: {cluster: cluster_a}
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+  factory_context_.cluster_manager_.initializeClusters({"cluster_a"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  auto headers = genHeaders("some.domain", "/", "GET");
+  headers.addCopy("x-default", "true");
+  EXPECT_EQ("cluster_a", config.route(headers, 0)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteMatcherTest, RouteProviderContinueMatchingFallsThroughToBaseline) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match: {prefix: "/"}
+    route: {cluster: baseline_cluster}
+  route_provider:
+    route_templates:
+    - template_id: a
+      route:
+        match: {prefix: "/"}
+        route: {cluster: cluster_a}
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+  factory_context_.cluster_manager_.initializeClusters({"cluster_a", "baseline_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  // No selection header, so the resolver continues matching and the baseline route is used.
+  auto continue_headers = genHeaders("some.domain", "/", "GET");
+  EXPECT_EQ("baseline_cluster", config.route(continue_headers, 0)->routeEntry()->clusterName());
+
+  // The provider is live, so a selected template takes precedence over the baseline.
+  auto select_headers = genHeaders("some.domain", "/", "GET");
+  select_headers.addCopy("x-template", "a");
+  EXPECT_EQ("cluster_a", config.route(select_headers, 0)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteMatcherTest, RouteProviderRedirectTemplate) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  route_provider:
+    route_templates:
+    - template_id: r
+      route:
+        match: {prefix: "/"}
+        redirect: {host_redirect: "example.com"}
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  auto headers = genHeaders("some.domain", "/", "GET");
+  headers.addCopy("x-template", "r");
+  const auto route = config.route(headers, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ(nullptr, route->routeEntry());
+  ASSERT_NE(nullptr, route->directResponseEntry());
+  EXPECT_EQ(Http::Code::MovedPermanently, route->directResponseEntry()->responseCode());
+}
+
+TEST_F(RouteMatcherTest, RouteProviderShadowModeServesBaselineAndReportsMismatch) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match: {prefix: "/"}
+    route: {cluster: baseline_cluster}
+  route_provider:
+    shadow_mode: true
+    route_templates:
+    - template_id: a
+      route:
+        match: {prefix: "/"}
+        route: {cluster: cluster_a}
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+  factory_context_.cluster_manager_.initializeClusters({"cluster_a", "baseline_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  auto headers = genHeaders("some.domain", "/", "GET");
+  headers.addCopy("x-template", "a");
+  // Shadow mode serves the baseline route while the provider route is only computed for comparison.
+  EXPECT_EQ("baseline_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+
+  ASSERT_NE(nullptr, factory.resolver_);
+  EXPECT_TRUE(factory.resolver_->shadow_called_);
+  ASSERT_NE(nullptr, factory.resolver_->shadow_provider_route_);
+  ASSERT_NE(nullptr, factory.resolver_->shadow_baseline_route_);
+  EXPECT_EQ("cluster_a", factory.resolver_->shadow_provider_route_->routeEntry()->clusterName());
+  EXPECT_EQ("baseline_cluster",
+            factory.resolver_->shadow_baseline_route_->routeEntry()->clusterName());
+  EXPECT_EQ(1U,
+            factory_context_.store_.counter("vhost.local_service.route_provider.shadow_mismatch")
+                .value());
+  EXPECT_EQ(
+      0U,
+      factory_context_.store_.counter("vhost.local_service.route_provider.shadow_match").value());
+}
+
+TEST_F(RouteMatcherTest, RouteProviderShadowModeReportsMatch) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match: {prefix: "/"}
+    route: {cluster: baseline_cluster}
+  route_provider:
+    shadow_mode: true
+    route_templates:
+    - template_id: a
+      route:
+        match: {prefix: "/"}
+        route: {cluster: baseline_cluster}
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+  factory_context_.cluster_manager_.initializeClusters({"baseline_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  auto headers = genHeaders("some.domain", "/", "GET");
+  headers.addCopy("x-template", "a");
+  EXPECT_EQ("baseline_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  EXPECT_EQ(
+      1U,
+      factory_context_.store_.counter("vhost.local_service.route_provider.shadow_match").value());
+  EXPECT_EQ(0U,
+            factory_context_.store_.counter("vhost.local_service.route_provider.shadow_mismatch")
+                .value());
+}
+
+TEST_F(RouteMatcherTest, RouteProviderShadowModeRequiresBaseline) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  route_provider:
+    shadow_mode: true
+    route_templates:
+    - template_id: a
+      route:
+        match: {prefix: "/"}
+        route: {cluster: cluster_a}
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+  factory_context_.cluster_manager_.initializeClusters({"cluster_a"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_THAT(creation_status_.message(),
+              testing::ContainsRegex("route provider shadow_mode requires routes or matcher"));
+}
+
+TEST_F(RouteMatcherTest, RouteProviderDuplicateTemplateId) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  route_provider:
+    route_templates:
+    - template_id: a
+      route:
+        match: {prefix: "/"}
+        route: {cluster: cluster_a}
+    - template_id: a
+      route:
+        match: {prefix: "/"}
+        route: {cluster: cluster_b}
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+  factory_context_.cluster_manager_.initializeClusters({"cluster_a", "cluster_b"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_THAT(creation_status_.message(),
+              testing::ContainsRegex("duplicate route provider template id 'a'"));
+}
+
+TEST_F(RouteMatcherTest, RouteProviderDefaultTemplateIdNotFound) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  route_provider:
+    default_template_id: missing
+    route_templates:
+    - template_id: a
+      route:
+        match: {prefix: "/"}
+        route: {cluster: cluster_a}
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+  factory_context_.cluster_manager_.initializeClusters({"cluster_a"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_THAT(creation_status_.message(),
+              testing::ContainsRegex("default_template_id 'missing' does not match any template"));
+}
+
+TEST_F(RouteMatcherTest, RouteProviderUnknownResolver) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  route_provider:
+    route_templates:
+    - template_id: a
+      route:
+        match: {prefix: "/"}
+        route: {cluster: cluster_a}
+    resolver:
+      name: envoy.router.route_provider.does_not_exist
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster_a"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_THAT(creation_status_.message(),
+              testing::ContainsRegex("Didn't find a registered route provider resolver"));
+}
+
+TEST_F(RouteMatcherTest, RouteProviderCreationFailure) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  route_provider:
+    route_templates:
+    - template_id: a
+      route:
+        match: {prefix: "/"}
+        route: {cluster: cluster_a}
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  factory.fail_ = true;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+  factory_context_.cluster_manager_.initializeClusters({"cluster_a"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_THAT(creation_status_.message(), testing::ContainsRegex("route provider creation failed"));
+}
+
 TEST_F(RouteMatcherTest, InlineClusterSpecifierPlugin) {
   const std::string yaml = R"EOF(
 virtual_hosts:

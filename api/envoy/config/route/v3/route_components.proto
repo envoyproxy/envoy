@@ -45,7 +45,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -102,6 +102,12 @@ message VirtualHost {
   // can be specified.
   xds.type.matcher.v3.Matcher matcher = 21
       [(udpa.annotations.field_migrate).oneof_promotion = "route_selection"];
+
+  // The route provider that selects and builds routes for incoming requests through a resolver
+  // extension. It may be set on its own, or alongside ``routes`` or ``matcher``, which then act as
+  // the baseline for :ref:`shadow_mode
+  // <envoy_v3_api_field_config.route.v3.RouteProvider.shadow_mode>` comparisons.
+  RouteProvider route_provider = 26;
 
   // Specifies the type of TLS enforcement the virtual host expects. If this option is not
   // specified, there is no TLS requirement for the virtual host.
@@ -272,6 +278,43 @@ message FilterAction {
 message RouteList {
   // The list of routes that will be matched and run, in order. The first route that matches will be used.
   repeated Route routes = 1;
+}
+
+// A route provider owns route selection for a virtual host through a resolver extension. The
+// resolver selects one of the route templates for a request, so a small set of templates can serve
+// many product routes. The provider may run in shadow mode next to ``routes`` or ``matcher`` to
+// validate its results before serving real traffic.
+// Used in :ref:`VirtualHost.route_provider <envoy_v3_api_field_config.route.v3.VirtualHost.route_provider>`.
+// [#next-free-field: 5]
+message RouteProvider {
+  // A named route used as a base shape. When the resolver selects a template, its action and fields
+  // are used to build the route for the request.
+  message RouteTemplate {
+    // The template id. Must be unique within the provider and is used by the resolver to select
+    // this template.
+    string template_id = 1 [(validate.rules).string = {min_len: 1}];
+
+    // The route this template selects.
+    Route route = 2 [(validate.rules).message = {required: true}];
+  }
+
+  // The templates the resolver selects among. At least one template is required.
+  repeated RouteTemplate route_templates = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // The template selected when the resolver returns a use-default decision. If set, it must match
+  // the ``template_id`` of one of ``route_templates``. If not specified, a use-default decision is
+  // treated as no match.
+  string default_template_id = 2;
+
+  // The resolver extension that selects a template for each request. This field is required.
+  // [#extension-category: envoy.router.route_provider]
+  core.v3.TypedExtensionConfig resolver = 3 [(validate.rules).message = {required: true}];
+
+  // When ``true`` the provider runs in shadow mode. The route from ``routes`` or ``matcher`` is
+  // served while the provider route is computed only for comparison, so results can be validated
+  // before serving real traffic. ``routes`` or ``matcher`` must be set when this is ``true``. If
+  // not specified, defaults to ``false`` and the provider route is served.
+  bool shadow_mode = 4;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
