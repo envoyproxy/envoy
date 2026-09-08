@@ -81,17 +81,17 @@ RateLimitTokenBucket::RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_
     : token_bucket_(max_tokens, time_source,
                     // Calculate the fill rate in tokens per second.
                     tokens_per_fill / std::chrono::duration<double>(fill_interval).count()),
-      fill_interval_(fill_interval), shadow_mode_(shadow_mode) {}
+      fill_interval_(fill_interval), shadow_mode_(shadow_mode),
+      preserve_one_request_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.local_ratelimit_local_cluster_preserve_one_request")) {}
 bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume) {
   ASSERT(!(factor <= 0.0 || factor > 1.0));
   const double max_tokens = token_bucket_.maxTokens();
   const double scaled_tokens = to_consume / factor;
   // When sharing makes a request that would otherwise fit larger than the bucket, charge one full
   // bucket so it can be admitted when full.
-  const bool preserve_one_request =
-      max_tokens > 0 && to_consume <= max_tokens && scaled_tokens > max_tokens &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.local_ratelimit_local_cluster_preserve_one_request");
+  const bool preserve_one_request = preserve_one_request_ && max_tokens > 0 &&
+                                    to_consume <= max_tokens && scaled_tokens > max_tokens;
   const double tokens = preserve_one_request ? max_tokens : scaled_tokens;
   auto cb = [tokens](double total) { return total < tokens ? 0.0 : tokens; };
   return token_bucket_.consume(cb) != 0.0;
