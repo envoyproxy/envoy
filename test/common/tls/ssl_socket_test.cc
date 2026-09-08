@@ -6754,20 +6754,25 @@ TEST_P(SslSocketTest, EcdhCurves) {
   client.set_allow_renegotiation(false);
 
   // Connection using TLS 1.3 defaults (server default and client with TLS 1.3) succeeds.
-  // In non-FIPS builds, X25519MLKEM768 is negotiated by default.
-  client_params->set_tls_maximum_protocol_version(
-      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
-  TestUtilOptionsV2 tls13_test_options(listener, client, true, version_);
-  if (!FIPS_mode()) {
-    tls13_test_options.setExpectedTlsGroup("X25519MLKEM768");
-    tls13_test_options.setExpectedServerStats("ssl.curves.X25519MLKEM768");
-    tls13_test_options.setExpectedClientStats("ssl.curves.X25519MLKEM768");
-  } else {
-    tls13_test_options.setExpectedTlsGroup("P-256");
-    tls13_test_options.setExpectedServerStats("ssl.curves.P-256");
-    tls13_test_options.setExpectedClientStats("ssl.curves.P-256");
+  // In non-FIPS builds, X25519MLKEM768 is negotiated by default when runtime guard is enabled.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.tls_use_x25519_mlkem768_by_default", "true"}});
+    client_params->set_tls_maximum_protocol_version(
+        envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+    TestUtilOptionsV2 tls13_test_options(listener, client, true, version_);
+    if (!FIPS_mode()) {
+      tls13_test_options.setExpectedTlsGroup("X25519MLKEM768");
+      tls13_test_options.setExpectedServerStats("ssl.curves.X25519MLKEM768");
+      tls13_test_options.setExpectedClientStats("ssl.curves.X25519MLKEM768");
+    } else {
+      tls13_test_options.setExpectedTlsGroup("P-256");
+      tls13_test_options.setExpectedServerStats("ssl.curves.P-256");
+      tls13_test_options.setExpectedClientStats("ssl.curves.P-256");
+    }
+    testUtilV2(tls13_test_options);
   }
-  testUtilV2(tls13_test_options);
 
   // With TLS 1.3 defaults and runtime guard disabled, connection negotiates X25519 (or P-256 in
   // FIPS).
@@ -6775,6 +6780,8 @@ TEST_P(SslSocketTest, EcdhCurves) {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues(
         {{"envoy.reloadable_features.tls_use_x25519_mlkem768_by_default", "false"}});
+    client_params->set_tls_maximum_protocol_version(
+        envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
     TestUtilOptionsV2 disabled_test_options(listener, client, true, version_);
     if (!FIPS_mode()) {
       disabled_test_options.setExpectedTlsGroup("X25519");
@@ -6789,8 +6796,13 @@ TEST_P(SslSocketTest, EcdhCurves) {
   }
 
   // Client connects offering only X25519MLKEM768 in TLS 1.3, server with default curves accepts it
-  // (non-FIPS).
+  // (non-FIPS) when runtime guard is enabled.
   if (!FIPS_mode()) {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.tls_use_x25519_mlkem768_by_default", "true"}});
+    client_params->set_tls_maximum_protocol_version(
+        envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
     client_params->add_ecdh_curves("X25519MLKEM768");
     TestUtilOptionsV2 mlkem_test_options(listener, client, true, version_);
     std::string mlkem_stats = "ssl.curves.X25519MLKEM768";

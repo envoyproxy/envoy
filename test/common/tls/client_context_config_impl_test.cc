@@ -940,6 +940,10 @@ TEST_F(ClientContextConfigImplTest, ExplicitX25519Mlkem768Curve) {
 
 // Verify that default ECDH curves include X25519MLKEM768 when runtime guard is enabled.
 TEST_F(ClientContextConfigImplTest, DefaultCurvesX25519Mlkem768) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_use_x25519_mlkem768_by_default", "true"}});
+
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
   if (FIPS_mode()) {
