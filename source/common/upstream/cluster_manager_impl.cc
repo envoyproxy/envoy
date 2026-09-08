@@ -1796,6 +1796,16 @@ void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
     // notifies the cluster manager about it.
     return;
   }
+  // Defer eviction because a missing resource can be reported from a subscription callback;
+  // erasing it synchronously would destroy the subscription while it is active.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.odcds_evict_subscription_on_terminal_status")) {
+    if (auto& odcds = map_node_handle.mapped().odcds_; odcds != nullptr) {
+      dispatcher_.post([odcds, name = std::string(name), status]() {
+        odcds->onDiscoveryTerminated(name, status);
+      });
+    }
+  }
   // Let all the worker threads know that the discovery timed out.
   tls_.runOnAllThreads(
       [name = std::string(name), status](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {

@@ -170,6 +170,14 @@ public:
     notifier_.notifyMissingCluster(resource_name);
   }
 
+  // Evicts the singleton subscription so a later on-demand request can retry.
+  void removeSubscription(absl::string_view resource_name) {
+    auto erased = subscriptions_.erase(resource_name);
+    if (erased > 0) {
+      ENVOY_LOG(debug, "ODCDS-manager: evicting subscription for resource {}", resource_name);
+    }
+  }
+
   void addSubscription(absl::string_view resource_name, bool old_ads) {
     if (subscriptions_.contains(resource_name)) {
       ENVOY_LOG(debug, "ODCDS-manager: resource {} is already subscribed to, skipping",
@@ -353,6 +361,13 @@ XdstpOdCdsApiImpl::subscriptionsManager(Server::Configuration::ServerFactoryCont
 
 void XdstpOdCdsApiImpl::updateOnDemand(std::string cluster_name) {
   subscriptions_manager_->addSubscription(cluster_name, old_ads_);
+}
+
+void XdstpOdCdsApiImpl::onDiscoveryTerminated(absl::string_view resource_name,
+                                              ClusterDiscoveryStatus status) {
+  if (status == ClusterDiscoveryStatus::Timeout || status == ClusterDiscoveryStatus::Missing) {
+    subscriptions_manager_->removeSubscription(resource_name);
+  }
 }
 } // namespace Upstream
 } // namespace Envoy

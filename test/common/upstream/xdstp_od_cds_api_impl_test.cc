@@ -308,6 +308,54 @@ TEST_F(XdstpOdCdsApiImplTest, MultipleSubscriptions) {
   callbacks2->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
 }
 
+TEST_F(XdstpOdCdsApiImplTest, OnDiscoveryTerminatedTimeoutEvictsAndAllowsResubscribe) {
+  InSequence s;
+
+  const std::string cluster_name = "fake_cluster";
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+
+  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _)).Times(0);
+  odcds_->updateOnDemand(cluster_name);
+
+  odcds_->onDiscoveryTerminated(cluster_name, ClusterDiscoveryStatus::Timeout);
+
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+}
+
+TEST_F(XdstpOdCdsApiImplTest, OnDiscoveryTerminatedMissingEvictsAndAllowsResubscribe) {
+  InSequence s;
+
+  const std::string cluster_name = "fake_cluster";
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+
+  odcds_->onDiscoveryTerminated(cluster_name, ClusterDiscoveryStatus::Missing);
+
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+}
+
+TEST_F(XdstpOdCdsApiImplTest, OnDiscoveryTerminatedAvailableDoesNotEvict) {
+  InSequence s;
+
+  const std::string cluster_name = "fake_cluster";
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+
+  odcds_->onDiscoveryTerminated(cluster_name, ClusterDiscoveryStatus::Available);
+
+  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _)).Times(0);
+  odcds_->updateOnDemand(cluster_name);
+}
+
+TEST_F(XdstpOdCdsApiImplTest, OnDiscoveryTerminatedUnknownResourceIsNoOp) {
+  odcds_->onDiscoveryTerminated("unknown_cluster", ClusterDiscoveryStatus::Timeout);
+  expectSingletonSubscription("fake_cluster");
+  odcds_->updateOnDemand("fake_cluster");
+}
+
 // Tests cluster removal via a delta update.
 TEST_F(XdstpOdCdsApiImplTest, ClusterRemovalViaDeltaUpdate) {
   InSequence s;
