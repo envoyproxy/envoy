@@ -14,7 +14,6 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/retry_policy_impl.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 
 #include "absl/strings/str_cat.h"
@@ -130,16 +129,10 @@ absl::StatusOr<Router::RetryPolicyConstSharedPtr>
 createRetryPolicy(const envoy::config::core::v3::RetryPolicy& core_retry_policy,
                   Server::Configuration::CommonFactoryContext& context) {
   // Convert core retry policy to route retry policy and create the implementation.
-  // By default when runtime flag is true, pass empty string to respect user's configured
-  // retry_on, not override it. When flag is false, use hardcoded defaults for backwards
-  // compatibility.
-  const std::string default_retry_on =
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ext_authz_http_client_retries_respect_user_retry_on")
-          ? ""
-          : "5xx,gateway-error,connect-failure,reset";
+  // Pass an empty default retry_on so that the user's configured retry_on is respected rather
+  // than overridden.
   envoy::config::route::v3::RetryPolicy route_retry_policy =
-      Http::Utility::convertCoreToRouteRetryPolicy(core_retry_policy, default_retry_on);
+      Http::Utility::convertCoreToRouteRetryPolicy(core_retry_policy, "");
 
   return Router::RetryPolicyImpl::create(route_retry_policy, context.messageValidationVisitor(),
                                          context);
