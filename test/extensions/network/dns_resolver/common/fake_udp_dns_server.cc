@@ -132,7 +132,6 @@ void FakeUdpDnsServer::onReadReady() {
       continue;
     }
 
-    queries_received_++;
     auto responses = makeResponses(buf, result.return_value_);
 
     for (auto& response : responses) {

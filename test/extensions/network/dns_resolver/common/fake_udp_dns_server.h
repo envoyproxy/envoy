@@ -45,10 +45,6 @@ public:
   // Loopback address string matching the socket family.
   const std::string& address() const { return address_; }
 
-  // Counters. Updated on, and so only safe to read from, the dispatcher's thread.
-  uint64_t queriesReceived() const { return queries_received_; }
-  uint64_t responsesSent() const { return responses_sent_; }
-
 protected:
   // Builds up to 2 responses. Empty responses will be skipped.
   virtual std::array<std::vector<uint8_t>, 2> makeResponses(const uint8_t* query, size_t query_len);
@@ -76,9 +72,6 @@ private:
   uint16_t port_{0};
   std::string address_;
   std::deque<std::pair<std::vector<uint8_t>, Address::InstanceConstSharedPtr>> outgoing_;
-
-  uint64_t queries_received_{0};
-  uint64_t responses_sent_{0};
 
   DefaultRecord default_a_;
   DefaultRecord default_aaaa_;
