@@ -50,7 +50,7 @@ http_filters:
 
 TEST_F(FilterChainTest, CreateFilterChain) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(basic_config_), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -85,7 +85,7 @@ http_filters:
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(basic_config_), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -158,7 +158,7 @@ http_filters:
   // Force a simulated time system.
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -185,8 +185,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(basic_config_);
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
+  HttpConnectionManagerConfig config(hcm_config, context_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -235,8 +234,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
   hcm_config.mutable_upgrade_configs(0)->mutable_enabled()->set_value(false);
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
+  HttpConnectionManagerConfig config(hcm_config, context_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -306,8 +304,7 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
     std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
+  HttpConnectionManagerConfig config(hcm_config, context_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -360,8 +357,7 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
     std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
+  HttpConnectionManagerConfig config(hcm_config, context_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(
@@ -375,8 +371,7 @@ TEST_F(FilterChainTest, InvalidConfig) {
   hcm_config.add_upgrade_configs()->set_upgrade_type("WEBSOCKET");
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
+  HttpConnectionManagerConfig config(hcm_config, context_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),

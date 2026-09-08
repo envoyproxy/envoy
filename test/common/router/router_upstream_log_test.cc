@@ -398,7 +398,7 @@ typed_config:
 
   init(std::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
   run(200, {{"request-header-name", "request-header-val"}},
-      {{"response-header-name", "response-header-val"}},
+      {{"response-header-name", "response-header-val"}, {"date", "Sun, 06 Nov 1994 08:49:37 GMT"}},
       {{"response-trailer-name", "response-trailer-val"}});
 
   EXPECT_EQ(output_.size(), 1U);
@@ -413,10 +413,11 @@ typed_config:
   // Response headers:
   // :status: 200
   // response-header-name: response-header-val
+  // date: Sun, 06 Nov 1994 08:49:37 GMT
 
   // Response trailers:
   // response-trailer-name: response-trailer-val
-  EXPECT_EQ(output_.front(), "110 49 41");
+  EXPECT_EQ(output_.front(), "110 82 41");
 }
 
 // Test UPSTREAM_CLUSTER log formatter.

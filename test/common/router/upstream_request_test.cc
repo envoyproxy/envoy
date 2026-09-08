@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "source/common/common/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/router/upstream_codec_filter.h"
@@ -6,6 +8,7 @@
 #include "test/common/http/common.h"
 #include "test/common/memory/memory_test_utility.h"
 #include "test/mocks/router/router_filter_interface.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -82,6 +85,56 @@ TEST_F(UpstreamRequestTest, TestAccessors) {
       Http::TestResponseHeaderMapImpl({{":status", "200"}}));
   EXPECT_CALL(router_filter_interface_, onUpstreamHeaders(_, _, _, _));
   upstream_request_->decodeHeaders(std::move(response_headers), false);
+}
+
+struct DateHeaderCase {
+  bool runtime_enabled;
+  std::optional<absl::string_view> upstream_date;
+  absl::string_view expected_date;
+};
+
+constexpr absl::string_view kRfc850Date = "Sunday, 06-Nov-94 08:49:37 GMT";
+constexpr absl::string_view kAsctimeDate = "Sun Nov  6 08:49:37 1994";
+constexpr absl::string_view kImfFixdate = "Sun, 06 Nov 1994 08:49:37 GMT";
+constexpr absl::string_view kStampedDate = "Mon, 07 Nov 1994 08:49:37 GMT";
+constexpr absl::string_view kInvalidDate = "not a date";
+
+class UpstreamRequestDateHeaderTest : public Event::TestUsingSimulatedTime,
+                                      public UpstreamRequestTest,
+                                      public testing::WithParamInterface<DateHeaderCase> {};
+
+INSTANTIATE_TEST_SUITE_P(DateHeaderCases, UpstreamRequestDateHeaderTest,
+                         testing::Values(
+                             // Missing or unparseable Date is stamped
+                             DateHeaderCase{true, std::nullopt, kStampedDate},
+                             DateHeaderCase{true, kInvalidDate, kStampedDate},
+                             // Any accepted format is preserved
+                             DateHeaderCase{true, kImfFixdate, kImfFixdate},
+                             DateHeaderCase{true, kRfc850Date, kRfc850Date},
+                             DateHeaderCase{true, kAsctimeDate, kAsctimeDate},
+                             // Runtime disabled
+                             DateHeaderCase{false, std::nullopt, ""},
+                             DateHeaderCase{false, kInvalidDate, kInvalidDate}));
+
+TEST_P(UpstreamRequestDateHeaderTest, SetsDateForProxiedResponses) {
+  const auto& param = GetParam();
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http_set_response_date_at_ingress",
+                               param.runtime_enabled ? "true" : "false"}});
+  simTime().setSystemTime(*DateUtil::parseHttpDate(kStampedDate));
+  initialize();
+
+  auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  if (param.upstream_date.has_value()) {
+    response_headers->setDate(*param.upstream_date);
+  }
+
+  EXPECT_CALL(router_filter_interface_, onUpstreamHeaders(200, _, _, false))
+      .WillOnce(Invoke([&](uint64_t, Http::ResponseHeaderMapPtr&& headers, UpstreamRequest&, bool) {
+        EXPECT_EQ(headers->getDateValue(), param.expected_date);
+      }));
+  upstream_request_->upstreamToDownstream().decodeHeaders(std::move(response_headers), false);
 }
 
 // UpstreamRequest is responsible for adding proper gRPC annotations to spans.

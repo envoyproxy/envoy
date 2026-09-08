@@ -25,7 +25,6 @@
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_impl.h"
-#include "source/common/http/date_provider_impl.h"
 #include "source/common/http/dependency_manager.h"
 #include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/http1/codec_stats.h"
@@ -132,7 +131,7 @@ public:
   HttpConnectionManagerConfig(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           config,
-      Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
+      Server::Configuration::FactoryContext& context,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager* scoped_routes_config_provider_manager,
       Tracing::TracerManager& tracer_manager,
@@ -165,7 +164,6 @@ public:
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks,
                                         Server::OverloadManager& overload_manager) override;
-  Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override;
   FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() const override { return generate_request_id_; }
@@ -355,7 +353,6 @@ private:
   bool generate_request_id_;
   const bool preserve_external_request_id_;
   const bool always_set_request_id_in_response_;
-  Http::DateProvider& date_provider_;
   Http::ConnectionManagerListenerStats listener_stats_;
   const bool proxy_100_continue_;
   const bool stream_error_on_invalid_http_messaging_;
@@ -406,7 +403,6 @@ public:
 class Utility {
 public:
   struct Singletons {
-    std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider_;
     Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager_;
     std::shared_ptr<Config::ConfigProviderManager> scoped_routes_config_provider_manager_;
     Tracing::TracerManagerSharedPtr tracer_manager_;
@@ -426,7 +422,6 @@ public:
    *
    * @param proto_config supplies the config to install.
    * @param context supplies the context used to create the config.
-   * @param date_provider the singleton used in config creation.
    * @param route_config_provider_manager the singleton used in config creation.
    * @param scoped_routes_config_provider_manager the singleton used in config creation.
    * @return a shared_ptr to the created config object or a creation error
@@ -434,7 +429,7 @@ public:
   static absl::StatusOr<std::shared_ptr<HttpConnectionManagerConfig>> createConfig(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
-      Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
+      Server::Configuration::FactoryContext& context,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager* scoped_routes_config_provider_manager,
       Tracing::TracerManager& tracer_manager,

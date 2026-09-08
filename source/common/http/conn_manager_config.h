@@ -14,7 +14,6 @@
 #include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "source/common/http/date_provider.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/symbol_table.h"
@@ -245,11 +244,6 @@ public:
                                           const Buffer::Instance& data,
                                           ServerConnectionCallbacks& callbacks,
                                           Server::OverloadManager& overload_manager) PURE;
-
-  /**
-   * @return DateProvider& the date provider to use for
-   */
-  virtual DateProvider& dateProvider() PURE;
 
   /**
    * @return the time in milliseconds the connection manager will wait between issuing a "shutdown

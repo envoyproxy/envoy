@@ -227,20 +227,12 @@ validateRds(const envoy::extensions::filters::network::http_connection_manager::
 } // namespace
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
-SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
 static const std::string srds_factory_name = "envoy.srds_factory.default";
 
 Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
   auto& server_context = context.serverFactoryContext();
-
-  std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
-      server_context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
-          SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&server_context] {
-            return std::make_shared<Http::TlsCachingDateProviderImpl>(
-                server_context.mainThreadDispatcher(), server_context.threadLocal());
-          });
 
   Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager =
       server_context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
@@ -266,23 +258,22 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
       Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
           server_context);
 
-  return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
-          tracer_manager, filter_config_provider_manager};
+  return {route_config_provider_manager, scoped_routes_config_provider_manager, tracer_manager,
+          filter_config_provider_manager};
 }
 
 absl::StatusOr<std::shared_ptr<HttpConnectionManagerConfig>> Utility::createConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
-    Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
+    Server::Configuration::FactoryContext& context,
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager* scoped_routes_config_provider_manager,
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager) {
   absl::Status creation_status = absl::OkStatus();
   auto config = std::make_shared<HttpConnectionManagerConfig>(
-      proto_config, context, date_provider, route_config_provider_manager,
-      scoped_routes_config_provider_manager, tracer_manager, filter_config_provider_manager,
-      creation_status);
+      proto_config, context, route_config_provider_manager, scoped_routes_config_provider_manager,
+      tracer_manager, filter_config_provider_manager, creation_status);
   RETURN_IF_NOT_OK(creation_status);
   return config;
 }
@@ -303,7 +294,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   Utility::Singletons singletons = Utility::createSingletons(context);
 
   auto config_or_error = Utility::createConfig(
-      proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      proto_config, context, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_);
   RETURN_IF_NOT_OK_REF(config_or_error.status());
@@ -360,7 +351,7 @@ InternalAddressConfig::InternalAddressConfig(
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config,
-    Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
+    Server::Configuration::FactoryContext& context,
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager* scoped_routes_config_provider_manager,
     Tracing::TracerManager& tracer_manager,
@@ -416,7 +407,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),
       always_set_request_id_in_response_(config.always_set_request_id_in_response()),
-      date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.prefixedScope())),
       proxy_100_continue_(config.proxy_100_continue()),
@@ -946,7 +936,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   Utility::Singletons singletons = Utility::createSingletons(context);
 
   auto config_or_error = Utility::createConfig(
-      proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      proto_config, context, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_);
   RETURN_IF_NOT_OK_REF(config_or_error.status());

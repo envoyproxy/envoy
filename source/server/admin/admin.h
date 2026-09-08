@@ -24,7 +24,6 @@
 #include "source/common/common/macros.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_impl.h"
-#include "source/common/http/date_provider_impl.h"
 #include "source/common/http/default_server_string.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
@@ -144,7 +143,6 @@ public:
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks,
                                         Server::OverloadManager& overload_manager) override;
-  Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() const override { return false; }
@@ -510,7 +508,6 @@ private:
   std::optional<std::chrono::milliseconds> max_connection_duration_;
   std::optional<std::chrono::milliseconds> max_stream_duration_;
   std::optional<std::string> user_agent_;
-  Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Http::Http1Settings http1_settings_;
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;

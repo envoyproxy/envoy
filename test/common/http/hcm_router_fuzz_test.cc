@@ -4,7 +4,6 @@
 #include "envoy/router/router.h"
 
 #include "source/common/http/conn_manager_impl.h"
-#include "source/common/http/date_provider_impl.h"
 #include "source/common/router/router.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/router/upstream_request.h"

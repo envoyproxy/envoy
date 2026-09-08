@@ -203,7 +203,7 @@ http_filters:
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -249,7 +249,7 @@ http_filters:
     creation_status_ = absl::OkStatus();
     EXPECT_CALL(context_.listener_info_, isQuic()).WillOnce(Return(true));
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                       date_provider_, route_config_provider_manager_,
+                                       route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
     ASSERT_OK(creation_status_);
@@ -313,7 +313,7 @@ http_filters:
   EXPECT_CALL(tracer_manager_, getOrCreateTracer(_)).Times(0);
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -355,7 +355,7 @@ http_filters:
   EXPECT_CALL(tracer_manager_, getOrCreateTracer(_)).Times(0);
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -394,7 +394,7 @@ http_filters:
   EXPECT_CALL(tracer_manager_, getOrCreateTracer(nullptr)).WillOnce(Return(tracer_));
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -438,7 +438,7 @@ http_filters:
       .WillOnce(Return(tracer_));
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -500,7 +500,7 @@ http_filters:
       .WillOnce(Return(tracer_));
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -533,7 +533,7 @@ tracing:
         path: [ { key: xx }, { key: yy } ]
   )EOF";
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -560,7 +560,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -598,7 +598,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -635,7 +635,7 @@ TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -672,7 +672,7 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
  )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -720,7 +720,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -743,7 +743,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationEnabled) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -766,7 +766,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationExplicitFa
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -789,7 +789,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -813,7 +813,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultInternalAddress) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -841,7 +841,7 @@ TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -874,7 +874,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -894,7 +894,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbConfigured) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -914,7 +914,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -955,7 +955,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfiguredViaRunti
       .WillByDefault(Return(9000));
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -978,7 +978,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersCountMaxConfiguredViaRu
       .WillByDefault(Return(42));
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -999,7 +999,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1018,7 +1018,7 @@ TEST_F(HttpConnectionManagerConfigTest, StreamIdleTimeoutDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1040,7 +1040,7 @@ TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1064,7 +1064,7 @@ TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutDefaultStreamIdleTimeo
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1087,7 +1087,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamFlushTimeout) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1110,7 +1110,7 @@ TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutAndStreamIdleTimeoutSe
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1136,7 +1136,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxConnectionDurationJitter) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1164,7 +1164,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxConnectionDurationJitterDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1187,7 +1187,7 @@ TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitter) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1212,7 +1212,7 @@ TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitterDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1235,7 +1235,7 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeout) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1255,7 +1255,7 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1277,7 +1277,7 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutOff) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1297,7 +1297,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestHeaderCount) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1319,7 +1319,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1341,7 +1341,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxResponseHeaderKbInvalid) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_THAT(creation_status_, Not(IsOk()));
@@ -1360,7 +1360,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestPerConnection) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1382,7 +1382,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestPerConnectionConfigurable) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1406,7 +1406,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
       .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1431,7 +1431,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
       .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1456,7 +1456,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
       .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1482,7 +1482,7 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
       .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1506,7 +1506,7 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamDefault) {
       .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1532,7 +1532,7 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpsreamTrue) {
       .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1558,7 +1558,7 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamFalse) {
       .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1585,7 +1585,7 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamAndSchemeToOverwriteI
       .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1614,7 +1614,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
       .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1645,7 +1645,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .WillOnce(Return(true));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1673,7 +1673,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .Times(0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1701,7 +1701,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .Times(0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1721,7 +1721,7 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1742,7 +1742,7 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesTrue) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1763,7 +1763,7 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesFalse) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1783,7 +1783,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1804,7 +1804,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1844,7 +1844,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1865,7 +1865,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortTrue) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1886,7 +1886,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortFalse) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1906,7 +1906,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1927,7 +1927,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotTrue) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1948,7 +1948,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotFalse) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1968,7 +1968,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresAllowedByDefault) 
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -1991,7 +1991,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresDroppedByConfig) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -2014,7 +2014,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresRequestRejectedByC
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -2035,7 +2035,7 @@ TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -2055,7 +2055,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledRequestTimeout) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -2074,46 +2074,11 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
   EXPECT_EQ(0, config.requestTimeout().count());
-}
-
-TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
-  const std::string yaml_string = R"EOF(
-codec_type: http1
-stat_prefix: router
-route_config:
-  virtual_hosts:
-  - name: service
-    domains:
-    - "*"
-    routes:
-    - match:
-        prefix: "/"
-      route:
-        cluster: cluster
-http_filters:
-- name: encoder-decoder-buffer-filter
-  typed_config:
-    "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
-- name: envoy.filters.http.router
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  )EOF";
-
-  context_.server_factory_context_.cluster_manager_.initializeClusters({"cluster"}, {});
-  auto proto_config = parseHttpConnectionManagerFromYaml(yaml_string);
-  HttpConnectionManagerFilterConfigFactory factory;
-  // We expect a single slot allocation vs. multiple.
-  EXPECT_CALL(context_.server_factory_context_.thread_local_, allocateSlot());
-  Network::FilterFactoryCb cb1 =
-      factory.createFilterFactoryFromProto(proto_config, context_).value();
-  Network::FilterFactoryCb cb2 =
-      factory.createFilterFactoryFromProto(proto_config, context_).value();
-  EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context_.serverFactoryContext()));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {
@@ -2159,7 +2124,7 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
 
   {
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string),
-                                       context_, date_provider_, route_config_provider_manager_,
+                                       context_, route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
     ASSERT_OK(creation_status_);
@@ -2174,7 +2139,7 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
     )EOF";
 
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                       date_provider_, route_config_provider_manager_,
+                                       route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
     ASSERT_OK(creation_status_);
@@ -2189,7 +2154,7 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
     )EOF";
 
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                       date_provider_, route_config_provider_manager_,
+                                       route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
     ASSERT_OK(creation_status_);
@@ -2225,7 +2190,7 @@ TEST_F(HttpConnectionManagerConfigTest,
     )EOF";
 
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                       date_provider_, route_config_provider_manager_,
+                                       route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
     ASSERT_OK(creation_status_);
@@ -2280,7 +2245,7 @@ TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
 
   {
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string),
-                                       context_, date_provider_, route_config_provider_manager_,
+                                       context_, route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
     ASSERT_OK(creation_status_);
@@ -2295,7 +2260,7 @@ TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
     )EOF";
 
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                       date_provider_, route_config_provider_manager_,
+                                       route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
     ASSERT_OK(creation_status_);
@@ -2331,7 +2296,7 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccess
     )EOF";
 
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                       date_provider_, route_config_provider_manager_,
+                                       route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
     ASSERT_OK(creation_status_);
@@ -2671,7 +2636,7 @@ TEST_F(HttpConnectionManagerConfigTest, AlwaysSetRequestIdInResponseDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -2691,7 +2656,7 @@ TEST_F(HttpConnectionManagerConfigTest, AlwaysSetRequestIdInResponseConfigured) 
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -2765,7 +2730,7 @@ TEST_F(HttpConnectionManagerConfigTest, CustomRequestIDExtension) {
   Registry::InjectFactory<Server::Configuration::RequestIDExtensionFactory> registration(factory);
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -2832,7 +2797,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -2860,7 +2825,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3012,7 +2977,7 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3039,7 +3004,7 @@ TEST_F(HttpConnectionManagerConfigTest, EarlyHeaderMutationExtension) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3360,7 +3325,7 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefault) {
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .WillRepeatedly(Return(0));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3390,7 +3355,7 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .WillRepeatedly(Return(3));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3403,7 +3368,7 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .WillRepeatedly(Return(4));
   HttpConnectionManagerConfig config1(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                      date_provider_, route_config_provider_manager_,
+                                      route_config_provider_manager_,
                                       &scoped_routes_config_provider_manager_, tracer_manager_,
                                       filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3437,7 +3402,7 @@ TEST_F(HttpConnectionManagerConfigTest,
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .Times(0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3473,7 +3438,7 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .Times(0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3498,7 +3463,7 @@ TEST_F(HttpConnectionManagerConfigTest, SetCurrentClientCertDetailsCertAndChain)
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3524,7 +3489,7 @@ TEST_F(HttpConnectionManagerConfigTest, SetCurrentClientCertDetailsIssuer) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3569,7 +3534,7 @@ TEST_F(HttpConnectionManagerConfigTest, ForwardClientCertMatcher) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3633,7 +3598,7 @@ TEST_F(HttpConnectionManagerConfigTest, ForwardClientCertMatcherWithMultipleActi
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3663,7 +3628,7 @@ TEST_F(HttpConnectionManagerConfigTest, ForwardClientCertMatcherAllDetailsTypes)
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3763,7 +3728,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfig) {
       .Times(AnyNumber());
 #ifdef ENVOY_ENABLE_UHV
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3771,7 +3736,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfig) {
 #else
   // If UHV is disabled, providing config should result in rejection
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
 #endif
@@ -3802,7 +3767,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfigWithRuntimeDisabled
       .Times(AnyNumber());
 #ifdef ENVOY_ENABLE_UHV
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3812,7 +3777,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfigWithRuntimeDisabled
 #else
   // If UHV is disabled, providing config should result in rejection
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_THAT(creation_status_, Not(IsOk()));
@@ -3846,7 +3811,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfigWithRuntimeE
       .Times(AnyNumber());
 #ifdef ENVOY_ENABLE_UHV
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3863,7 +3828,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfigWithRuntimeE
   // If UHV is disabled, enabling envoy.reloadable_features.enable_universal_header_validator should
   // result in rejection
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_THAT(creation_status_, Not(IsOk()));
@@ -3892,7 +3857,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfig) {
   EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_, getInteger(_, _))
       .Times(AnyNumber());
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3936,7 +3901,7 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
       .Times(AnyNumber());
 #ifdef ENVOY_ENABLE_UHV
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -3953,7 +3918,7 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
   // If UHV is disabled, enabling envoy.reloadable_features.enable_universal_header_validator should
   // result in rejection
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_THAT(creation_status_, Not(IsOk()));
@@ -4011,7 +3976,6 @@ TEST_F(HcmUtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
   // call for filter instance "one".
   auto singletons_one = Utility::createSingletons(context_one_);
 
-  EXPECT_THAT(singletons_one.date_provider_.get(), NotNull());
   EXPECT_THAT(singletons_one.route_config_provider_manager_.get(), NotNull());
   EXPECT_THAT(singletons_one.tracer_manager_.get(), NotNull());
 
@@ -4020,7 +3984,6 @@ TEST_F(HcmUtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
   auto singletons_two = Utility::createSingletons(context_two_);
 
   // Ensure that returned values are still the same, even though the context has changed.
-  EXPECT_EQ(singletons_two.date_provider_, singletons_one.date_provider_);
   EXPECT_EQ(singletons_two.route_config_provider_manager_,
             singletons_one.route_config_provider_manager_);
   EXPECT_EQ(singletons_two.scoped_routes_config_provider_manager_,
@@ -4091,7 +4054,7 @@ http_filters:
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_OK(creation_status_);
@@ -4126,7 +4089,7 @@ http_filters:
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_OK(creation_status_);
@@ -4187,7 +4150,7 @@ http_filters:
       .WillOnce(Return(ByMove(Router::ScopeKeyBuilderPtr())));
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+                                     route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);

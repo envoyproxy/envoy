@@ -356,6 +356,30 @@ uint64_t DateUtil::nowToSeconds(TimeSource& time_source) {
       .count();
 }
 
+std::optional<SystemTime> DateUtil::parseHttpDate(absl::string_view http_date) {
+  // Acceptable Date/Time Formats per:
+  // https://www.rfc-editor.org/rfc/rfc9110.html#section-5.6.7
+  //
+  // Sun, 06 Nov 1994 08:49:37 GMT    ; IMF-fixdate.
+  // Sunday, 06-Nov-94 08:49:37 GMT   ; obsolete RFC 850 format.
+  // Sun Nov  6 08:49:37 1994         ; ANSI C's asctime() format.
+  static constexpr absl::string_view formats[] = {
+      "%a, %d %b %Y %H:%M:%S GMT", "%A, %d-%b-%y %H:%M:%S GMT", "%a %b %e %H:%M:%S %Y"};
+  absl::Time time;
+  for (absl::string_view format : formats) {
+    if (absl::ParseTime(format, http_date, &time, nullptr)) {
+      return absl::ToChronoTime(time);
+    }
+  }
+  return std::nullopt;
+}
+
+std::string DateUtil::httpDate(SystemTime time) {
+  // fromTime caches the formatted string per thread and second.
+  static const DateFormatter formatter("%a, %d %b %Y %H:%M:%S GMT");
+  return formatter.fromTime(time);
+}
+
 const char* StringUtil::strtoull(const char* str, uint64_t& out, int base) {
   if (strlen(str) == 0) {
     return nullptr;

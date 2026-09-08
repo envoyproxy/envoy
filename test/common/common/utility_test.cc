@@ -198,6 +198,16 @@ TEST(DateUtil, NowToMilliseconds) {
   EXPECT_EQ(12345067, DateUtil::nowToMilliseconds(test_time));
 }
 
+TEST(DateUtil, ParseHttpDate) {
+  // 784111777 is 11/6/94, 8:49:37 in each of the three accepted formats.
+  for (absl::string_view date : {"Sun, 06 Nov 1994 08:49:37 GMT", "Sunday, 06-Nov-94 08:49:37 GMT",
+                                 "Sun Nov  6 08:49:37 1994"}) {
+    EXPECT_EQ(784111777, SystemTime::clock::to_time_t(*DateUtil::parseHttpDate(date))) << date;
+  }
+  EXPECT_EQ(DateUtil::parseHttpDate("Sunday, 06-11-1994 08:49:37"), std::nullopt);
+  EXPECT_EQ(DateUtil::parseHttpDate(""), std::nullopt);
+}
+
 TEST(OutputBufferStream, FailsOnWriteToEmptyBuffer) {
   constexpr char data = 'x';
   OutputBufferStream ostream{nullptr, 0};

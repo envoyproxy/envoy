@@ -115,7 +115,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptr) {
 
   absl::Status creation_status = absl::OkStatus();
   auto config = std::make_shared<NullCodecDrainAwareConfig>(
-      hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      hcm_config, context_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/false,
       creation_status);
@@ -140,7 +140,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptrDrai
 
   absl::Status creation_status = absl::OkStatus();
   auto config = std::make_shared<NullCodecDrainAwareConfig>(
-      hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      hcm_config, context_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
       creation_status);
@@ -184,7 +184,7 @@ hcm_config:
 
   absl::Status creation_status = absl::OkStatus();
   auto config = std::make_shared<DrainAwareHttpConnectionManagerConfig>(
-      hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      hcm_config, context_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/false,
       creation_status);
@@ -228,7 +228,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledNonReverseSocket) {
 
   absl::Status creation_status = absl::OkStatus();
   auto config = std::make_shared<FakeCodecDrainAwareConfig>(
-      hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      hcm_config, context_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
       creation_status);
@@ -259,7 +259,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledReverseTunnelWiresRedial) {
 
   absl::Status creation_status = absl::OkStatus();
   auto config = std::make_shared<FakeCodecDrainAwareConfig>(
-      hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      hcm_config, context_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
       creation_status);

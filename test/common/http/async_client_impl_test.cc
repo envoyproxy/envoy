@@ -47,6 +47,8 @@ namespace Envoy {
 namespace Http {
 namespace {
 
+static const std::string kDateHeaderValue = "Sun, 06 Nov 1994 08:49:37 GMT";
+
 class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
@@ -195,8 +197,9 @@ TEST_F(AsyncClientImplTest, BasicStream) {
 
   response_decoder_->decode1xxHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "100"}}));
-  response_decoder_->decodeHeaders(
-      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{
+                                       {":status", "200"}, {"date", kDateHeaderValue}}),
+                                   false);
   response_decoder_->decodeData(*body, true);
 
   EXPECT_EQ(
@@ -251,8 +254,9 @@ TEST_F(AsyncClientImplTest, BasicStreamWithInternalHeadersDisabled) {
 
   response_decoder_->decode1xxHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "100"}}));
-  response_decoder_->decodeHeaders(
-      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{
+                                       {":status", "200"}, {"date", kDateHeaderValue}}),
+                                   false);
   response_decoder_->decodeData(*body, true);
 
   EXPECT_EQ(
@@ -1512,7 +1516,7 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
 
-  TestResponseHeaderMapImpl expected_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"date", kDateHeaderValue}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), false));
   EXPECT_CALL(stream_callbacks_, onReset());
@@ -1521,8 +1525,9 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, false);
 
-  response_decoder_->decodeHeaders(
-      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{
+                                       {":status", "200"}, {"date", kDateHeaderValue}}),
+                                   false);
   response_decoder_->decodeData(*body, false);
 
   stream->reset();
@@ -1550,7 +1555,7 @@ TEST_F(AsyncClientImplTest, SendDataAfterRemoteClosure) {
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
 
-  TestResponseHeaderMapImpl expected_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"date", kDateHeaderValue}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
   EXPECT_CALL(stream_callbacks_, onComplete());
@@ -1558,8 +1563,9 @@ TEST_F(AsyncClientImplTest, SendDataAfterRemoteClosure) {
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   stream->sendHeaders(headers, false);
 
-  response_decoder_->decodeHeaders(
-      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{
+                                       {":status", "200"}, {"date", kDateHeaderValue}}),
+                                   false);
   response_decoder_->decodeData(*body, true);
 
   EXPECT_CALL(stream_encoder_, encodeData(_, _)).Times(0);
@@ -1591,7 +1597,7 @@ TEST_F(AsyncClientImplTest, SendTrailersRemoteClosure) {
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
 
-  TestResponseHeaderMapImpl expected_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"date", kDateHeaderValue}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
   EXPECT_CALL(stream_callbacks_, onComplete());
@@ -1599,8 +1605,9 @@ TEST_F(AsyncClientImplTest, SendTrailersRemoteClosure) {
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   stream->sendHeaders(headers, false);
 
-  response_decoder_->decodeHeaders(
-      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{
+                                       {":status", "200"}, {"date", kDateHeaderValue}}),
+                                   false);
   response_decoder_->decodeData(*body, true);
 
   EXPECT_CALL(stream_encoder_, encodeTrailers(_)).Times(0);
@@ -1671,7 +1678,7 @@ TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
 
-  TestResponseHeaderMapImpl expected_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"date", kDateHeaderValue}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), false));
   EXPECT_CALL(stream_callbacks_, onReset());
@@ -1680,8 +1687,9 @@ TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, false);
 
-  response_decoder_->decodeHeaders(
-      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{
+                                       {":status", "200"}, {"date", kDateHeaderValue}}),
+                                   false);
   response_decoder_->decodeData(*body, false);
 
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
@@ -2197,7 +2205,7 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
 
-  TestResponseHeaderMapImpl expected_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"date", kDateHeaderValue}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), false));
 
@@ -2205,8 +2213,9 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, false);
 
-  response_decoder_->decodeHeaders(
-      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{
+                                       {":status", "200"}, {"date", kDateHeaderValue}}),
+                                   false);
   response_decoder_->decodeData(*body, false);
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body2.get()), true));
@@ -2561,8 +2570,9 @@ TEST_F(AsyncClientImplTest, UpstreamOverrideHost) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, true);
 
-  response_decoder_->decodeHeaders(
-      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{
+                                       {":status", "200"}, {"date", kDateHeaderValue}}),
+                                   false);
   response_decoder_->decodeData(*body, true);
 }
 
@@ -2617,8 +2627,9 @@ TEST_F(AsyncClientImplTest, UpstreamOverrideHostNotStrict) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, true);
 
-  response_decoder_->decodeHeaders(
-      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{
+                                       {":status", "200"}, {"date", kDateHeaderValue}}),
+                                   false);
   response_decoder_->decodeData(*body, true);
 }
 
@@ -2667,8 +2678,9 @@ TEST_F(AsyncClientImplTest, NoUpstreamOverrideHost) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, true);
 
-  response_decoder_->decodeHeaders(
-      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{
+                                       {":status", "200"}, {"date", kDateHeaderValue}}),
+                                   false);
   response_decoder_->decodeData(*body, true);
 }
 

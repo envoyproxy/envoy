@@ -650,7 +650,6 @@ public:
   MOCK_METHOD(ServerConnection*, createCodec_,
               (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&,
                Server::OverloadManager&));
-  MOCK_METHOD(DateProvider&, dateProvider, ());
   MOCK_METHOD(std::chrono::milliseconds, drainTimeout, (), (const));
   MOCK_METHOD(FilterChainFactory&, filterFactory, ());
   MOCK_METHOD(bool, generateRequestId, (), (const));
