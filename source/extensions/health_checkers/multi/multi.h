@@ -29,9 +29,10 @@ public:
 
 private:
   struct PerCheckerData {
-    Upstream::HealthCheckerSharedPtr checker;
     Stats::ScopeSharedPtr stat_scope;
     absl::node_hash_map<const Upstream::Host*, uint32_t> host_flags;
+    // Must be last: destructor invokes flag callbacks that access host_flags.
+    Upstream::HealthCheckerSharedPtr checker;
   };
 
   struct PerHostState {

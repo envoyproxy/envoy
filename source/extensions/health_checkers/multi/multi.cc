@@ -31,35 +31,14 @@ MultiHealthChecker::MultiHealthChecker(Upstream::Cluster& cluster,
   envoy::extensions::health_checkers::multi::v3::Multi multi_config;
   THROW_IF_NOT_OK(MessageUtil::unpackTo(any_config, multi_config));
 
-  for (int i = 0; i < multi_config.methods_size(); i++) {
-    const auto& method = multi_config.methods(i);
-
-    // Build a synthetic HealthCheck config for this sub-checker by copying the outer config
-    // (which has timing, thresholds, transport socket settings) and setting the check method.
-    envoy::config::core::v3::HealthCheck sub_config = config;
-
-    switch (method.method_case()) {
-    case envoy::extensions::health_checkers::multi::v3::Multi::HealthCheckMethod::kHttpHealthCheck:
-      *sub_config.mutable_http_health_check() = method.http_health_check();
-      break;
-    case envoy::extensions::health_checkers::multi::v3::Multi::HealthCheckMethod::kTcpHealthCheck:
-      *sub_config.mutable_tcp_health_check() = method.tcp_health_check();
-      break;
-    case envoy::extensions::health_checkers::multi::v3::Multi::HealthCheckMethod::kGrpcHealthCheck:
-      *sub_config.mutable_grpc_health_check() = method.grpc_health_check();
-      break;
-    case envoy::extensions::health_checkers::multi::v3::Multi::HealthCheckMethod::
-        kCustomHealthCheck:
-      *sub_config.mutable_custom_health_check() = method.custom_health_check();
-      break;
-    default:
-      PANIC("unexpected health check method type");
-    }
+  for (int i = 0; i < multi_config.health_checks_size(); i++) {
+    const auto& entry = multi_config.health_checks(i);
+    const auto& sub_config = entry.health_check();
 
     Stats::ScopeSharedPtr checker_scope;
     Stats::Scope* scope;
-    if (!method.name().empty()) {
-      std::vector<Stats::TagStringView> tags{{"name", method.name()}};
+    if (!entry.name().empty()) {
+      std::vector<Stats::TagStringView> tags{{"name", entry.name()}};
       checker_scope = cluster.info()->statsScope().createScopeWithTaggedName("health_check", tags,
                                                                              absl::string_view{});
       scope = checker_scope.get();

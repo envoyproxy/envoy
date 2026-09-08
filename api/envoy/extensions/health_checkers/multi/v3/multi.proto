@@ -19,33 +19,24 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the multiple health checker extension.
 // All configured health check methods must pass for a host to be considered healthy.
-// Timing, thresholds, and transport socket configuration come from the enclosing
-// :ref:`HealthCheck <envoy_v3_api_msg_config.core.v3.HealthCheck>` message.
+//
+// .. note::
+//
+//   The configured timing and thresholds in :ref:`health_checks <envoy_v3_api_field_config.cluster.v3.Cluster.health_checks>`
+//   are not used by this checker and are ignored. Only the configuration of each sub
+//   checker configured here are used.
 message Multi {
-  message HealthCheckMethod {
-    oneof method {
-      option (validate.required) = true;
-
-      // HTTP health check.
-      config.core.v3.HealthCheck.HttpHealthCheck http_health_check = 1;
-
-      // TCP health check.
-      config.core.v3.HealthCheck.TcpHealthCheck tcp_health_check = 2;
-
-      // gRPC health check.
-      config.core.v3.HealthCheck.GrpcHealthCheck grpc_health_check = 3;
-
-      // Custom health check.
-      config.core.v3.HealthCheck.CustomHealthCheck custom_health_check = 4;
-    }
-
+  message HealthCheck {
     // Optional name for this sub-checker's metrics. If set, stats for this
     // sub-checker will be emitted under ``health_check.name.<name>.{attempt,success,...}``
     // instead of the default ``health_check.{attempt,success,...}``.
-    string name = 5;
+    string name = 1;
+
+    // Full health check configuration for this sub-checker.
+    config.core.v3.HealthCheck health_check = 2 [(validate.rules).message = {required: true}];
   }
 
-  // The health check methods to run. All must pass for a host to be considered healthy.
+  // The health checks to run. All must pass for a host to be considered healthy.
   // At least two must be specified.
-  repeated HealthCheckMethod methods = 1 [(validate.rules).repeated = {min_items: 2}];
+  repeated HealthCheck health_checks = 1 [(validate.rules).repeated = {min_items: 2}];
 }

@@ -40,9 +40,19 @@ public:
       name: envoy.health_checkers.multi
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.health_checkers.multi.v3.Multi
-        methods:
-        - tcp_health_check: {}
-        - tcp_health_check: {}
+        health_checks:
+        - health_check:
+            timeout: 1s
+            interval: 1s
+            unhealthy_threshold: 1
+            healthy_threshold: 1
+            tcp_health_check: {}
+        - health_check:
+            timeout: 1s
+            interval: 1s
+            unhealthy_threshold: 1
+            healthy_threshold: 1
+            tcp_health_check: {}
     )EOF";
     createChecker(yaml);
   }
@@ -57,11 +67,21 @@ public:
       name: envoy.health_checkers.multi
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.health_checkers.multi.v3.Multi
-        methods:
+        health_checks:
         - name: first
-          tcp_health_check: {}
+          health_check:
+            timeout: 1s
+            interval: 1s
+            unhealthy_threshold: 1
+            healthy_threshold: 1
+            tcp_health_check: {}
         - name: second
-          tcp_health_check: {}
+          health_check:
+            timeout: 1s
+            interval: 1s
+            unhealthy_threshold: 1
+            healthy_threshold: 1
+            tcp_health_check: {}
     )EOF";
     createChecker(yaml);
   }
@@ -218,13 +238,13 @@ TEST_F(MultiHealthCheckerImplTest, CallbackFiresOnTransition) {
   int callback_count = 0;
   Upstream::HealthTransition last_transition{};
   Upstream::HealthState last_state{};
-  health_checker_->addHostCheckCompleteCb(
-      [&](const Upstream::HostSharedPtr&, Upstream::HealthTransition transition,
-          Upstream::HealthState state) {
-        callback_count++;
-        last_transition = transition;
-        last_state = state;
-      });
+  health_checker_->addHostCheckCompleteCb([&](const Upstream::HostSharedPtr&,
+                                              Upstream::HealthTransition transition,
+                                              Upstream::HealthState state) {
+    callback_count++;
+    last_transition = transition;
+    last_state = state;
+  });
 
   health_checker_->start();
 

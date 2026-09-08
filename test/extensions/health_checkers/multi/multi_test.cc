@@ -25,10 +25,20 @@ TEST(MultiHealthCheckerFactoryTest, CreateFromValidConfig) {
       name: envoy.health_checkers.multi
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.health_checkers.multi.v3.Multi
-        methods:
-        - http_health_check:
-            path: /healthcheck
-        - tcp_health_check: {}
+        health_checks:
+        - health_check:
+            timeout: 1s
+            interval: 1s
+            unhealthy_threshold: 2
+            healthy_threshold: 2
+            http_health_check:
+              path: /healthcheck
+        - health_check:
+            timeout: 1s
+            interval: 1s
+            unhealthy_threshold: 2
+            healthy_threshold: 2
+            tcp_health_check: {}
     )EOF";
 
   NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
