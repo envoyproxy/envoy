@@ -241,11 +241,11 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
   ASSERT(client_ == nullptr);
-  ASSERT(pending_connection_ == nullptr);
+  ASSERT(negotiating_connection_ == nullptr);
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onDeferredDelete() {
-  resetPendingConnection();
+  resetNegotiatingConnection();
   if (client_) {
     // If there is an active request it will get reset, so make sure we ignore the reset.
     expect_reset_ = true;
@@ -253,14 +253,14 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onDeferredDelete() {
   }
 }
 
-void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::resetPendingConnection() {
-  if (pending_connection_ == nullptr) {
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::resetNegotiatingConnection() {
+  if (negotiating_connection_ == nullptr) {
     return;
   }
-  pending_connection_->removeConnectionCallbacks(pending_connection_callback_impl_);
-  pending_connection_->close(Network::ConnectionCloseType::Abort);
-  pending_host_description_.reset();
-  parent_.dispatcher_.deferredDelete(std::move(pending_connection_));
+  negotiating_connection_->removeConnectionCallbacks(negotiating_connection_callback_impl_);
+  negotiating_connection_->close(Network::ConnectionCloseType::Abort);
+  negotiating_host_description_.reset();
+  parent_.dispatcher_.deferredDelete(std::move(negotiating_connection_));
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
@@ -305,7 +305,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
 // TODO(lilika) : Support connection pooling
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    ASSERT(pending_connection_ == nullptr);
+    ASSERT(negotiating_connection_ == nullptr);
     // Nothing about what the connection advertises changes: the health check offers whatever the
     // cluster's TLS context or `tls_options` configure, as it always has. What is new is that the
     // protocol the peer selects from that list is used to choose the codec.
@@ -328,24 +328,24 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
     // as it always has.
     //
     // Negotiating over TLS: the codec comes from the ALPN protocol, unknown until the handshake
-    // completes. So only connect here and return; onPendingConnectionEvent() then chooses the
+    // completes. So only connect here and return; onNegotiatingConnectionEvent() then chooses the
     // codec and sends the request once Connected arrives.
     if (negotiate_codec && conn.connection_->ssl() != nullptr) {
       // Reset these before connecting: a leftover `expect_reset_` from a previous timeout would
       // otherwise suppress the failure for this attempt.
       expect_reset_ = false;
       reuse_connection_ = parent_.reuse_connection_;
-      pending_host_description_ = conn.host_description_;
-      pending_connection_ = std::move(conn.connection_);
-      pending_connection_->addConnectionCallbacks(pending_connection_callback_impl_);
+      negotiating_host_description_ = conn.host_description_;
+      negotiating_connection_ = std::move(conn.connection_);
+      negotiating_connection_->addConnectionCallbacks(negotiating_connection_callback_impl_);
       // Apply the connection settings that the codec client would otherwise have applied before
       // connecting, so that the connect and the handshake behave as they did when the codec client
       // was created up front.
-      pending_connection_->detectEarlyCloseWhenReadDisabled(false);
-      pending_connection_->noDelay(true);
+      negotiating_connection_->detectEarlyCloseWhenReadDisabled(false);
+      negotiating_connection_->noDelay(true);
       // The codec is chosen from the negotiated protocol and the request is sent once the
-      // connection is established. See onPendingConnectionEvent().
-      pending_connection_->connect();
+      // connection is established. See onNegotiatingConnectionEvent().
+      negotiating_connection_->connect();
       return;
     }
 
@@ -365,18 +365,18 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::attachCodecClient(
   protocol_ = codecClientTypeToProtocol(codec_type);
 }
 
-void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onPendingConnectionEvent(
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onNegotiatingConnectionEvent(
     Network::ConnectionEvent event) {
-  ASSERT(pending_connection_ != nullptr);
+  ASSERT(negotiating_connection_ != nullptr);
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    ENVOY_CONN_LOG(debug, "connect failure reason={} health_flags={}", *pending_connection_,
-                   pending_connection_->transportFailureReason(),
+    ENVOY_CONN_LOG(debug, "connect failure reason={} health_flags={}", *negotiating_connection_,
+                   negotiating_connection_->transportFailureReason(),
                    HostUtility::healthFlagsToString(*host_));
-    pending_connection_->removeConnectionCallbacks(pending_connection_callback_impl_);
-    pending_host_description_.reset();
-    parent_.dispatcher_.deferredDelete(std::move(pending_connection_));
+    negotiating_connection_->removeConnectionCallbacks(negotiating_connection_callback_impl_);
+    negotiating_host_description_.reset();
+    parent_.dispatcher_.deferredDelete(std::move(negotiating_connection_));
     if (!expect_reset_) {
       // handleFailure() may deferred delete this session, so nothing may be touched afterwards.
       handleFailure(envoy::data::core::v3::NETWORK);
@@ -396,16 +396,16 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onPendingConnectionEve
 
   // The negotiated protocol - if any - is now known. Anything other than a protocol this health
   // checker can speak falls back to the configured codec.
-  const std::string alpn = pending_connection_->nextProtocol();
+  const std::string alpn = negotiating_connection_->nextProtocol();
   const Http::CodecType codec_type = codecTypeFromAlpn(alpn, parent_.codec_client_type_);
-  ENVOY_CONN_LOG(debug, "health check negotiated alpn='{}', using {}", *pending_connection_, alpn,
-                 Http::Utility::getProtocolString(codecClientTypeToProtocol(codec_type)));
+  ENVOY_CONN_LOG(debug, "health check negotiated alpn='{}', using {}", *negotiating_connection_,
+                 alpn, Http::Utility::getProtocolString(codecClientTypeToProtocol(codec_type)));
 
   // The handshake completed, so the negotiated protocol is finally known. Choose the codec from
   // it, hand the live connection to a codec client, and send the request.
-  pending_connection_->removeConnectionCallbacks(pending_connection_callback_impl_);
-  Upstream::Host::CreateConnectionData data{std::move(pending_connection_),
-                                            std::move(pending_host_description_)};
+  negotiating_connection_->removeConnectionCallbacks(negotiating_connection_callback_impl_);
+  Upstream::Host::CreateConnectionData data{std::move(negotiating_connection_),
+                                            std::move(negotiating_host_description_)};
   attachCodecClient(data, codec_type);
   sendRequest();
 }
@@ -599,12 +599,12 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   request_in_flight_ = false;
-  if (pending_connection_) {
-    ENVOY_CONN_LOG(debug, "connect timeout health_flags={}", *pending_connection_,
+  if (negotiating_connection_) {
+    ENVOY_CONN_LOG(debug, "connect timeout health_flags={}", *negotiating_connection_,
                    HostUtility::healthFlagsToString(*host_));
-    // The caller records the timeout as a failure. resetPendingConnection() detaches the callbacks
-    // before closing, so the close it triggers is not reported a second time.
-    resetPendingConnection();
+    // The caller records the timeout as a failure. resetNegotiatingConnection() detaches the
+    // callbacks before closing, so the close it triggers is not reported a second time.
+    resetNegotiatingConnection();
     return;
   }
 

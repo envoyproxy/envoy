@@ -93,9 +93,9 @@ private:
     // Encodes the health check request on `client_`. Requires `client_ != nullptr`.
     void sendRequest();
     // Handles events on a connection that has not been handed to a codec client yet.
-    void onPendingConnectionEvent(Network::ConnectionEvent event);
-    // Aborts and disposes of `pending_connection_`, if any.
-    void resetPendingConnection();
+    void onNegotiatingConnectionEvent(Network::ConnectionEvent event);
+    // Aborts and disposes of `negotiating_connection_`, if any.
+    void resetNegotiatingConnection();
 
     // ActiveHealthCheckSession
     void onInterval() override;
@@ -138,12 +138,12 @@ private:
     // Callbacks for a connection that is still being established and has no codec client yet.
     // Deliberately distinct from ConnectionCallbackImpl so that every codec-driven callback can
     // continue to assume `client_ != nullptr`.
-    class PendingConnectionCallbackImpl : public Network::ConnectionCallbacks {
+    class NegotiatingConnectionCallbackImpl : public Network::ConnectionCallbacks {
     public:
-      PendingConnectionCallbackImpl(HttpActiveHealthCheckSession& parent) : parent_(parent) {}
+      NegotiatingConnectionCallbackImpl(HttpActiveHealthCheckSession& parent) : parent_(parent) {}
       // Network::ConnectionCallbacks
       void onEvent(Network::ConnectionEvent event) override {
-        parent_.onPendingConnectionEvent(event);
+        parent_.onNegotiatingConnectionEvent(event);
       }
       void onAboveWriteBufferHighWatermark() override {}
       void onBelowWriteBufferLowWatermark() override {}
@@ -163,14 +163,14 @@ private:
     };
 
     ConnectionCallbackImpl connection_callback_impl_{*this};
-    PendingConnectionCallbackImpl pending_connection_callback_impl_{*this};
+    NegotiatingConnectionCallbackImpl negotiating_connection_callback_impl_{*this};
     HttpConnectionCallbackImpl http_connection_callback_impl_{*this};
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
     // Set while a connection is being established and the codec has not been chosen yet. Mutually
     // exclusive with `client_`.
-    Network::ClientConnectionPtr pending_connection_;
-    HostDescriptionConstSharedPtr pending_host_description_;
+    Network::ClientConnectionPtr negotiating_connection_;
+    HostDescriptionConstSharedPtr negotiating_host_description_;
     Http::ResponseHeaderMapPtr response_headers_;
     Buffer::InstancePtr response_body_;
     const std::string& hostname_;

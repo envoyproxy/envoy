@@ -1849,7 +1849,7 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiationDisabledByRuntimeGuard) {
 
 // A connection that fails to establish is reported as a network failure straight away, rather than
 // waiting for the health check to time out.
-TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionRemoteClose) {
+TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionRemoteClose) {
   setupNoServiceValidationHCOneUnhealthy();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -1878,7 +1878,7 @@ TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionRemoteClose) {
 
 // A handshake that never completes is reported as a timeout, and the connection being established
 // is aborted.
-TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionTimeout) {
+TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionTimeout) {
   setupNoServiceValidationHCOneUnhealthy();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -1915,7 +1915,8 @@ TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionTimeout) {
 }
 
 // A transport socket that reports the handshake as complete via ConnectedZeroRtt is handled the
-// same as Connected; otherwise the session would sit on the pending connection until it timed out.
+// same as Connected; otherwise the session would sit on the negotiating connection until it timed
+// out.
 TEST_F(HttpHealthCheckerImplTest, AlpnConnectedZeroRttSelectsNegotiatedCodec) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
@@ -1943,8 +1944,8 @@ TEST_F(HttpHealthCheckerImplTest, AlpnConnectedZeroRttSelectsNegotiatedCodec) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
-// A locally closed pending connection is reported as a network failure, same as a remote close.
-TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionLocalClose) {
+// A locally closed negotiating connection is reported as a network failure, same as a remote close.
+TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionLocalClose) {
   setupNoServiceValidationHCOneUnhealthy();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -2002,7 +2003,7 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedCodecReusedAcrossIntervals) {
 }
 
 // The health checker is destroyed while a handshake is still in flight.
-TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionDeletedWhileConnecting) {
+TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionDeletedWhileConnecting) {
   setupNoServiceValidationHC();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -2019,9 +2020,9 @@ TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionDeletedWhileConnecting) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
 }
 
-// Removing the host from the health check completion callback while the pending connection is
+// Removing the host from the health check completion callback while the negotiating connection is
 // being torn down must not use freed memory.
-TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionHostRemovedInFailureCallback) {
+TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatingConnectionHostRemovedInFailureCallback) {
   setupNoServiceValidationHCOneUnhealthy();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
