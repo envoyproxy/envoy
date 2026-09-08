@@ -124,14 +124,15 @@ Network::DnsResolverSharedPtr makeDnsResolver(Event::Dispatcher& dispatcher, Api
   return resolver_or_status.value();
 }
 
-// A FakeUdpDnsServer whose per-query response behavior is driven by the fuzz input: each incoming
-// query draws a mutation and the resulting bytes (possibly none, possibly several datagrams) are
-// what the resolver sees. This runs on the server's background thread, so it is the sole consumer
-// of `provider` once start() has been called.
+// A FakeUdpDnsServer whose per-query response behavior is driven by the
+// provided input: on each query the next mutation is drawn and used to
+// determine the behavior. The resulting bytes (possibly none, possibly several
+// datagrams) are sent in response.
 class FuzzingUdpDnsServer : public Network::Test::FakeUdpDnsServer {
 public:
-  explicit FuzzingUdpDnsServer(FuzzedDataProvider& provider, Event::Dispatcher& dispatcher)
-      : Network::Test::FakeUdpDnsServer(dispatcher), mutations_(makeResponseMutations(provider)) {}
+  explicit FuzzingUdpDnsServer(std::vector<ResponseMutation> mutations,
+                               Event::Dispatcher& dispatcher)
+      : Network::Test::FakeUdpDnsServer(dispatcher), mutations_(std::move(mutations)) {}
 
 protected:
   std::array<std::vector<uint8_t>, 2> makeResponses(const uint8_t* query,
@@ -219,18 +220,18 @@ void __wrap_ares_rand_bytes(void* state, unsigned char* buf, size_t len) {
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   FuzzedDataProvider provider(buf, len);
 
-  // Draw the whole query plan up front, before FuzzingUdpDnsServer's background thread starts
-  // drawing from the *same* provider inside makeResponses().
-  // FuzzedDataProvider's cursor isn't synchronized, so this ordering is what keeps it to a
-  // single writer at a time instead of a real data race between this thread and the server
-  // thread.
+  // Determine the behavior of the client and the server from fuzz input before
+  // handing the remaining input off to be used as the source of randomness for
+  // the c-ares library. This keeps the whole execution deterministic, which
+  // makes a crash caused by a fuzz input reproducible.
   const auto plan = makeQueryPlan(provider);
+  const auto responseMutations = makeResponseMutations(provider);
 
   // Use real (not simulated) time since the UDP server runs on a real background thread.
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("fuzz_thread");
 
-  FuzzingUdpDnsServer dns_server(provider, *dispatcher);
+  FuzzingUdpDnsServer dns_server(std::move(responseMutations), *dispatcher);
   dns_server.setDefaultAResponse("127.0.0.1");
   dns_server.setDefaultAAAAResponse("::1");
 
