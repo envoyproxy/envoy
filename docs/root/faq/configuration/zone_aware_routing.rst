@@ -18,18 +18,12 @@ These are the requirements:
 
   Only essential parts are listed in the configuration below for the cluster manager.
 
-.. code-block:: yaml
-
-  cluster_manager:
-    local_cluster_name: cluster_a
-  static_resources:
-    clusters:
-    - name: cluster_a
-      type: EDS
-      eds_cluster_config: ...
-    - name: cluster_b
-      type: EDS
-      eds_cluster_config: ...
+.. literalinclude:: _include/local-cluster.yaml
+    :language: yaml
+    :lines: 1-26
+    :lineno-start: 1
+    :linenos:
+    :caption: :download:`local-cluster.yaml <_include/local-cluster.yaml>`
 
 Envoy configuration on the destination service
 ----------------------------------------------
