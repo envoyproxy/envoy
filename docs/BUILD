@@ -255,6 +255,7 @@ genrule(
     && _BUILD_SHA=$${BUILD_DOCS_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${BUILD_SCM_REVISION}}} \
     && $(location //tools:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
+         --build_target=dirhtml \
          --build_sha="$$_BUILD_SHA" \
          --docs_tag="$${BUILD_DOCS_TAG:-}" \
          --version_file=$(location @envoy//:VERSION.txt) \
@@ -280,6 +281,7 @@ genrule(
     cmd = """
     $(location //tools:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
+         --build_target=dirhtml \
          --build_sha="$${BUILD_DOCS_SHA:-}" \
          --version_file=$(location @envoy//:VERSION.txt) \
          --descriptor_path=$(location @envoy_api//:v3_proto_set) \
