@@ -2211,6 +2211,7 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:test_random_generator_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

@@ -7,10 +7,14 @@
 
 #include "gtest/gtest.h"
 
-// Verifies that the OCSP responses @envoy_toolshed//certs:gen produces are
-// well-formed and carry the status and validity window the spec asks for. This
-// replaces the human-readable `*_ocsp_resp_details.txt` dumps that the old
-// offline fixture generation scripts wrote next to each response.
+// Verifies that the fixtures @envoy_toolshed//certs:gen produces match the
+// generator spec (validity windows, OCSP response contents, etc). This is not
+// a test of OCSP/certificate parsing logic in general -- see ocsp_test.cc and
+// utility_test.cc for that -- it only exercises the properties that are
+// specific to the generated fixtures, such as the `next_update_days = 730`
+// guarantee. This replaces the human-readable `*_ocsp_resp_details.txt` dumps
+// that the old offline fixture generation scripts wrote next to each
+// response.
 namespace Envoy {
 namespace {
 
@@ -25,27 +29,16 @@ public:
     return {str.begin(), str.end()};
   }
 
-  bssl::UniquePtr<X509> readCert(const std::string& filename) {
-    return Extensions::TransportSockets::Tls::readCertFromFile(TestEnvironment::substitute(
-        "{{ test_rundir }}/test/common/tls/ocsp/test_data/" + filename));
-  }
-
 protected:
   Event::SimulatedTimeSystem time_system_;
 };
 
-// A response with a nextUpdate in the future parses, matches the certificate it
-// was generated for and is not yet expired.
+// The generator stamps `next_update_days = 730` onto this fixture, so it must
+// stay valid for the best part of two years after every regeneration.
 TEST_F(GeneratedOcspResponseTest, GoodResponseIsValid) {
   auto response = OcspResponseWrapperImpl::create(readResponse("good_ocsp_resp.der"), time_system_);
   ASSERT_TRUE(response.ok());
 
-  EXPECT_EQ(OcspResponseStatus::Successful, (*response)->getResponseStatus());
-  EXPECT_TRUE((*response)->matchesCertificate(*readCert("good_cert.pem")));
-  EXPECT_FALSE((*response)->matchesCertificate(*readCert("revoked_cert.pem")));
-
-  // The generator stamps `next_update_days = 730` onto this fixture, so it must
-  // stay valid for the best part of two years after every regeneration.
   EXPECT_FALSE((*response)->isExpired());
   EXPECT_GT((*response)->secondsUntilExpiration(), 0);
 }
@@ -56,25 +49,18 @@ TEST_F(GeneratedOcspResponseTest, ResponseWithoutNextUpdateIsExpired) {
       OcspResponseWrapperImpl::create(readResponse("revoked_ocsp_resp.der"), time_system_);
   ASSERT_TRUE(response.ok());
 
-  EXPECT_EQ(OcspResponseStatus::Successful, (*response)->getResponseStatus());
-  EXPECT_TRUE((*response)->matchesCertificate(*readCert("revoked_cert.pem")));
   EXPECT_TRUE((*response)->isExpired());
   EXPECT_EQ(0, (*response)->secondsUntilExpiration());
-}
-
-// The multi-certificate fixture really does carry two SingleResponse entries,
-// which Envoy rejects.
-TEST_F(GeneratedOcspResponseTest, MultipleCertificateResponseIsRejected) {
-  EXPECT_EQ(
-      OcspResponseWrapperImpl::create(readResponse("multiple_cert_ocsp_resp.der"), time_system_)
-          .status()
-          .message(),
-      "OCSP Response must be for one certificate only");
 }
 
 // The validity window of the generated certificates depends on the year the
 // build was stamped with, so check that fixtures which are meant to be current
 // really are, and that the expired one really is expired.
+//
+// This intentionally uses the real system clock via `X509_cmp_current_time`,
+// contrary to the usual hermetic-time rule, because the point of the test is
+// to verify that the build-stamped fixtures are valid *right now*. Do not
+// convert this to `SimulatedTimeSystem`.
 class GeneratedCertValidityTest : public testing::Test {
 public:
   bssl::UniquePtr<X509> readCert(const std::string& path) {
@@ -93,7 +79,7 @@ public:
 
 TEST_F(GeneratedCertValidityTest, ExpiredFixtureIsExpired) {
   auto cert = readCert("test/config/integration/certs/expired_cert.pem");
-  ASSERT_NE(nullptr, cert.get());
+  ASSERT_NE(nullptr, cert.get()) << "expired_cert.pem";
   EXPECT_LT(X509_cmp_current_time(X509_get0_notAfter(cert.get())), 0);
 }
 

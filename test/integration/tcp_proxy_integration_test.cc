@@ -29,6 +29,8 @@
 #include "test/test_common/test_random_generator.h"
 
 #include "absl/functional/any_invocable.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
 using testing::_;

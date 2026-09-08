@@ -17,6 +17,10 @@
 # done by prefixing keys with "STABLE_". To avoid breaking compatibility with
 # other status scripts, this one still echos the non-stable ("volatile") names.
 
+# The year @envoy_toolshed//certs uses to stamp generated test certificates.
+# Certificates are valid from Jan 1 of this year, which keeps them from ageing out of validity.
+echo "STABLE_CERT_EPOCH_YEAR $(date -u +%Y)"
+
 # If this SOURCE_VERSION file exists then it must have been placed here by a
 # distribution doing a non-git, source build.
 # Distributions would be expected to echo the commit/tag as BUILD_SCM_REVISION
@@ -72,6 +76,3 @@ if [[ -n "$git_remote" ]]; then
     echo "BUILD_SCM_REMOTE ${git_remote}"
 fi
 
-# The year @envoy_toolshed//certs uses to stamp generated test certificates.
-# Certificates are valid from Jan 1 of this year, which keeps them from ageing out of validity.
-echo "STABLE_CERT_EPOCH_YEAR $(date -u +%Y)"

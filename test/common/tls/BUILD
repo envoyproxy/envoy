@@ -233,6 +233,26 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "generated_fixtures_test",
+    srcs = [
+        "generated_fixtures_test.cc",
+    ],
+    data = [
+        "//test/common/tls/ocsp/test_data:certs",
+        "//test/common/tls/test_data:certs",
+        "//test/config/integration/certs",
+    ],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        ":ssl_test_utils",
+        "//source/common/tls/ocsp:ocsp_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = [
         "utility_test.cc",
