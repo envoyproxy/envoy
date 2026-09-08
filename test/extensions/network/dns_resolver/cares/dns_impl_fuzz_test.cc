@@ -250,7 +250,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
   // Pump the dispatcher for a bounded number of events. This should be sufficient to
   // drive every legitimate query completion.
-  for (size_t i = 0; i < static_cast<size_t>(1 << 24) && completed < plan.size(); ++i) {
+  constexpr size_t maxDispatcherRuns = static_cast<size_t>(1 << 24);
+  for (size_t i = 0; i < maxDispatcherRuns && completed < plan.size(); ++i) {
     dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   }
 
