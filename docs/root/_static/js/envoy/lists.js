@@ -1,7 +1,7 @@
 /**
  * Lists of links: toctree indexes rendered as rows rather than paragraphs.
  *
- * `api-v3/bootstrap/bootstrap.html` is 74 hyperlinks in one column, every one
+ * `api-v3/bootstrap/bootstrap` is 74 hyperlinks in one column, every one
  * of them opening with the same twenty-one characters, all set in the prose
  * face and all underlined. Nothing here moves, groups, sorts or renames any of
  * them — the order Sphinx emits is the order that renders. What changes is:

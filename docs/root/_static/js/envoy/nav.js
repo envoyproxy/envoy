@@ -34,7 +34,7 @@ const AREA_ICONS = {
  * The first meaningful path segment of a top-level link.
  *
  * Sidebar hrefs are relative to the current page, so from deep in the API tree
- * they arrive as `../../start/start.html`; the leading hops have to come off
+ * they arrive as `../../start/start`; the leading hops have to come off
  * before the segment means anything.
  */
 function areaOf(href) {
