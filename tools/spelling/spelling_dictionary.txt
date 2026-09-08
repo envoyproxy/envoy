@@ -202,6 +202,7 @@ ECDH
 ECDHE
 ECDS
 ECDSA
+sigalgs
 ECONNREFUSED
 ECONNRESET
 EDESTRUCTION
@@ -612,6 +613,7 @@ XN
 XNOR
 XSS
 YAML
+YYYY
 ZXID
 absl
 accesslog
@@ -906,6 +908,7 @@ extrahelp
 faceplant
 facto
 failover
+faketime
 fallbacks
 fanout
 fastbuild
@@ -1247,6 +1250,7 @@ pfctl
 pipelined
 pipelining
 pkey
+pkix
 plaintext
 pluggable
 pointee
