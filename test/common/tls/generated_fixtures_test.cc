@@ -1,11 +1,15 @@
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "source/common/tls/ocsp/ocsp.h"
 
 #include "test/common/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/x509.h"
 
 // Verifies that the fixtures @envoy_toolshed//certs:gen produces match the
 // generator spec (validity windows, OCSP response contents, etc). This is not
@@ -18,7 +22,6 @@
 namespace Envoy {
 namespace {
 
-using Extensions::TransportSockets::Tls::Ocsp::OcspResponseStatus;
 using Extensions::TransportSockets::Tls::Ocsp::OcspResponseWrapperImpl;
 
 class GeneratedOcspResponseTest : public testing::Test {

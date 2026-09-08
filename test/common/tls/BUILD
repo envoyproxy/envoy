@@ -242,13 +242,13 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
         "//test/config/integration/certs",
     ],
+    external_deps = ["ssl"],
     rbe_pool = "linux_x64_small",
     deps = [
         ":ssl_test_utils",
         "//source/common/tls/ocsp:ocsp_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:utility_lib",
     ],
 )
 

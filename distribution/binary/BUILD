@@ -58,7 +58,7 @@ pkg_tar(
         ":release_files",
         ":vrp_cert_files",
     ],
+    out = "release.docker.tar.zst",
     compressor = "@zstd//:zstd_cli",
     compressor_args = "-T0",
-    out = "release.docker.tar.zst",
 )
