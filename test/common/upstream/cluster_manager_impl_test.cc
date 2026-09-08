@@ -2808,6 +2808,7 @@ void expectSdsZeroTimeoutDoesNotBlockCds(ClusterManagerImplTest& t,
   auto cluster_config = parseClusterFromV3Yaml(cluster_yaml);
   std::shared_ptr<MockClusterMockPrioritySet> mock_cluster =
       std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+  mock_cluster->info_->name_ = cluster_config.name();
   EXPECT_CALL(*mock_cluster, initialize(_)); // SDS never resolves
   EXPECT_CALL(t.factory_, clusterFromProto_(ProtoEq(cluster_config), _, true))
       .WillOnce(Return(std::make_pair(mock_cluster, nullptr)));
