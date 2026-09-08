@@ -172,6 +172,7 @@ typed_config:
                                      {"accept", "application/json"},
                                      {"accept", "text/event-stream"},
                                      {"content-type", "application/json"},
+                                     {"mcp-protocol-version", "2026-07-28"},
                                      {"mcp-method", "tasks/get"},
                                      {"mcp-name", "header-task"}},
       request_body);
@@ -208,6 +209,7 @@ typed_config:
                                      {"accept", "application/json"},
                                      {"accept", "text/event-stream"},
                                      {"content-type", "application/json"},
+                                     {"mcp-protocol-version", "2026-07-28"},
                                      {"mcp-method", "tasks/get"},
                                      {"mcp-name", "header-task"}},
       request_body);
