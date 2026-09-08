@@ -182,9 +182,6 @@ private:
     bool expect_reset_ : 1 = false;
     bool reuse_connection_ : 1 = false;
     bool request_in_flight_ : 1 = false;
-    // Set when the codec client was attached to an already established connection, so that the
-    // request is sent from onEvent() rather than inline. See onPendingConnectionEvent().
-    bool send_request_when_codec_connected_ : 1 = false;
   };
 
   using HttpActiveHealthCheckSessionPtr = std::unique_ptr<HttpActiveHealthCheckSession>;

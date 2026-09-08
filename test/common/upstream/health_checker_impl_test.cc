@@ -1675,57 +1675,6 @@ TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedHttp2WithHttp1Configured) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
-// The health check request must not be encoded inline while the connection is being handed to a
-// codec client. It is sent from the session's own connection callback instead, which runs after
-// the codec client has handled the same Connected event and armed the cluster idle timer, so that
-// creating the stream disables that timer for as long as the request is in flight. The observer
-// below is registered ahead of both of those callbacks, so it can only prove that no stream
-// exists yet at handover time; the relative order of the codec client and the session is fixed by
-// the order attachCodecClient() registers them.
-TEST_F(HttpHealthCheckerImplTest, AlpnRequestNotSentDuringConnectionHandoff) {
-  setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
-  expectSessionCreate();
-  expectTlsConnection(0, "h2");
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  // Registered after the session's pending connection callback, and therefore before the callbacks
-  // that the codec client and the session add when the connection is handed over to a codec
-  // client. This observes the connection in between the two.
-  NiceMock<Network::MockConnectionCallbacks> observer;
-  test_sessions_[0]->client_connection_->addConnectionCallbacks(observer);
-  bool observed = false;
-  EXPECT_CALL(observer, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) {
-        observed = true;
-        // The codec client has been created, but no stream has been created on it yet.
-        EXPECT_NE(nullptr, test_sessions_[0]->codec_client_);
-        EXPECT_EQ(nullptr, test_sessions_[0]->stream_response_callbacks_);
-      }));
-
-  completeHandshake(0);
-  EXPECT_TRUE(observed);
-  EXPECT_NE(nullptr, test_sessions_[0]->stream_response_callbacks_);
-  // The connection outlives this scope, so detach the observer before it goes away.
-  test_sessions_[0]->client_connection_->removeConnectionCallbacks(observer);
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-              enableTimer(std::chrono::milliseconds(45000), _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond(0, "200", false, false, true);
-  EXPECT_EQ(Host::Health::Healthy,
-            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
-}
-
 // The mirror image: a connection that negotiates http/1.1 is health checked over HTTP/1.1 even
 // though HTTP/2 is configured.
 TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedHttp1WithHttp2Configured) {

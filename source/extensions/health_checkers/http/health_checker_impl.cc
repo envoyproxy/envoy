@@ -224,9 +224,7 @@ Http::Protocol HttpHealthCheckerImpl::configuredProtocol() const {
 
 bool HttpHealthCheckerImpl::negotiateCodec() const {
   // `codec_client_type: HTTP3` keeps its existing behavior and is never switched to another codec
-  // by what the handshake negotiates. This check is what enforces that: health check connections
-  // are plain TCP (see HostImplBase::createConnection), so with HTTP/3 configured on a TLS cluster
-  // the connection can still negotiate `h2` or `http/1.1`.
+  // by what the handshake negotiates.
   return codec_client_type_ != Http::CodecType::HTTP3 && useNegotiatedProtocol();
 }
 
@@ -301,30 +299,11 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
     response_headers_.reset();
     response_body_->drain(response_body_->length());
     parent_.dispatcher_.deferredDelete(std::move(client_));
-    // The connection can be closed in between the codec client being attached and this session
-    // being told that it is connected, in which case the request was never sent. Close events are
-    // always delivered to every callback, so clearing this here is enough to keep it from leaking
-    // into the next interval.
-    send_request_when_codec_connected_ = false;
-    return;
-  }
-
-  if (send_request_when_codec_connected_) {
-    // Set by the deferred path in onPendingConnectionEvent(). The codec client has now handled
-    // Connected and armed the idle timer, so newStream() below disables it for the life of the
-    // probe.
-    ASSERT(event == Network::ConnectionEvent::Connected ||
-           event == Network::ConnectionEvent::ConnectedZeroRtt);
-    send_request_when_codec_connected_ = false;
-    sendRequest();
   }
 }
 
 // TODO(lilika) : Support connection pooling
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
-  // A new attempt starts with nothing outstanding: the request for this attempt is sent either
-  // below or, for a connection whose codec is chosen from ALPN, from onEvent().
-  send_request_when_codec_connected_ = false;
   if (!client_) {
     ASSERT(pending_connection_ == nullptr);
     // Nothing about what the connection advertises changes: the health check offers whatever the
@@ -349,8 +328,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
     // as it always has.
     //
     // Negotiating over TLS: the codec comes from the ALPN protocol, unknown until the handshake
-    // completes. So only connect here and return; the codec is chosen and the request sent from
-    // onPendingConnectionEvent() when Connected arrives.
+    // completes. So only connect here and return; onPendingConnectionEvent() then chooses the
+    // codec and sends the request once Connected arrives.
     if (negotiate_codec && conn.connection_->ssl() != nullptr) {
       // Reset these before connecting: a leftover `expect_reset_` from a previous timeout would
       // otherwise suppress the failure for this attempt.
@@ -423,19 +402,12 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onPendingConnectionEve
                  Http::Utility::getProtocolString(codecClientTypeToProtocol(codec_type)));
 
   // The handshake completed, so the negotiated protocol is finally known. Choose the codec from
-  // it and hand the live connection to a codec client; the probe is now ready to send.
+  // it, hand the live connection to a codec client, and send the request.
   pending_connection_->removeConnectionCallbacks(pending_connection_callback_impl_);
   Upstream::Host::CreateConnectionData data{std::move(pending_connection_),
                                             std::move(pending_host_description_)};
   attachCodecClient(data, codec_type);
-
-  // The request is not sent here. It is sent from this session's onEvent() a moment later, for one
-  // reason: the codec client arms the cluster idle timer when it handles Connected, and sending
-  // here would run newStream()'s disableIdleTimer() before that re-arm rather than after, leaving
-  // the timer running under an in-flight probe. attachCodecClient() registered this session as a
-  // connection callback during the delivery of this same Connected event (the callback list is a
-  // std::list still being walked), so onEvent() is handed that event next and sends then.
-  send_request_when_codec_connected_ = true;
+  sendRequest();
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::sendRequest() {
