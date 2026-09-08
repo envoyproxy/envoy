@@ -46,6 +46,9 @@ const Http::LowerCaseString kMcpMethod{
 const Http::LowerCaseString kMcpName{
     std::string(Filters::Common::Mcp::McpConstants::MCP_NAME_HEADER)};
 
+const Http::LowerCaseString kMcpProtocolVersion{
+    Filters::Common::Mcp::McpConstants::MCP_PROTOCOL_VERSION_HEADER};
+
 void setNestedStringValue(Protobuf::Struct& metadata, absl::string_view path,
                           absl::string_view value) {
   const std::vector<absl::string_view> segments = absl::StrSplit(path, '.');
@@ -133,6 +136,8 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
                                  : 8192), // Default: 8KB
       request_storage_mode_(proto_config.request_storage_mode()),
       attribute_source_(proto_config.attribute_source()),
+      protocol_versions_(proto_config.protocol_versions()),
+      error_reply_format_(proto_config.error_reply_format()),
       metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
@@ -308,6 +313,10 @@ bool McpFilter::needsBody() const {
     return true;
   }
 
+  if (shouldValidateNewSpecHeaders()) {
+    return true;
+  }
+
   if (!hasCompleteHeaderAttributes()) {
     return true;
   }
@@ -327,6 +336,26 @@ bool McpFilter::needsBody() const {
   }
 
   return false;
+}
+
+bool McpFilter::shouldValidateNewSpecHeaders() const {
+  if (protocol_version_.has_value() &&
+      *protocol_version_ == Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28) {
+    return true;
+  }
+
+  const auto& supported = config_->protocolVersions().supported();
+  if (supported.empty()) {
+    return false;
+  }
+
+  for (const auto& version : supported) {
+    if (version != Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 bool McpFilter::hasCompleteHeaderAttributes() const {
@@ -351,6 +380,16 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
   if (trafficMode() == envoy::extensions::filters::http::mcp::v3::Mcp::NOOP) {
     ENVOY_LOG(debug, "MCP filter in NOOP mode, passing through without inspection");
     return Http::FilterHeadersStatus::Continue;
+  }
+
+  const auto protocol_version_headers = headers.get(kMcpProtocolVersion);
+  if (!protocol_version_headers.empty()) {
+    protocol_version_ = std::string(protocol_version_headers[0]->value().getStringView());
+
+    if (!config_->isProtocolVersionSupported(*protocol_version_)) {
+      sendUnsupportedProtocolVersionReply(*protocol_version_);
+      return Http::FilterHeadersStatus::StopIteration;
+    }
   }
 
   if (isValidMcpDeleteRequest(headers)) {
@@ -520,6 +559,44 @@ void McpFilter::sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp
                                      statusToString(status));
 }
 
+void McpFilter::sendUnsupportedProtocolVersionReply(absl::string_view requested_version) {
+  const std::string error_msg =
+      absl::StrCat("Unsupported MCP protocol version: ", requested_version);
+
+  if (config_->errorReplyFormat() == envoy::extensions::filters::http::mcp::v3::Mcp::FORMAT_TEXT) {
+    sendErrorReply(error_msg, Filters::Common::Mcp::Status::NotJsonRpc);
+    return;
+  }
+
+  Protobuf::Struct reply;
+
+  (*reply.mutable_fields())["jsonrpc"].set_string_value("2.0");
+  (*reply.mutable_fields())["id"].set_null_value(Protobuf::NULL_VALUE);
+
+  auto* error = (*reply.mutable_fields())["error"].mutable_struct_value();
+  (*error->mutable_fields())["code"].set_number_value(-32022);
+  (*error->mutable_fields())["message"].set_string_value(error_msg);
+
+  auto* data = (*error->mutable_fields())["data"].mutable_struct_value();
+
+  auto* supported = (*data->mutable_fields())["supported"].mutable_list_value();
+
+  for (const auto& version : config_->protocolVersions().supported()) {
+    supported->add_values()->set_string_value(version);
+  }
+
+  (*data->mutable_fields())["requested"].set_string_value(requested_version);
+
+  const std::string body = MessageUtil::getJsonStringFromMessageOrError(reply);
+
+  decoder_callbacks_->sendLocalReply(
+      Http::Code::BadRequest, body,
+      [](Http::ResponseHeaderMap& headers) {
+        headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+      },
+      std::nullopt, "");
+}
+
 bool McpFilter::headerAttributesMatch() const {
   if (!parser_) {
     return false;
@@ -551,6 +628,37 @@ bool McpFilter::verifyHeaderAttributes() const {
   return headerAttributesMatch();
 }
 
+McpFilter::ProtocolVersionValidationResult McpFilter::validateProtocolVersion() const {
+  if (!shouldValidateNewSpecHeaders()) {
+    return ProtocolVersionValidationResult::Ok;
+  }
+
+  if (!protocol_version_.has_value() || !parser_) {
+    return ProtocolVersionValidationResult::Missing;
+  }
+
+  const Protobuf::Value* meta =
+      parser_->getNestedValue(std::string(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META));
+
+  if (meta == nullptr || meta->kind_case() != Protobuf::Value::kStructValue) {
+    return ProtocolVersionValidationResult::Missing;
+  }
+
+  const auto& fields = meta->struct_value().fields();
+  const auto it =
+      fields.find(std::string(Filters::Common::Mcp::McpConstants::PROTOCOL_VERSION_META_KEY));
+
+  if (it == fields.end() || it->second.kind_case() != Protobuf::Value::kStringValue) {
+    return ProtocolVersionValidationResult::Missing;
+  }
+
+  if (it->second.string_value() != *protocol_version_) {
+    return ProtocolVersionValidationResult::Mismatch;
+  }
+
+  return ProtocolVersionValidationResult::Ok;
+}
+
 Http::FilterDataStatus McpFilter::completeParsing() {
   parsing_complete_ = true;
   is_mcp_request_ = parser_->isValidMcpRequest();
@@ -567,6 +675,17 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   if (!is_mcp_request_ && shouldRejectRequest()) {
     sendErrorReply("request must be a valid JSON-RPC 2.0 message for MCP",
                    Filters::Common::Mcp::Status::NotJsonRpc);
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
+  const auto version_validation = validateProtocolVersion();
+  if (version_validation == ProtocolVersionValidationResult::Mismatch) {
+    // send -32020 HeaderMismatch
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
+  if (version_validation == ProtocolVersionValidationResult::Missing) {
+    // send -32602 Invalid Params
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 

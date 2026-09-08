@@ -72,6 +72,29 @@ public:
   envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attributeSource() const {
     return attribute_source_;
   }
+
+  const envoy::extensions::filters::http::mcp::v3::Mcp::ProtocolVersions& protocolVersions() const {
+    return protocol_versions_;
+  }
+
+  bool isProtocolVersionSupported(absl::string_view version) const {
+    if (protocol_versions_.supported().empty()) {
+      return true;
+    }
+
+    for (const auto& supported_version : protocol_versions_.supported()) {
+      if (supported_version == version) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  envoy::extensions::filters::http::mcp::v3::Mcp::ErrorReplyFormat errorReplyFormat() const {
+    return error_reply_format_;
+  }
+
   const ParserConfig& parserConfig() const { return parser_config_; }
   bool shouldStoreToDynamicMetadata() const {
     return request_storage_mode_ ==
@@ -100,6 +123,8 @@ private:
   const uint32_t max_request_body_size_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attribute_source_;
+  const envoy::extensions::filters::http::mcp::v3::Mcp::ProtocolVersions protocol_versions_;
+  const envoy::extensions::filters::http::mcp::v3::Mcp::ErrorReplyFormat error_reply_format_;
   const std::string metadata_namespace_;
   ParserConfig parser_config_;
   McpFilterStats stats_;
@@ -180,13 +205,21 @@ private:
   const McpOverrideConfig* routeOverride() const;
 
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
+  void sendUnsupportedProtocolVersionReply(absl::string_view requested_version);
   bool needsBody() const;
   bool hasCompleteHeaderAttributes() const;
   bool headerAttributesMatch() const;
   bool verifyHeaderAttributes() const;
+  enum class ProtocolVersionValidationResult {
+    Ok,
+    Missing,
+    Mismatch,
+  };
+  ProtocolVersionValidationResult validateProtocolVersion() const;
   Http::FilterDataStatus completeParsing();
   void setDynamicMetadataStatus(Protobuf::Struct metadata);
   void populateMetadataFromHeaders();
+  bool shouldValidateNewSpecHeaders() const;
 
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
@@ -200,6 +233,7 @@ private:
   bool skip_body_parsing_{false};
   std::string header_method_;
   std::string header_name_;
+  std::optional<std::string> protocol_version_;
   Filters::Common::Mcp::Status status_{Filters::Common::Mcp::Status::Ok};
 };
 

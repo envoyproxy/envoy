@@ -21,7 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.mcp]
 
 // This filter will inspect and get attributes from MCP traffic.
-// [#next-free-field: 10]
+// [#next-free-field: 12]
 message Mcp {
   // Traffic handling mode for non-MCP traffic.
   enum TrafficMode {
@@ -70,6 +70,24 @@ message Mcp {
     // identifier carried by ``Mcp-Name`` (``params.name``, ``params.uri``, or
     // ``params.taskId``), and avoid parsing the body when nothing else requires it.
     HEADERS = 2;
+  }
+
+  // Configures MCP protocol revisions accepted by the filter.
+  message ProtocolVersions {
+    // MCP protocol revisions accepted by the filter, for example
+    // "2025-11-25" or "2026-07-28".
+    //
+    // An unset or empty list accepts any protocol revision.
+    repeated string supported = 1;
+  }
+
+  // Controls the format used for MCP protocol error responses.
+  enum ErrorReplyFormat {
+    // Returns the existing plain-text local reply format.
+    FORMAT_TEXT = 0;
+
+    // Returns MCP protocol errors as JSON-RPC error responses.
+    FORMAT_JSON_RPC = 1;
   }
 
   message TraceContextPropagationConfig {
@@ -140,6 +158,12 @@ message Mcp {
   // and the method-specific identifier carried by ``Mcp-Name``; other configured
   // extraction rules still require body parsing.
   AttributeSource attribute_source = 9 [(validate.rules).enum = {defined_only: true}];
+
+  // MCP protocol revisions accepted by the filter.
+  ProtocolVersions protocol_versions = 10;
+
+  // Format used for MCP protocol error responses.
+  ErrorReplyFormat error_reply_format = 11;
 }
 
 // Parser configuration with method-specific rules.
