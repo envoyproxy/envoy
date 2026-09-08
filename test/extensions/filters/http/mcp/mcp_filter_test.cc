@@ -378,16 +378,14 @@ TEST_F(McpFilterTest, VerifyRejectsMissingMethodHeader) {
                                          {"mcp-protocol-version", "2026-07-28"},
                                          {"mcp-name", "task-123"}};
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                    "Missing required Mcp-Method header",
+                    _, _, _));
 
-  Buffer::OwnedImpl buffer(
-      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})");
-
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest,
-                             "MCP header attributes do not match request body", _, _, _));
-
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(headers, false));
 
   EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
 }
@@ -679,7 +677,9 @@ TEST_F(McpFilterTest, SupportedProtocolVersionContinues) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
                                          {"accept", "application/json, text/event-stream"},
-                                         {"mcp-protocol-version", "2026-07-28"}};
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
@@ -758,7 +758,9 @@ TEST_F(McpFilterTest, ProtocolVersionMetaMatchesHeader) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
-                                         {"mcp-protocol-version", "2026-07-28"}};
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
@@ -784,7 +786,9 @@ TEST_F(McpFilterTest, ProtocolVersionMetaMismatchRejects) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
-                                         {"mcp-protocol-version", "2026-07-28"}};
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
@@ -806,6 +810,9 @@ TEST_F(McpFilterTest, ProtocolVersionMetaMismatchJsonRpcReply) {
   proto_config.mutable_protocol_versions()->add_supported("2026-07-28");
   proto_config.set_error_reply_format(
       envoy::extensions::filters::http::mcp::v3::Mcp::FORMAT_JSON_RPC);
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::
+          DYNAMIC_METADATA_AND_FILTER_STATE);
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
@@ -816,7 +823,9 @@ TEST_F(McpFilterTest, ProtocolVersionMetaMismatchJsonRpcReply) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
-                                         {"mcp-protocol-version", "2026-07-28"}};
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
@@ -842,6 +851,15 @@ TEST_F(McpFilterTest, ProtocolVersionMetaMismatchJsonRpcReply) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 
   EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()
+          ->getDataReadOnly<McpFilterStateObject>(
+              std::string(McpFilterStateObject::FilterStateKey));
+
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_FALSE(filter_state_obj->isMcpRequest());
+  EXPECT_EQ(Filters::Common::Mcp::Status::NotJsonRpc,
+            filter_state_obj->status());
 }
 
 TEST_F(McpFilterTest, MissingProtocolVersionMetaContinues) {
@@ -858,7 +876,9 @@ TEST_F(McpFilterTest, MissingProtocolVersionMetaContinues) {
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"},
-                                         {"mcp-protocol-version", "2026-07-28"}};
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
@@ -868,6 +888,106 @@ TEST_F(McpFilterTest, MissingProtocolVersionMetaContinues) {
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+TEST_F(McpFilterTest, NewSpecBodyRejectsMissingMethodHeader) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(
+      envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  proto_config.mutable_protocol_versions()->add_supported("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(
+      proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"},
+      {"content-type", "application/json"},
+      {"accept", "application/json"},
+      {"accept", "text/event-stream"},
+      {"mcp-protocol-version", "2026-07-28"}};
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     "Missing required Mcp-Method header",
+                     _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, NewSpecBodyRejectsMissingNameHeader) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(
+      envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  proto_config.mutable_protocol_versions()->add_supported("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(
+      proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"},
+      {"content-type", "application/json"},
+      {"accept", "application/json"},
+      {"accept", "text/event-stream"},
+      {"mcp-protocol-version", "2026-07-28"},
+      {"mcp-method", "tasks/get"}};
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     "Missing required Mcp-Name header",
+                     _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, NewSpecBodyRejectsHeaderBodyMismatch) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(
+      envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  proto_config.mutable_protocol_versions()->add_supported("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(
+      proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"},
+      {"content-type", "application/json"},
+      {"accept", "application/json"},
+      {"accept", "text/event-stream"},
+      {"mcp-protocol-version", "2026-07-28"},
+      {"mcp-method", "tasks/get"},
+      {"mcp-name", "header-task"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"body-task"}})");
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     "MCP header attributes do not match request body",
+                     _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_->decodeData(buffer, true));
 }
 
 TEST_F(McpFilterTest, NewSpecRejectsDeleteWithMethodNotAllowed) {
@@ -883,10 +1003,24 @@ TEST_F(McpFilterTest, NewSpecRejectsDeleteWithMethodNotAllowed) {
                                          {"mcp-session-id", "session-123"},
                                          {"mcp-protocol-version", "2026-07-28"}};
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::MethodNotAllowed,
-                             "MCP DELETE is not supported for protocol version 2026-07-28", _, _,
-                             _));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Http::Code::MethodNotAllowed,
+          "MCP DELETE is not supported for protocol version 2026-07-28",
+          _, _, _))
+      .WillOnce([](Http::Code, absl::string_view,
+                  std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                  const std::optional<Grpc::Status::GrpcStatus>,
+                  absl::string_view) {
+        Http::TestResponseHeaderMapImpl response_headers;
+        modify_headers(response_headers);
+
+        const auto allow_headers =
+            response_headers.get(Http::LowerCaseString("allow"));
+        ASSERT_EQ(1, allow_headers.size());
+        EXPECT_EQ("POST", allow_headers[0]->value().getStringView());
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
@@ -903,10 +1037,24 @@ TEST_F(McpFilterTest, NewSpecRejectsSseGetWithMethodNotAllowed) {
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {"accept", "text/event-stream"}, {"mcp-protocol-version", "2026-07-28"}};
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::MethodNotAllowed,
-                             "MCP GET with SSE is not supported for protocol version 2026-07-28", _,
-                             _, _));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Http::Code::MethodNotAllowed,
+          "MCP GET with SSE is not supported for protocol version 2026-07-28",
+          _, _, _))
+      .WillOnce([](Http::Code, absl::string_view,
+                  std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                  const std::optional<Grpc::Status::GrpcStatus>,
+                  absl::string_view) {
+        Http::TestResponseHeaderMapImpl response_headers;
+        modify_headers(response_headers);
+
+        const auto allow_headers =
+            response_headers.get(Http::LowerCaseString("allow"));
+        ASSERT_EQ(1, allow_headers.size());
+        EXPECT_EQ("POST", allow_headers[0]->value().getStringView());
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
@@ -939,6 +1087,9 @@ TEST_F(McpFilterTest, UnsupportedProtocolVersionJsonRpcReply) {
   proto_config.mutable_protocol_versions()->add_supported("2026-07-28");
   proto_config.set_error_reply_format(
       envoy::extensions::filters::http::mcp::v3::Mcp::FORMAT_JSON_RPC);
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::
+          DYNAMIC_METADATA_AND_FILTER_STATE);
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
@@ -968,6 +1119,15 @@ TEST_F(McpFilterTest, UnsupportedProtocolVersionJsonRpcReply) {
       });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()
+          ->getDataReadOnly<McpFilterStateObject>(
+              std::string(McpFilterStateObject::FilterStateKey));
+
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_FALSE(filter_state_obj->isMcpRequest());
+  EXPECT_EQ(Filters::Common::Mcp::Status::NotJsonRpc,
+            filter_state_obj->status());
 }
 
 // Test per-route override configuration
