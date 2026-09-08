@@ -5387,7 +5387,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
         EXPECT_NE(EMPTY_STRING, server_connection->ssl()->sessionId());
         EXPECT_EQ(server_connection->ssl()->sessionId(), client_connection->ssl()->sessionId());
         // On a resumed connection the server must still be able to retrieve the SNI from the
-        // ClientHello. This depends on SSL_get_servername() returning the requested name for
+        // ClientHello. This depends on `SSL_get_servername()` returning the requested name for
         // resumed sessions (see https://github.com/envoyproxy/envoy/pull/47297).
         if (!expected_sni.empty()) {
           EXPECT_EQ(expected_sni, server_connection->ssl()->sni());
@@ -5530,7 +5530,7 @@ TEST_P(SslSocketTest, TicketSessionResumption) {
 }
 
 // Validates that when a session is resumed, the server can still read the SNI from the
-// connection. Retrieving the SNI relies on SSL_get_servername() returning the requested
+// connection. Retrieving the SNI relies on `SSL_get_servername()` returning the requested
 // server name for resumed sessions, which must hold for both BoringSSL and the OpenSSL
 // compatibility layer (see https://github.com/envoyproxy/envoy/pull/47297).
 TEST_P(SslSocketTest, TicketSessionResumptionWithSni) {
