@@ -189,7 +189,7 @@ message Mcp {
   ProtocolVersions protocol_versions = 11;
 
   // Format used for MCP protocol error responses.
-  ErrorReplyFormat error_reply_format = 12;
+  ErrorReplyFormat error_reply_format = 12 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Parser configuration with method-specific rules.
