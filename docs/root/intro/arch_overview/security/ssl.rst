@@ -73,16 +73,21 @@ key exchange that combines the classical X25519 elliptic-curve Diffie-Hellman wi
 protection against "harvest now, decrypt later" attacks by quantum computers while maintaining
 compatibility with existing infrastructure through the hybrid construction.
 
-X25519MLKEM768 is **not** included in the default ECDH curves. To opt in, explicitly set the
-``ecdh_curves`` field in the
+In non-FIPS builds of BoringSSL, X25519MLKEM768 is included by default as the most preferred curve
+in the default ECDH curves (``X25519MLKEM768:X25519:P-256``). Peers that do not support
+ML-KEM will gracefully fall back to X25519 or P-256 via standard TLS group negotiation.
+
+This behavioral change can be temporarily reverted by setting runtime guard
+``envoy.reloadable_features.tls_use_x25519_mlkem768_by_default`` to ``false``.
+
+Operators can also explicitly customize the ``ecdh_curves`` field in the
 :ref:`TlsParameters <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsParameters>`:
 
 .. literalinclude:: _include/ssl-pqc.yaml
    :language: yaml
    :caption: :download:`ssl-pqc.yaml <_include/ssl-pqc.yaml>`
 
-Placing X25519MLKEM768 first gives it the highest priority. Peers that do not support
-ML-KEM will gracefully fall back to X25519 or P-256 via standard TLS group negotiation.
+Placing X25519MLKEM768 first gives it the highest priority.
 
 The same configuration pattern applies to upstream (client) connections using
 :ref:`UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.

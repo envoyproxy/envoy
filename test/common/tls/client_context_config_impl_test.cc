@@ -917,8 +917,8 @@ TEST_F(ClientContextConfigImplTest, TestLoadCorruptPkcs12) {
 
 // Verify that X25519MLKEM768 can be explicitly configured as an ECDH curve
 // and that the resulting SSL context initializes successfully (non-FIPS only).
-// This proves PQC key exchange works via explicit opt-in configuration even
-// though it is not part of the default curve list.
+// Verify that X25519MLKEM768 can be explicitly configured as an ECDH curve
+// and that the resulting SSL context initializes successfully.
 TEST_F(ClientContextConfigImplTest, ExplicitX25519Mlkem768Curve) {
   const std::string yaml = R"EOF(
   common_tls_context:
@@ -936,6 +936,71 @@ TEST_F(ClientContextConfigImplTest, ExplicitX25519Mlkem768Curve) {
   // Verify the SSL context can be created successfully with X25519MLKEM768.
   auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
   EXPECT_TRUE(context_or_error.status().ok());
+}
+
+// Verify that default ECDH curves include X25519MLKEM768 when runtime guard is enabled.
+TEST_F(ClientContextConfigImplTest, DefaultCurvesX25519Mlkem768) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_use_x25519_mlkem768_by_default", "true"}});
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  if (FIPS_mode()) {
+    EXPECT_EQ(cfg->ecdhCurves(), "P-256");
+  } else {
+    EXPECT_EQ(cfg->ecdhCurves(), "X25519MLKEM768:X25519:P-256");
+  }
+  auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
+  EXPECT_TRUE(context_or_error.status().ok());
+
+  // Also verify server context config.
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  auto* server_cert = server_tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
+  if (FIPS_mode()) {
+    EXPECT_EQ(server_cfg->ecdhCurves(), "P-256");
+  } else {
+    EXPECT_EQ(server_cfg->ecdhCurves(), "X25519MLKEM768:X25519:P-256");
+  }
+}
+
+// Verify that default ECDH curves revert to X25519:P-256 when runtime guard is disabled.
+TEST_F(ClientContextConfigImplTest, DefaultCurvesRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_use_x25519_mlkem768_by_default", "false"}});
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  if (FIPS_mode()) {
+    EXPECT_EQ(cfg->ecdhCurves(), "P-256");
+  } else {
+    EXPECT_EQ(cfg->ecdhCurves(), "X25519:P-256");
+  }
+  auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
+  EXPECT_TRUE(context_or_error.status().ok());
+
+  // Also verify server context config.
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  auto* server_cert_disabled =
+      server_tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert_disabled->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert_disabled->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
+  if (FIPS_mode()) {
+    EXPECT_EQ(server_cfg->ecdhCurves(), "P-256");
+  } else {
+    EXPECT_EQ(server_cfg->ecdhCurves(), "X25519:P-256");
+  }
 }
 
 } // namespace Tls
