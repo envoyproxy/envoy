@@ -658,6 +658,84 @@ TEST_F(McpFilterTest, RejectModeRejectsNonJsonRpc) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
+TEST_F(McpFilterTest, SupportedProtocolVersionContinues) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_protocol_versions()->add_supported("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, UnsupportedProtocolVersionTextReply) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_protocol_versions()->add_supported("2026-07-28");
+  proto_config.set_error_reply_format(envoy::extensions::filters::http::mcp::v3::Mcp::FORMAT_TEXT);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"},
+                                         {"mcp-protocol-version", "2025-11-25"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "Unsupported MCP protocol version: 2025-11-25",
+                             _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, UnsupportedProtocolVersionJsonRpcReply) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_protocol_versions()->add_supported("2026-07-28");
+  proto_config.set_error_reply_format(
+      envoy::extensions::filters::http::mcp::v3::Mcp::FORMAT_JSON_RPC);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"},
+                                         {"mcp-protocol-version", "2025-11-25"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _))
+      .WillOnce([](Http::Code code, absl::string_view body,
+                   std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        EXPECT_EQ(Http::Code::BadRequest, code);
+
+        EXPECT_THAT(body, HasSubstr("\"jsonrpc\":\"2.0\""));
+        EXPECT_THAT(body, HasSubstr("\"code\":-32022"));
+        EXPECT_THAT(body, HasSubstr("\"requested\":\"2025-11-25\""));
+        EXPECT_THAT(body, HasSubstr("\"2026-07-28\""));
+
+        Http::TestResponseHeaderMapImpl response_headers;
+        modify_headers(response_headers);
+
+        EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
+                  response_headers.getContentTypeValue());
+      });
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
 // Test per-route override configuration
 TEST_F(McpFilterTest, PerRouteOverride) {
   // Setup route-specific config to REJECT_NO_MCP
