@@ -23,12 +23,48 @@ std::optional<std::string> jsonOrNullopt(const Protobuf::Message& message) {
 #endif
 }
 
+void setTypedTag(Span& span, absl::string_view tag, absl::string_view value,
+                 envoy::type::tracing::v3::CustomTag::ValueType value_type) {
+  if (value_type != envoy::type::tracing::v3::CustomTag::STRING &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tracing_typed_custom_tags")) {
+    switch (value_type) {
+    case envoy::type::tracing::v3::CustomTag::INT: {
+      int64_t int_value = 0;
+      if (absl::SimpleAtoi(value, &int_value)) {
+        span.setIntTag(tag, int_value);
+        return;
+      }
+      break;
+    }
+    case envoy::type::tracing::v3::CustomTag::DOUBLE: {
+      double double_value = 0;
+      if (absl::SimpleAtod(value, &double_value)) {
+        span.setDoubleTag(tag, double_value);
+        return;
+      }
+      break;
+    }
+    case envoy::type::tracing::v3::CustomTag::BOOL: {
+      bool bool_value = false;
+      if (absl::SimpleAtob(value, &bool_value)) {
+        span.setBoolTag(tag, bool_value);
+        return;
+      }
+      break;
+    }
+    default:
+      break;
+    }
+  }
+  span.setTag(tag, value);
+}
+
 } // namespace
 
 void CustomTagBase::applySpan(Span& span, const CustomTagContext& ctx) const {
   absl::string_view tag_value = value(ctx);
   if (!tag_value.empty()) {
-    span.setTag(tag(), tag_value);
+    setTypedTag(span, tag(), tag_value, value_type_);
   }
 }
 
@@ -42,15 +78,18 @@ void CustomTagBase::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
 }
 
 EnvironmentCustomTag::EnvironmentCustomTag(
-    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Environment& environment)
-    : CustomTagBase(tag), name_(environment.name()), default_value_(environment.default_value()) {
+    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Environment& environment,
+    envoy::type::tracing::v3::CustomTag::ValueType value_type)
+    : CustomTagBase(tag, value_type), name_(environment.name()),
+      default_value_(environment.default_value()) {
   const char* env = std::getenv(name_.data());
   final_value_ = env ? env : default_value_;
 }
 
 RequestHeaderCustomTag::RequestHeaderCustomTag(
-    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Header& request_header)
-    : CustomTagBase(tag), name_(Http::LowerCaseString(request_header.name())),
+    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Header& request_header,
+    envoy::type::tracing::v3::CustomTag::ValueType value_type)
+    : CustomTagBase(tag, value_type), name_(Http::LowerCaseString(request_header.name())),
       header_name_(request_header.name()), default_value_(request_header.default_value()) {}
 
 absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
@@ -64,8 +103,9 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
 }
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,
-                                     const envoy::type::tracing::v3::CustomTag::Metadata& metadata)
-    : CustomTagBase(tag), kind_(metadata.kind().kind_case()),
+                                     const envoy::type::tracing::v3::CustomTag::Metadata& metadata,
+                                     envoy::type::tracing::v3::CustomTag::ValueType value_type)
+    : CustomTagBase(tag, value_type), kind_(metadata.kind().kind_case()),
       metadata_key_(metadata.metadata_key()), default_value_(metadata.default_value()) {}
 
 void MetadataCustomTag::applySpan(Span& span, const CustomTagContext& ctx) const {
@@ -74,12 +114,12 @@ void MetadataCustomTag::applySpan(Span& span, const CustomTagContext& ctx) const
 
   if (!meta_str.has_value()) {
     if (!default_value_.empty()) {
-      span.setTag(tag(), default_value_);
+      setTypedTag(span, tag(), default_value_, value_type_);
     }
     return;
   }
 
-  span.setTag(tag(), meta_str.value());
+  setTypedTag(span, tag(), meta_str.value(), value_type_);
 }
 
 void MetadataCustomTag::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
@@ -163,47 +203,14 @@ FormatterCustomTag::FormatterCustomTag(absl::string_view tag, absl::string_view 
 }
 
 void FormatterCustomTag::applySpan(Span& span, const CustomTagContext& ctx) const {
-  // Apply the formatter to the span
   auto formatted_value = formatter_->format(ctx.formatter_context, ctx.stream_info);
-  if (formatted_value.empty()) {
-    return;
+  if (!formatted_value.empty()) {
+    setTypedTag(span, tag_, formatted_value, value_type_);
   }
-  // Emit a typed attribute when requested, falling back to a string tag if the
-  // value does not parse or the tracer has no typed-attribute support.
-  switch (value_type_) {
-  case envoy::type::tracing::v3::CustomTag::INT: {
-    int64_t int_value = 0;
-    if (absl::SimpleAtoi(formatted_value, &int_value)) {
-      span.setIntTag(tag_, int_value);
-      return;
-    }
-    break;
-  }
-  case envoy::type::tracing::v3::CustomTag::DOUBLE: {
-    double double_value = 0;
-    if (absl::SimpleAtod(formatted_value, &double_value)) {
-      span.setDoubleTag(tag_, double_value);
-      return;
-    }
-    break;
-  }
-  case envoy::type::tracing::v3::CustomTag::BOOL: {
-    bool bool_value = false;
-    if (absl::SimpleAtob(formatted_value, &bool_value)) {
-      span.setBoolTag(tag_, bool_value);
-      return;
-    }
-    break;
-  }
-  default:
-    break;
-  }
-  span.setTag(tag_, formatted_value);
 }
 
 void FormatterCustomTag::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
                                   const CustomTagContext& ctx) const {
-  // Apply the formatter to the log entry
   auto formatted_value = formatter_->format(ctx.formatter_context, ctx.stream_info);
   if (!formatted_value.empty()) {
     auto& custom_tags = *entry.mutable_custom_tags();
@@ -216,13 +223,17 @@ CustomTagUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag
                                   const Formatter::CommandParserPtrVector& command_parsers) {
   switch (tag.type_case()) {
   case envoy::type::tracing::v3::CustomTag::TypeCase::kLiteral:
-    return std::make_shared<const Tracing::LiteralCustomTag>(tag.tag(), tag.literal());
+    return std::make_shared<const Tracing::LiteralCustomTag>(tag.tag(), tag.literal(),
+                                                             tag.value_type());
   case envoy::type::tracing::v3::CustomTag::TypeCase::kEnvironment:
-    return std::make_shared<const Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment());
+    return std::make_shared<const Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment(),
+                                                                 tag.value_type());
   case envoy::type::tracing::v3::CustomTag::TypeCase::kRequestHeader:
-    return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
+    return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header(),
+                                                                   tag.value_type());
   case envoy::type::tracing::v3::CustomTag::TypeCase::kMetadata:
-    return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
+    return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata(),
+                                                              tag.value_type());
   case envoy::type::tracing::v3::CustomTag::TypeCase::kValue:
     return std::make_shared<const Tracing::FormatterCustomTag>(tag.tag(), tag.value(),
                                                                tag.value_type(), command_parsers);

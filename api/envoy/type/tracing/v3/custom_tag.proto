@@ -140,7 +140,7 @@ message CustomTag {
   // The value's type. Defaults to ``STRING``, which preserves the preexisting
   // behavior. When set to ``INT``, ``DOUBLE`` or ``BOOL``, tracers that support
   // typed span attributes (e.g. OpenTelemetry) emit the tag as an integer,
-  // floating-point or boolean attribute instead of a string. Currently honored for
-  // the ``value`` custom tag type.
+  // floating-point or boolean attribute instead of a string. Applies to every
+  // custom tag type.
   ValueType value_type = 7 [(validate.rules).enum = {defined_only: true}];
 }
