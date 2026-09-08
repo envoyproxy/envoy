@@ -282,19 +282,20 @@ function build_openssl() {
     bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
 }
 
-# Run a bazel query, staying quiet on success but surfacing stderr and the exit
+# Run a bazel cquery, staying quiet on success but surfacing stderr and the exit
 # code on failure, so a broken query fails the job instead of silently selecting
-# no tests. Query results go to stdout.
-function run_bazel_query() {
+# no tests. Results go to stdout as plain labels.
+function run_bazel_cquery() {
     local err out rc=0
     err="$(mktemp)"
-    out="$(bazel query "${BAZEL_QUERY_OPTIONS[@]}" "$1" 2>"$err")" || rc=$?
+    out="$(bazel cquery "${BAZEL_QUERY_OPTIONS[@]}" \
+                 --output=starlark --starlark:expr=target.label "$1" 2>"$err")" || rc=$?
     if [[ $rc -ne 0 ]]; then
-        echo "ERROR: bazel query failed (exit ${rc}): $1" >&2
+        echo "ERROR: bazel cquery failed (exit ${rc}): $1" >&2
         cat "$err" >&2
     fi
     rm -f "$err"
-    printf '%s' "$out"
+    printf '%s' "$out" | sed 's|^@@||'
     return "$rc"
 }
 
@@ -304,6 +305,7 @@ function build_openssl_presubmit() {
     # full suite still runs on post-submit via the regular "openssl" target.
     BAZEL_BUILD_OPTIONS+=("--config=openssl")
     setup_clang_toolchain
+    BAZEL_QUERY_OPTIONS+=("--config=openssl")
 
     echo "Bazel fastbuild build with OpenSSL..."
     bazel_envoy_binary_build fastbuild
@@ -322,6 +324,15 @@ function build_openssl_presubmit() {
     # Resolve each changed file to its Bazel label so tests can be selected from
     # the real dependency graph rather than by guessing test paths from source
     # paths (the test tree is not a 1:1 mirror of the source tree).
+    #
+    # Failing to diff is fatal: an empty file list would otherwise select no
+    # tests and report a green job that tested nothing.
+    local changed_files
+    if ! changed_files="$(git diff --name-only "$merge_base" HEAD)"; then
+        echo "ERROR: unable to diff ${merge_base}..HEAD; cannot determine affected tests." >&2
+        return 1
+    fi
+
     local -a changed_labels=()
     local global_config_changed=false
     while IFS= read -r file; do
@@ -354,13 +365,13 @@ function build_openssl_presubmit() {
                 [[ -n "$label" ]] && changed_labels+=("$label")
                 ;;
         esac
-    done < <(git diff --name-only "$merge_base" HEAD 2>/dev/null)
+    done < <(printf '%s\n' "$changed_files")
 
     # Tier 1: tests depending on the changed files. closure(//test/...) already
     # contains their //source/... deps, so it is a sufficient rdeps universe.
     local tier1_tests=""
     if [[ ${#changed_labels[@]} -gt 0 ]]; then
-        tier1_tests="$(run_bazel_query \
+        tier1_tests="$(run_bazel_cquery \
             "kind(test, rdeps(//test/... + //compat/openssl/test/..., set(${changed_labels[*]})))")"
     fi
 
@@ -370,7 +381,7 @@ function build_openssl_presubmit() {
     local tier2_tests=""
     if [[ "$global_config_changed" == "true" ]]; then
         echo "Global/build-config change detected; adding OpenSSL crypto-surface tests."
-        tier2_tests="$(run_bazel_query \
+        tier2_tests="$(run_bazel_cquery \
             "kind(test, rdeps(//test/... + //compat/openssl/test/..., //source/common/tls/... + //source/extensions/transport_sockets/tls/... + //compat/openssl/...))")"
     fi
 
