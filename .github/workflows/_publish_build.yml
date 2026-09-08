@@ -44,7 +44,6 @@ jobs:
     uses: ./.github/workflows/_run.yml
     with:
       arch: ${{ inputs.arch }}
-      bazel-cache: true
       bazel-extra: >-
         --config=rbe
       target: release.server_only
@@ -106,7 +105,6 @@ jobs:
     uses: ./.github/workflows/_run.yml
     with:
       arch: ${{ inputs.arch }}
-      bazel-cache: true
       bazel-extra: >-
         --config=remote-cache
       downloads: |
