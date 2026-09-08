@@ -76,10 +76,16 @@
 
 @media screen and (max-width: 1100px) {
   /* below this the margin is too tight to hang the anchor in it */
-  .envoy-content-main .rst-content a.headerlink {
+  .envoy-content-main .rst-content h1 > a.headerlink,
+  .envoy-content-main .rst-content h2 > a.headerlink,
+  .envoy-content-main .rst-content h3 > a.headerlink,
+  .envoy-content-main .rst-content h4 > a.headerlink,
+  .envoy-content-main .rst-content h5 > a.headerlink,
+  .envoy-content-main .rst-content h6 > a.headerlink {
     left: auto;
     margin-left: 0.4em;
-    position: static;
+    position: relative;
+    top: auto;
   }
 }
 

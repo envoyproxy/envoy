@@ -98,11 +98,18 @@ def dockerhub_envoy_role(
     return [pnode], []
 
 
+def _blank_permalink_icon(app):
+    # sphinx_rtd_theme overwrites this with a Font Awesome glyph when it loads,
+    # after conf.py has run; the stylesheet draws the `#` itself.
+    app.config.html_permalinks_icon = ''
+
+
 def setup(app):
     app.add_config_value('release_level', '', 'env')
     app.add_config_value('substitutions', [], 'html')
     app.add_directive('substitution-code-block', SubstitutionCodeBlock)
     app.add_role('dockerhub_envoy', dockerhub_envoy_role)
+    app.connect('builder-inited', _blank_permalink_icon)
 
 
 missing_config = (

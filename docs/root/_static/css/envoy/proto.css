@@ -92,7 +92,8 @@
 .envoy-content-main .rst-content .envoy-proto-symbol > h5 > a.headerlink {
   left: auto;
   margin-left: 0.5em;
-  position: static;
+  position: relative;
+  top: auto;
 }
 
 /* --- fields --------------------------------------------------------------

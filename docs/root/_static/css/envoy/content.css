@@ -120,17 +120,37 @@
   margin: 28px 0 8px;
 }
 
-/* the anchor hangs in the margin, so linking a heading never reflows the line */
+/* --- permalinks ----------------------------------------------------------
+
+   The anchor follows its text and is a positioned box, so the copied bubble
+   below has something to sit on. conf.py blanks the theme's Font Awesome
+   glyph; the `#` drawn here is the only mark. */
+
 .envoy-content-main .rst-content a.headerlink {
   color: var(--envoy-rule-strong);
+  font-family: inherit;
   font-size: 0.7em;
   font-weight: 400;
-  left: -1.35em;
+  /* the padding widens the hit target; the negative margin keeps the layout */
+  margin: -0.2em 0 -0.2em 0.5em;
   opacity: 0;
-  position: absolute;
+  padding: 0.2em 0.5em 0.2em 0;
+  position: relative;
   text-decoration: none;
-  top: 0.28em;
   visibility: visible;
+}
+
+/* in a heading it hangs in the margin, so linking one never reflows the line */
+.envoy-content-main .rst-content h1 > a.headerlink,
+.envoy-content-main .rst-content h2 > a.headerlink,
+.envoy-content-main .rst-content h3 > a.headerlink,
+.envoy-content-main .rst-content h4 > a.headerlink,
+.envoy-content-main .rst-content h5 > a.headerlink,
+.envoy-content-main .rst-content h6 > a.headerlink {
+  left: -1.35em;
+  margin-left: 0;
+  position: absolute;
+  top: 0.28em;
 }
 
 .envoy-content-main .rst-content a.headerlink::after {
@@ -138,12 +158,27 @@
 }
 
 .envoy-content-main .rst-content :hover > a.headerlink,
-.envoy-content-main .rst-content a.headerlink:focus-visible {
+.envoy-content-main .rst-content a.headerlink:focus-visible,
+.envoy-content-main .rst-content a.headerlink.envoy-copied {
   opacity: 1;
 }
 
 .envoy-content-main .rst-content a.headerlink:hover {
   color: var(--envoy-ink);
+}
+
+/* permalinks.js holds the class for a moment after the link is copied */
+.envoy-content-main .rst-content a.headerlink.envoy-copied::before {
+  background: var(--envoy-ink);
+  border-radius: 4px;
+  bottom: calc(100% + 4px);
+  color: var(--envoy-ground);
+  content: "Copied";
+  font: 500 11px/1 var(--envoy-font-sans);
+  left: 0;
+  padding: 4px 7px;
+  pointer-events: none;
+  position: absolute;
 }
 
 /* --- text ---------------------------------------------------------------- */
