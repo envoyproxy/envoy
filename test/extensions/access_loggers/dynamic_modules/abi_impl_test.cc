@@ -67,6 +67,16 @@ TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseHeaders) {
                    env_ptr, envoy_dynamic_module_type_http_header_type_ResponseHeader));
 }
 
+TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeRequestTrailers) {
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer", "trailer-value"}};
+  Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
+  log_context.setRequestTrailers(request_trailers);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  EXPECT_EQ(1, envoy_dynamic_module_callback_access_logger_get_headers_size(
+                   env_ptr, envoy_dynamic_module_type_http_header_type_RequestTrailer));
+}
+
 TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseTrailers) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
@@ -2931,17 +2941,19 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntRequestSizes) {
   stream_info_.protocol_ = Http::Protocol::Http11;
   stream_info_.bytes_received_ = 17;
   Http::TestRequestHeaderMapImpl request_headers{{"content-length", "0"}, {"x-test", "value"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer", "value"}};
   Formatter::Context log_context(&request_headers, nullptr, nullptr);
+  log_context.setRequestTrailers(request_trailers);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   uint64_t result = 1;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
       env_ptr, envoy_dynamic_module_type_attribute_id_RequestSize, &result));
-  EXPECT_EQ(0, result);
+  EXPECT_EQ(17, result);
 
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
       env_ptr, envoy_dynamic_module_type_attribute_id_RequestTotalSize, &result));
-  EXPECT_EQ(17 + request_headers.byteSize(), result);
+  EXPECT_EQ(17 + request_headers.byteSize() + request_trailers.byteSize(), result);
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntSizeFallbacks) {
@@ -2970,15 +2982,17 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntSizeFallbacks) {
   EXPECT_EQ(29, result);
 }
 
-TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntRequestSizeInvalidContentLength) {
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntRequestSizeIgnoresInvalidContentLength) {
   stream_info_.protocol_ = Http::Protocol::Http11;
+  stream_info_.bytes_received_ = 23;
   Http::TestRequestHeaderMapImpl request_headers{{"content-length", "invalid"}};
   Formatter::Context log_context(&request_headers, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   uint64_t result = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
       env_ptr, envoy_dynamic_module_type_attribute_id_RequestSize, &result));
+  EXPECT_EQ(23, result);
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntResponseTotalSize) {

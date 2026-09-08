@@ -2737,10 +2737,13 @@ TEST(ABIImpl, GetHttpSizeAndGrpcStatusAttributes) {
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
 
   Http::TestRequestHeaderMapImpl request_headers{{"content-length", "41"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-request-trailer", "value"}};
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
   EXPECT_CALL(decoder_callbacks, requestHeaders())
       .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
   EXPECT_CALL(encoder_callbacks, responseHeaders())
       .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
   EXPECT_CALL(encoder_callbacks, responseTrailers())
@@ -2751,10 +2754,10 @@ TEST(ABIImpl, GetHttpSizeAndGrpcStatusAttributes) {
   uint64_t result = 1;
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_RequestSize, &result));
-  EXPECT_EQ(41, result);
+  EXPECT_EQ(37, result);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_RequestTotalSize, &result));
-  EXPECT_EQ(37 + request_headers.byteSize(), result);
+  EXPECT_EQ(37 + request_headers.byteSize() + request_trailers.byteSize(), result);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_ResponseTotalSize, &result));
   EXPECT_EQ(43 + response_headers.byteSize() + response_trailers.byteSize(), result);

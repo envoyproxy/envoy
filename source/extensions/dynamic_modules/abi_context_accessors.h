@@ -30,10 +30,11 @@ public:
     const Http::RequestHeaderMap* request_headers{};
     const Http::ResponseHeaderMap* response_headers{};
     const Http::ResponseTrailerMap* response_trailers{};
+    const Http::RequestTrailerMap* request_trailers{};
   };
 
   // Resolve the header map for the given type from the formatting context. Supported types are
-  // RequestHeader, ResponseHeader, and ResponseTrailer.
+  // RequestHeader, RequestTrailer, ResponseHeader, and ResponseTrailer.
   static HeadersMapOptConstRef headerMapByType(const Formatter::Context& context,
                                                envoy_dynamic_module_type_http_header_type type);
 

@@ -15,7 +15,6 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 
-#include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
 
 namespace Envoy {
@@ -82,6 +81,8 @@ ContextAccessor::headerMapByType(const Formatter::Context& context,
   switch (type) {
   case envoy_dynamic_module_type_http_header_type_RequestHeader:
     return context.requestHeaders();
+  case envoy_dynamic_module_type_http_header_type_RequestTrailer:
+    return context.requestTrailers();
   case envoy_dynamic_module_type_http_header_type_ResponseHeader:
     return context.responseHeaders();
   case envoy_dynamic_module_type_http_header_type_ResponseTrailer:
@@ -414,17 +415,7 @@ bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
     if (http_context == nullptr) {
       break;
     }
-    if (http_context->request_headers != nullptr &&
-        http_context->request_headers->ContentLength() != nullptr) {
-      uint64_t content_length;
-      if (!absl::SimpleAtoi(http_context->request_headers->getContentLengthValue(),
-                            &content_length)) {
-        break;
-      }
-      *result = content_length;
-    } else {
-      *result = stream_info.bytesReceived();
-    }
+    *result = stream_info.bytesReceived();
     ok = true;
     break;
   }
@@ -434,7 +425,9 @@ bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
     }
     *result =
         stream_info.bytesReceived() +
-        (http_context->request_headers != nullptr ? http_context->request_headers->byteSize() : 0);
+        (http_context->request_headers != nullptr ? http_context->request_headers->byteSize() : 0) +
+        (http_context->request_trailers != nullptr ? http_context->request_trailers->byteSize()
+                                                   : 0);
     ok = true;
     break;
   }
@@ -542,9 +535,9 @@ bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
   if (!stream_info.protocol().has_value()) {
     return getAttributeInt(stream_info, attribute_id, result);
   }
-  const HttpAttributeContext http_context{context.requestHeaders().ptr(),
-                                          context.responseHeaders().ptr(),
-                                          context.responseTrailers().ptr()};
+  const HttpAttributeContext http_context{
+      context.requestHeaders().ptr(), context.responseHeaders().ptr(),
+      context.responseTrailers().ptr(), context.requestTrailers().ptr()};
   return getAttributeInt(stream_info, attribute_id, result, &http_context);
 }
 

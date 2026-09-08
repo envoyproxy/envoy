@@ -12,24 +12,43 @@ namespace Formatter {
 namespace DynamicModules {
 namespace {
 
+TEST(DynamicModuleFormatterAbiTest, RequestTrailersUseFormattingContext) {
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-request-trailer", "value"}};
+  ::Envoy::Formatter::Context context;
+  context.setRequestTrailers(request_trailers);
+  FormatterContext formatter_context{&context, &stream_info};
+
+  EXPECT_EQ(1, envoy_dynamic_module_callback_formatter_get_headers_size(
+                   &formatter_context, envoy_dynamic_module_type_http_header_type_RequestTrailer));
+
+  envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_formatter_get_header_value(
+      &formatter_context, envoy_dynamic_module_type_http_header_type_RequestTrailer,
+      {"x-request-trailer", 17}, &result, 0, nullptr));
+  EXPECT_EQ("value", absl::string_view(result.ptr, result.length));
+}
+
 TEST(DynamicModuleFormatterAbiTest, HttpIntegerAttributesUseFormattingContext) {
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.protocol_ = Http::Protocol::Http11;
   stream_info.bytes_received_ = 11;
   stream_info.bytes_sent_ = 13;
   Http::TestRequestHeaderMapImpl request_headers{{"content-length", "17"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-request-trailer", "value"}};
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
   ::Envoy::Formatter::Context context(&request_headers, &response_headers, &response_trailers);
+  context.setRequestTrailers(request_trailers);
   FormatterContext formatter_context{&context, &stream_info};
 
   uint64_t result = 1;
   EXPECT_TRUE(envoy_dynamic_module_callback_formatter_get_attribute_int(
       &formatter_context, envoy_dynamic_module_type_attribute_id_RequestSize, &result));
-  EXPECT_EQ(17, result);
+  EXPECT_EQ(11, result);
   EXPECT_TRUE(envoy_dynamic_module_callback_formatter_get_attribute_int(
       &formatter_context, envoy_dynamic_module_type_attribute_id_RequestTotalSize, &result));
-  EXPECT_EQ(11 + request_headers.byteSize(), result);
+  EXPECT_EQ(11 + request_headers.byteSize() + request_trailers.byteSize(), result);
   EXPECT_TRUE(envoy_dynamic_module_callback_formatter_get_attribute_int(
       &formatter_context, envoy_dynamic_module_type_attribute_id_ResponseTotalSize, &result));
   EXPECT_EQ(13 + response_headers.byteSize() + response_trailers.byteSize(), result);
