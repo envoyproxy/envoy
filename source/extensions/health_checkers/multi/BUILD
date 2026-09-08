@@ -12,9 +12,6 @@ envoy_cc_extension(
     name = "health_checker_lib",
     srcs = ["multi.cc"],
     hdrs = ["multi.h"],
-    extra_visibility = [
-        "//test:__subpackages__",
-    ],
     deps = [
         "//envoy/registry",
         "//source/common/common:callback_impl_lib",
