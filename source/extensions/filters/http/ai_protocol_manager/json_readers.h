@@ -41,13 +41,13 @@ constexpr size_t MaxStringValueSize = 256;
 // malformed when null.
 enum class NullPolicy { AllowNullAsAbsent, NullIsMalformed };
 
-// Read a token count (integer or JSON double). Returns nullopt for a missing
-// key; a key that is present but unusable -- wrong type, container, null
-// (no dialect documents null counts), negative, fractional, or out of range
-// -- also sets `malformed`, so a corrupt final cumulative update cannot leave
-// an earlier value published as complete.
+// Read a token count (integer or JSON double). Nullopt for a missing key; a present
+// but unusable key (wrong type, negative, fractional, out of range, or null unless
+// `null_policy` allows it) also sets `malformed`, so a corrupt final cumulative
+// update cannot leave an earlier value published as complete.
 std::optional<uint64_t> readCount(const nlohmann::json& json, const std::string& key,
-                                  bool& malformed);
+                                  bool& malformed,
+                                  NullPolicy null_policy = NullPolicy::NullIsMalformed);
 
 // Read a non-empty string value of at most MaxStringValueSize; anything else
 // reads as absent.

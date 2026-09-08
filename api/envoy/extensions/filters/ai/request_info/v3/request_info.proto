@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.ai.request_info.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.ai.request_info.v3";
+option java_outer_classname = "RequestInfoProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/ai/request_info/v3;request_infov3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Request info AI filter]
+// Request info AI filter :ref:`configuration overview
+// <config_http_filters_ai_protocol_manager_ai_filters>`.
+// [#extension: envoy.filters.ai.request_info]
+
+// An :ref:`AI filter
+// <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.filters>`
+// that publishes :ref:`envoy.data.ai.v3.RequestInfo
+// <envoy_v3_api_msg_data.ai.v3.RequestInfo>` as typed dynamic metadata. On a
+// declared endpoint with a body, the record is written before the request
+// headers continue, so every later HTTP filter (for example :ref:`ext_proc
+// <config_http_filters_ext_proc>`) sees it from its first request-headers
+// callback. The filter never modifies or rejects the request.
+message RequestInfo {
+  // Namespace for the emitted typed dynamic metadata.
+  // Defaults to ``envoy.ai.request_info``.
+  string metadata_namespace = 1;
+}

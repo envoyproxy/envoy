@@ -148,6 +148,89 @@ does not parse is forwarded unchanged.
       request_handling:
         parse_unconfigured_routes: true
 
+.. _config_http_filters_ai_protocol_manager_ai_filters:
+
+AI filters
+----------
+
+Once a declared AI endpoint's payload has been fully received, parsed and
+validated -- and before it is replayed to the rest of the HTTP filter chain --
+the filter runs the :ref:`AI filters
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.filters>`
+configured under ``request_handling``, in order, over the parsed document. An
+AI filter is an extension of the ``envoy.filters.ai`` category: it receives
+the request index and may read it, modify it (the payload is re-serialized
+from the index before replay), or reject the request with a local reply. A
+route without a per-route request declaration runs no AI filters, even under
+:ref:`parse_unconfigured_routes
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>`,
+and a headers-only or empty-body request has nothing to run them on.
+
+Request info
+~~~~~~~~~~~~
+
+The :ref:`request info filter
+<envoy_v3_api_msg_extensions.filters.ai.request_info.v3.RequestInfo>`
+(``envoy.filters.ai.request_info``) publishes what the request asks for -- the
+model, whether a streamed response was requested, the declared output token
+cap, and the number of messages and tools -- as an
+:ref:`envoy.data.ai.v3.RequestInfo <envoy_v3_api_msg_data.ai.v3.RequestInfo>`
+typed dynamic metadata record, under the namespace ``envoy.ai.request_info``
+by default. It never modifies or rejects the request.
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.ai_protocol_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+      request_handling:
+        filters:
+        - name: envoy.filters.ai.request_info
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.ai.request_info.v3.RequestInfo
+
+The attributes are read through the :ref:`wire API
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.api_protocol>`
+the route declared:
+
+.. csv-table::
+  :header: Attribute, OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, Gemini
+  :widths: 1, 1, 1, 1, 1
+
+  ``model``, ``model``, ``model``, ``model``, model segment of the request path
+  ``stream``, ``stream``, ``stream``, ``stream``, ``:streamGenerateContent`` operation in the request path
+  ``max_output_tokens``, "``max_completion_tokens``, else ``max_tokens``", ``max_output_tokens``, ``max_tokens``, "``generationConfig.maxOutputTokens`` (camelCase or snake_case)"
+  ``message_count``, ``messages``, "``input`` (a string counts as one message)", ``messages``, ``contents``
+  ``tool_count``, ``tools``, ``tools``, ``tools``, ``tools``
+
+A route that declares the endpoint without naming its API gets only ``model``
+and ``stream``, read from the top level of the payload. Every attribute is
+optional, and every value is client-declared: the record reports what the
+client asked for, not what the provider will do. A known attribute that is
+present but unusable -- wrong type, negative, fractional, out of range, or a
+string over 256 bytes (an offloaded string counts as over) -- reads as absent
+and flags the record ``extraction_status: PARTIAL``; the other attributes
+remain reliable.
+
+Because the AI filters run before the held request headers are released, the
+record is visible to every later decode filter from its first request-headers
+callback. An :ref:`ext_proc <config_http_filters_ext_proc>` filter listed after
+this one receives it in the ``metadata_context`` of its request-headers
+message through typed namespace forwarding:
+
+.. code-block:: yaml
+
+  metadata_options:
+    forwarding_namespaces:
+      typed:
+      - envoy.ai.request_info
+
+As with token usage, only typed metadata is published; untyped readers do not
+see it. When the namespace already holds a record for the stream -- typically
+from a second installation of the AI Protocol Manager -- the new publication is
+skipped (counted by ``request_info.duplicate``).
+
 Response token-usage extraction
 -------------------------------
 
@@ -420,3 +503,6 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   response_body_too_large, Counter, A JSON response exceeded ``max_json_body_size``; extraction skipped.
   sse_event_too_large, Counter, Pending or complete SSE event data exceeded ``max_sse_event_size``; that entire event was skipped.
   unsupported_content_encoding, Counter, The response carried a non-identity ``content-encoding``; extraction skipped.
+  request_info.published, Counter, The request info AI filter published an ``envoy.data.ai.v3.RequestInfo`` record (includes ``PARTIAL`` records).
+  request_info.partial, Counter, A published request info record was flagged ``extraction_status: PARTIAL``.
+  request_info.duplicate, Counter, Request info publication skipped because another installation of the filter had already published the namespace for this stream.

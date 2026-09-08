@@ -157,6 +157,11 @@ EXTENSIONS = {
     "envoy.string_matcher.lua":                         "//source/extensions/string_matcher/lua:config",
 
     #
+    # AI filters
+    #
+    "envoy.filters.ai.request_info":                    "//source/extensions/filters/ai/request_info:config",
+
+    #
     # HTTP filters
     #
 

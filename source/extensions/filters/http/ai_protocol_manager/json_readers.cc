@@ -10,12 +10,15 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 
 std::optional<uint64_t> readCount(const nlohmann::json& json, const std::string& key,
-                                  bool& malformed) {
+                                  bool& malformed, NullPolicy null_policy) {
   const auto it = json.find(key);
   if (it == json.end()) {
     return std::nullopt;
   }
   const nlohmann::json& value = *it;
+  if (value.is_null() && null_policy == NullPolicy::AllowNullAsAbsent) {
+    return std::nullopt;
+  }
   // JsonWithExtBufParser stores any literal that fits int64 as a *signed*
   // integer (is_number_unsigned() is true only above INT64_MAX), so probe the
   // signed representation first.

@@ -7,9 +7,12 @@
 
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/router/router.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_factory.h"
+#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_conversion.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
@@ -20,6 +23,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,54 +33,21 @@ namespace AiProtocolManager {
 using PerRouteProto =
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute;
 
-// The inverse pair mapping the shared wire-API enum (envoy.type.ai.v3
-// .ApiProtocol) to and from the internal mirror. Kept side by side as two
-// exhaustive switches -- a shared runtime table would trade away the
-// compiler's missing-case checking when either enum grows.
-
-// Unrecognized values -- possible only across a version skew, since configs
-// are validated defined_only -- auto-detect.
-inline ApiProtocol protocolFromProto(envoy::type::ai::v3::ApiProtocol protocol) {
-  switch (protocol) {
-  case envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS:
-    return ApiProtocol::OpenAiChatCompletions;
-  case envoy::type::ai::v3::OPENAI_RESPONSES:
-    return ApiProtocol::OpenAiResponses;
-  case envoy::type::ai::v3::ANTHROPIC_MESSAGES:
-    return ApiProtocol::AnthropicMessages;
-  case envoy::type::ai::v3::GEMINI_GENERATE_CONTENT:
-    return ApiProtocol::GeminiGenerateContent;
-  default:
-    return ApiProtocol::Unspecified;
-  }
-}
-
-inline envoy::type::ai::v3::ApiProtocol protocolToProto(ApiProtocol protocol) {
-  switch (protocol) {
-  case ApiProtocol::OpenAiChatCompletions:
-    return envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS;
-  case ApiProtocol::OpenAiResponses:
-    return envoy::type::ai::v3::OPENAI_RESPONSES;
-  case ApiProtocol::AnthropicMessages:
-    return envoy::type::ai::v3::ANTHROPIC_MESSAGES;
-  case ApiProtocol::GeminiGenerateContent:
-    return envoy::type::ai::v3::GEMINI_GENERATE_CONTENT;
-  case ApiProtocol::Unspecified:
-    break;
-  }
-  return envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED;
-}
-
-// Filter-level configuration, shared by every stream on the chain: which
-// directions are enabled, the token-usage extraction settings, and the
-// filter's stats. Shared across downstream and upstream installations alike.
+// Filter-level configuration shared by every stream on the chain, downstream and
+// upstream installations alike.
 class FilterConfig {
 public:
   FilterConfig(
       const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-      Stats::Scope& scope);
+      Stats::Scope& scope, AiFilterFactories ai_filter_factories = {});
+
+  // Resolves request_handling.filters against the envoy.filters.ai registry.
+  static absl::StatusOr<std::shared_ptr<const FilterConfig>>
+  create(const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
+         Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
 
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
+  const AiFilterFactories& aiFilterFactories() const { return ai_filter_factories_; }
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
   uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
@@ -102,6 +73,7 @@ private:
   const uint32_t max_sse_event_size_ = 0;
   const uint32_t max_json_body_size_ = 0;
   const uint32_t max_parsed_sse_events_ = 0;
+  const AiFilterFactories ai_filter_factories_;
 };
 using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
 
@@ -182,7 +154,8 @@ private:
 // endpoint carries no such gate.
 //
 // A declared wire API with a registered payload schema is validated at end of
-// payload (schema/schema_registry.h); normalization comes later.
+// payload (schema/schema_registry.h), then the configured AI filters run over the
+// parsed document (filter_manager.h); normalization comes later.
 //
 // Encode (response) path: observe-only token-usage extraction. When
 // response_handling.token_usage is configured, 2xx SSE/JSON responses on
@@ -252,8 +225,7 @@ private:
   bool route_has_request_{false};
   ApiProtocol route_request_protocol_{ApiProtocol::Unspecified};
 
-  // The parsed payload. Populated once the body has been fully received and
-  // parsed; nothing consumes it yet.
+  // The parsed payload, handed to the FilterManager once fully received.
   JsonWithExtBuf request_json_;
   // Cleared once parsing is done with, whether it completed, was abandoned, or
   // failed the request.
@@ -265,6 +237,8 @@ private:
   // Request headers for this stream. Held by pointer during decode path.
   Http::RequestHeaderMap* request_headers_{nullptr};
 
+  // Declared ahead of the manager so it outlives the AI filters the manager owns.
+  std::unique_ptr<AiFilterContext> ai_filter_context_;
   // FilterManager orchestrating the AI filter chain.
   std::unique_ptr<FilterManager> filter_manager_;
 

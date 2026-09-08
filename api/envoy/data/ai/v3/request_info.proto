@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package envoy.data.ai.v3;
+
+import "envoy/type/ai/v3/api_protocol.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.data.ai.v3";
+option java_outer_classname = "RequestInfoProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/data/ai/v3;aiv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: AI request info]
+
+// Request attributes extracted from an AI request payload by the
+// :ref:`request info AI filter
+// <envoy_v3_api_msg_extensions.filters.ai.request_info.v3.RequestInfo>` of the
+// :ref:`AI Protocol Manager filter <config_http_filters_ai_protocol_manager>`
+// and published as typed dynamic metadata. It is the request-side counterpart
+// of :ref:`TokenUsage <envoy_v3_api_msg_data.ai.v3.TokenUsage>`. All values
+// are client-declared and unverified. Every attribute is optional; one that is
+// present but unusable (wrong type, out of range, or a string over 256 bytes)
+// reads as absent and marks the record ``PARTIAL``.
+// [#next-free-field: 8]
+message RequestInfo {
+  enum ExtractionStatus {
+    EXTRACTION_STATUS_UNSPECIFIED = 0;
+
+    // Every known attribute present in the payload was usable.
+    COMPLETE = 1;
+
+    // At least one known attribute was present but unusable; the attributes
+    // that are present remain reliable.
+    PARTIAL = 2;
+  }
+
+  // The route's declared wire API. ``API_PROTOCOL_UNSPECIFIED`` means the
+  // route declared an AI endpoint without naming its API; only the shared
+  // top-level ``model`` and ``stream`` are read then.
+  type.ai.v3.ApiProtocol api_protocol = 1;
+
+  // The payload's top-level ``model``, or, for Gemini, the model segment of
+  // the request path. Empty when absent.
+  string model = 2;
+
+  // The payload's ``stream`` flag, or, for Gemini, whether the request path's
+  // operation is ``streamGenerateContent``. Absent when the request did not say.
+  google.protobuf.BoolValue stream = 3;
+
+  // The output token cap the request declares: ``max_completion_tokens`` (or
+  // ``max_tokens``) for OpenAI Chat Completions, ``max_output_tokens`` for
+  // OpenAI Responses, ``max_tokens`` for Anthropic Messages, and
+  // ``generationConfig.maxOutputTokens`` (camelCase or snake_case) for Gemini.
+  // Absent when not declared.
+  google.protobuf.UInt64Value max_output_tokens = 4;
+
+  // Number of direct elements in the conversation array: ``messages`` for
+  // OpenAI Chat Completions and Anthropic Messages, ``input`` for OpenAI
+  // Responses (a string ``input`` counts as one), ``contents`` for Gemini.
+  google.protobuf.UInt32Value message_count = 5;
+
+  // Number of direct elements in the ``tools`` array.
+  google.protobuf.UInt32Value tool_count = 6;
+
+  // Quality of the extracted record.
+  ExtractionStatus extraction_status = 7;
+}

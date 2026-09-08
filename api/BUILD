@@ -182,6 +182,7 @@ proto_library(
         "//envoy/extensions/content_parsers/json/v3:pkg",
         "//envoy/extensions/dynamic_modules/v3:pkg",
         "//envoy/extensions/early_data/v3:pkg",
+        "//envoy/extensions/filters/ai/request_info/v3:pkg",
         "//envoy/extensions/filters/common/dependency/v3:pkg",
         "//envoy/extensions/filters/common/fault/v3:pkg",
         "//envoy/extensions/filters/common/jwks/v3:pkg",
