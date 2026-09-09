@@ -38,17 +38,9 @@ def random_loopback_host():
 # non-coverage build; 6 seconds should be enough to be not flaky in most
 # configurations.
 #
-# Unfortunately, because the test is verifying the behavior of a connection
-# during drain, the first connection must last for the full tolerance duration,
-# so increasing this value increases the duration of the test. For this
-# reason we want to keep it as low as possible without causing flaky failure.
-#
-# If this goes longer than 10 seconds connections start timing out which
-# causes the test to get stuck and time out. Unfortunately for tsan or asan
-# runs the "long enough to start up" constraint fights with the "too long for
-# connections to be idle" constraint. Ideally this test would be disabled for
-# those slower test contexts, but we don't currently have infrastructure for
-# that.
+# The slow upstream response is now gated by the test instead of sleeping for
+# this duration, so this constant primarily controls startup polling and UDP
+# request retry deadlines.
 STARTUP_TOLERANCE_SECONDS = 6
 
 # We send multiple requests in parallel and require them all to function correctly
@@ -56,15 +48,16 @@ STARTUP_TOLERANCE_SECONDS = 6
 # also tests that there's not an "only one" success situation.
 PARALLEL_REQUESTS = 5
 
-UPSTREAM_SLOW_PORT = 54321
-UPSTREAM_FAST_PORT = 54322
+PORT_BASE = random.randrange(20000, 60000 - 6)
+UPSTREAM_SLOW_PORT = PORT_BASE
+UPSTREAM_FAST_PORT = PORT_BASE + 1
 UPSTREAM_HOST = random_loopback_host()
 ENVOY_HOST = UPSTREAM_HOST
-ENVOY_PORT = 54323
-ENVOY_ADMIN_PORT = 54324
-ENVOY_UDP_PORT = 54325
-UPSTREAM_UDP_SLOW_PORT = 54326
-UPSTREAM_UDP_FAST_PORT = 54327
+ENVOY_PORT = PORT_BASE + 2
+ENVOY_ADMIN_PORT = PORT_BASE + 3
+ENVOY_UDP_PORT = PORT_BASE + 4
+UPSTREAM_UDP_SLOW_PORT = PORT_BASE + 5
+UPSTREAM_UDP_FAST_PORT = PORT_BASE + 6
 # Append process ID to the socket path to minimize chances of
 # conflict. We can't use TEST_TMPDIR for this because it makes
 # the socket path too long.
@@ -82,13 +75,14 @@ log.addHandler(_stream_handler)
 
 class Upstream:
     # This class runs a server which takes an http request to
-    # path=/ and responds with "start\n" [three second pause] "end\n".
+    # path=/ and responds with "start\n" [test-controlled delay] "end\n".
     # This allows us to test that during hot restart an already-opened
     # connection will persist.
     # If initialized with True it will instead respond with
     # "fast instance" immediately.
     def __init__(self, fast_version=False):
         self.port = UPSTREAM_FAST_PORT if fast_version else UPSTREAM_SLOW_PORT
+        self.release = asyncio.Event()
         self.app = web.Application()
         self.app.add_routes([
             web.get("/", self.fast_response) if fast_version else web.get("/", self.slow_response),
@@ -119,7 +113,10 @@ class Upstream:
             status=200, reason="OK", headers={"content-type": "text/plain"})
         await response.prepare(request)
         await response.write(b"start\n")
-        await asyncio.sleep(STARTUP_TOLERANCE_SECONDS + 0.5)
+        try:
+            await asyncio.wait_for(self.release.wait(), timeout=60)
+        except asyncio.TimeoutError:
+            log.warning("timed out waiting to release slow upstream response")
         await response.write(b"end\n")
         await response.write_eof()
         return response
@@ -389,6 +386,20 @@ async def _wait_for_envoy_epoch(i: int):
     assert expected_substring in response, f"expected_substring={expected_substring}, server_info={response}"
 
 
+async def _terminate_process(process: asyncio.subprocess.Process | None) -> None:
+    if process is None or process.returncode is not None:
+        return
+    try:
+        process.terminate()
+    except ProcessLookupError:
+        return
+    try:
+        await asyncio.wait_for(process.wait(), timeout=5)
+    except asyncio.TimeoutError:
+        process.kill()
+        await process.wait()
+
+
 class IntegrationTest(unittest.IsolatedAsyncioTestCase):
     server_cert: pathlib.Path
     server_key: pathlib.Path
@@ -437,147 +448,155 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         return await super().asyncTearDown()
 
     async def test_dead_parent_startup(self) -> None:
-        log.info("starting envoy")
-        envoy_process_1 = await asyncio.create_subprocess_exec(
-            *self.base_envoy_args,
-            "--restart-epoch",
-            "0",
-            "--use-dynamic-base-id",
-            "--base-id-path",
-            self.base_id_path,
-            "-c",
-            self.slow_config_path,
-        )
-        log.info(f"cert path = {IntegrationTest.server_cert}")
-        log.info("waiting for envoy ready")
-        await _wait_for_envoy_epoch(0)
-        base_id = int(self.base_id_path.read_text())
-        log.info("terminating first envoy process")
-        envoy_process_1.terminate()
-        await envoy_process_1.wait()
+        envoy_process_1 = None
+        envoy_process_2 = None
+        try:
+            log.info("starting envoy")
+            envoy_process_1 = await asyncio.create_subprocess_exec(
+                *self.base_envoy_args,
+                "--restart-epoch",
+                "0",
+                "--use-dynamic-base-id",
+                "--base-id-path",
+                self.base_id_path,
+                "-c",
+                self.slow_config_path,
+            )
+            log.info(f"cert path = {IntegrationTest.server_cert}")
+            log.info("waiting for envoy ready")
+            await _wait_for_envoy_epoch(0)
+            base_id = int(self.base_id_path.read_text())
+            log.info("terminating first envoy process")
+            envoy_process_1.terminate()
+            await envoy_process_1.wait()
 
-        log.info("starting envoy with hot restart config but parent is dead")
-        envoy_process_2 = await asyncio.create_subprocess_exec(
-            *self.base_envoy_args,
-            "--restart-epoch",
-            "1",
-            "--base-id",
-            str(base_id),
-            "--skip-hot-restart-on-no-parent",
-            "-c",
-            self.fast_config_path,
-        )
-        log.info("waiting for envoy ready")
-        await _wait_for_envoy_epoch(1)
-        log.info("sending request to fast upstream")
-        request_url = f"http://{ENVOY_HOST}:{ENVOY_PORT}/"
-        response = _full_http_request(request_url)
-        self.assertEqual(
-            await response,
-            "fast instance",
-            "envoy server should be running despite failed hot restart",
-        )
-        log.info("shutting instance down")
-        envoy_process_2.terminate()
-        await envoy_process_2.wait()
+            log.info("starting envoy with hot restart config but parent is dead")
+            envoy_process_2 = await asyncio.create_subprocess_exec(
+                *self.base_envoy_args,
+                "--restart-epoch",
+                "1",
+                "--base-id",
+                str(base_id),
+                "--skip-hot-restart-on-no-parent",
+                "-c",
+                self.fast_config_path,
+            )
+            log.info("waiting for envoy ready")
+            await _wait_for_envoy_epoch(1)
+            log.info("sending request to fast upstream")
+            request_url = f"http://{ENVOY_HOST}:{ENVOY_PORT}/"
+            response = _full_http_request(request_url)
+            self.assertEqual(
+                await response,
+                "fast instance",
+                "envoy server should be running despite failed hot restart",
+            )
+        finally:
+            log.info("cleaning up envoy instances")
+            await _terminate_process(envoy_process_2)
+            await _terminate_process(envoy_process_1)
 
     async def test_connection_handoffs(self) -> None:
-        log.info("starting envoy")
-        envoy_process_1 = await asyncio.create_subprocess_exec(
-            *self.base_envoy_args,
-            "--restart-epoch",
-            "0",
-            "--use-dynamic-base-id",
-            "--base-id-path",
-            self.base_id_path,
-            "-c",
-            self.slow_config_path,
-        )
-        log.info(f"cert path = {IntegrationTest.server_cert}")
-        log.info("waiting for envoy ready")
-        await _wait_for_envoy_epoch(0)
-        log.info("making requests")
-        request_url = f"http://{ENVOY_HOST}:{ENVOY_PORT}/"
-        srequest_url = f"https://{ENVOY_HOST}:{ENVOY_PORT}/"
-        slow_responses = [
-            HttpRequestLineGenerator(request_url) for i in range(PARALLEL_REQUESTS)
-        ] + [Http3RequestLineGenerator(srequest_url) for i in range(PARALLEL_REQUESTS)]
-        log.info("waiting for responses to begin")
-        for response in slow_responses:
-            self.assertEqual(await response.line(), b"start\n")
-        log.info("establishing udp session")
-        udp_session_a = await UdpSession.open()
-        response = await udp_session_a.request(b"hello")
-        self.assertTrue(response.endswith(b" via-slow"), response)
-        base_id = int(self.base_id_path.read_text())
-        log.info(f"starting envoy hot restart for base id {base_id}")
-        envoy_process_2 = await asyncio.create_subprocess_exec(
-            *self.base_envoy_args,
-            "--restart-epoch",
-            "1",
-            "--parent-shutdown-time-s",
-            str(STARTUP_TOLERANCE_SECONDS + 1),
-            "--base-id",
-            str(base_id),
-            "-c",
-            self.fast_config_path,
-        )
-        log.info("waiting for new envoy instance to begin")
-        await _wait_for_envoy_epoch(1)
-        log.info("sending request to fast upstream")
-        fast_responses = [_full_http_request(request_url) for i in range(PARALLEL_REQUESTS)
-                         ] + [_full_http3_request(srequest_url) for i in range(PARALLEL_REQUESTS)]
-        for response in fast_responses:
-            self.assertEqual(
-                await response,
-                "fast instance",
-                "new requests after hot restart begins should go to new cluster",
+        envoy_process_1 = None
+        envoy_process_2 = None
+        udp_session_a = None
+        udp_session_b = None
+        try:
+            log.info("starting envoy")
+            envoy_process_1 = await asyncio.create_subprocess_exec(
+                *self.base_envoy_args,
+                "--restart-epoch",
+                "0",
+                "--use-dynamic-base-id",
+                "--base-id-path",
+                self.base_id_path,
+                "-c",
+                self.slow_config_path,
             )
-
-        # UDP sessions established before hot restart stay on the old instance during drain,
-        # while new sessions are forwarded to the new instance.
-        log.info("checking udp sessions during drain")
-        udp_session_b = await UdpSession.open()
-        response = await udp_session_a.request(b"hello")
-        self.assertTrue(response.endswith(b" via-slow"), response)
-        response = await udp_session_b.request(b"hello")
-        self.assertTrue(response.endswith(b" via-fast"), response)
-
-        # Now wait for the slow request to complete, and make sure it still gets the
-        # response from the old instance.
-        log.info("waiting for completion of original slow request")
-        t1 = datetime.now()
-        for response in slow_responses:
-            self.assertEqual(await response.line(), b"end\n")
-        t2 = datetime.now()
-        self.assertGreater(
-            (t2 - t1).total_seconds(),
-            0.5,
-            "slow request should be incomplete when the test waits for it, otherwise the test is not necessarily validating during-drain behavior",
-        )
-        for response in slow_responses:
-            self.assertEqual(await response.join(), 0)
-        log.info("waiting for parent instance to terminate")
-        await envoy_process_1.wait()
-        log.info("sending second request to fast upstream")
-        fast_responses = [_full_http_request(request_url) for i in range(PARALLEL_REQUESTS)
-                         ] + [_full_http3_request(srequest_url) for i in range(PARALLEL_REQUESTS)]
-        for response in fast_responses:
-            self.assertEqual(
-                await response,
-                "fast instance",
-                "new requests after old instance terminates should go to new cluster",
+            log.info(f"cert path = {IntegrationTest.server_cert}")
+            log.info("waiting for envoy ready")
+            await _wait_for_envoy_epoch(0)
+            log.info("making requests")
+            request_url = f"http://{ENVOY_HOST}:{ENVOY_PORT}/"
+            srequest_url = f"https://{ENVOY_HOST}:{ENVOY_PORT}/"
+            slow_responses = [
+                HttpRequestLineGenerator(request_url) for i in range(PARALLEL_REQUESTS)
+            ] + [Http3RequestLineGenerator(srequest_url) for i in range(PARALLEL_REQUESTS)]
+            log.info("waiting for responses to begin")
+            for response in slow_responses:
+                self.assertEqual(await response.line(), b"start\n")
+            log.info("establishing udp session")
+            udp_session_a = await UdpSession.open()
+            response = await udp_session_a.request(b"hello")
+            self.assertTrue(response.endswith(b" via-slow"), response)
+            base_id = int(self.base_id_path.read_text())
+            log.info(f"starting envoy hot restart for base id {base_id}")
+            envoy_process_2 = await asyncio.create_subprocess_exec(
+                *self.base_envoy_args,
+                "--restart-epoch",
+                "1",
+                "--parent-shutdown-time-s",
+                str(STARTUP_TOLERANCE_SECONDS * 2),
+                "--base-id",
+                str(base_id),
+                "-c",
+                self.fast_config_path,
             )
-        # The new udp session is uninterrupted, the old session re-establishes on the new instance
-        response = await udp_session_b.request(b"hello")
-        self.assertTrue(response.endswith(b" via-fast"), response)
-        response = await udp_session_a.request(b"hello")
-        self.assertTrue(response.endswith(b" via-fast"), response)
-        udp_session_a.close()
-        udp_session_b.close()
-        log.info("shutting child instance down")
-        envoy_process_2.terminate()
-        await envoy_process_2.wait()
+            log.info("waiting for new envoy instance to begin")
+            await _wait_for_envoy_epoch(1)
+            log.info("sending request to fast upstream")
+            fast_responses = ([_full_http_request(request_url) for i in range(PARALLEL_REQUESTS)] +
+                              [_full_http3_request(srequest_url) for i in range(PARALLEL_REQUESTS)])
+            for response in fast_responses:
+                self.assertEqual(
+                    await response,
+                    "fast instance",
+                    "new requests after hot restart begins should go to new cluster",
+                )
+
+            # UDP sessions established before hot restart stay on the old instance during drain,
+            # while new sessions are forwarded to the new instance.
+            log.info("checking udp sessions during drain")
+            udp_session_b = await UdpSession.open()
+            response = await udp_session_a.request(b"hello")
+            self.assertTrue(response.endswith(b" via-slow"), response)
+            response = await udp_session_b.request(b"hello")
+            self.assertTrue(response.endswith(b" via-fast"), response)
+
+            # Now release the slow request and make sure it still gets the
+            # response from the old instance.
+            log.info("releasing original slow request")
+            self.slow_upstream.release.set()
+            for response in slow_responses:
+                self.assertEqual(await response.line(), b"end\n")
+            for response in slow_responses:
+                self.assertEqual(await response.join(), 0)
+            log.info("waiting for parent instance to terminate")
+            await envoy_process_1.wait()
+            log.info("sending second request to fast upstream")
+            fast_responses = ([_full_http_request(request_url) for i in range(PARALLEL_REQUESTS)] +
+                              [_full_http3_request(srequest_url) for i in range(PARALLEL_REQUESTS)])
+            for response in fast_responses:
+                self.assertEqual(
+                    await response,
+                    "fast instance",
+                    "new requests after old instance terminates should go to new cluster",
+                )
+            # The new udp session is uninterrupted, while the old session re-establishes on
+            # the new instance.
+            response = await udp_session_b.request(b"hello")
+            self.assertTrue(response.endswith(b" via-fast"), response)
+            response = await udp_session_a.request(b"hello")
+            self.assertTrue(response.endswith(b" via-fast"), response)
+        finally:
+            self.slow_upstream.release.set()
+            if udp_session_b is not None:
+                udp_session_b.close()
+            if udp_session_a is not None:
+                udp_session_a.close()
+            log.info("cleaning up envoy instances")
+            await _terminate_process(envoy_process_2)
+            await _terminate_process(envoy_process_1)
 
 
 def generate_server_cert(
