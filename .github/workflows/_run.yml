@@ -315,7 +315,7 @@ jobs:
           ref: ${{ inputs.trusted && fromJSON(inputs.request).request.sha || fromJSON(inputs.request).request.ref }}
         fetch-merge-commit: false
         pr: ${{ fromJSON(inputs.request).request.pr }}
-        ssh-key: ${{ inputs.trusted && inputs.ssh-key || '' }}
+        ssh-key: ${{ inputs.trusted && secrets.ssh-key || '' }}
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
@@ -325,7 +325,7 @@ jobs:
       if: ${{ inputs.checkout-extra }}
       with:
         config: ${{ inputs.checkout-extra }}
-        ssh-key: ${{ inputs.trusted && inputs.ssh-key-extra || '' }}
+        ssh-key: ${{ inputs.trusted && secrets.ssh-key-extra || '' }}
 
     - name: Import GPG key
       uses: envoyproxy/toolshed/actions/gpg/import@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
