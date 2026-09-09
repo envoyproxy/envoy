@@ -391,130 +391,125 @@ void ClusterManagerImpl::applyPendingThreadLocalUpdates() {
       std::move(pending_thread_local_actions_));
   pending_thread_local_actions_.clear();
 
-  tls_.runOnAllThreads(
-      [pending_actions](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-        ASSERT(cluster_manager.has_value(), // LCOV_EXCL_LINE
-               "Expected the ThreadLocalClusterManager to be set during ClusterManagerImpl "
-               "creation."); // LCOV_EXCL_LINE
-        for (const auto& action : *pending_actions) {
-          if (action.type_ == PendingThreadLocalAction::Type::Removal) {
-            const std::string& cluster_name = action.removal_cluster_name_;
-            ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
+  tls_.runOnAllThreads([pending_actions](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    ASSERT(cluster_manager.has_value(), // LCOV_EXCL_LINE
+           "Expected the ThreadLocalClusterManager to be set during ClusterManagerImpl "
+           "creation."); // LCOV_EXCL_LINE
+    for (const auto& action : *pending_actions) {
+      if (action.type_ == PendingThreadLocalAction::Type::Removal) {
+        const std::string& cluster_name = action.removal_cluster_name_;
+        ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
+        for (auto cb_it = cluster_manager->update_callbacks_.begin();
+             cb_it != cluster_manager->update_callbacks_.end();) {
+          auto curr_cb_it = cb_it;
+          ++cb_it;
+          (*curr_cb_it)->onClusterRemoval(cluster_name);
+        }
+        cluster_manager->thread_local_clusters_.erase(cluster_name);
+        cluster_manager->thread_local_deferred_clusters_.erase(cluster_name);
+        cluster_manager->local_stats_.clusters_inflated_.set(
+            cluster_manager->thread_local_clusters_.size());
+      } else {
+        const auto& info = action.info_;
+        const auto& params = action.params_;
+        const bool add_or_update_cluster = action.add_or_update_cluster_;
+        const auto& load_balancer_factory = action.load_balancer_factory_;
+        const auto& map = action.host_map_;
+        const auto& cluster_initialization_object = action.cluster_initialization_object_;
+        const UnitFloat drop_overload = action.drop_overload_;
+        const auto& drop_category = action.drop_category_;
+        const bool enable_batch_aware_update = action.enable_batch_aware_update_;
+
+        if (const bool defer_unused_clusters =
+                cluster_initialization_object != nullptr &&
+                !cluster_manager->thread_local_clusters_.contains(info->name()) &&
+                !Envoy::Thread::MainThread::isMainThread();
+            defer_unused_clusters) {
+          ENVOY_LOG(debug, "Deferring add or update for TLS cluster {}", info->name());
+          cluster_manager->thread_local_deferred_clusters_[info->name()] =
+              cluster_initialization_object;
+
+          // For deferred clusters, construct a command closure that will lazily
+          // initialize the cluster entry inline only when traffic first accesses it.
+          ThreadLocalClusterCommand command =
+              [&cluster_manager, cluster_name = info->name()]() -> ThreadLocalCluster& {
+            auto existing_cluster_entry =
+                cluster_manager->thread_local_clusters_.find(cluster_name);
+            if (existing_cluster_entry != cluster_manager->thread_local_clusters_.end()) {
+              return *existing_cluster_entry->second;
+            }
+            auto* cluster_entry = cluster_manager->initializeClusterInlineIfExists(cluster_name);
+            ASSERT(cluster_entry != nullptr,
+                   "Deferred clusters initiailization should not fail."); // LCOV_EXCL_LINE
+            return *cluster_entry;
+          };
+          // Notify registered callbacks that the cluster is available via deferred command.
+          for (auto cb_it = cluster_manager->update_callbacks_.begin();
+               cb_it != cluster_manager->update_callbacks_.end();) {
+            auto curr_cb_it = cb_it;
+            ++cb_it;
+            (*curr_cb_it)->onClusterAddOrUpdate(info->name(), command);
+          }
+        } else {
+          ThreadLocalClusterManagerImpl::ClusterEntry* new_cluster = nullptr;
+          if (add_or_update_cluster) {
+            if (cluster_manager->thread_local_clusters_.contains(info->name())) {
+              ENVOY_LOG(debug, "updating TLS cluster {}", info->name());
+            } else {
+              ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
+            }
+
+            // Eagerly instantiate the thread-local cluster entry on this worker.
+            new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(*cluster_manager, info,
+                                                                          load_balancer_factory);
+            cluster_manager->thread_local_clusters_[info->name()].reset(new_cluster);
+            cluster_manager->local_stats_.clusters_inflated_.set(
+                cluster_manager->thread_local_clusters_.size());
+          }
+
+          if (cluster_manager->thread_local_clusters_[info->name()]) {
+            cluster_manager->thread_local_clusters_[info->name()]->setDropOverload(drop_overload);
+            cluster_manager->thread_local_clusters_[info->name()]->setDropCategory(drop_category);
+          }
+          if (enable_batch_aware_update) {
+            // Apply all per-priority host updates simultaneously in a single call to
+            // updateHosts(), preventing multiple intermediate load balancer rebuilds.
+            std::vector<std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>
+                updates;
+            updates.reserve(params.per_priority_update_params_.size());
+            for (const auto& per_priority : params.per_priority_update_params_) {
+              updates.emplace_back(per_priority);
+            }
+            cluster_manager->thread_local_clusters_[info->name()]->updateHosts(updates, map);
+          } else {
+            // Fallback path: update each priority sequentially when batch-aware update is
+            // disabled.
+            for (const auto& per_priority : params.per_priority_update_params_) {
+              cluster_manager->updateClusterMembership(
+                  info->name(), per_priority.priority_, per_priority.update_hosts_params_,
+                  per_priority.locality_weights_, per_priority.hosts_added_,
+                  per_priority.hosts_removed_, per_priority.weighted_priority_health_,
+                  per_priority.overprovisioning_factor_, map);
+            }
+          }
+
+          if (new_cluster != nullptr) {
+            // Non-deferred cluster: notify registered callbacks with command returning the
+            // eager cluster.
+            ThreadLocalClusterCommand command = [&new_cluster]() -> ThreadLocalCluster& {
+              return *new_cluster;
+            };
             for (auto cb_it = cluster_manager->update_callbacks_.begin();
                  cb_it != cluster_manager->update_callbacks_.end();) {
               auto curr_cb_it = cb_it;
               ++cb_it;
-              (*curr_cb_it)->onClusterRemoval(cluster_name);
-            }
-            cluster_manager->thread_local_clusters_.erase(cluster_name);
-            cluster_manager->thread_local_deferred_clusters_.erase(cluster_name);
-            cluster_manager->local_stats_.clusters_inflated_.set(
-                cluster_manager->thread_local_clusters_.size());
-          } else {
-            const auto& info = action.info_;
-            const auto& params = action.params_;
-            const bool add_or_update_cluster = action.add_or_update_cluster_;
-            const auto& load_balancer_factory = action.load_balancer_factory_;
-            const auto& map = action.host_map_;
-            const auto& cluster_initialization_object = action.cluster_initialization_object_;
-            const UnitFloat drop_overload = action.drop_overload_;
-            const auto& drop_category = action.drop_category_;
-            const bool enable_batch_aware_update = action.enable_batch_aware_update_;
-
-            if (const bool defer_unused_clusters =
-                    cluster_initialization_object != nullptr &&
-                    !cluster_manager->thread_local_clusters_.contains(info->name()) &&
-                    !Envoy::Thread::MainThread::isMainThread();
-                defer_unused_clusters) {
-              ENVOY_LOG(debug, "Deferring add or update for TLS cluster {}", info->name());
-              cluster_manager->thread_local_deferred_clusters_[info->name()] =
-                  cluster_initialization_object;
-
-              // For deferred clusters, construct a command closure that will lazily
-              // initialize the cluster entry inline only when traffic first accesses it.
-              ThreadLocalClusterCommand command =
-                  [&cluster_manager, cluster_name = info->name()]() -> ThreadLocalCluster& {
-                auto existing_cluster_entry =
-                    cluster_manager->thread_local_clusters_.find(cluster_name);
-                if (existing_cluster_entry != cluster_manager->thread_local_clusters_.end()) {
-                  return *existing_cluster_entry->second;
-                }
-                auto* cluster_entry =
-                    cluster_manager->initializeClusterInlineIfExists(cluster_name);
-                ASSERT(cluster_entry != nullptr,
-                       "Deferred clusters initiailization should not fail."); // LCOV_EXCL_LINE
-                return *cluster_entry;
-              };
-              // Notify registered callbacks that the cluster is available via deferred command.
-              for (auto cb_it = cluster_manager->update_callbacks_.begin();
-                   cb_it != cluster_manager->update_callbacks_.end();) {
-                auto curr_cb_it = cb_it;
-                ++cb_it;
-                (*curr_cb_it)->onClusterAddOrUpdate(info->name(), command);
-              }
-            } else {
-              ThreadLocalClusterManagerImpl::ClusterEntry* new_cluster = nullptr;
-              if (add_or_update_cluster) {
-                if (cluster_manager->thread_local_clusters_.contains(info->name())) {
-                  ENVOY_LOG(debug, "updating TLS cluster {}", info->name());
-                } else {
-                  ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
-                }
-
-                // Eagerly instantiate the thread-local cluster entry on this worker.
-                new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
-                    *cluster_manager, info, load_balancer_factory);
-                cluster_manager->thread_local_clusters_[info->name()].reset(new_cluster);
-                cluster_manager->local_stats_.clusters_inflated_.set(
-                    cluster_manager->thread_local_clusters_.size());
-              }
-
-              if (cluster_manager->thread_local_clusters_[info->name()]) {
-                cluster_manager->thread_local_clusters_[info->name()]->setDropOverload(
-                    drop_overload);
-                cluster_manager->thread_local_clusters_[info->name()]->setDropCategory(
-                    drop_category);
-              }
-              if (enable_batch_aware_update) {
-                // Apply all per-priority host updates simultaneously in a single call to
-                // updateHosts(), preventing multiple intermediate load balancer rebuilds.
-                std::vector<
-                    std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>
-                    updates;
-                updates.reserve(params.per_priority_update_params_.size());
-                for (const auto& per_priority : params.per_priority_update_params_) {
-                  updates.emplace_back(per_priority);
-                }
-                cluster_manager->thread_local_clusters_[info->name()]->updateHosts(updates, map);
-              } else {
-                // Fallback path: update each priority sequentially when batch-aware update is
-                // disabled.
-                for (const auto& per_priority : params.per_priority_update_params_) {
-                  cluster_manager->updateClusterMembership(
-                      info->name(), per_priority.priority_, per_priority.update_hosts_params_,
-                      per_priority.locality_weights_, per_priority.hosts_added_,
-                      per_priority.hosts_removed_, per_priority.weighted_priority_health_,
-                      per_priority.overprovisioning_factor_, map);
-                }
-              }
-
-              if (new_cluster != nullptr) {
-                // Non-deferred cluster: notify registered callbacks with command returning the
-                // eager cluster.
-                ThreadLocalClusterCommand command = [&new_cluster]() -> ThreadLocalCluster& {
-                  return *new_cluster;
-                };
-                for (auto cb_it = cluster_manager->update_callbacks_.begin();
-                     cb_it != cluster_manager->update_callbacks_.end();) {
-                  auto curr_cb_it = cb_it;
-                  ++cb_it;
-                  (*curr_cb_it)->onClusterAddOrUpdate(info->name(), command);
-                }
-              }
+              (*curr_cb_it)->onClusterAddOrUpdate(info->name(), command);
             }
           }
         }
-      });
+      }
+    }
+  });
 
   // If ADS mux startup was deferred because an RAII batch update was active when the ADS
   // cluster finished initializing, start it now that all accumulated thread-local cluster
