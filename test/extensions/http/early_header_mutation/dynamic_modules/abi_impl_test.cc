@@ -177,8 +177,17 @@ TEST_F(EarlyHeaderMutationAbiImplTest, GetAttributeStringUnsetProtocol) {
 }
 
 TEST_F(EarlyHeaderMutationAbiImplTest, GetAttributeIntConnectionId) {
+  stream_info_.downstream_connection_info_provider_->setConnectionID(42);
   uint64_t value = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_early_header_mutation_get_attribute_int(
+  ASSERT_TRUE(envoy_dynamic_module_callback_early_header_mutation_get_attribute_int(
+      ptr(), envoy_dynamic_module_type_attribute_id_ConnectionId, &value));
+  EXPECT_EQ(42u, value);
+}
+
+// Without a connection ID on the provider the getter reports absence rather than a default value.
+TEST_F(EarlyHeaderMutationAbiImplTest, GetAttributeIntConnectionIdUnset) {
+  uint64_t value = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_early_header_mutation_get_attribute_int(
       ptr(), envoy_dynamic_module_type_attribute_id_ConnectionId, &value));
 }
 
