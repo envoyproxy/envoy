@@ -2,7 +2,6 @@
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
-#include "envoy/singleton/manager.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
@@ -27,9 +26,6 @@
 
 namespace Envoy {
 namespace Server {
-
-SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager);
-
 namespace FilterChain {
 
 // Return a fake address for use when either the source or destination is unix domain socket.

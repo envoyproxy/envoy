@@ -13,6 +13,7 @@ namespace ContentParsers {
 namespace Json {
 namespace {
 
+using testing::HasSubstr;
 using ProtoConfig = envoy::extensions::content_parsers::json::v3::JsonContentParser;
 
 class JsonContentParserTest : public testing::Test {
@@ -158,7 +159,7 @@ rules:
   EXPECT_FALSE(result.error_message.has_value());
   EXPECT_EQ(result.immediate_actions.size(), 1);
   EXPECT_TRUE(result.immediate_actions[0].value->has_string_value());
-  EXPECT_NE(result.immediate_actions[0].value->string_value().find("tokens"), std::string::npos);
+  EXPECT_THAT(result.immediate_actions[0].value->string_value(), HasSubstr("tokens"));
 }
 
 TEST_F(JsonContentParserTest, StringValueType) {

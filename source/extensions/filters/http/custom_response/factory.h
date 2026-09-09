@@ -14,14 +14,11 @@ namespace CustomResponse {
 inline constexpr absl::string_view FilterName = "envoy.filters.http.custom_response";
 
 class CustomResponseFilterFactory
-    : public Common::ExceptionFreeFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::custom_response::v3::CustomResponse>,
       public Logger::Loggable<Logger::Id::filter> {
 public:
-  CustomResponseFilterFactory() : ExceptionFreeFactoryBase(std::string(FilterName)) {}
-  absl::StatusOr<::Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+  CustomResponseFilterFactory() : UnifiedFactoryBase(std::string(FilterName)) {}
   absl::StatusOr<::Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
       Server::Configuration::ServerFactoryContext& context,

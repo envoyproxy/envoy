@@ -3,9 +3,12 @@
 #include "source/extensions/filters/http/basic_auth/basic_auth_filter.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
 
 namespace Envoy {
 namespace Extensions {
@@ -80,7 +83,7 @@ TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, true));
 
   ASSERT_TRUE(captured_metadata.fields().contains("username"));
-  EXPECT_EQ("user1", captured_metadata.fields().at("username").string_value());
+  EXPECT_THAT(captured_metadata.fields(), Contains(IsStructString("username", "user1")));
 }
 
 TEST_F(FilterTest, BasicAuthDoesNotSetDynamicMetadataByDefault) {
@@ -441,7 +444,7 @@ TEST_F(AllowMissingFilterTest, SuccessSetsDynamicMetadata) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   ASSERT_TRUE(captured_metadata.fields().contains("username"));
-  EXPECT_EQ("user1", captured_metadata.fields().at("username").string_value());
+  EXPECT_THAT(captured_metadata.fields(), Contains(IsStructString("username", "user1")));
 }
 
 TEST_F(AllowMissingFilterTest, PassThroughDoesNotSetDynamicMetadata) {

@@ -42,6 +42,10 @@ using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
 
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -1104,9 +1108,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
   EXPECT_EQ(host_address_map[host2->address()->asString()], host2);
-  EXPECT_EQ(clientMap().size(), 2);
-  EXPECT_TRUE(clientMap().contains(host1));
-  EXPECT_TRUE(clientMap().contains(host2));
+  EXPECT_THAT(clientMap(), UnorderedElementsAre(Key(host1), Key(host2)));
   void* host1_active_client = clientMap(host1);
   EXPECT_EQ(createdViaRedirectHosts().size(), 2);
   EXPECT_EQ(clientsToDrain().size(), 0);
@@ -1203,9 +1205,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
   EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
   EXPECT_EQ(host_address_map[host2->address()->asString()], host2);
-  EXPECT_EQ(clientMap().size(), 2);
-  EXPECT_TRUE(clientMap().contains(host1));
-  EXPECT_TRUE(clientMap().contains(host2));
+  EXPECT_THAT(clientMap(), UnorderedElementsAre(Key(host1), Key(host2)));
   EXPECT_EQ(createdViaRedirectHosts().size(), 2);
   EXPECT_EQ(clientsToDrain().size(), 0);
   EXPECT_EQ(drainTimer()->enabled(), false);
@@ -1281,9 +1281,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
   EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
   EXPECT_EQ(host_address_map[host2->address()->asString()], host2);
-  EXPECT_EQ(clientMap().size(), 2);
-  EXPECT_TRUE(clientMap().contains(host1));
-  EXPECT_TRUE(clientMap().contains(host2));
+  EXPECT_THAT(clientMap(), UnorderedElementsAre(Key(host1), Key(host2)));
   EXPECT_EQ(createdViaRedirectHosts().size(), 2);
   EXPECT_EQ(clientsToDrain().size(), 0);
   EXPECT_EQ(drainTimer()->enabled(), false);

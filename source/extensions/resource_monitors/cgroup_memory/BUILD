@@ -26,11 +26,9 @@ envoy_cc_library(
     hdrs = ["cgroup_memory_stats_reader.h"],
     deps = [
         ":cgroup_memory_paths",
-        "//envoy/common:exception_lib",
         "//envoy/filesystem:filesystem_interface",
-        "//source/common/common:assert_lib",
         "//source/common/common:fmt_lib",
-        "//source/common/common:thread_lib",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
     ],
 )
@@ -42,11 +40,7 @@ envoy_cc_library(
     deps = [
         ":cgroup_memory_stats_reader",
         "//envoy/common:exception_lib",
-        "//envoy/filesystem:filesystem_interface",
-        "//envoy/server:resource_monitor_config_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:fmt_lib",
-        "//source/common/common:thread_lib",
+        "//envoy/server:resource_monitor_interface",
         "@envoy_api//envoy/extensions/resource_monitors/cgroup_memory/v3:pkg_cc_proto",
     ],
 )
@@ -57,6 +51,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":cgroup_memory_monitor",
+        ":cgroup_memory_stats_reader",
         "//envoy/registry",
         "//source/common/common:assert_lib",
         "//source/extensions/resource_monitors/common:factory_base_lib",

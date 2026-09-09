@@ -103,6 +103,52 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// An empty-requires rule (the documented /healthz exemption) must still strip configured
+// payload and claim headers so a client cannot spoof them on the bypass path.
+TEST_P(LocalJwksIntegrationTest, ExemptPathSanitizesClaimHeaders) {
+  const std::string config = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    audiences:
+    - example_service
+    forward_payload_header: sec-istio-auth-userinfo
+    claim_to_headers:
+    - header_name: x-jwt-claim-sub
+      claim_name: sub
+rules:
+- match:
+    prefix: /healthz
+- match:
+    prefix: /
+  requires:
+    provider_name: example_provider
+)";
+  config_helper_.prependFilter(getAuthFilterConfig(config, true, false));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/healthz"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"sec-istio-auth-userinfo", "spoofed-payload"},
+      {"x-jwt-claim-sub", "spoofed-sub"},
+  });
+
+  waitForNextUpstreamRequest();
+  EXPECT_TRUE(
+      upstream_request_->headers().get(Http::LowerCaseString("sec-istio-auth-userinfo")).empty());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-jwt-claim-sub")).empty());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // With local Jwks, this test verifies a request is rejected with an expired JWT.
 TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
   config_helper_.prependFilter(getFilterConfig(true, false));
@@ -781,6 +827,34 @@ TEST_P(PerRouteIntegrationTest, PerRouteConfigDisabled) {
   });
 
   waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Per-route disabled still strips configured payload/claim headers so a client cannot spoof them.
+TEST_P(PerRouteIntegrationTest, PerRouteConfigDisabledSanitizesClaimHeaders) {
+  PerRouteConfig per_route;
+  per_route.set_disabled(true);
+  setup(ExampleConfig, per_route);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"sec-istio-auth-userinfo", "spoofed-payload"},
+      {"x-jwt-claim-sub", "spoofed-sub"},
+  });
+
+  waitForNextUpstreamRequest();
+  EXPECT_TRUE(
+      upstream_request_->headers().get(Http::LowerCaseString("sec-istio-auth-userinfo")).empty());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-jwt-claim-sub")).empty());
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   ASSERT_TRUE(response->waitForEndStream());

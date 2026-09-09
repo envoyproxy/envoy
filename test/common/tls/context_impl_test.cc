@@ -24,6 +24,7 @@
 #include "test/common/tls/test_data/no_san_cert_info.h"
 #include "test/common/tls/test_data/san_dns3_cert_info.h"
 #include "test/common/tls/test_data/san_ip_cert_info.h"
+#include "test/common/tls/test_data/selfsigned_cert_info.h"
 #include "test/common/tls/test_data/unittest_cert_info.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -1648,9 +1649,8 @@ TEST_F(ServerContextConfigImplTest, TlsCertificateNonEmpty) {
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   auto server_context_config =
       *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
-  ContextManagerImpl manager(server_factory_context_);
-  Stats::IsolatedStoreImpl store;
-  EXPECT_EQ(manager.createSslServerContext(*store.rootScope(), *server_context_config, nullptr)
+  ContextManagerImpl manager(factory_context_.server_context_);
+  EXPECT_EQ(manager.createSslServerContext(*store_.rootScope(), *server_context_config, nullptr)
                 .status()
                 .message(),
             "Server TlsCertificates must have a certificate specified");
@@ -1752,12 +1752,11 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProviderFallbac
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()->add_tls_certificates();
-  Stats::IsolatedStoreImpl store;
   NiceMock<Ssl::MockContextManager> context_manager;
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  ContextManagerImpl manager(server_factory_context_);
+  ContextManagerImpl manager(factory_context_.server_context_);
   EXPECT_CALL(factory_context_.server_context_, sslContextManager())
       .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
@@ -1780,7 +1779,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   auto server_context_config =
       *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
-  EXPECT_EQ(manager.createSslServerContext(*store.rootScope(), *server_context_config, nullptr)
+  EXPECT_EQ(manager.createSslServerContext(*store_.rootScope(), *server_context_config, nullptr)
                 .status()
                 .message(),
             "Failed to get BoringSSL private key method from provider");
@@ -2127,9 +2126,13 @@ common_tls_context:
   std::string expected_metric_name =
       absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
 
+  auto cert_expiry =
+      TestUtility::parseTime(TEST_SELFSIGNED_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  uint64_t expected_expiry = absl::ToUnixSeconds(cert_expiry);
+
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), 1787339648);
+  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
 }
 
 TEST_F(CertificateExpirationMetricsTest, ClientCertificateExpirationMetrics) {
@@ -2160,9 +2163,177 @@ common_tls_context:
   std::string expected_metric_name =
       absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
 
+  auto cert_expiry =
+      TestUtility::parseTime(TEST_SELFSIGNED_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  uint64_t expected_expiry = absl::ToUnixSeconds(cert_expiry);
+
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), 1787339648);
+  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
+}
+
+// Certificate-level min > context max produces an effective range that can never negotiate.
+// This is caught at server context construction.
+TEST_F(SslContextImplTest, CertMinVersionExceedsContextMaxRejected) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_3
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  auto ctx = manager_.createSslServerContext(*store_.rootScope(), *cfg, nullptr);
+  EXPECT_FALSE(ctx.ok());
+  EXPECT_THAT(ctx.status().message(), testing::HasSubstr("effective min protocol version exceeds"));
+}
+
+// Certificate-level max < context min produces an effective range that can never negotiate.
+TEST_F(SslContextImplTest, CertMaxVersionBelowContextMinRejected) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+      tls_params:
+        tls_maximum_protocol_version: TLSv1_2
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  auto ctx = manager_.createSslServerContext(*store_.rootScope(), *cfg, nullptr);
+  EXPECT_FALSE(ctx.ok());
+  EXPECT_THAT(ctx.status().message(), testing::HasSubstr("effective min protocol version exceeds"));
+}
+
+// Invalid certificate-level cipher is rejected at server context construction, not at config parse
+// time. This also confirms that an invalid cipher on a client certificate tls_params is not
+// rejected (the field is ignored before validation runs).
+TEST_F(SslContextImplTest, InvalidCertLevelCipherRejectedAtContextCreation) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+      tls_params:
+        cipher_suites: "BOGUS-CIPHER"
+        ecdh_curves: "P-256"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  auto ctx = manager_.createSslServerContext(*store_.rootScope(), *cfg, nullptr);
+  EXPECT_FALSE(ctx.ok());
+  EXPECT_THAT(ctx.status().message(), testing::HasSubstr("Failed to initialize cipher suites"));
+}
+
+TEST_F(SslContextImplTest, InvalidCertLevelEcdhCurveRejectedAtContextCreation) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+      tls_params:
+        cipher_suites: "ECDHE-RSA-AES128-GCM-SHA256"
+        ecdh_curves: "BOGUS-CURVE"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  auto ctx = manager_.createSslServerContext(*store_.rootScope(), *cfg, nullptr);
+  EXPECT_FALSE(ctx.ok());
+  EXPECT_THAT(ctx.status().message(), testing::HasSubstr("Failed to initialize ECDH curves"));
+}
+
+TEST_F(SslContextImplTest, InvalidCertLevelSigAlgRejectedAtContextCreation) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+      tls_params:
+        cipher_suites: "ECDHE-RSA-AES128-GCM-SHA256"
+        ecdh_curves: "P-256"
+        signature_algorithms: "bogus_sigalg"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  auto ctx = manager_.createSslServerContext(*store_.rootScope(), *cfg, nullptr);
+  EXPECT_FALSE(ctx.ok());
+  EXPECT_THAT(ctx.status().message(),
+              testing::HasSubstr("Failed to initialize TLS signature algorithms"));
+}
+
+// Invalid certificate-level cipher on a client certificate is accepted: tls_params on client
+// certs is cleared before validation runs, so invalid values do not reject the config.
+TEST_F(SslContextImplTest, InvalidCertLevelCipherOnClientCertAccepted) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+      tls_params:
+        cipher_suites: "BOGUS-CIPHER"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Envoy::Ssl::ClientContextSharedPtr client_ctx;
+  EXPECT_LOG_CONTAINS("warning", "tls_params on a client TlsCertificate is not supported",
+                      client_ctx = *manager_.createSslClientContext(*store_.rootScope(), *cfg));
+  auto cleanup = cleanUpHelper(client_ctx);
+}
+
+// tls_params on a client certificate is not supported — a warning is logged and the params are
+// cleared so context-level params are used instead.
+TEST_F(SslContextImplTest, ClientCertTlsParamsWarns) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+      tls_params:
+        cipher_suites: "ECDHE-RSA-AES128-GCM-SHA256"
+        ecdh_curves: "P-256"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Envoy::Ssl::ClientContextSharedPtr client_ctx;
+  EXPECT_LOG_CONTAINS("warning", "tls_params on a client TlsCertificate is not supported",
+                      client_ctx = *manager_.createSslClientContext(*store_.rootScope(), *cfg));
+  auto cleanup = cleanUpHelper(client_ctx);
 }
 
 } // namespace Tls

@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "gradient_controller_test",
     srcs = ["gradient_controller_test.cc"],
     extension_names = ["envoy.filters.http.adaptive_concurrency"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",

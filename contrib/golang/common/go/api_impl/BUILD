@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -10,16 +10,16 @@ go_library(
     ],
     cgo = True,
     clinkopts = select({
-        "@io_bazel_rules_go//go/platform:android": [
+        "@rules_go//go/platform:android": [
             "-Wl,-unresolved-symbols=ignore-all",
         ],
-        "@io_bazel_rules_go//go/platform:darwin": [
+        "@rules_go//go/platform:darwin": [
             "-Wl,-undefined,dynamic_lookup",
         ],
-        "@io_bazel_rules_go//go/platform:ios": [
+        "@rules_go//go/platform:ios": [
             "-Wl,-undefined,dynamic_lookup",
         ],
-        "@io_bazel_rules_go//go/platform:linux": [
+        "@rules_go//go/platform:linux": [
             "-Wl,-unresolved-symbols=ignore-all",
         ],
         "//conditions:default": [],

@@ -51,6 +51,10 @@ using testing::Return;
 using testing::StrictMock;
 using testing::WhenDynamicCastTo;
 
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -537,7 +541,7 @@ tracing:
   std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
   const Tracing::CustomTagMap& custom_tag_map = config.tracingConfig()->custom_tags_;
   for (const std::string& custom_tag : custom_tags) {
-    EXPECT_NE(custom_tag_map.find(custom_tag), custom_tag_map.end());
+    EXPECT_THAT(custom_tag_map, Contains(Key(custom_tag)));
   }
 }
 
@@ -4093,14 +4097,10 @@ http_filters:
   EXPECT_OK(creation_status_);
 
   const auto& https_ports = config.httpsDestinationPorts();
-  EXPECT_EQ(2, https_ports.size());
-  EXPECT_TRUE(https_ports.contains(443));
-  EXPECT_TRUE(https_ports.contains(8443));
+  EXPECT_THAT(https_ports, UnorderedElementsAre(443, 8443));
 
   const auto& http_ports = config.httpDestinationPorts();
-  EXPECT_EQ(2, http_ports.size());
-  EXPECT_TRUE(http_ports.contains(80));
-  EXPECT_TRUE(http_ports.contains(8080));
+  EXPECT_THAT(http_ports, UnorderedElementsAre(80, 8080));
 }
 
 // Test empty forward_proto_config is valid (feature disabled).

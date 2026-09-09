@@ -23,9 +23,9 @@ WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_con
       const envoy::extensions::access_loggers::wasm::v3::WasmAccessLog&>(
       proto_config, context.messageValidationVisitor());
 
-  auto plugin_config = std::make_unique<Common::Wasm::PluginConfig>(
-      config.config(), context.serverFactoryContext(), context.scope(), context.initManager(),
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, false);
+  auto plugin_config =
+      std::make_unique<Common::Wasm::PluginConfig>(config.config(), context.serverFactoryContext(),
+                                                   context.scope(), context.initManager(), false);
   auto access_log = std::make_shared<WasmAccessLog>(std::move(plugin_config), std::move(filter));
 
   context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(

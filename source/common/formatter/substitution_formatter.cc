@@ -662,15 +662,20 @@ std::string OmitEmptyJsonFormatterImpl::format(const Context& context,
                                                const StreamInfo::StreamInfo& info) const {
   std::string log_line;
   log_line.reserve(2048);
+  formatTo(log_line, context, info);
+  return log_line;
+}
+
+void OmitEmptyJsonFormatterImpl::formatTo(std::string& sink, const Context& context,
+                                          const StreamInfo::StreamInfo& info) const {
   std::string scratch; // Helper to hold the formatted value of a single provider.
-  JsonStringSerializer serializer(log_line);
+  JsonStringSerializer serializer(sink);
   if (!serializeJsonFormatMapNode(*root_, context, info, serializer, scratch)) {
     // Every field was omitted; the root object is always emitted as an empty object.
     serializer.addMapBeginDelimiter();
     serializer.addMapEndDelimiter();
   }
-  log_line.push_back('\n');
-  return log_line;
+  sink.push_back('\n');
 }
 
 } // namespace Formatter

@@ -32,6 +32,8 @@ envoy_cc_test(
     size = "medium",
     srcs = ["reverse_tunnel_acceptor_extension_test.cc"],
     deps = [
+        "//source/common/network:socket_interface_lib",
+        "//source/common/network:utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/reverse_tunnel_reporting_service:reporter_mocks",

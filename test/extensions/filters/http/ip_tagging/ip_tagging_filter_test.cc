@@ -869,9 +869,9 @@ TEST_P(NestedPrefixesFilterTest, NestedPrefixes) {
 
   // There is no guarantee for the order tags are returned by the LC-Trie.
   const std::string header_tag_data = request_headers.get_(Http::Headers::get().EnvoyIpTags.get());
-  EXPECT_NE(std::string::npos, header_tag_data.find("test"));
-  EXPECT_NE(std::string::npos, header_tag_data.find("internal_request"));
-  EXPECT_NE(std::string::npos, header_tag_data.find("duplicate_request"));
+  EXPECT_THAT(header_tag_data, HasSubstr("test"));
+  EXPECT_THAT(header_tag_data, HasSubstr("internal_request"));
+  EXPECT_THAT(header_tag_data, HasSubstr("duplicate_request"));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   Http::TestRequestTrailerMapImpl request_trailers;

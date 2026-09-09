@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <memory>
 #include <optional>
 #include <string>
@@ -1791,7 +1792,7 @@ uint64_t Filter::getMergedConfigId() {
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
     Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context)
+    Server::Configuration::GenericFactoryContext& context)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       concurrency_(context.serverFactoryContext().options().concurrency()),
@@ -1799,7 +1800,7 @@ FilterConfig::FilterConfig(
       metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))),
       secret_reader_(std::make_shared<SecretReader>(proto_config, context)) {};
 
-void FilterConfig::newGoPluginConfig() {
+absl::Status FilterConfig::newGoPluginConfig() {
   ENVOY_LOG(debug, "initializing golang filter config");
   std::string buf;
   auto res = plugin_config_.SerializeToString(&buf);
@@ -1818,11 +1819,12 @@ void FilterConfig::newGoPluginConfig() {
   config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
 
   if (config_id_ == 0) {
-    throw EnvoyException(
-        fmt::format("golang filter failed to parse plugin config: {} {}", so_id_, so_path_));
+    return absl::InvalidArgumentError(
+        std::format("golang filter failed to parse plugin config: {} {}", so_id_, so_path_));
   }
 
   ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
+  return absl::OkStatus();
 }
 
 FilterConfig::~FilterConfig() {
@@ -1975,7 +1977,7 @@ RoutePluginConfig::RoutePluginConfig(
   config_id_ = getConfigId();
   if (config_id_ == 0) {
     throw EnvoyException(
-        fmt::format("golang filter failed to parse plugin config: {}", plugin_name_));
+        std::format("golang filter failed to parse plugin config: {}", plugin_name_));
   }
   ENVOY_LOG(debug, "golang filter new per route '{}' plugin config, id: {}", plugin_name_,
             config_id_);
@@ -2068,7 +2070,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 
 SecretReader::SecretReader(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::GenericFactoryContext& context) {
   if (proto_config.generic_secrets_size() > 0) {
     auto& server_context = context.serverFactoryContext();
     auto& init_manager = context.initManager();

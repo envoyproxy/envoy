@@ -197,7 +197,8 @@ public:
 
     context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
         server_factory_context_);
-    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
   }
 
   std::unique_ptr<RawConnectionDriver> createConnectionAndWrite(const std::string& alpn,
@@ -467,7 +468,8 @@ public:
 
     context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
         server_factory_context_);
-    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
     address_ = Ssl::getSslAddress(version_, lookupPort("http"));
   }
 

@@ -1,0 +1,44 @@
+namespace google.api.expr;
+
+table Entry {
+  f_string:string;
+  f_int:int;
+}
+
+table IndexedEntry {
+  f_string:string (key);
+  f_int:int;
+}
+
+table TestBuffer {
+  f_byte:byte;
+  f_ubyte:ubyte;
+  f_short:short = 150;
+  f_ushort:ushort;
+  f_int:int;
+  f_uint:uint;
+  f_long:long;
+  f_ulong:ulong;
+  f_float:float;
+  f_double:double;
+  f_bool:bool = true;
+  f_string:string;
+  f_obj:Entry;
+
+  r_byte:[byte];
+  r_ubyte:[ubyte];
+  r_short:[short];
+  r_ushort:[ushort];
+  r_int:[int];
+  r_uint:[uint];
+  r_long:[long];
+  r_ulong:[ulong];
+  r_float:[float];
+  r_double:[double];
+  r_bool:[bool];
+  r_string:[string];
+  r_obj:[Entry];
+  r_indexed:[IndexedEntry];
+}
+
+root_type TestBuffer;

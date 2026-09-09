@@ -23,19 +23,12 @@ absl::StatusOr<Http::FilterFactoryCb> McpRouterFilterConfigFactory::createFilter
 }
 
 absl::StatusOr<Http::FilterFactoryCb>
-McpRouterFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(proto_config, stats_prefix, context.serverFactoryContext(),
-                             context.scope());
-}
-
-absl::StatusOr<Http::FilterFactoryCb>
 McpRouterFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactory(proto_config, extra_context.stats_prefix, context, context.scope());
+  return createFilterFactory(proto_config, extra_context.stats_prefix, context,
+                             extra_context.scopeOr(context));
 }
 
 /**

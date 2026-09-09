@@ -195,6 +195,17 @@ TEST_P(ActiveUdpListenerTest, MultipleFiltersOnReceiveErrorStopIteration) {
   active_listener_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
 }
 
+// Drain notifications are broadcast to every listener the connection handler owns, so a UDP
+// listener receives them on any server drain or hot restart. They must be silent no-ops rather
+// than ENVOY_BUGs. See ListenerManagerImpl::onServerDrainStart().
+TEST_P(ActiveUdpListenerTest, DrainNotificationsAreNoOps) {
+  setup();
+
+  active_listener_->onListenerDrainStart(Network::ConnectionDrainEvent{});
+  const std::list<const Network::FilterChain*> filter_chains;
+  active_listener_->onFilterChainDrainStart(filter_chains, Network::ConnectionDrainEvent{});
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

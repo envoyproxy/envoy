@@ -1668,8 +1668,8 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
 // The `histograms_recorded_` guard ensures we only record once (only for headers, not trailers).
 void ConnectionImpl::recordHistogramsForStream(StreamImpl& stream) {
   if (record_http2_histograms_ && !stream.histograms_recorded_) {
-    uint64_t headers_size = stream.headers().byteSize();
-    uint64_t headers_count = stream.headers().size();
+    uint64_t headers_size = stream.headers().byteSize() + stream.discarded_host_header_size_;
+    uint64_t headers_count = stream.headers().size() + stream.discarded_host_header_count_;
     uint64_t headers_with_cookies_size = headers_size + stream.cookies_.size();
     uint64_t headers_with_cookies_count = headers_count + stream.cookie_count_;
     stats_.header_list_size_.recordValue(headers_with_cookies_size);
@@ -1711,21 +1711,25 @@ int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderStr
     stats_.cookies_total_bytes_too_large_.inc();
     return ERR_TEMPORAL_CALLBACK_FAILURE;
   }
-  uint64_t headers_size = stream->headers().byteSize();
-  uint64_t headers_count = stream->headers().size();
+  return checkHeaderLimits(*stream);
+}
+
+int ConnectionImpl::checkHeaderLimits(StreamImpl& stream) {
+  uint64_t headers_size = stream.headers().byteSize() + stream.discarded_host_header_size_;
+  uint64_t headers_count = stream.headers().size() + stream.discarded_host_header_count_;
 
   if (http2_include_cookies_in_limits_) {
-    headers_size += stream->cookies_.size();
-    headers_count += stream->cookie_count_;
+    headers_size += stream.cookies_.size();
+    headers_count += stream.cookie_count_;
   }
 
   if (headers_size > max_headers_kb_ * 1024) {
-    stream->setDetails(Http2ResponseCodeDetails::get().header_list_size_too_large);
+    stream.setDetails(Http2ResponseCodeDetails::get().header_list_size_too_large);
     stats_.header_list_size_too_large_.inc();
     return ERR_TEMPORAL_CALLBACK_FAILURE;
   }
   if (headers_count > max_headers_count_) {
-    stream->setDetails(Http2ResponseCodeDetails::get().too_many_headers);
+    stream.setDetails(Http2ResponseCodeDetails::get().too_many_headers);
     stats_.header_overflow_.inc();
     // This will cause the library to reset/close the stream.
     return ERR_TEMPORAL_CALLBACK_FAILURE;
@@ -2517,8 +2521,17 @@ int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
       // Check if there is already the :authority header
       const auto result = stream->headers().get(Http::Headers::get().Host);
       if (!result.empty()) {
-        // Discard the host header value
-        return 0;
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.http2_track_size_of_dropped_host_header")) {
+          // Discard the host header value but track its size for enforcing received header map
+          // limits.
+          stream->discarded_host_header_size_ += name.size() + value.size();
+          stream->discarded_host_header_count_++;
+          stream->bytes_meter_->addDecompressedHeaderBytesReceived(name.size() + value.size());
+          return checkHeaderLimits(*stream);
+        } else {
+          return 0;
+        }
       }
       // Otherwise use host value as :authority
     }

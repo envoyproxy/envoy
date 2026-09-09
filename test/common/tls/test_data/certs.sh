@@ -10,10 +10,10 @@ cd "$HERE" || exit 1
 trap cleanup EXIT
 
 cleanup() {
-    rm ./*csr
-    rm ./*srl
-    rm ./crl_*
-    rm ./intermediate_crl_*
+    rm -f ./*csr
+    rm -f ./*srl
+    rm -f ./crl_*
+    rm -f ./intermediate_crl_*
 }
 
 
@@ -133,16 +133,24 @@ generate_info_header() {
     } > "${1}_cert_info.h"
 }
 
-# $1=<certificate name> $2=<CA name> $3=[days]
+# $1=<certificate name> $2=<CA name> $3=[days] $4=[not_before] $5=[not_after]
 generate_x509_cert() {
-    local days extra_args=()
+    local days extra_req_args=() extra_x509_args=()
     days="${3:-${DEFAULT_VALIDITY_DAYS}}"
     if [[ -f "${1}_password.txt" ]]; then
-        extra_args=(-passin "file:${1}_password.txt")
+        extra_req_args+=(-passin "file:${1}_password.txt")
+        extra_x509_args+=(-passin "file:${1}_password.txt")
     fi
-    openssl req -new -key "${1}_key.pem" -out "${1}_cert.csr" -config "${1}_cert.cfg" -batch -sha256 "${extra_args[@]}"
-    openssl x509 -req -days "$days" -in "${1}_cert.csr" -sha256 -CA "${2}_cert.pem" -CAkey \
-            "${2}_key.pem" -CAcreateserial -out "${1}_cert.pem" -extensions v3_ca -extfile "${1}_cert.cfg" "${extra_args[@]}"
+    if [[ -n "$4" && -n "$5" ]]; then
+        extra_x509_args+=(-not_before "$4" -not_after "$5")
+    elif [[ "$days" -lt 0 ]]; then
+        extra_x509_args+=(-not_before 20200101000000Z -not_after 20210101000000Z)
+    else
+        extra_x509_args+=(-days "$days")
+    fi
+    openssl req -new -key "${1}_key.pem" -out "${1}_cert.csr" -config "${1}_cert.cfg" -batch -sha256 "${extra_req_args[@]}"
+    openssl x509 -req -in "${1}_cert.csr" -sha256 -CA "${2}_cert.pem" -CAkey \
+            "${2}_key.pem" -CAcreateserial -out "${1}_cert.pem" -extensions v3_ca -extfile "${1}_cert.cfg" "${extra_x509_args[@]}"
     generate_info_header "$1"
 }
 

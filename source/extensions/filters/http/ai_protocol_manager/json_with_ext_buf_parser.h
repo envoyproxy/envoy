@@ -47,10 +47,19 @@ public:
   // directly usable by filters, while conversation content goes to the buffer.
   static constexpr std::uint32_t kDefaultInlineStringThresholdBytes = 1024;
 
+  // Bounds DOM amplification: small scalars amplify input bytes by more than
+  // an order of magnitude in per-node overhead, so a byte cap on the source
+  // alone does not bound the heap. Generous for real payloads (an ordinary
+  // provider response is a few thousand nodes).
+  static constexpr std::uint32_t kDefaultMaxNodes = 1 << 18;
+
   struct Config {
     // A string whose decoded content exceeds this is recorded as a reference
     // instead of being materialized.
     std::uint32_t inline_string_threshold_bytes{kDefaultInlineStringThresholdBytes};
+    // Parsing fails once the document exceeds this many DOM nodes (scalars,
+    // containers, and external references alike).
+    std::uint32_t max_nodes{kDefaultMaxNodes};
   };
 
   explicit JsonWithExtBufParser(Config config);
@@ -98,6 +107,8 @@ private:
 
   nlohmann::json root_;
   bool root_set_{false};
+  // Nodes attached so far, checked against config_.max_nodes.
+  std::uint32_t node_count_{0};
   bool finished_{false};
   absl::Status status_;
 

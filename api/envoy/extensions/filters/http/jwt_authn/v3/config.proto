@@ -913,7 +913,9 @@ message JwtClaimToHeader {
   }
 
   // The HTTP header name to copy the claim to.
-  // The header name will be sanitized and replaced.
+  // The header name is sanitized from the request for every provider configured on the filter
+  // (including on paths that bypass JWT verification) and then replaced with the claim value when
+  // verification succeeds.
   string header_name = 1
       [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 

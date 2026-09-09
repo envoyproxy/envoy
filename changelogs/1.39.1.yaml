@@ -1,0 +1,139 @@
+date: August 27, 2026
+
+bug_fixes:
+- area: ext_authz
+  change: |
+    Fix: `CVE-2026-73547 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-87ph-jqwm-pg6r>`_
+
+    Fixed abnormal process termination when Envoy calls ext_authz service with requests without URI path
+    (i.e. CONNECT).
+- area: ext_authz
+  change: |
+    Fix: `CVE-2026-50572 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-q8wp-gf7q-m8cv>`_
+
+    Fixed UAF when ext_authz over HTTP causes request to be rejected.
+- area: ext_proc
+  change: |
+    Fixed multiple lifetime bugs in the external processing (``ext_proc``) filter and the underlying
+    gRPC async client that could lead to use-after-free or double delivery of callbacks. The gRPC
+    :ref:`async client <envoy_v3_api_msg_config.core.v3.GrpcService>` now holds an optional reference to
+    its stream callbacks and drops it once the stream is cleaned up or the owner detaches via
+    ``waitForRemoteCloseAndDelete()``, so a stream that outlives its callbacks (for example while awaiting
+    remote close) no longer invokes callbacks on freed memory. Re-entrant resets during stream
+    initialization are guarded so remote close is not notified (and the tracing span not finished) twice
+    when the cluster is missing or stream creation fails synchronously, and half-close/cleanup no longer
+    dereference a stream that was never established. The ``ext_proc`` ``ThreadLocalStreamManager`` and
+    ``ProcessorStreamImpl`` now close any still-open streams on destruction to avoid dangling references
+    into the underlying gRPC stream.
+- area: html
+  change: |
+    Fix: `CVE-2026-73546 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-pv9h-4fxf-7vrg>`_
+
+    Sanitize stat names before converting them to HTML.
+    The change is guarded by runtime guard ``envoy.reloadable_features.sanitize_html_stats_names``.
+- area: http2
+  change: |
+    Fix: `CVE-2026-73513 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-jjmm-fw8p-crpw>`_
+
+    Fixed abnormal process termination when Envoy receives trailers without the END_STREAM flag
+    over HTTP/2 protocol.
+- area: http2
+  change: |
+    Fixes `CVE-2026-73550 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-qgf6-qvhw-4hvh>`_
+
+    Account for the length of dropped ``Host`` headers in HTTP/2 request header map size and count limits. ``Host`` headers
+    are dropped when they match HTTP/2 ```:authority`` header.
+
+    This behavioral change can be reverted by setting the runtime
+    guard ``envoy.reloadable_features.http2_track_size_of_dropped_host_header`` to ``false``.
+- area: http3
+  change: |
+    Fix: `CVE-2026-73512 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-r6j2-mrm5-72mg>`_
+
+    Fixed UAF when Envoy receives specifically timed sequence of HTTP/3 frames.
+- area: http3
+  change: |
+    Fix: `CVE-2026-48521 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-5vff-j9p4-38j3>`_
+
+    Fixed abnormal process termination when Envoy is configured to automatically select a protocol with upstream
+    server based on ALPN and the server uses HTTP/3.
+- area: http
+  change: |
+    Fixed a request/response body data-loss bug in the HTTP filter manager. When a filter stopped
+    iteration on headers (for example a wasm filter with ``allow_on_headers_stop_iteration``, which maps
+    to a single-iteration stop rather than ``StopAllIterationAndWatermark``), resumed asynchronously, and
+    then on a subsequent body frame moved that frame into the filter-manager buffer via
+    ``addDecodedData()``/``addEncodedData()`` before returning ``Continue``, the now-empty frame was
+    forwarded down the chain and the buffered bytes were silently dropped. This corrupted large streamed
+    request bodies (for example one 16 KiB chunk lost when chained with an ``ext_proc`` filter in
+    ``FULL_DUPLEX_STREAMED`` mode). The just-buffered data is now forwarded instead of the empty frame.
+    This behavioral change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.filter_manager_forward_added_data_on_continue`` to ``false``.
+- area: http
+  change: |
+    Fix: `CVE-2026-73548 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-3vhp-c83q-jqc2>`_.
+
+    Fixed a vulnerability where payload sent before a generic HTTP upgrade was accepted could be
+    interpreted as a pipelined HTTP/1 request and poison a shared upstream connection. Generic upgrade
+    payload is now paused until the upstream accepts the upgrade. This change can be temporarily
+    reverted by setting ``envoy.reloadable_features.http_pause_generic_upgrade_request_body`` to
+    ``false``.
+- area: quic
+  change: |
+    Fix: `CVE-2026-73549 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-jp5f-qr64-c9vw>`_
+
+    Fixed a crash when handling scoped IPv6 addresses in QUIC client connection and Original Dst cluster.
+- area: safe_regex
+  change: |
+    Fix `CVE-2026-73552 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-23xh-2qxr-3xv8>`_
+
+    Switch safe_regex charset mode from UTF-8 to Latin1. HTTP headers are not UTF-8 encoded
+    and must use Latin1 charset for regex expressions.
+    This behavioral change can be temporarily reverted by setting runtime
+    guard ``envoy.reloadable_features.re2_use_latin1_mode`` to ``false``.
+- area: tls
+  change: |
+    Fixed a bug where OpenSSL was using glibc's allocator instead of tcmalloc. This
+    resulted in OpenSSL operating on a completely separate heap, defeating
+    tcmalloc's performance benefits on the TLS hot path and making all OpenSSL
+    allocations invisible to tcmalloc heap profiling and memory dumps.
+- area: tls
+  change: |
+    Fixed a memory leak in the OpenSSL compatibility layer where ``SSL_get0_peer_certificates()``
+    called ``SSL_get_peer_certificate()`` without freeing the returned reference. Each call leaked
+    one ``X509`` refcount, preventing the certificate and its sub-allocations from being freed when
+    the connection closed, causing unbounded memory growth in certain deployments.
+- area: url_normalization
+  change: |
+    Fixes `CVE-2026-73551 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-2w8w-rfw7-8gg4>`_
+
+    Strip URL path parameters from dot and dotdot segments (segments that start with ``/..;`` or ``/.;``). This allows
+    path canonicalization to interpret them correctly. Stripping of path parameters from dot and dotdot segments
+    occurs only if the ``normalize_path`` configuration option is enabled.
+
+    This behavioral change can be temporarily reverted by setting runtime
+    guard ``envoy.reloadable_features.strip_dotdot_segments_with_parameters`` to ``false``.
+- area: url_normalization
+  change: |
+    Fixes `CVE-2026-73511 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-m745-gh6x-349x>`_
+
+    Strip path parameters from individual path segments per https://datatracker.ietf.org/doc/html/rfc3986#section-3.3
+
+    This behavioral change can be temporarily reverted by setting runtime
+    guard ``envoy.reloadable_features.strip_path_parameters_per_segment`` to ``false``.
+
+minor_behavior_changes:
+- area: rbac
+  change: |
+    Fix: `CVE-2026-73553 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-77x5-xqjg-hprq>`_
+
+    RBAC path matching (via ``PathMatcher`` and ``UriTemplateMatcher``) now respects the route's
+    ``ignore_path_parameters_in_path_matching`` configuration. When enabled on a route, the RBAC filter
+    will strip path parameters (everything after a semicolon in each path segment, e.g., transforming
+    ``/admin;x=y/action;foo=bar`` to ``/admin/action``) before evaluating the path match. This ensures
+    path matching consistency between the Router and the RBAC filter, preventing authorization bypasses
+    where an attacker could append path parameters to bypass RBAC rules while still being routed to the
+    protected endpoint.
+
+    This behavioral change can be temporarily reverted by setting the runtime guard
+    ``envoy.reloadable_features.rbac_respect_ignore_path_parameters`` to ``false``.

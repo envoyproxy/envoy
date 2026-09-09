@@ -22,17 +22,11 @@ absl::StatusOr<Http::FilterFactoryCb> TransformFactoryConfig::createFilterFactor
   };
 }
 
-absl::StatusOr<Http::FilterFactoryCb> TransformFactoryConfig::createFilterFactoryFromProtoTyped(
-    const ProtoConfig& proto_config, const std::string& stat_prefix,
-    Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(proto_config, stat_prefix, context.serverFactoryContext(),
-                             context.scope());
-}
-
 absl::StatusOr<Http::FilterFactoryCb> TransformFactoryConfig::createHttpFilterFactoryFromProtoTyped(
     const ProtoConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactory(proto_config, extra_context.stats_prefix, context, context.scope());
+  return createFilterFactory(proto_config, extra_context.stats_prefix, context,
+                             extra_context.scopeOr(context));
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

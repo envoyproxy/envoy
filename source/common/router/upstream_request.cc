@@ -435,6 +435,13 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
       }
       parent_.setupRouteTimeoutForWebsocketUpgrade();
     }
+  } else if (!end_stream &&
+             Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.http_pause_generic_upgrade_request_body") &&
+             Http::Utility::isUpgrade(*headers)) {
+    // Pause proxying the payload of generic (non-WebSocket) upgrades until the upstream
+    // accepts the upgrade.
+    paused_for_generic_upgrade_ = true;
   }
 
   // Kick off creation of the upstream connection immediately upon receiving headers. In future it
@@ -650,10 +657,11 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   if (protocol) {
     stream_info_.protocol(protocol.value());
   } else {
-    // We only pause for CONNECT and WebSocket for HTTP upstreams. If this is a TCP upstream,
-    // unpause.
+    // We only pause for CONNECT and upgrades for HTTP upstreams. If this is a non-HTTP
+    // upstream (e.g. TCP for CONNECT termination or UDP for CONNECT-UDP termination), unpause.
     paused_for_connect_ = false;
     paused_for_websocket_ = false;
+    paused_for_generic_upgrade_ = false;
   }
 
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();

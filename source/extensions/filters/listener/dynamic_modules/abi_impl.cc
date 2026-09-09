@@ -756,13 +756,10 @@ bool envoy_dynamic_module_callback_listener_filter_set_filter_state(
     return false;
   }
 
-  std::string key_str(key.ptr, key.length);
-  std::string value_str(value.ptr, value.length);
-
   // TODO(wbpcode): check whether the key already exists and whether overwriting is allowed.
-  callbacks->filterState().setData(key_str, std::make_shared<Router::StringAccessorImpl>(value_str),
-                                   StreamInfo::FilterState::LifeSpan::Connection);
-  return true;
+  return ContextAccessor::setFilterStateBytes(
+      callbacks->streamInfo(), absl::string_view(key.ptr, key.length),
+      absl::string_view(value.ptr, value.length), StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 bool envoy_dynamic_module_callback_listener_filter_get_filter_state(
@@ -805,28 +802,9 @@ bool envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
     return false;
   }
 
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-
-  auto* factory =
-      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(key_view);
-  if (factory == nullptr) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "no ObjectFactory registered for filter state key '{}'", key_view);
-    return false;
-  }
-
-  auto object = factory->createFromBytes(value_view);
-  if (object == nullptr) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "ObjectFactory failed to create object for filter state key '{}'",
-                        key_view);
-    return false;
-  }
-
-  callbacks->filterState().setData(key_view, std::move(object),
-                                   StreamInfo::FilterState::LifeSpan::Connection);
-  return true;
+  return ContextAccessor::setFilterStateTyped(
+      callbacks->streamInfo(), absl::string_view(key.ptr, key.length),
+      absl::string_view(value.ptr, value.length), StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 bool envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
@@ -949,15 +927,9 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
     return;
   }
 
-  std::string ns(filter_namespace.ptr, filter_namespace.length);
-  std::string key_str(key.ptr, key.length);
-  std::string value_str(value.ptr, value.length);
-
-  Protobuf::Struct metadata;
-  auto& fields = *metadata.mutable_fields();
-  fields[key_str].set_string_value(value_str);
-
-  callbacks->setDynamicMetadata(ns, metadata);
+  ContextAccessor::setDynamicMetadataString(
+      callbacks->streamInfo(), absl::string_view(filter_namespace.ptr, filter_namespace.length),
+      absl::string_view(key.ptr, key.length), absl::string_view(value.ptr, value.length));
 }
 
 bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
@@ -1006,14 +978,9 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
     return;
   }
 
-  std::string ns(filter_namespace.ptr, filter_namespace.length);
-  std::string key_str(key.ptr, key.length);
-
-  Protobuf::Struct metadata;
-  auto& fields = *metadata.mutable_fields();
-  fields[key_str].set_number_value(value);
-
-  callbacks->setDynamicMetadata(ns, metadata);
+  ContextAccessor::setDynamicMetadataNumber(
+      callbacks->streamInfo(), absl::string_view(filter_namespace.ptr, filter_namespace.length),
+      absl::string_view(key.ptr, key.length), value);
 }
 
 void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(

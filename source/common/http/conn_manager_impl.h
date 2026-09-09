@@ -15,6 +15,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/api_listener.h"
 #include "envoy/http/codec.h"
@@ -28,6 +29,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/scopes.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
@@ -69,7 +71,8 @@ public:
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
                         Server::OverloadManager& overload_manager, TimeSource& time_system,
-                        envoy::config::core::v3::TrafficDirection direction);
+                        envoy::config::core::v3::TrafficDirection direction,
+                        Server::Configuration::ServerFactoryContext& server_context);
   ~ConnectionManagerImpl() override;
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -118,6 +121,7 @@ public:
       codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
     }
   }
+  void onDrain(Network::ConnectionDrainEvent drain_event) override;
 
   TimeSource& timeSource() { return time_source_; }
 
@@ -640,6 +644,9 @@ private:
   bool shouldDeferRequestProxyingToNextIoCycle();
   void onDeferredRequestProcessing();
 
+  // Returns true if the connection should now be drain-closed.
+  bool shouldDrainClose(Network::DrainDirection scope);
+
   enum class DrainState { NotDraining, Draining, Closing };
 
   ConnectionManagerConfigSharedPtr config_;
@@ -649,6 +656,10 @@ private:
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;
   const Network::DrainDecision& drain_close_;
+  // Set when the connection is notified of a drain sequence via onDrain(). Carries the drain start
+  // time and strategy so the drain-close decision can be computed at the connection level (see
+  // shouldDrainClose()).
+  std::optional<Network::ConnectionDrainEvent> connection_drain_event_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
   // An idle timer for the connection. This is only armed when there are no streams on the
@@ -696,6 +707,14 @@ private:
   const uint32_t max_requests_during_dispatch_{UINT32_MAX};
   Event::SchedulableCallbackPtr deferred_request_processing_callback_;
   const envoy::config::core::v3::TrafficDirection direction_;
+  Server::Configuration::ServerFactoryContext& server_context_;
+  // The drain type of the listener owning this connection, used to decide whether
+  // /healthcheck/fail should drain-close it.
+  envoy::config::listener::v3::Listener::DrainType drain_type_{
+      envoy::config::listener::v3::Listener::DEFAULT};
+  // Latched when the connection manager is created so it is not re-read on every response. See
+  // shouldDrainClose().
+  const bool use_connection_event_drain_ = false;
 
   // If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3
   // protocols the stream is destroyed after both request and response are complete i.e. reach their

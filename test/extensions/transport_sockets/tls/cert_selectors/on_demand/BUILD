@@ -56,7 +56,7 @@ envoy_extension_cc_test(
         "envoy.tls.certificate_mappers.static_name",
         "envoy.tls.certificate_mappers.sni",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/tls:config",

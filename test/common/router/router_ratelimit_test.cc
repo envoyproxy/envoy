@@ -84,7 +84,8 @@ public:
   void setupTest(const std::string& yaml) {
     envoy::config::route::v3::RouteConfiguration route_config;
     TestUtility::loadFromYaml(yaml, route_config);
-    config_ = *ConfigImpl::create(route_config, factory_context_, any_validation_visitor_, true);
+    config_ = *ConfigImpl::create(route_config, factory_context_, any_validation_visitor_,
+                                  factory_context_.initManager(), true);
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
   }
 

@@ -45,19 +45,12 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoHelper(
 }
 
 absl::StatusOr<Http::FilterFactoryCb>
-AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
-    const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix, DualInfo dual_info,
-    Server::Configuration::ServerFactoryContext& server_context) {
-  return createFilterFactoryFromProtoHelper(config, stats_prefix, server_context, dual_info.scope);
-}
-
-absl::StatusOr<Http::FilterFactoryCb>
 AwsRequestSigningFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const AwsRequestSigningProtoConfig& config,
     Server::Configuration::ServerFactoryContext& server_context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
   return createFilterFactoryFromProtoHelper(config, extra_context.stats_prefix, server_context,
-                                            server_context.scope());
+                                            extra_context.scopeOr(server_context));
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

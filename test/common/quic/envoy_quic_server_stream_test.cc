@@ -989,6 +989,28 @@ TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
   quic_session_.OnDatagramReceived(datagram_fragment_);
 }
 
+TEST_F(EnvoyQuicServerStreamTest, DropDatagramAfterStreamRecreation) {
+  auto valid_indicator = std::make_shared<bool>(true);
+  std::weak_ptr<bool> weak_ind = valid_indicator;
+
+  EXPECT_CALL(stream_decoder_, getRequestDecoderHandle()).WillRepeatedly(Invoke([weak_ind, this]() {
+    auto handle = std::make_unique<NiceMock<Http::MockRequestDecoderHandle>>();
+    ON_CALL(*handle, get()).WillByDefault(Invoke([weak_ind, this]() {
+      if (weak_ind.expired())
+        return OptRef<Http::RequestDecoder>();
+      return OptRef<Http::RequestDecoder>(stream_decoder_);
+    }));
+    return handle;
+  }));
+
+  setUpCapsuleProtocol(true, false);
+
+  valid_indicator.reset();
+
+  EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
+  quic_session_.OnDatagramReceived(datagram_fragment_);
+}
+
 // A WebTransport CONNECT stream is header-only at the HTTP layer; trailers/METADATA/body are not
 // part of WebTransport. EnvoyQuicServerStream::resetIfWebTransport() resets such a stream so the
 // offending frame is never proxied upstream. (Body never reaches OnBodyAvailable because QUICHE

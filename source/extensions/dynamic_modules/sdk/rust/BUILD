@@ -29,17 +29,11 @@ cargo_build_script(
         },
         "@platforms//os:linux": {
             "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
-            "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
-                "-resource-dir $${pwd}/external/llvm_toolchain_llvm/lib/clang/" + LLVM_MAJOR,
-                "-isystem $${pwd}/external/llvm_toolchain_llvm/lib_legacy/clang/" + LLVM_MAJOR + "/include",
-                "-isystem $${pwd}/external/llvm_toolchain_llvm/include/x86_64-unknown-linux-gnu/c++/v1/",
-                "-isystem $${pwd}/external/llvm_toolchain_llvm/include/aarch64-unknown-linux-gnu/c++/v1/",
-                # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.
-                "-isystem $${pwd}/external/sysroot_linux_x86_64/usr/include",
-                "-isystem $${pwd}/external/sysroot_linux_x86_64/usr/include/x86_64-linux-gnu",
-                "-isystem $${pwd}/external/sysroot_linux_arm64/usr/include",
-                "-isystem $${pwd}/external/sysroot_linux_arm64/usr/include/aarch64-linux-gnu",
-            ]),
+            "ENVOY_LLVM_ANCHOR": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
+            "ENVOY_LLVM_MAJOR": LLVM_MAJOR,
+            # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.
+            "ENVOY_SYSROOT_AMD64_ANCHOR": "$(location @sysroot_linux_amd64//:usr/include/stdio.h)",
+            "ENVOY_SYSROOT_ARM64_ANCHOR": "$(location @sysroot_linux_arm64//:usr/include/stdio.h)",
         },
         "//conditions:default": {},
     }),
@@ -51,6 +45,8 @@ cargo_build_script(
             "@llvm_toolchain_llvm//:include",
             "@llvm_toolchain_llvm//:lib/libclang.so",
             "@llvm_toolchain_llvm//:lib_legacy",
+            "@sysroot_linux_amd64//:usr/include/stdio.h",
+            "@sysroot_linux_arm64//:usr/include/stdio.h",
         ],
         "//conditions:default": [],
     }) + select({

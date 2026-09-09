@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Fault Injection :ref:`configuration overview <config_http_filters_fault_injection>`.
 // [#extension: envoy.filters.http.fault]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message FaultAbort {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.fault.v2.FaultAbort";
@@ -54,6 +54,10 @@ message FaultAbort {
   // The percentage of requests/operations/connections that will be aborted with the error code
   // provided.
   type.v3.FractionalPercent percentage = 3;
+
+  // The response body to be returned when aborting the request.
+  // If not specified, defaults to "fault filter abort".
+  string response_body = 6;
 }
 
 // [#next-free-field: 17]

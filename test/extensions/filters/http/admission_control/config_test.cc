@@ -48,7 +48,6 @@ public:
 protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  AdmissionControlFilterFactory::DualInfo dual_info_{context_};
   Stats::IsolatedStoreImpl store_;
   Stats::Scope& scope_{*store_.rootScope()};
   NiceMock<Random::MockRandomGenerator> random_;
@@ -79,8 +78,8 @@ success_criteria:
   AdmissionControlProto proto;
   TestUtility::loadFromYamlAndValidate(yaml, proto);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  auto status_or = admission_control_filter_factory.createFilterFactoryFromProtoTyped(
-      proto, "whatever", dual_info_, factory_context.serverFactoryContext());
+  auto status_or = admission_control_filter_factory.createFilterFactoryFromProto(proto, "whatever",
+                                                                                 factory_context);
   EXPECT_THAT(status_or, HasStatusMessage("Success rate threshold cannot be less than 1.0%."));
 }
 
@@ -106,8 +105,8 @@ success_criteria:
   AdmissionControlProto proto;
   TestUtility::loadFromYamlAndValidate(yaml, proto);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  auto status_or = admission_control_filter_factory.createFilterFactoryFromProtoTyped(
-      proto, "whatever", dual_info_, factory_context.serverFactoryContext());
+  auto status_or = admission_control_filter_factory.createFilterFactoryFromProto(proto, "whatever",
+                                                                                 factory_context);
   EXPECT_THAT(status_or, HasStatusMessage("Success rate threshold cannot be less than 1.0%."));
 }
 

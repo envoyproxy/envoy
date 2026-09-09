@@ -233,7 +233,8 @@ public:
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Random::MockRandomGenerator> random_;
   HttpServerPropertiesCacheSharedPtr alternate_protocols_;
-  Stats::IsolatedStoreImpl store_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  Stats::IsolatedStoreImpl store_{factory_context_.server_context_.serverScope().symbolTable()};
   Quic::QuicStatNames quic_stat_names_;
   PersistentQuicInfoPtr quic_connection_persistent_info_;
   NiceMock<Envoy::ConnectionPool::MockCancellable> cancel_;
@@ -246,7 +247,6 @@ public:
 
   StreamInfo::MockStreamInfo info_;
   NiceMock<MockRequestEncoder> encoder_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
 
