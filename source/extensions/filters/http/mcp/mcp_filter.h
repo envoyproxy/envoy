@@ -92,10 +92,6 @@ public:
     return false;
   }
 
-  envoy::extensions::filters::http::mcp::v3::Mcp::ErrorReplyFormat errorReplyFormat() const {
-    return error_reply_format_;
-  }
-
   const ParserConfig& parserConfig() const { return parser_config_; }
   bool shouldStoreToDynamicMetadata() const {
     return request_storage_mode_ ==
@@ -124,12 +120,8 @@ private:
   const uint32_t max_request_body_size_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attribute_source_;
-<<<<<<< HEAD
   const bool early_terminate_when_routable_;
-=======
   const envoy::extensions::filters::http::mcp::v3::Mcp::ProtocolVersions protocol_versions_;
-  const envoy::extensions::filters::http::mcp::v3::Mcp::ErrorReplyFormat error_reply_format_;
->>>>>>> eedbc950ad (mcp: add protocol version enforcement groundwork)
   const std::string metadata_namespace_;
   ParserConfig parser_config_;
   McpFilterStats stats_;
