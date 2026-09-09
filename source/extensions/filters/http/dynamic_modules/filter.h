@@ -294,7 +294,7 @@ private:
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
   Stats::StatNameDynamicPool stat_name_pool_;
-  uint32_t worker_index_;
+  uint32_t worker_index_ = 0;
   // Tracks whether addDownstreamWatermarkCallbacks() has been invoked on decoder_callbacks_.
   // Also gates the paired remove in onDestroy(), because removeDownstreamWatermarkCallbacks()
   // asserts that the callback was previously added.

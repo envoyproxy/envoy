@@ -58,10 +58,13 @@ const nlohmann::json* readObject(const nlohmann::json& json, const std::string& 
                                  bool& malformed,
                                  NullPolicy null_policy = NullPolicy::NullIsMalformed);
 
-// Adds an optional adjunct onto a base count. A sum above the metadata-safe
-// bound is dropped rather than published imprecisely, and reported through
-// `overflow` so the caller flags the record instead of silently omitting a
-// canonical component.
+// Adds an optional adjunct onto a base count. An absent adjunct leaves the
+// base as it is; an absent base with a present adjunct reads as zero, because
+// a dialect omits its native bucket when the model produced none of it and
+// the adjunct still belongs in the canonical count. A sum above the
+// metadata-safe bound is dropped rather than published imprecisely, and
+// reported through `overflow` so the caller flags the record instead of
+// silently omitting a canonical component.
 std::optional<uint64_t> addCounts(std::optional<uint64_t> base,
                                   const std::optional<uint64_t>& extra, bool& overflow);
 
