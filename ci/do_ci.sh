@@ -310,9 +310,8 @@ function build_openssl_presubmit() {
     echo "Bazel fastbuild build with OpenSSL..."
     bazel_envoy_binary_build fastbuild
 
-    # Merge base for the PR's changed files. Fetch the (possibly shallow) target
-    # branch, then merge-base to see only PR changes; fall back to diffing the
-    # target branch directly when history is too shallow.
+    # Diff against the merge base to see only the PR's own changes; fall back to
+    # the target branch itself when history is too shallow for a merge base.
     local merge_base
     if [[ -n "${CI_TARGET_BRANCH}" ]]; then
         git fetch origin "${CI_TARGET_BRANCH}" 2>/dev/null || true
@@ -321,34 +320,30 @@ function build_openssl_presubmit() {
         merge_base="HEAD~1"
     fi
 
-    # Resolve each changed file to its Bazel label so tests can be selected from
-    # the real dependency graph rather than by guessing test paths from source
-    # paths (the test tree is not a 1:1 mirror of the source tree).
-    #
-    # Failing to diff is fatal: an empty file list would otherwise select no
-    # tests and report a green job that tested nothing.
+    # A failed diff is fatal: an empty file list would otherwise select no tests
+    # and report a green job that tested nothing.
     local changed_files
     if ! changed_files="$(git diff --name-only "$merge_base" HEAD)"; then
         echo "ERROR: unable to diff ${merge_base}..HEAD; cannot determine affected tests." >&2
         return 1
     fi
 
+    # Resolve changed files to Bazel labels, so tests are selected from the real
+    # dependency graph rather than by guessing test paths from source paths (the
+    # test tree is not a 1:1 mirror of the source tree).
     local -a changed_labels=()
     local global_config_changed=false
     while IFS= read -r file; do
         [[ -z "$file" ]] && continue
         [[ -e "$file" ]] || continue  # skip deleted files; they have no label
         case "$file" in
-            # Global/build config: blast radius isn't a per-file query. Defer to
-            # the crypto-surface fallback below.
+            # Global/build config: blast radius isn't a per-file query, so defer
+            # to the crypto-surface seed below.
             .bazelrc|.bazelversion|WORKSPACE|WORKSPACE.bazel|MODULE.bazel|MODULE.bazel.lock|bazel/*)
                 global_config_changed=true
                 ;;
-            # BUILD/.bzl changes affect the whole package. A root-level one
-            # (dirname ".") would yield the invalid pattern "//./..."; treat it
-            # as global build config instead. Only add the package pattern if it
-            # actually contains targets -- a .bzl in a non-package dir would
-            # otherwise make the rdeps set() query fail.
+            # Whole package. A root-level file would yield the invalid pattern
+            # "//./...", and a .bzl in a non-package dir has no targets to match.
             *BUILD|*BUILD.bazel|*.bzl)
                 local dir
                 dir="$(dirname "$file")"
@@ -367,31 +362,36 @@ function build_openssl_presubmit() {
         esac
     done < <(printf '%s\n' "$changed_files")
 
-    # Tier 1: tests depending on the changed files. closure(//test/...) already
-    # contains their //source/... deps, so it is a sufficient rdeps universe.
-    local tier1_tests=""
-    if [[ ${#changed_labels[@]} -gt 0 ]]; then
-        tier1_tests="$(run_bazel_cquery \
-            "kind(test, rdeps(//test/... + //compat/openssl/test/..., set(${changed_labels[*]})))")"
-    fi
+    # rdeps universe; its closure already covers the //source/... deps.
+    local universe="//test/... + //compat/openssl/test/..."
 
-    # Tier 2 (fallback for global/build-config changes): a full //test/... run is
-    # too costly, so run tests depending on the crypto/TLS surface that differs
-    # between OpenSSL and BoringSSL.
-    local tier2_tests=""
+    # Bazel honors "manual" only when expanding wildcard patterns, and the
+    # selection is passed to `bazel test` as explicit labels, so manual tests
+    # must be excluded here or they would be forced to run.
+    local manual="attr(tags, '[\\[ ]manual[,\\]]', ${universe})"
+
+    # Seeds: the PR's own targets, plus -- for global/build-config changes -- the
+    # crypto/TLS surface that differs between OpenSSL and BoringSSL, a full
+    # //test/... run being too costly. One query covers both, since
+    # rdeps(U, A) + rdeps(U, B) is the same set as rdeps(U, A + B).
+    local seed=""
+    [[ ${#changed_labels[@]} -gt 0 ]] && seed="set(${changed_labels[*]})"
     if [[ "$global_config_changed" == "true" ]]; then
         echo "Global/build-config change detected; adding OpenSSL crypto-surface tests."
-        tier2_tests="$(run_bazel_cquery \
-            "kind(test, rdeps(//test/... + //compat/openssl/test/..., //source/common/tls/... + //source/extensions/transport_sockets/tls/... + //compat/openssl/...))")"
+        seed="${seed:+${seed} + }//source/common/tls/... + //source/extensions/transport_sockets/tls/... + //compat/openssl/..."
     fi
 
-    # Combine both tiers, dropping blanks and duplicates. A read loop (rather
-    # than mapfile) keeps this portable to bash without mapfile, e.g. macOS.
+    # `selected` is assigned after declaring so `set -e` still sees a failing
+    # query; `local x="$(false)"` would return 0. sort -u because cquery can
+    # emit one label under several configurations.
     local -a test_targets=()
-    local target
-    while IFS= read -r target; do
-        [[ -n "$target" ]] && test_targets+=("$target")
-    done < <(printf '%s\n%s\n' "$tier1_tests" "$tier2_tests" | sort -u)
+    local target selected
+    if [[ -n "$seed" ]]; then
+        selected="$(run_bazel_cquery "kind(test, rdeps(${universe}, ${seed})) except ${manual}")"
+        while IFS= read -r target; do
+            [[ -n "$target" ]] && test_targets+=("$target")
+        done < <(printf '%s\n' "$selected" | sort -u)
+    fi
 
     if [[ ${#test_targets[@]} -eq 0 ]]; then
         echo "No affected test targets found, skipping tests."

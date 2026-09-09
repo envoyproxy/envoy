@@ -192,6 +192,23 @@ TEST_F(WatermarkBufferTest, DrainUsingExtract) {
   EXPECT_EQ(2, times_high_watermark_called_);
 }
 
+TEST_F(WatermarkBufferTest, DrainUsingExtractImmutable) {
+  // extractImmutableFrontSlice() must check the low watermark like drain().
+  buffer_.appendSliceForTest(TEN_BYTES, 5);
+  buffer_.appendSliceForTest(TEN_BYTES, 6);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(0, times_low_watermark_called_);
+
+  buffer_.extractImmutableFrontSlice(); // essentially drain(5)
+  EXPECT_EQ(6, buffer_.length());
+  EXPECT_EQ(0, times_low_watermark_called_);
+
+  // Now drain below the low watermark.
+  buffer_.extractImmutableFrontSlice(); // essentially drain(6)
+  EXPECT_EQ(0, buffer_.length());
+  EXPECT_EQ(1, times_low_watermark_called_);
+}
+
 // Verify that low watermark callback is called on drain in the case where the
 // high watermark is non-zero and low watermark is 0.
 TEST_F(WatermarkBufferTest, DrainWithLowWatermarkOfZero) {

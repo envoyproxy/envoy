@@ -113,3 +113,5 @@ jobs:
     with:
       artifacts: |
         ["docs"]
+      request: ${{ inputs.request }}
+      trusted: ${{ inputs.trusted }}
