@@ -255,7 +255,7 @@ typed_config:
   EXPECT_EQ(nullptr, upstream_request_);
 }
 
-TEST_P(McpFilterIntegrationTest, RejectsProtocolVersionHeaderBodyMismatchWithJsonRpcReply) {
+TEST_P(McpFilterIntegrationTest, RejectsProtocolVersionHeaderBodyMismatchReply) {
   initializeFilter(R"EOF(
 name: envoy.filters.http.mcp
 typed_config:
@@ -264,7 +264,6 @@ typed_config:
   protocol_versions:
     supported:
     - "2026-07-28"
-  error_reply_format: FORMAT_JSON_RPC
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -476,7 +475,7 @@ typed_config:
   EXPECT_EQ(nullptr, upstream_request_);
 }
 
-TEST_P(McpFilterIntegrationTest, RejectsUnsupportedProtocolVersionWithJsonRpcReply) {
+TEST_P(McpFilterIntegrationTest, RejectsUnsupportedProtocolVersionReply) {
   initializeFilter(R"EOF(
 name: envoy.filters.http.mcp
 typed_config:
@@ -485,7 +484,6 @@ typed_config:
   protocol_versions:
     supported:
     - "2026-07-28"
-  error_reply_format: FORMAT_JSON_RPC
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

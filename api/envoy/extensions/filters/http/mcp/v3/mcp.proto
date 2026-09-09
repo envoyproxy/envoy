@@ -20,7 +20,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // MCP filter :ref:`configuration overview <config_http_filters_mcp>`.
 // [#extension: envoy.filters.http.mcp]
 
-// [#next-free-field: 12]
+// [#next-free-field: 11]
 message Mcp {
   // Traffic handling mode for non-MCP traffic.
   enum TrafficMode {
@@ -71,21 +71,17 @@ message Mcp {
     HEADERS = 2;
   }
 
-  // Controls the format used for MCP protocol error responses.
-  enum ErrorReplyFormat {
-    // Returns the existing plain-text local reply format.
-    FORMAT_TEXT = 0;
-
-    // Returns MCP protocol errors as JSON-RPC error responses.
-    FORMAT_JSON_RPC = 1;
-  }
-
   // Configures MCP protocol revisions accepted by the filter.
   message ProtocolVersions {
-    // MCP protocol revisions accepted by the filter, for example
-    // "2025-11-25" or "2026-07-28".
+    // MCP protocol revisions accepted by the filter.
     //
-    // An unset or empty list accepts any protocol revision.
+    // If one or more revisions are configured, a request with an explicit
+    // MCP-Protocol-Version header is accepted only when the value exactly matches
+    // one of the configured revisions.
+    //
+    // If unset or empty, no protocol-version allowlist restriction is applied.
+    // The request's MCP-Protocol-Version header determines the revision when
+    // present; if the header is absent, existing legacy behavior is preserved.
     repeated string supported = 1;
   }
 
@@ -161,8 +157,6 @@ message Mcp {
   // MCP protocol revisions accepted by the filter.
   ProtocolVersions protocol_versions = 10;
 
-  // Format used for MCP protocol error responses.
-  ErrorReplyFormat error_reply_format = 11 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Parser configuration with method-specific rules.
