@@ -1,0 +1,20 @@
+double_value: 0.6666666666666666
+float_value: 0.1
+nested {
+  ratio: 1.72191555e-41
+}
+wrapped_float {
+  value: 3.4028235e38
+}
+wrapped_double {
+  value: 5e-324
+}
+repeated_double: inf
+repeated_double: nan
+repeated_double: -0.0
+repeated_nested {
+  ratio: -inf
+}
+repeated_nested {
+  ratio: 1e-10
+}
