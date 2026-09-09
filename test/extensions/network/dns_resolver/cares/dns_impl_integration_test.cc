@@ -2,12 +2,19 @@
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 
 #include "test/integration/http_integration.h"
+#include "test/mocks/network/mocks.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 
 namespace Envoy {
 namespace Network {
 namespace {
+
+using testing::_;
+using testing::Invoke;
+using testing::NiceMock;
+using testing::Return;
 
 class DnsImplIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                public HttpIntegrationTest {
@@ -55,6 +62,82 @@ TEST_P(DnsImplIntegrationTest, StrictDnsWithCaresResolver) {
 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+class SharedDnsResolverIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  SharedDnsResolverIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()),
+        registered_dns_factory_(dns_resolver_factory_) {
+    setUpstreamCount(2);
+  }
+
+  void configureDnsClusters() {
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+          auto* strict_dns_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+          strict_dns_cluster->set_type(envoy::config::cluster::v3::Cluster::STRICT_DNS);
+          strict_dns_cluster->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
+
+          envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+          auto* typed_dns_resolver_config = strict_dns_cluster->mutable_typed_dns_resolver_config();
+          typed_dns_resolver_config->set_name(std::string(Network::CaresDnsResolver));
+          std::ignore = typed_dns_resolver_config->mutable_typed_config()->PackFrom(cares);
+
+          auto* logical_dns_cluster = bootstrap.mutable_static_resources()->add_clusters();
+          logical_dns_cluster->CopyFrom(*strict_dns_cluster);
+          logical_dns_cluster->set_name("cluster_1");
+          logical_dns_cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
+          logical_dns_cluster->mutable_load_assignment()->set_cluster_name("cluster_1");
+        });
+  }
+
+  Network::DnsResolverSharedPtr makeResolver() {
+    auto resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+    ON_CALL(*resolver, resolve(_, _, _))
+        .WillByDefault(Invoke([](const std::string&, Network::DnsLookupFamily,
+                                     Network::DnsResolver::ResolveCb callback) {
+          callback(Network::DnsResolver::ResolutionStatus::Completed, "",
+                   TestUtility::makeDnsResponse(
+                       {Network::Test::getLoopbackAddressString(GetParam())}));
+          return nullptr;
+        }));
+    return resolver;
+  }
+
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, SharedDnsResolverIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(SharedDnsResolverIntegrationTest, StrictAndLogicalDnsClustersShareResolver) {
+  config_helper_.addRuntimeOverride("envoy.restart_features.shared_cares_dns_resolver", "true");
+  configureDnsClusters();
+
+  auto resolver = makeResolver();
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillOnce(Return(resolver));
+
+  initialize();
+}
+
+TEST_P(SharedDnsResolverIntegrationTest, RuntimeGuardDisablesResolverSharing) {
+  config_helper_.addRuntimeOverride("envoy.restart_features.shared_cares_dns_resolver", "false");
+  configureDnsClusters();
+
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .Times(2)
+      .WillRepeatedly(Invoke([this](Event::Dispatcher&, Api::Api&,
+                                    const envoy::config::core::v3::TypedExtensionConfig&) {
+        return makeResolver();
+      }));
+
+  initialize();
 }
 
 // Test UDP Channel Refresh Behavior

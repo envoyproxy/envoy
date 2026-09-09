@@ -15,7 +15,7 @@ namespace Upstream {
 absl::StatusOr<Network::DnsResolverSharedPtr> ClusterDnsResolverCache::getOrCreate(
     Network::DnsResolverFactory& dns_resolver_factory, Event::Dispatcher& dispatcher, Api::Api& api,
     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
-  ASSERT(dispatcher.isThreadSafe());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
 
   // Sharing is limited to the c-ares resolver: its channel and query cache are the state worth
   // sharing, and limiting the scope keeps the other resolver types on their existing

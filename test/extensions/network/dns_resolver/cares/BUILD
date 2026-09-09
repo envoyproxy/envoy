@@ -48,6 +48,8 @@ envoy_cc_test(
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/network/dns_resolver/cares:config",
         "//test/integration:http_integration_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:status_utility_lib",
     ],
 )
