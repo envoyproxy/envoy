@@ -10266,3 +10266,231 @@ fn test_cluster_specifier_metrics_vec_metric_invalid_id() {
     .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
     .is_err());
 }
+
+// Stubs for the route extension callbacks so the SDK tests can drive the context wrappers and the
+// FFI entry points without Envoy.
+static STUB_ROUTE_EXTENSION_CLUSTER: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+static STUB_ROUTE_EXTENSION_ACTION_OVERRIDE: std::sync::Mutex<Option<String>> =
+  std::sync::Mutex::new(None);
+const STUB_ROUTE_EXTENSION_RANDOM_VALUE: u64 = 42;
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_extension_get_request_headers_size(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_extension_context_envoy_ptr,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_extension_get_request_headers(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_extension_context_envoy_ptr,
+  _result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_extension_get_request_header_value(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_extension_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _index: usize,
+  _total_count_out: *mut usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_extension_get_random_value(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_extension_context_envoy_ptr,
+) -> u64 {
+  STUB_ROUTE_EXTENSION_RANDOM_VALUE
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_extension_set_cluster_name(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_extension_context_envoy_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  let value = unsafe {
+    String::from_utf8_lossy(std::slice::from_raw_parts(
+      cluster_name.ptr as *const u8,
+      cluster_name.length,
+    ))
+    .into_owned()
+  };
+  *STUB_ROUTE_EXTENSION_CLUSTER.lock().unwrap() = Some(value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_extension_set_route_action_override(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_extension_context_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let value = unsafe {
+    String::from_utf8_lossy(std::slice::from_raw_parts(
+      name.ptr as *const u8,
+      name.length,
+    ))
+    .into_owned()
+  };
+  // The stub treats "known" as a declared override and anything else as absent, so both the found
+  // and not found paths of the setter are exercised.
+  let found = value == "known";
+  *STUB_ROUTE_EXTENSION_ACTION_OVERRIDE.lock().unwrap() = Some(value);
+  found
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_route_extension_config_new_impl() {
+  struct TestRouteExtensionConfig;
+  impl route_extension::RouteExtensionConfig for TestRouteExtensionConfig {
+    fn on_route(
+      &self,
+      _ctx: &mut route_extension::RouteExtensionContext,
+    ) -> route_extension::RouteExtensionDecision {
+      route_extension::RouteExtensionDecision::Keep
+    }
+  }
+
+  let mut new_fn: NewRouteExtensionConfigFunction = |_, _| Some(Box::new(TestRouteExtensionConfig));
+  let result = route_extension::envoy_dynamic_module_on_route_extension_config_new_impl(
+    "test_route_extension",
+    b"config",
+    &new_fn,
+  );
+  assert!(!result.is_null());
+  unsafe {
+    route_extension::envoy_dynamic_module_on_route_extension_config_destroy(result);
+  }
+
+  // None should result in a null pointer (e.g. unknown extension name).
+  new_fn = |_, _| None;
+  let result = route_extension::envoy_dynamic_module_on_route_extension_config_new_impl(
+    "test_route_extension",
+    b"config",
+    &new_fn,
+  );
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_route_extension_config_destroy() {
+  // This test ensures the wrapped trait object is dropped exactly once on `_destroy`.
+  static DROP_COUNT: AtomicU32 = AtomicU32::new(0);
+  struct TestRouteExtensionConfig;
+  impl route_extension::RouteExtensionConfig for TestRouteExtensionConfig {
+    fn on_route(
+      &self,
+      _ctx: &mut route_extension::RouteExtensionContext,
+    ) -> route_extension::RouteExtensionDecision {
+      route_extension::RouteExtensionDecision::Keep
+    }
+  }
+  impl Drop for TestRouteExtensionConfig {
+    fn drop(&mut self) {
+      DROP_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let new_fn: NewRouteExtensionConfigFunction = |_, _| Some(Box::new(TestRouteExtensionConfig));
+  let config_ptr = route_extension::envoy_dynamic_module_on_route_extension_config_new_impl(
+    "test_route_extension",
+    b"",
+    &new_fn,
+  );
+  assert!(!config_ptr.is_null());
+  unsafe {
+    route_extension::envoy_dynamic_module_on_route_extension_config_destroy(config_ptr);
+  }
+  assert_eq!(1, DROP_COUNT.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_route_extension_on_route() {
+  // Drives the on_route hook through the FFI entry point so the boxed trait object, the context
+  // wrapper, and the returned decision are all exercised.
+  static RANDOM_VALUE_SEEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+  struct TestRouteExtensionConfig;
+  impl route_extension::RouteExtensionConfig for TestRouteExtensionConfig {
+    fn on_route(
+      &self,
+      ctx: &mut route_extension::RouteExtensionContext,
+    ) -> route_extension::RouteExtensionDecision {
+      RANDOM_VALUE_SEEN.store(ctx.get_random_value(), std::sync::atomic::Ordering::SeqCst);
+      ctx.set_cluster_name("overridden");
+      // Exercise both the found and not found return paths of the override setter.
+      assert!(ctx.set_route_action_override("known"));
+      assert!(!ctx.set_route_action_override("missing"));
+      route_extension::RouteExtensionDecision::Override
+    }
+  }
+
+  *STUB_ROUTE_EXTENSION_CLUSTER.lock().unwrap() = None;
+  *STUB_ROUTE_EXTENSION_ACTION_OVERRIDE.lock().unwrap() = None;
+  let new_fn: NewRouteExtensionConfigFunction = |_, _| Some(Box::new(TestRouteExtensionConfig));
+  let config_ptr = route_extension::envoy_dynamic_module_on_route_extension_config_new_impl(
+    "test_route_extension",
+    b"",
+    &new_fn,
+  );
+  assert!(!config_ptr.is_null());
+
+  let decision = unsafe {
+    route_extension::envoy_dynamic_module_on_route_extension_on_route(
+      config_ptr,
+      std::ptr::null_mut(),
+    )
+  };
+  assert_eq!(
+    abi::envoy_dynamic_module_type_route_extension_decision::Override,
+    decision
+  );
+  assert_eq!(
+    STUB_ROUTE_EXTENSION_RANDOM_VALUE,
+    RANDOM_VALUE_SEEN.load(std::sync::atomic::Ordering::SeqCst)
+  );
+  assert_eq!(
+    Some("overridden".to_owned()),
+    *STUB_ROUTE_EXTENSION_CLUSTER.lock().unwrap()
+  );
+  assert_eq!(
+    Some("missing".to_owned()),
+    *STUB_ROUTE_EXTENSION_ACTION_OVERRIDE.lock().unwrap()
+  );
+
+  unsafe {
+    route_extension::envoy_dynamic_module_on_route_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_route_extension_on_route_recovers_from_panic() {
+  // Route customization runs on worker threads, so a panic must be caught at the FFI boundary and
+  // reported as keeping the route rather than unwinding across the ABI.
+  struct PanicConfig;
+  impl route_extension::RouteExtensionConfig for PanicConfig {
+    fn on_route(
+      &self,
+      _ctx: &mut route_extension::RouteExtensionContext,
+    ) -> route_extension::RouteExtensionDecision {
+      panic!("intentional panic in on_route");
+    }
+  }
+
+  let config: Box<dyn route_extension::RouteExtensionConfig> = Box::new(PanicConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const std::ffi::c_void;
+  let decision = unsafe {
+    route_extension::envoy_dynamic_module_on_route_extension_on_route(
+      config_ptr,
+      std::ptr::null_mut(),
+    )
+  };
+  assert_eq!(
+    abi::envoy_dynamic_module_type_route_extension_decision::Keep,
+    decision
+  );
+  unsafe {
+    route_extension::envoy_dynamic_module_on_route_extension_config_destroy(config_ptr);
+  }
+}

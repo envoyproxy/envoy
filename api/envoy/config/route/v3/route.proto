@@ -171,6 +171,7 @@ message RouteConfiguration {
   // when no route matched within the selected virtual host, in which case an extension may produce
   // one. The route the last extension returns is the route Envoy uses. If not specified, no route
   // configuration level extension runs.
+  // [#extension-category: envoy.router.route_extension]
   repeated core.v3.TypedExtensionConfig route_extensions = 19;
 }
 

@@ -15649,6 +15649,212 @@ envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value);
 
+// =============================================================================
+// =============================== Route Extension =============================
+// =============================================================================
+
+// =============================================================================
+// Route Extension Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_route_extension_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleRouteExtensionConfig class in Envoy. This is passed to the module when creating a
+ * new in-module route extension configuration and may be used to access the route extension
+ * configuration-scoped information in the future.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_route_extension_config_module_ptr in
+ * the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_route_extension_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_route_extension_config_module_ptr is a pointer to an in-module route
+ * extension configuration created by envoy_dynamic_module_on_route_extension_config_new. A single
+ * configuration is shared by every request handled by the route extension.
+ *
+ * This has 1:1 correspondence with the DynamicModuleRouteExtensionConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_route_extension_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_route_extension_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_route_extension_context_envoy_ptr is a raw pointer to the Envoy context
+ * of a single route customization. It provides read access to the request headers and the random
+ * value, and it is the target of the setter callbacks that record the overrides.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ *
+ * THREADING: This pointer is only valid on the worker thread handling the request, for the duration
+ * of a single envoy_dynamic_module_on_route_extension_on_route call, and it refers to storage that
+ * Envoy reuses once the call returns. Route customization runs concurrently on multiple worker
+ * threads, so the module must not store this pointer, share it across threads, or use it after the
+ * hook returns. Every envoy_dynamic_module_callback_route_extension_* callback must be called with
+ * this pointer from inside that hook.
+ */
+typedef void* envoy_dynamic_module_type_route_extension_context_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_route_extension_decision is the decision a route extension returns for
+ * a request. It selects how Envoy uses the route the extension received.
+ */
+typedef enum envoy_dynamic_module_type_route_extension_decision {
+  // Use the received route unchanged.
+  envoy_dynamic_module_type_route_extension_decision_Keep = 0,
+  // Use the received route with the overrides recorded during the hook.
+  envoy_dynamic_module_type_route_extension_decision_Override = 1,
+  // Use no route, so the request is handled as if nothing had matched.
+  envoy_dynamic_module_type_route_extension_decision_Drop = 2,
+} envoy_dynamic_module_type_route_extension_decision;
+
+// =============================================================================
+// Route Extension Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_route_extension_config_new is called on the main thread when a route
+ * extension referencing this module is configured. The module should parse the configuration and
+ * return a pointer to the in-module route extension configuration.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteExtensionConfig object for the
+ * corresponding config.
+ * @param name is the extension name used to select an implementation within the module. The buffer
+ * is owned by Envoy and is valid only during this call.
+ * @param config is the configuration bytes for the extension. The buffer is owned by Envoy and is
+ * valid only during this call.
+ * @return a pointer to the in-module route extension configuration. Returning nullptr indicates a
+ * failure to initialize, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_route_extension_config_module_ptr
+envoy_dynamic_module_on_route_extension_config_new(
+    envoy_dynamic_module_type_route_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_route_extension_config_destroy is called when the route extension
+ * configuration is destroyed.
+ *
+ * This may be called on any thread. The configuration is kept alive by the requests referencing it,
+ * so the last reference may be released on a worker thread after the route configuration is
+ * replaced. The module must not assume the main thread here.
+ *
+ * @param config_module_ptr is the pointer to the in-module route extension configuration.
+ */
+void envoy_dynamic_module_on_route_extension_config_destroy(
+    envoy_dynamic_module_type_route_extension_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_route_extension_on_route is called while the route is being resolved for
+ * a request. The module reads the request with the getter callbacks below, records any overrides
+ * with the setter callbacks, and returns the decision that tells Envoy how to use the route.
+ *
+ * This may be called concurrently on multiple worker threads with the same in-module configuration,
+ * so the module must treat the configuration as read-only and avoid shared mutable state.
+ *
+ * @param config_module_ptr is the pointer to the in-module route extension configuration.
+ * @param context_envoy_ptr is the pointer to the Envoy route customization context, valid only
+ * during this call.
+ * @return the decision for the request. Overrides recorded during the hook take effect only when
+ * the decision is Override.
+ */
+envoy_dynamic_module_type_route_extension_decision envoy_dynamic_module_on_route_extension_on_route(
+    envoy_dynamic_module_type_route_extension_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr context_envoy_ptr);
+
+// =============================================================================
+// Route Extension Callbacks
+// =============================================================================
+
+// ------------------- Route Extension Callbacks - Request State ---------------
+
+/**
+ * envoy_dynamic_module_callback_route_extension_get_request_headers_size returns the number of
+ * request headers.
+ *
+ * @param context_envoy_ptr is the pointer to the route customization context.
+ * @return the number of request headers.
+ */
+size_t envoy_dynamic_module_callback_route_extension_get_request_headers_size(
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_extension_get_request_headers is called by the module to get
+ * all request headers.
+ *
+ * @param context_envoy_ptr is the pointer to the route customization context.
+ * @param result_headers is the output array. The module must pre-allocate at least
+ * envoy_dynamic_module_callback_route_extension_get_request_headers_size entries. Envoy does not
+ * bounds check the array, so passing a shorter one is undefined behavior. The buffers in the
+ * entries are owned by Envoy and are valid until the end of the current event hook.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_extension_get_request_headers(
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_route_extension_get_request_header_value is called by the module to
+ * get a request header value by key.
+ *
+ * @param context_envoy_ptr is the pointer to the route customization context.
+ * @param key is the header key to look up.
+ * @param result is the output buffer for the header value. The buffer is owned by Envoy and is
+ * valid until the end of the current event hook.
+ * @param index is the index for multi-value headers, 0 for the first value.
+ * @param total_count_out receives the total number of values for the key when non-null.
+ * @return true if the header exists at the given index, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_extension_get_request_header_value(
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * envoy_dynamic_module_callback_route_extension_get_random_value returns the stable random value
+ * Envoy generated for the request, for extensions that make a weighted choice.
+ *
+ * @param context_envoy_ptr is the pointer to the route customization context.
+ * @return the random value for the request.
+ */
+uint64_t envoy_dynamic_module_callback_route_extension_get_random_value(
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr context_envoy_ptr);
+
+// ------------------- Route Extension Callbacks - Overrides -------------------
+
+/**
+ * envoy_dynamic_module_callback_route_extension_set_cluster_name records the upstream cluster the
+ * request should use. It takes effect only when the hook returns the Override decision.
+ *
+ * @param context_envoy_ptr is the pointer to the route customization context.
+ * @param cluster_name is the cluster name. The buffer is owned by the module.
+ */
+void envoy_dynamic_module_callback_route_extension_set_cluster_name(
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name);
+
+/**
+ * envoy_dynamic_module_callback_route_extension_set_route_action_override selects a named route
+ * action override declared in the configuration for the request. It replaces the retry policy, the
+ * metadata match criteria, the request mirroring policies and the hash policy of the matched route
+ * with the ones the override builds, for the properties that it sets. It takes effect only when the
+ * hook returns the Override decision.
+ *
+ * @param context_envoy_ptr is the pointer to the route customization context.
+ * @param name is the name of the entry in the route_action_overrides map. The buffer is owned by
+ * the module.
+ * @return true if the name matches a declared override, false otherwise. A false return changes
+ * nothing, so the route action properties of the matched route stay in effect unless an earlier
+ * call already selected an override.
+ */
+bool envoy_dynamic_module_callback_route_extension_set_route_action_override(
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
 #ifdef __cplusplus
 }
 #endif

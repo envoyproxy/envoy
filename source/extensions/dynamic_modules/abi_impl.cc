@@ -5374,4 +5374,50 @@ envoy_dynamic_module_callback_health_checker_get_host_health(
   return envoy_dynamic_module_type_host_health_Unhealthy;
 }
 
+__attribute__((weak)) size_t envoy_dynamic_module_callback_route_extension_get_request_headers_size(
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_extension_get_request_headers_size: not "
+               "implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_route_extension_get_request_headers(
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_extension_get_request_headers: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_route_extension_get_request_header_value(
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*, size_t,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_extension_get_request_header_value: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) uint64_t envoy_dynamic_module_callback_route_extension_get_random_value(
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_extension_get_random_value: not "
+               "implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_extension_set_cluster_name(
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_extension_set_cluster_name: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_route_extension_set_route_action_override(
+    envoy_dynamic_module_type_route_extension_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_extension_set_route_action_override: not "
+               "implemented in this context");
+  return false;
+}
+
 } // extern "C"

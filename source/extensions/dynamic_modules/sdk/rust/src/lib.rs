@@ -26,6 +26,7 @@ pub mod load_balancer;
 pub mod matcher;
 pub mod matcher_data_input;
 pub mod network;
+pub mod route_extension;
 pub mod stats_sink;
 pub mod tracer;
 pub mod transport_socket;
@@ -684,6 +685,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `access_logger:` — [`NewAccessLoggerConfigFunction`] for access loggers
 /// - `formatter:` — [`NewFormatterConfigFunction`] for formatters
 /// - `cluster_specifier:` — [`NewClusterSpecifierConfigFunction`] for cluster specifiers
+/// - `route_extension:` — [`NewRouteExtensionConfigFunction`] for route extensions
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 ///
 /// # Examples
@@ -902,6 +904,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION,
       $fn,
       "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
+    );
+  };
+  (@register route_extension : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_EXTENSION_CONFIG_FUNCTION,
+      $fn,
+      "NEW_ROUTE_EXTENSION_CONFIG_FUNCTION"
     );
   };
   (@register stat_sink : $fn:expr) => {
@@ -1278,6 +1287,22 @@ pub type NewClusterSpecifierConfigFunction =
 pub static NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION: OnceLock<NewClusterSpecifierConfigFunction> =
   OnceLock::new();
 
+/// The factory function that creates a route extension configuration. See the `route_extension:`
+/// arm of [`declare_all_init_functions!`].
+///
+/// The `name` is the value of `extension_name` from the `dynamic_modules` route extension
+/// configuration, allowing a single module to dispatch to different route extension
+/// implementations. The `config` is the raw bytes from the `extension_config` field. Returning
+/// `None` causes Envoy to reject the route extension configuration.
+pub type NewRouteExtensionConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn route_extension::RouteExtensionConfig>>;
+
+/// The global factory function for route extensions. This is set via the `route_extension:` arm of
+/// [`declare_all_init_functions!`] (or the [`declare_route_extension_init_functions!`] shim) and is
+/// not intended to be set directly.
+pub static NEW_ROUTE_EXTENSION_CONFIG_FUNCTION: OnceLock<NewRouteExtensionConfigFunction> =
+  OnceLock::new();
+
 /// Declare the init functions for a cluster specifier dynamic module.
 ///
 /// The first argument is the program init function with [`ProgramInitFunction`] type.
@@ -1322,6 +1347,69 @@ macro_rules! declare_cluster_specifier_init_functions {
           envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION,
           $new_cluster_specifier_config_fn,
           "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      })) {
+        ::std::result::Result::Ok(v) => v,
+        ::std::result::Result::Err(payload) => {
+          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
+          ::std::ptr::null()
+        },
+      }
+    }
+  };
+}
+
+/// Declare the init functions for a route extension dynamic module.
+///
+/// This macro generates the `envoy_dynamic_module_on_program_init` function required by the dynamic
+/// module ABI and registers the route extension factory. Use it when the module implements only a
+/// route extension. Modules that implement several extension kinds should use
+/// [`declare_all_init_functions!`] instead.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::route_extension::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_route_extension_config(
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn RouteExtensionConfig>> {
+///   Some(Box::new(MyRouteExtensionConfig {}))
+/// }
+///
+/// struct MyRouteExtensionConfig {}
+///
+/// impl RouteExtensionConfig for MyRouteExtensionConfig {
+///   fn on_route(&self, ctx: &mut RouteExtensionContext) -> RouteExtensionDecision {
+///     ctx.set_cluster_name("my_cluster");
+///     RouteExtensionDecision::Override
+///   }
+/// }
+///
+/// declare_route_extension_init_functions!(program_init, new_route_extension_config);
+/// ```
+#[macro_export]
+macro_rules! declare_route_extension_init_functions {
+  ($f:ident, $new_route_extension_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_EXTENSION_CONFIG_FUNCTION,
+          $new_route_extension_config_fn,
+          "NEW_ROUTE_EXTENSION_CONFIG_FUNCTION"
         );
         if ($f()) {
           envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
