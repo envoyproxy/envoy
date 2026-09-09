@@ -170,7 +170,6 @@ RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness
 // from the connection-level drain notification (Network::Connection::onDrain()) instead of by
 // polling the listener DrainDecision. Latched per connection when the network filter is created.
 RUNTIME_GUARD(envoy_reloadable_features_use_connection_event_drain);
-RUNTIME_GUARD(envoy_reloadable_features_use_migration_in_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_response);
