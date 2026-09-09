@@ -337,6 +337,9 @@ bool McpFilter::needsBody() const {
     return true;
   }
 
+  // Mcp-Method and Mcp-Name header semantics are only defined for the
+  // new protocol. Legacy requests fall back to body parsing even when
+  // attribute_source is HEADERS.
   if (!shouldUseNewSpecSemantics()) {
     return true;
   }
