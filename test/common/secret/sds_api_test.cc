@@ -103,6 +103,8 @@ TEST_F(SdsApiTest, BasicManualStart) {
       []() {}, *dispatcher_, *api_, false);
   EXPECT_CALL(*subscription_factory_.subscription_, start(_));
   sds_api.start();
+  // Validate that starting twice only calls subscription start once.
+  sds_api.start();
 }
 
 // Validate that a noop init manager is used if the InitManger passed into the constructor

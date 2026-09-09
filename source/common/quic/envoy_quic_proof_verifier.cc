@@ -75,14 +75,15 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     const std::string& /*cert_sct*/, const quic::ProofVerifyContext* context,
     std::string* error_details, std::unique_ptr<quic::ProofVerifyDetails>* details,
     uint8_t* out_alert, std::unique_ptr<quic::ProofVerifierCallback> callback) {
-  ASSERT(details != nullptr);
-  ASSERT(!certs.empty());
   auto* verify_context = dynamic_cast<const EnvoyQuicProofVerifyContext*>(context);
   if (verify_context == nullptr) {
     IS_ENVOY_BUG("QUIC proof verify context was not setup correctly.");
     return quic::QUIC_FAILURE;
   }
-  ENVOY_BUG(!verify_context->isServer(), "Client certificates are not supported in QUIC yet.");
+  ASSERT(details != nullptr);
+  ASSERT(!certs.empty());
+  // Server-side client certificate validation is handled by `EnvoyTlsServerHandshaker`.
+  ASSERT(!verify_context->isServer());
 
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
   for (const auto& cert_str : certs) {

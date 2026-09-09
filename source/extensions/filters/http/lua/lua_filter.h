@@ -37,9 +37,10 @@ struct LuaFilterStats {
 class PerLuaCodeSetup : Logger::Loggable<Logger::Id::lua> {
 public:
   // creation_status is set (and construction stops early) if the supplied code cannot be parsed.
-  PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                  Stats::Gauge& vm_count_gauge, uint32_t concurrency,
-                  absl::Status& creation_status);
+  PerLuaCodeSetup(const std::string& lua_code,
+                  const Filters::Common::Lua::PackagePaths& package_paths,
+                  ThreadLocal::SlotAllocator& tls, Stats::Gauge& vm_count_gauge,
+                  uint32_t concurrency, absl::Status& creation_status);
   ~PerLuaCodeSetup();
 
   Extensions::Filters::Common::Lua::CoroutinePtr createCoroutine() {
@@ -224,6 +225,7 @@ public:
             {"importPublicKey", static_luaImportPublicKey},
             {"verifySignature", static_luaVerifySignature},
             {"base64Escape", static_luaBase64Escape},
+            {"base64Decode", static_luaBase64Decode},
             {"timestamp", static_luaTimestamp},
             {"timestampString", static_luaTimestampString},
             {"connectionStreamInfo", static_luaConnectionStreamInfo},
@@ -335,6 +337,13 @@ private:
    * @return (string) base64 escaped string.
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaBase64Escape);
+
+  /**
+   * Base64 decode a string.
+   * @param1 (string) base64 encoded string to be decoded.
+   * @return (string) the decoded string, or nil if the input is not valid base64.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaBase64Decode);
 
   /**
    * Timestamp.
@@ -491,6 +500,7 @@ public:
     return nullptr;
   }
   bool clearRouteCache() const { return clear_route_cache_; }
+  const Protobuf::Struct& filterContext() const { return filter_context_; }
 
   const LuaFilterStats& stats() const { return stats_; }
   Stats::Scope& luaStatsScope() const { return *lua_stats_scope_; }
@@ -505,6 +515,7 @@ private:
   }
 
   const bool clear_route_cache_{};
+  const Protobuf::Struct filter_context_;
   PerLuaCodeSetupPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
@@ -526,12 +537,14 @@ public:
   bool disabled() const { return disabled_; }
   absl::string_view name() const { return name_; }
   PerLuaCodeSetup* perLuaCodeSetup() const { return per_lua_code_setup_ptr_.get(); }
+  bool hasFilterContext() const { return has_filter_context_; }
   const Protobuf::Struct& filterContext() const { return filter_context_; }
 
 private:
   const bool disabled_;
   const std::string name_;
   PerLuaCodeSetupPtr per_lua_code_setup_ptr_;
+  const bool has_filter_context_ = false;
   const Protobuf::Struct filter_context_;
 };
 
@@ -698,8 +711,10 @@ private:
   }
 
   const Protobuf::Struct& filterContext() const {
-    return per_route_config_ == nullptr ? Protobuf::Struct::default_instance()
-                                        : per_route_config_->filterContext();
+    if (per_route_config_ != nullptr && per_route_config_->hasFilterContext()) {
+      return per_route_config_->filterContext();
+    }
+    return config_->filterContext();
   }
 
   Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,

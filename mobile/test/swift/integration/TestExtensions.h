@@ -2,4 +2,4 @@
 
 #import <Foundation/Foundation.h>
 
-#import "external/envoy_build_config/test_extensions.h"
+#import "test_extensions.h"

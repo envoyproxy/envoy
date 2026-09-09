@@ -172,7 +172,7 @@ TEST_F(DynamicModuleAccessLogTest, EmitLog) {
   NiceMock<ThreadLocal::MockInstance> tls;
   auto* slot = new NiceMock<MockSlot>();
 
-  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotPtr{slot}));
+  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotSharedPtr{slot}));
 
   auto access_log = std::make_unique<DynamicModuleAccessLog>(
       nullptr, config_, static_cast<ThreadLocal::SlotAllocator&>(tls));
@@ -207,7 +207,7 @@ TEST_F(DynamicModuleAccessLogTest, EmitLogNullLogger) {
   NiceMock<ThreadLocal::MockInstance> tls;
   auto* slot = new NiceMock<MockSlot>();
 
-  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotPtr{slot}));
+  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotSharedPtr{slot}));
 
   auto access_log = std::make_unique<DynamicModuleAccessLog>(
       nullptr, config_, static_cast<ThreadLocal::SlotAllocator&>(tls));

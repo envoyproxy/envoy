@@ -2,12 +2,16 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/metrics/v3/metrics_service.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/config/well_known_names.h"
 #include "source/common/memory/stats.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 
 #include "test/common/memory/memory_test_utility.h"
 #include "test/config/integration/certs/clientcert_hash.h"
@@ -256,6 +260,207 @@ TEST_P(StatsIntegrationTest, WithExpiredCert) {
           ->gauge("listener.0.0.0.0_0.ssl.certificate.server_cert.expiration_unix_time_seconds")
           ->value(),
       1743788480);
+}
+
+// Verifies that the stats interface is unchanged whether the stats store derives tags with the
+// legacy tag-extraction rules or with the new explicit-tags logic (the tag-friendly scope API).
+// Both modes must produce byte-for-byte identical flat names, tag-extracted names and tags for
+// every call site that has already been migrated, because any difference is a user-visible break.
+//
+// The mode is chosen once during server initialization, from the process-global
+// `envoy.reloadable_features.enable_stats_explicit_tags` flag, and that read happens before the
+// runtime loader exists (see `InstanceBase::initializeOrThrow`). So the flag has to be set
+// directly; `config_helper_.addRuntimeOverride()` would be applied too late to be observed. The
+// global `TestListener` restores all absl flags at the end of each test, so the override does not
+// leak into the rest of the binary.
+//
+// Migrating a new scope to the tag-friendly API means adding its stats to `expectations()` below.
+class StatsTagsModeIntegrationTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public BaseIntegrationTest {
+public:
+  StatsTagsModeIntegrationTest() : BaseIntegrationTest(std::get<0>(GetParam())) {}
+
+  static std::string testName(const testing::TestParamInfo<ParamType>& info) {
+    return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(info.param)),
+                        std::get<1>(info.param) ? "_ExplicitTags" : "_LegacyTags");
+  }
+
+  bool explicitTags() const { return std::get<1>(GetParam()); }
+
+  void initialize() override {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                  explicitTags());
+    BaseIntegrationTest::initialize();
+  }
+
+  // A single expected stat: its flat name, the name it should be tag-extracted to, and the tags
+  // that should be attached to it.
+  struct StatExpectation {
+    std::string name_;
+    std::string tag_extracted_name_;
+    std::vector<std::pair<std::string, std::string>> tags_;
+  };
+
+  // The listener stats scope is named after the listener's `stat_prefix`, or after its address if
+  // no prefix is configured.
+  std::string mainListenerScope() const {
+    return version_ == Network::Address::IpVersion::v4 ? "127.0.0.1_0" : "[__1]_0";
+  }
+
+  std::vector<StatExpectation> expectations() const {
+    const std::string& cluster_name = Config::TagNames::get().CLUSTER_NAME;
+    const std::string& listener_address = Config::TagNames::get().LISTENER_ADDRESS;
+    const std::string& tcp_prefix = Config::TagNames::get().TCP_PREFIX;
+    const std::string& xds_resource_name = Config::TagNames::get().XDS_RESOURCE_NAME;
+
+    return {
+        // Cluster scope, `source/common/upstream/upstream_impl.cc`.
+        {"cluster.cluster_0.upstream_cx_total",
+         "cluster.upstream_cx_total",
+         {{cluster_name, "cluster_0"}}},
+        {"cluster.cluster_0.membership_total",
+         "cluster.membership_total",
+         {{cluster_name, "cluster_0"}}},
+        // Listener scope keyed by address, `source/common/listener_manager/listener_impl.cc`.
+        {absl::StrCat("listener.", mainListenerScope(), ".downstream_cx_total"),
+         "listener.downstream_cx_total",
+         {{listener_address, mainListenerScope()}}},
+        // The same scope, but keyed by the listener's `stat_prefix` instead of its address.
+        {"listener.tcp_listener.downstream_cx_total",
+         "listener.downstream_cx_total",
+         {{listener_address, "tcp_listener"}}},
+        // The admin listener is deliberately excluded from listener address tagging, in both the
+        // legacy extraction rules and the explicit-tags scope.
+        {"listener.admin.downstream_cx_total", "listener.admin.downstream_cx_total", {}},
+        // TCP proxy scope, `source/common/tcp_proxy/tcp_proxy.cc`.
+        {"tcp.tcp_stats.downstream_cx_total",
+         "tcp.downstream_cx_total",
+         {{tcp_prefix, "tcp_stats"}}},
+        // SDS scope, `source/common/secret/sds_api.cc`.
+        {"sds.server_cert.key_rotation_failed",
+         "sds.key_rotation_failed",
+         {{xds_resource_name, "server_cert"}}},
+        {"sds.server_cert.update_success",
+         "sds.update_success",
+         {{xds_resource_name, "server_cert"}}},
+#ifdef ENVOY_GOOGLE_GRPC
+        // Google gRPC client scope, `source/common/grpc/async_client_manager_impl.cc`. Only the
+        // Google gRPC client uses this scope, so it is absent from builds that leave it out.
+        {"grpc.grpc_stats.google_grpc_client_creation",
+         "grpc.google_grpc_client_creation",
+         {{Config::TagNames::get().GOOGLE_GRPC_CLIENT_PREFIX, "grpc_stats"}}},
+        {"grpc.grpc_stats.streams_total",
+         "grpc.streams_total",
+         {{Config::TagNames::get().GOOGLE_GRPC_CLIENT_PREFIX, "grpc_stats"}}},
+#endif
+    };
+  }
+
+  static std::vector<std::pair<std::string, std::string>> tagsOf(const Stats::Metric& metric) {
+    std::vector<std::pair<std::string, std::string>> tags;
+    for (const Stats::Tag& tag : metric.tags()) {
+      tags.emplace_back(tag.name_, tag.value_);
+    }
+    std::sort(tags.begin(), tags.end());
+    return tags;
+  }
+
+  void checkExpectation(const StatExpectation& expectation) {
+    Stats::CounterSharedPtr counter = test_server_->counter(expectation.name_);
+    Stats::GaugeSharedPtr gauge = test_server_->gauge(expectation.name_);
+    const Stats::Metric* metric = counter != nullptr ? static_cast<Stats::Metric*>(counter.get())
+                                                     : static_cast<Stats::Metric*>(gauge.get());
+    ASSERT_NE(metric, nullptr) << "no counter or gauge named '" << expectation.name_ << "'";
+
+    EXPECT_EQ(metric->tagExtractedName(), expectation.tag_extracted_name_)
+        << " for stat '" << expectation.name_ << "'";
+    std::vector<std::pair<std::string, std::string>> expected_tags = expectation.tags_;
+    std::sort(expected_tags.begin(), expected_tags.end());
+    EXPECT_EQ(tagsOf(*metric), expected_tags) << " for stat '" << expectation.name_ << "'";
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndTagsMode, StatsTagsModeIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    StatsTagsModeIntegrationTest::testName);
+
+TEST_P(StatsTagsModeIntegrationTest, DefaultTagsAndNamesAreIdenticalInBothModes) {
+  // A filesystem-backed SDS secret, so that the server creates an `sds.<resource name>.` scope.
+  const std::string secret_path = TestEnvironment::writeStringToFileForTest(
+      "stats_tags_mode_secret.yaml",
+      fmt::format(R"EOF(
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: server_cert
+  tls_certificate:
+    certificate_chain:
+      filename: "{}"
+    private_key:
+      filename: "{}"
+)EOF",
+                  TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
+                  TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
+
+  config_helper_.addConfigModifier([this, secret_path](
+                                       envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Serve the default listener over TLS with a dynamic secret, which creates the SDS scope.
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    auto* sds_secret_config =
+        tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+    sds_secret_config->set_name("server_cert");
+    sds_secret_config->mutable_sds_config()->mutable_path_config_source()->set_path(secret_path);
+    auto* transport_socket = bootstrap.mutable_static_resources()
+                                 ->mutable_listeners(0)
+                                 ->mutable_filter_chains(0)
+                                 ->mutable_transport_socket();
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
+
+    // A second listener running a TCP proxy, which creates the `tcp.<stat prefix>.` scope. Its
+    // `stat_prefix` also exercises the non-address flavor of the listener stats scope.
+    auto* listener = bootstrap.mutable_static_resources()->add_listeners();
+    listener->set_name("tcp_listener");
+    listener->set_stat_prefix("tcp_listener");
+    auto* socket_address = listener->mutable_address()->mutable_socket_address();
+    socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
+    socket_address->set_port_value(0);
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    tcp_proxy.set_stat_prefix("tcp_stats");
+    tcp_proxy.set_cluster("cluster_0");
+    auto* filter = listener->add_filter_chains()->add_filters();
+    filter->set_name("envoy.filters.network.tcp_proxy");
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
+
+#ifdef ENVOY_GOOGLE_GRPC
+    // A stats sink backed by a Google gRPC client, which creates the `grpc.<stat prefix>.` scope
+    // (and its stats) while the sink is being built during server startup. The target is never
+    // expected to accept a connection; the stats under test are created when the client itself is
+    // constructed, not when it streams.
+    auto* metrics_sink = bootstrap.add_stats_sinks();
+    metrics_sink->set_name("envoy.stat_sinks.metrics_service");
+    envoy::config::metrics::v3::MetricsServiceConfig metrics_config;
+    auto* google_grpc = metrics_config.mutable_grpc_service()->mutable_google_grpc();
+    google_grpc->set_target_uri(
+        absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":1"));
+    google_grpc->set_stat_prefix("grpc_stats");
+    metrics_config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    std::ignore = metrics_sink->mutable_typed_config()->PackFrom(metrics_config);
+#endif
+  });
+
+  initialize();
+
+  // Sanity check that the parameterized mode really took effect; otherwise both params
+  // would silently be testing the same thing.
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), explicitTags());
+
+  for (const StatExpectation& expectation : expectations()) {
+    checkExpectation(expectation);
+  }
 }
 
 // TODO(cmluciano) Refactor once https://github.com/envoyproxy/envoy/issues/5624 is solved

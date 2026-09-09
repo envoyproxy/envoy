@@ -729,7 +729,7 @@ TEST_P(OdCdsIntegrationTest, DisablingOdCdsAtVirtualHostLevelWorks) {
 class OdCdsAdsIntegrationTest
     : public AdsIntegrationTestBase,
       public testing::TestWithParam<
-          std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta, bool>> {
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>> {
 public:
   OdCdsAdsIntegrationTest() : AdsIntegrationTestBase(ipVersion(), sotwOrDelta()) {}
 
@@ -737,21 +737,17 @@ public:
 
   static std::string protocolTestParamsToString(
       const ::testing::TestParamInfo<
-          std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta, bool>>& p) {
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>>& p) {
     return fmt::format(
-        "{}_{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
+        "{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
         std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-        std::get<2>(p.param) == Grpc::SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld",
-        std::get<3>(p.param) ? "WithOdcdsOverAdsFix" : "WithoutOdcdsOverAdsFix");
+        std::get<2>(p.param) == Grpc::SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld");
   }
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
   Grpc::SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
-  bool odcdsOverAdsFixEnabled() const { return std::get<3>(GetParam()); }
 
   void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.odcds_over_ads_fix",
-                                      odcdsOverAdsFixEnabled() ? "true" : "false");
     AdsIntegrationTestBase::initialize();
 
     test_server_->waitUntilListenersReady();
@@ -863,11 +859,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
                      // Only delta xDS is supported for on-demand CDS.
-                     testing::Values(Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta),
-                     // Whether to use the new/old OdCdsApiImpl (will be removed once
-                     // "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions"
-                     // is deprecated).
-                     testing::Values(true, false)));
+                     testing::Values(Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)));
 
 // tests a scenario when:
 //  - making a request to an unknown cluster
@@ -1168,13 +1160,6 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryMultipleClustersSequenti
 //  - Sending the CDS response for new_cluster2.
 //  - both requests are resumed.
 TEST_P(OdCdsAdsIntegrationTest, NoCdsConfigOnDemandClusterMultipleClustersSequentially) {
-  // This test does not work with the previous OdCdsApi implementation (OdCdsApiImpl),
-  // but works with the new one (XdstpOdCdsApiImpl).
-  // Once envoy.reloadable_features.odcds_over_ads_fix is removed, this test
-  // will only execute the fixed component.
-  if (!odcdsOverAdsFixEnabled()) {
-    GTEST_SKIP() << "This test only passes with the new XdstpOdCdsApiImpl implementation";
-  }
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.mutable_dynamic_resources()->clear_cds_config();
   });
@@ -1378,13 +1363,6 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterTwoClustersBeforeResponseAfterIni
 //  - both requests are resumed.
 TEST_P(OdCdsAdsIntegrationTest,
        NoCdsConfigOnDemandDiscoveryTwoClustersBeforeResponseAfterInitialCluster) {
-  // This test does not work with the previous OdCdsApi implementation (OdCdsApiImpl),
-  // but works with the new one (XdstpOdCdsApiImpl).
-  // Once envoy.reloadable_features.odcds_over_ads_fix is removed, this test
-  // will only execute the fixed component.
-  if (!odcdsOverAdsFixEnabled()) {
-    GTEST_SKIP() << "This test only passes with the new XdstpOdCdsApiImpl implementation";
-  }
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.mutable_dynamic_resources()->clear_cds_config();
   });

@@ -15,23 +15,19 @@ namespace Geoip {
  * Config registration for the geoip filter. @see NamedHttpFilterConfigFactory.
  */
 class GeoipFilterFactory
-    : public Common::ExceptionFreeFactoryBase<envoy::extensions::filters::http::geoip::v3::Geoip> {
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::geoip::v3::Geoip> {
 public:
-  GeoipFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.geoip") {}
+  GeoipFilterFactory() : UnifiedFactoryBase("envoy.filters.http.geoip") {}
 
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       Server::Configuration::ExtraFactoryContext& extra_context) override;
 
 private:
-  // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
-  // (ServerFactoryContext) paths. A GenericFactoryContext is used so the filter's scope and
-  // validation visitor stay correct for each path, while the provider driver is created with the
-  // server factory context.
+  // Shared factory creation used by the listener/cluster and route/vhost-level paths. A
+  // GenericFactoryContext is used so the filter's scope and validation visitor stay correct for
+  // each path, while the provider driver is created with the server factory context.
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactory(const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
                       const std::string& stat_prefix,

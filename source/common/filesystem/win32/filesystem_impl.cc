@@ -131,7 +131,7 @@ static std::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
   // invalid value and return nullopt.
   static const SystemTime windows_file_time_epoch =
       absl::ToChronoTime(absl::FromCivil(absl::CivilYear(1601), absl::UTCTimeZone()));
-  ULARGE_INTEGER tenths_of_microseconds{t.dwLowDateTime, t.dwHighDateTime};
+  ULARGE_INTEGER tenths_of_microseconds{{t.dwLowDateTime, t.dwHighDateTime}};
   uint64_t v = static_cast<uint64_t>(tenths_of_microseconds.QuadPart);
   SystemTime ret = windows_file_time_epoch + std::chrono::microseconds{v / 10};
   if (ret <= SystemTime{}) {
@@ -436,7 +436,7 @@ bool InstanceImplWin32::illegalPath(const std::string& path) {
     }
 
     for (const char& ch : elt) {
-      if (!(filename_char_table[ch] & 1)) {
+      if (!(filename_char_table[static_cast<unsigned char>(ch)] & 1)) {
         return true;
       }
     }

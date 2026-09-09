@@ -248,6 +248,8 @@ public:
   absl::Status startWorkers(OptRef<GuardDog> guard_dog, std::function<void()> callback) override;
   void stopListeners(StopListenersType stop_listeners_type,
                      const Network::ExtraShutdownListenerOptions& options) override;
+  void onServerDrainStart(Network::DrainDirection direction,
+                          Network::ConnectionDrainEvent drain_event) override;
   void stopWorkers() override;
   void beginListenerUpdate() override { lds_error_state_tracker_.clear(); }
   void endListenerUpdate(FailureStates&& failure_state) override;

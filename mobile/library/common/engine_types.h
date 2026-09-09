@@ -22,8 +22,8 @@ struct EngineCallbacks {
 
 /** The callbacks for Envoy Logger. */
 struct EnvoyLogger {
-  absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log_ =
-      [](Logger::Logger::Levels, const std::string&) {};
+  absl::AnyInvocable<void(Logger::Levels, const std::string&)> on_log_ = [](Logger::Levels,
+                                                                            const std::string&) {};
   absl::AnyInvocable<void()> on_exit_ = [] {};
 };
 

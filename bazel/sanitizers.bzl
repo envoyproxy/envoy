@@ -8,7 +8,7 @@ def sanitizer_deps():
     the system libc++.
     """
     return select({
-        "@envoy//bazel:msan_build": ["@envoy//bazel/foreign_cc:libcxx_msan_wrapper"],
-        "@envoy//bazel:tsan_build": ["@envoy//bazel/foreign_cc:libcxx_tsan_wrapper"],
+        "@envoy//bazel:msan_build": ["@envoy//bazel/deps:libcxx_msan_wrapper"],
+        "@envoy//bazel:tsan_build": ["@envoy//bazel/deps:libcxx_tsan_wrapper"],
         "//conditions:default": [],
     })

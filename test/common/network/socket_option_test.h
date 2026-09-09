@@ -99,7 +99,7 @@ public:
     };
     unset_socketstates.remove_if(
         [&](envoy::config::core::v3::SocketOption::SocketState state) -> bool {
-          return when.find(state) != when.end();
+          return when.contains(state);
         });
     for (auto state : unset_socketstates) {
       EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(0);

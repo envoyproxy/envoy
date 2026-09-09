@@ -506,6 +506,11 @@ pub trait EnvoyNetworkFilter {
   /// Get the upstream connection ID, or 0 if not available.
   fn get_upstream_connection_id(&self) -> u64;
 
+  /// Signal the downstream connection to enable secure transport mode.
+  /// This is done when the downstream connection's transport socket is of startTLS type.
+  /// Returns true if the downstream transport was successfully converted to secure mode.
+  fn start_downstream_secure_transport(&mut self) -> bool;
+
   /// Signal to the filter manager to enable secure transport mode in upstream connection.
   /// This is done when upstream connection's transport socket is of startTLS type.
   /// Returns true if the upstream transport was successfully converted to secure mode.
@@ -1803,6 +1808,12 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
   fn get_upstream_connection_id(&self) -> u64 {
     unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(self.raw)
+    }
+  }
+
+  fn start_downstream_secure_transport(&mut self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(self.raw)
     }
   }
 

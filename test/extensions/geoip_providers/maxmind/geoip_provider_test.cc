@@ -575,6 +575,25 @@ TEST_F(GeoipProviderTest, ValidConfigAnonHostingSuccessfulLookup) {
   expectStats("anon_db");
 }
 
+TEST_F(GeoipProviderTest, ValidConfigAnonHostingOnlySuccessfulLookup) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        anon_hosting: "x-geo-anon-hosting"
+    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("71.160.223.45");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), lookup_cb.AsStdFunction());
+  EXPECT_THAT(captured_lookup_response_,
+              testing::UnorderedElementsAre(testing::Pair("x-geo-anon-hosting", "true")));
+  expectStats("anon_db");
+}
+
 TEST_F(GeoipProviderTest, ValidConfigUsingCityDbNoHeadersAddedWhenIpIsNotInDb) {
   const std::string config_yaml = R"EOF(
     common_provider_config:

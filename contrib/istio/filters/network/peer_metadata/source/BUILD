@@ -17,6 +17,7 @@ envoy_cc_contrib_extension(
         "//contrib/istio/filters/common/source:peer_metadata_registry_lib",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:address_interface",
+        "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server:filter_config_interface",
@@ -30,6 +31,7 @@ envoy_cc_contrib_extension(
         "//source/common/tcp_proxy",
         "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "//source/extensions/io_socket/user_space:io_handle_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/peer_metadata/v3:pkg_cc_proto",
     ],
 )

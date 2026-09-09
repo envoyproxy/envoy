@@ -15,17 +15,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-absl::StatusOr<Http::FilterFactoryCb> BufferFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config, const std::string&,
-    DualInfo, Server::Configuration::ServerFactoryContext&) {
-  ASSERT(proto_config.has_max_request_bytes());
-
-  BufferFilterConfigSharedPtr filter_config(new BufferFilterConfig(proto_config));
-  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<BufferFilter>(filter_config));
-  };
-}
-
 absl::StatusOr<Envoy::Http::FilterFactoryCb>
 BufferFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config,

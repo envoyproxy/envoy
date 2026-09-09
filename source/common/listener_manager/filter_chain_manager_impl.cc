@@ -2,7 +2,6 @@
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
-#include "envoy/singleton/manager.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
@@ -27,9 +26,6 @@
 
 namespace Envoy {
 namespace Server {
-
-SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager);
-
 namespace FilterChain {
 
 // Return a fake address for use when either the source or destination is unix domain socket.
@@ -205,7 +201,7 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   const auto* origin = getOriginFilterChainManager();
   if (origin != nullptr) {
     for (const auto& message_and_filter_chain : origin->fc_contexts_) {
-      if (fc_contexts_.find(message_and_filter_chain.first) == fc_contexts_.end()) {
+      if (!fc_contexts_.contains(message_and_filter_chain.first)) {
         origin->draining_filter_chains_.push_back(message_and_filter_chain.second);
       }
     }
@@ -415,7 +411,7 @@ absl::Status FilterChainManagerImpl::addFilterChainForDestinationPorts(
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
-  if (destination_ports_map.find(destination_port) == destination_ports_map.end()) {
+  if (!destination_ports_map.contains(destination_port)) {
     destination_ports_map[destination_port] =
         std::make_pair<DestinationIPsMap, DestinationIPsTriePtr>(DestinationIPsMap{}, nullptr);
   }

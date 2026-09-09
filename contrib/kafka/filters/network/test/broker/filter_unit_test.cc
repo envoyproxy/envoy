@@ -279,7 +279,7 @@ TEST_F(KafkaMetricsFacadeImplUnitTest, ShouldRegisterResponse) {
 
   // then
   const auto& request_arrivals = testee_.getRequestArrivalsForTest();
-  ASSERT_EQ(request_arrivals.find(correlation_id), request_arrivals.end());
+  ASSERT_FALSE(request_arrivals.contains(correlation_id));
 }
 
 TEST_F(KafkaMetricsFacadeImplUnitTest, ShouldRegisterUnknownResponse) {

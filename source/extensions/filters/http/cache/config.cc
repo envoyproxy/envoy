@@ -32,12 +32,6 @@ absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactory(
   };
 }
 
-absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-    const std::string& /*stats_prefix*/, Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(config, context.serverFactoryContext());
-}
-
 absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
     Server::Configuration::ServerFactoryContext& context,

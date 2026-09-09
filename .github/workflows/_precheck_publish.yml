@@ -34,8 +34,6 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     with:
       arch: ${{ matrix.arch }}
-      bazel-cache: ${{ matrix.bazel-cache != 'DISABLE' }}
-      bazel-cache-output-base: ${{ matrix.bazel-cache-output-base || 'base' }}
       bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && '-arm64' || '' }}
@@ -48,6 +46,8 @@ jobs:
         ERROR
         error:
         Error:
+        FAILED
+        FAIL:
       skip: ${{ matrix.skip != false && true || false }}
       steps-post: ${{ matrix.steps-post }}
       target: ${{ matrix.target }}
@@ -73,14 +73,10 @@ jobs:
           timeout-minutes: 180
         - target: config
           name: Config
-          bazel-cache: true
-          bazel-cache-output-base: docs
           rbe: true
           skip: ${{ ! fromJSON(inputs.request).run.precheck-publish-config }}
         - target: docs
           name: Docs
-          bazel-cache: true
-          bazel-cache-output-base: docs
           bazel-extra: >-
             --config=rbe
             --config=docs-ci
@@ -88,7 +84,7 @@ jobs:
           upload-name: docs
           upload-path: generated/docs
           steps-post: |
-            - uses: envoyproxy/toolshed/actions/jq@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
+            - uses: envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
               with:
                 output-path: generated/docs/gcs-metadata.json
                 input-format: yaml

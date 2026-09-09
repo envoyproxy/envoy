@@ -25,7 +25,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "coroutine_test",
     srcs = ["coroutine_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":manual_executor_lib",
         "//source/common/coroutine:context_lib",
@@ -45,7 +45,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dispatcher_executor_test",
     srcs = ["dispatcher_executor_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/coroutine:dispatcher_executor_lib",
         "//source/common/coroutine:launch_lib",
@@ -57,12 +57,45 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "semaphore_test",
+    srcs = ["semaphore_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":manual_executor_lib",
+        "//source/common/coroutine:coroutine_lib",
+        "//source/common/coroutine:semaphore_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_test(
+    name = "async_queue_test",
+    srcs = ["async_queue_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":manual_executor_lib",
+        "//source/common/coroutine:async_queue_lib",
+        "//source/common/coroutine:coroutine_lib",
+        "//source/common/coroutine:dispatcher_executor_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
 # Echo-server micro-benchmark: a callback state machine vs. a coroutine body, both
 # over a real dispatcher + IoHandle, driven by a shared blocking two-thread client.
 envoy_cc_benchmark_binary(
     name = "perf_test",
     srcs = ["perf_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",

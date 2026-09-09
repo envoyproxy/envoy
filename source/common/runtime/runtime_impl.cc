@@ -469,8 +469,8 @@ absl::Status ProtoLayer::walkProtoValue(const Protobuf::Value& v, const std::str
     break;
   case Protobuf::Value::kStructValue: {
     const Protobuf::Struct& s = v.struct_value();
-    if (s.fields().empty() || s.fields().find("numerator") != s.fields().end() ||
-        s.fields().find("denominator") != s.fields().end()) {
+    if (s.fields().empty() || s.fields().contains("numerator") ||
+        s.fields().contains("denominator")) {
       SnapshotImpl::addEntry(values_, prefix, v, "");
       break;
     }
@@ -772,6 +772,7 @@ absl::StatusOr<SnapshotImplPtr> LoaderImpl::createNewSnapshot() {
     }
   }
   stats_.num_layers_.set(layers.size());
+  auto snapshot = std::make_unique<SnapshotImpl>(generator_, stats_, std::move(layers));
   if (error_layers == 0) {
     stats_.load_success_.inc();
   } else {
@@ -782,7 +783,7 @@ absl::StatusOr<SnapshotImplPtr> LoaderImpl::createNewSnapshot() {
   } else {
     stats_.override_dir_not_exists_.inc();
   }
-  return std::make_unique<SnapshotImpl>(generator_, stats_, std::move(layers));
+  return snapshot;
 }
 
 } // namespace Runtime

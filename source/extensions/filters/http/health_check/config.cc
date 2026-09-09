@@ -62,20 +62,13 @@ absl::StatusOr<Http::FilterFactoryCb> HealthCheckFilterConfig::createFilterFacto
   };
 }
 
-absl::StatusOr<Http::FilterFactoryCb> HealthCheckFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::health_check::v3::HealthCheck& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  return createFilterFactoryHelper(proto_config, stats_prefix, context.serverFactoryContext(),
-                                   context.scope());
-}
-
 absl::StatusOr<Http::FilterFactoryCb>
 HealthCheckFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::health_check::v3::HealthCheck& proto_config,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
   return createFilterFactoryHelper(proto_config, extra_context.stats_prefix, context,
-                                   context.scope());
+                                   extra_context.scopeOr(context));
 }
 
 /**

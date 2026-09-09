@@ -14,13 +14,13 @@ namespace Envoy {
 TEST(EngineTest, SetLogger) {
   std::atomic<bool> logging_was_called{false};
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Logger::Levels, const std::string&) { logging_was_called = true; };
+  logger->on_log_ = [&](Logger::Levels, const std::string&) { logging_was_called = true; };
 
   absl::Notification engine_running;
   auto engine_callbacks = std::make_unique<EngineCallbacks>();
   engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
   Platform::EngineBuilder engine_builder;
-  engine_builder.setLogLevel(Logger::Logger::debug)
+  engine_builder.setLogLevel(Logger::Levels::debug)
       .setLogger(std::move(logger))
       .setEngineCallbacks(std::move(engine_callbacks))
       .enforceTrustChainVerification(false);
@@ -68,7 +68,7 @@ TEST(EngineTest, SetEngineCallbacks) {
   auto engine_callbacks = std::make_unique<EngineCallbacks>();
   engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
   Platform::EngineBuilder engine_builder;
-  engine_builder.setLogLevel(Logger::Logger::debug)
+  engine_builder.setLogLevel(Logger::Levels::debug)
       .setEngineCallbacks(std::move(engine_callbacks))
       .enforceTrustChainVerification(false);
   EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
@@ -126,7 +126,7 @@ TEST(EngineTest, SetEventTracker) {
   event_tracker->on_exit_ = [&] { on_track_exit.Notify(); };
 
   Platform::EngineBuilder engine_builder;
-  engine_builder.setLogLevel(Logger::Logger::debug)
+  engine_builder.setLogLevel(Logger::Levels::debug)
       .setEngineCallbacks(std::move(engine_callbacks))
       .setEventTracker(std::move(event_tracker))
       .enforceTrustChainVerification(false);
@@ -141,7 +141,7 @@ TEST(EngineTest, SetEventTracker) {
 
 TEST(EngineTest, DontWaitForOnEngineRunning) {
   Platform::EngineBuilder engine_builder;
-  engine_builder.setLogLevel(Logger::Logger::debug).enforceTrustChainVerification(false);
+  engine_builder.setLogLevel(Logger::Levels::debug).enforceTrustChainVerification(false);
   EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
 
   std::string actual_status_code;
@@ -185,7 +185,7 @@ TEST(EngineTest, TerminateWithoutWaitingForOnEngineRunning) {
   engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
 
   Platform::EngineBuilder engine_builder;
-  auto engine = engine_builder.setLogLevel(Logger::Logger::debug).build();
+  auto engine = engine_builder.setLogLevel(Logger::Levels::debug).build();
 
   engine->terminate();
 }

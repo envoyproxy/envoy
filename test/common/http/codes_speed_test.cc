@@ -19,9 +19,14 @@ namespace Http {
 
 template <class SymbolTableClass> class CodeUtilitySpeedTest {
 public:
-  CodeUtilitySpeedTest()
-      : global_store_(symbol_table_), cluster_store_(symbol_table_), code_stats_(symbol_table_),
-        pool_(symbol_table_), from_az_(pool_.add("from_az")), prefix_(pool_.add("prefix")),
+  // ResponseStatInfo::prefix_ is left empty by the router, ext_authz and ratelimit; only the
+  // router's alt-stat-prefix path supplies a non-empty one. Both shapes are benchmarked.
+  explicit CodeUtilitySpeedTest(bool empty_prefix)
+      : global_store_(symbol_table_), cluster_store_(symbol_table_),
+        // Cluster stats are charged to a "cluster.<name>." scope in production.
+        cluster_scope_(cluster_store_.createScope("cluster.test-cluster")),
+        code_stats_(symbol_table_), pool_(symbol_table_), from_az_(pool_.add("from_az")),
+        prefix_(empty_prefix ? Stats::StatName() : pool_.add("prefix")),
         req_vcluster_name_(pool_.add("req_vcluster_name")),
         test_cluster_(pool_.add("test-cluster")), test_vhost_(pool_.add("test-vhost")),
         to_az_(pool_.add("to_az")), vhost_name_(pool_.add("vhost_name")) {}
@@ -33,7 +38,7 @@ public:
                    Stats::StatName from_az = Stats::StatName(),
                    Stats::StatName to_az = Stats::StatName()) {
     Http::CodeStats::ResponseStatInfo info{*global_store_.rootScope(),
-                                           *cluster_store_.rootScope(),
+                                           *cluster_scope_,
                                            prefix_,
                                            code,
                                            internal_request,
@@ -63,7 +68,7 @@ public:
   void responseTiming() {
     Stats::StatName empty_stat_name;
     Http::CodeStats::ResponseTimingInfo info{*global_store_.rootScope(),
-                                             *cluster_store_.rootScope(),
+                                             *cluster_scope_,
                                              prefix_,
                                              std::chrono::milliseconds(5),
                                              true,
@@ -79,6 +84,7 @@ public:
   SymbolTableClass symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_store_;
+  Stats::ScopeSharedPtr cluster_scope_;
   Http::CodeStatsImpl code_stats_;
   Stats::StatNamePool pool_;
   const Stats::StatName from_az_;
@@ -93,9 +99,10 @@ public:
 } // namespace Http
 } // namespace Envoy
 
+// Mirrors the router, ext_authz and ratelimit call shape: an empty ResponseStatInfo prefix.
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AddResponsesRealSymtab(benchmark::State& state) {
-  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;
+  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context(true);
 
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
@@ -104,9 +111,21 @@ static void BM_AddResponsesRealSymtab(benchmark::State& state) {
 }
 BENCHMARK(BM_AddResponsesRealSymtab);
 
+// Mirrors the router's alt-stat-prefix call shape: a non-empty ResponseStatInfo prefix.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_AddResponsesRealSymtabWithPrefix(benchmark::State& state) {
+  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context(false);
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    context.addResponses();
+  }
+}
+BENCHMARK(BM_AddResponsesRealSymtabWithPrefix);
+
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_ResponseTimingRealSymtab(benchmark::State& state) {
-  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;
+  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context(true);
 
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
@@ -114,3 +133,14 @@ static void BM_ResponseTimingRealSymtab(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_ResponseTimingRealSymtab);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_ResponseTimingRealSymtabWithPrefix(benchmark::State& state) {
+  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context(false);
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    context.responseTiming();
+  }
+}
+BENCHMARK(BM_ResponseTimingRealSymtabWithPrefix);

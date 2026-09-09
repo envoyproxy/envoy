@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     name = "datasource_server_preferred_address_test",
     srcs = envoy_select_enable_http3(["datasource_server_preferred_address_test.cc"]),
     extension_names = ["envoy.quic.server_preferred_address.datasource"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/extensions/quic/server_preferred_address:datasource_server_preferred_address_config_lib",
         "//test/mocks/protobuf:protobuf_mocks",
@@ -28,7 +28,7 @@ envoy_extension_cc_test(
     name = "fixed_server_preferred_address_test",
     srcs = envoy_select_enable_http3(["fixed_server_preferred_address_test.cc"]),
     extension_names = ["envoy.quic.server_preferred_address.fixed"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_lib",
         "//test/mocks/protobuf:protobuf_mocks",

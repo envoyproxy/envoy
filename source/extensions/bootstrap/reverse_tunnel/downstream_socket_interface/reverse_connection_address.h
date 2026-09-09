@@ -1,10 +1,8 @@
 #pragma once
 
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include <functional>
 
+#include "envoy/common/platform.h"
 #include "envoy/network/address.h"
 
 #include "source/common/common/logger.h"

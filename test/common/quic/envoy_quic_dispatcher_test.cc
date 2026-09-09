@@ -119,6 +119,42 @@ public:
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
+  // Creates a single QUIC session whose network filter chain registers `callbacks` as connection
+  // callbacks, so that drain notifications delivered to the session can be observed.
+  void setUpSessionWithConnectionCallbacks(Network::ConnectionCallbacks& callbacks,
+                                           std::shared_ptr<Network::MockReadFilter> read_filter) {
+    // Capture the callbacks by address: `callbacks` is a reference parameter that does not outlive
+    // this call, while the lambda does.
+    drain_filter_factory_.push_back(
+        std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
+            [cb = &callbacks, read_filter](Network::FilterManager& filter_manager) {
+              filter_manager.addReadFilter(read_filter);
+              read_filter->callbacks_->connection().addConnectionCallbacks(*cb);
+            }));
+    EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+        .WillRepeatedly(Return(&proof_source_->filterChain()));
+    EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
+        .WillRepeatedly(ReturnRef(drain_filter_factory_));
+    EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
+        .WillRepeatedly(Return(true));
+    EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
+        .WillOnce(Invoke([](Network::Connection& connection,
+                            const Filter::NetworkFilterFactoriesList& filter_factories) {
+          Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
+          return true;
+        }));
+    EXPECT_CALL(*read_filter, onNewConnection())
+        // Stop iteration to avoid calling getRead/WriteBuffer().
+        .WillOnce(Return(Network::FilterStatus::StopIteration));
+
+    const quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                                ? quic::QuicIpAddress::Loopback4()
+                                                : quic::QuicIpAddress::Loopback6(),
+                                            54321);
+    envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+    processValidChloPacket(peer_addr);
+  }
+
   void processValidChloPacket(const quic::QuicSocketAddress& peer_addr) {
     // Create a Quic Crypto or TLS1.3 CHLO packet.
     EnvoyQuicClock clock(*dispatcher_);
@@ -287,6 +323,9 @@ protected:
   std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
   testing::NiceMock<Network::MockFilterChainManager> filter_chain_manager_;
   Filter::NetworkFilterFactoriesList empty_filter_factory_;
+  // Used by setUpSessionWithConnectionCallbacks(); a fixture member so the factories outlive the
+  // session they build.
+  Filter::NetworkFilterFactoriesList drain_filter_factory_;
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicDispatcherTests, EnvoyQuicDispatcherTest,
@@ -517,6 +556,75 @@ TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
 
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   envoy_quic_dispatcher_.closeConnectionsWithFilterChain(&proof_source_->filterChain());
+}
+
+TEST_P(EnvoyQuicDispatcherTest, DrainConnectionsWithGivenFilterChains) {
+  std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
+  Network::MockConnectionCallbacks network_connection_callbacks;
+  setUpSessionWithConnectionCallbacks(network_connection_callbacks, read_filter);
+
+  // The session belonging to the drained filter chain is notified, and is NOT closed.
+  const MonotonicTime start_time = dispatcher_->timeSource().monotonicTime();
+  Network::ConnectionDrainEvent observed;
+  EXPECT_CALL(network_connection_callbacks, onDrain(_))
+      .WillOnce(Invoke([&observed](Network::ConnectionDrainEvent event) { observed = event; }));
+  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose)).Times(0);
+  const std::list<const Network::FilterChain*> filter_chains{&proof_source_->filterChain()};
+  envoy_quic_dispatcher_.drainConnectionsWithFilterChains(
+      filter_chains, Network::ConnectionDrainEvent{start_time, Server::DrainStrategy::Immediate});
+  EXPECT_EQ(start_time, observed.start_time);
+  EXPECT_EQ(Server::DrainStrategy::Immediate, observed.strategy);
+
+  // A filter chain with no sessions is skipped rather than treated as an error.
+  Network::MockFilterChain unrelated_filter_chain;
+  const std::list<const Network::FilterChain*> unrelated{&unrelated_filter_chain};
+  EXPECT_CALL(network_connection_callbacks, onDrain(_)).Times(0);
+  envoy_quic_dispatcher_.drainConnectionsWithFilterChains(unrelated,
+                                                          Network::ConnectionDrainEvent{});
+
+  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  envoy_quic_dispatcher_.closeConnectionsWithFilterChain(&proof_source_->filterChain());
+}
+
+TEST_P(EnvoyQuicDispatcherTest, DrainAllConnectionsNotifiesEverySession) {
+  std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
+  Network::MockConnectionCallbacks network_connection_callbacks;
+  setUpSessionWithConnectionCallbacks(network_connection_callbacks, read_filter);
+
+  const MonotonicTime start_time = dispatcher_->timeSource().monotonicTime();
+  Network::ConnectionDrainEvent observed;
+  EXPECT_CALL(network_connection_callbacks, onDrain(_))
+      .WillOnce(Invoke([&observed](Network::ConnectionDrainEvent event) { observed = event; }));
+  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose)).Times(0);
+  envoy_quic_dispatcher_.drainAllConnections(
+      Network::ConnectionDrainEvent{start_time, Server::DrainStrategy::Gradual});
+  EXPECT_EQ(start_time, observed.start_time);
+  EXPECT_EQ(Server::DrainStrategy::Gradual, observed.strategy);
+
+  // The first event wins: a second notification (a server drain escalating from InboundOnly to
+  // All) is dropped rather than re-notifying sessions. The WillOnce() above fails the test if
+  // onDrain() fires again.
+  envoy_quic_dispatcher_.drainAllConnections(Network::ConnectionDrainEvent{
+      start_time + std::chrono::seconds(30), Server::DrainStrategy::Immediate});
+
+  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  envoy_quic_dispatcher_.closeConnectionsWithFilterChain(&proof_source_->filterChain());
+}
+
+// A drain callback is allowed to synchronously close its session. Closing the last session of a
+// filter chain erases the whole entry from connections_by_filter_chain_ (see
+// EnvoyQuicServerSession::OnConnectionClosed()), so the drain must not be iterating that list.
+TEST_P(EnvoyQuicDispatcherTest, DrainCallbackClosingSessionIsSafe) {
+  std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
+  Network::MockConnectionCallbacks network_connection_callbacks;
+  setUpSessionWithConnectionCallbacks(network_connection_callbacks, read_filter);
+
+  EXPECT_CALL(network_connection_callbacks, onDrain(_))
+      .WillOnce(Invoke([read_filter](Network::ConnectionDrainEvent) {
+        read_filter->callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      }));
+  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  envoy_quic_dispatcher_.drainAllConnections(Network::ConnectionDrainEvent{});
 }
 
 TEST_P(EnvoyQuicDispatcherTest, EnvoyQuicCryptoServerStreamHelper) {

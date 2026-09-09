@@ -14,6 +14,9 @@
 using testing::NiceMock;
 using testing::ReturnRef;
 
+using testing::Contains;
+using testing::Key;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -329,7 +332,7 @@ TEST_F(SetMetadataFilterTest, TypedWithAllowOverwrite) {
   ASSERT_TRUE(any_val.UnpackTo(&test_cfg));
   EXPECT_EQ("bat_namespace", test_cfg.metadata_namespace());
   ASSERT_TRUE(test_cfg.has_value());
-  EXPECT_TRUE(test_cfg.value().fields().contains("bat"));
+  EXPECT_THAT(test_cfg.value().fields(), Contains(Key("bat")));
 }
 
 TEST_F(SetMetadataFilterTest, TypedWithNoAllowOverwrite) {
@@ -364,7 +367,7 @@ TEST_F(SetMetadataFilterTest, TypedWithNoAllowOverwrite) {
   ASSERT_TRUE(any_val.UnpackTo(&test_cfg));
   EXPECT_EQ("foo_namespace", test_cfg.metadata_namespace());
   ASSERT_TRUE(test_cfg.has_value());
-  EXPECT_TRUE(test_cfg.value().fields().contains("foo"));
+  EXPECT_THAT(test_cfg.value().fields(), Contains(Key("foo")));
   EXPECT_EQ(1, config_->stats().overwrite_denied_.value());
 }
 

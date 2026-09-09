@@ -8,6 +8,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/network/generic_proxy/interface/filter.h"
 #include "source/extensions/filters/network/generic_proxy/route_impl.h"
@@ -777,9 +778,18 @@ void Filter::closeDownstreamConnection() {
   downstreamConnection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
+bool Filter::shouldDrainClose() {
+  if (!use_connection_event_drain_) {
+    return drain_decision_.drainClose(Network::DrainDirection::All);
+  }
+
+  return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_);
+}
+
 void Filter::mayBeDrainClose() {
-  if ((drain_decision_.drainClose(Network::DrainDirection::All) || stream_drain_decision_) &&
-      active_streams_.empty()) {
+  // Note that the drain decision is only evaluated once it is known to be needed, since either
+  // path consumes a random number on every call.
+  if (active_streams_.empty() && (stream_drain_decision_ || shouldDrainClose())) {
     onDrainCloseAndNoActiveStreams();
   }
 }

@@ -35,11 +35,12 @@ using JwtVerify::Status;
 
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
 public:
-  JwksDataImpl(const JwtProvider& jwt_provider, Server::Configuration::FactoryContext& context,
-               CreateJwksFetcherCb fetcher_cb, JwtAuthnFilterStats& stats,
-               absl::Status& creation_status)
-      : jwt_provider_(jwt_provider), time_source_(context.serverFactoryContext().timeSource()),
-        tls_(context.serverFactoryContext().threadLocal()) {
+  JwksDataImpl(const JwtProvider& jwt_provider,
+               Server::Configuration::ServerFactoryContext& context,
+               OptRef<Init::Manager> init_manager, CreateJwksFetcherCb fetcher_cb,
+               JwtAuthnFilterStats& stats, absl::Status& creation_status)
+      : jwt_provider_(jwt_provider), time_source_(context.timeSource()),
+        tls_(context.threadLocal()) {
     std::vector<std::string> audiences;
     for (const auto& aud : jwt_provider_.audiences()) {
       audiences.push_back(aud);
@@ -47,7 +48,7 @@ public:
     audiences_ = std::make_unique<JwtVerify::CheckAudience>(audiences);
 
     if (jwt_provider_.has_subjects()) {
-      sub_matcher_.emplace(jwt_provider_.subjects(), context.serverFactoryContext());
+      sub_matcher_.emplace(jwt_provider_.subjects(), context);
     }
 
     // Resolve each claim_to_headers entry to an explicit path once here rather than per request.
@@ -85,8 +86,7 @@ public:
       return std::make_shared<ThreadLocalCache>(enable_jwt_cache, config, dispatcher.timeSource());
     });
 
-    auto inline_jwks_or = Config::DataSource::read(jwt_provider_.local_jwks(), true,
-                                                   context.serverFactoryContext().api());
+    auto inline_jwks_or = Config::DataSource::read(jwt_provider_.local_jwks(), true, context.api());
     SET_AND_RETURN_IF_NOT_OK(inline_jwks_or.status(), creation_status);
     const auto& inline_jwks = inline_jwks_or.value();
     if (!inline_jwks.empty()) {
@@ -114,8 +114,7 @@ public:
         // Use the null validation visitor because it was used by the async client in the previous
         // implementation.
         auto policy_or_error = Router::RetryPolicyImpl::create(
-            route_retry_policy, ProtobufMessage::getNullValidationVisitor(),
-            context.serverFactoryContext());
+            route_retry_policy, ProtobufMessage::getNullValidationVisitor(), context);
         SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
         retry_policy_ = std::move(policy_or_error.value());
       }
@@ -146,7 +145,7 @@ public:
 
       // create async_fetch for remote_jwks, if is no-op if async_fetch is not enabled.
       async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
-          jwt_provider_.remote_jwks(), retry_policy_, context, fetcher_cb,
+          jwt_provider_.remote_jwks(), retry_policy_, context, init_manager, fetcher_cb,
           stats.jwks_fetch_success_, stats.jwks_fetch_failed_,
           [this](Envoy::JwtVerify::JwksPtr&& jwks) { setJwksToAllThreads(std::move(jwks)); });
     }
@@ -253,13 +252,14 @@ using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;
 class JwksCacheImpl : public JwksCache {
 public:
   // Load the config from envoy config.
-  JwksCacheImpl(const JwtAuthentication& config, Server::Configuration::FactoryContext& context,
-                CreateJwksFetcherCb fetcher_fn, JwtAuthnFilterStats& stats,
-                absl::Status& creation_status)
+  JwksCacheImpl(const JwtAuthentication& config,
+                Server::Configuration::ServerFactoryContext& context,
+                OptRef<Init::Manager> init_manager, CreateJwksFetcherCb fetcher_fn,
+                JwtAuthnFilterStats& stats, absl::Status& creation_status)
       : stats_(stats) {
     for (const auto& [name, provider] : config.providers()) {
-      auto jwks_data =
-          std::make_unique<JwksDataImpl>(provider, context, fetcher_fn, stats, creation_status);
+      auto jwks_data = std::make_unique<JwksDataImpl>(provider, context, init_manager, fetcher_fn,
+                                                      stats, creation_status);
       if (!creation_status.ok()) {
         return;
       }
@@ -318,10 +318,12 @@ private:
 
 absl::StatusOr<JwksCachePtr>
 JwksCache::create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
-                  Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
+                  Server::Configuration::ServerFactoryContext& context,
+                  OptRef<Init::Manager> init_manager, CreateJwksFetcherCb fetcher_fn,
                   JwtAuthnFilterStats& stats) {
   absl::Status creation_status = absl::OkStatus();
-  auto cache = std::make_unique<JwksCacheImpl>(config, context, fetcher_fn, stats, creation_status);
+  auto cache = std::make_unique<JwksCacheImpl>(config, context, init_manager, fetcher_fn, stats,
+                                               creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
   return cache;
 }

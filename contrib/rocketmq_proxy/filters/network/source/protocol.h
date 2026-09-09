@@ -1,5 +1,6 @@
 #pragma once
 
+#include <format>
 #include <map>
 #include <utility>
 
@@ -541,7 +542,7 @@ public:
 
   const std::string& directiveKey() {
     if (key_.empty()) {
-      key_ = fmt::format("{}-{}-{}-{}", consumer_group_, topic_, queue_id_, offset_);
+      key_ = std::format("{}-{}-{}-{}", consumer_group_, topic_, queue_id_, offset_);
     }
     return key_;
   }

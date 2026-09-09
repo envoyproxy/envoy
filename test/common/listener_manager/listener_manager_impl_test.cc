@@ -3193,6 +3193,47 @@ filter_chains:
   checkStats(__LINE__, 1, 0, 1, 0, 0, 0, 0);
 }
 
+// A listener drain propagates the configured drain strategy, so its connections ramp up over the
+// drain window like a server drain does.
+TEST_P(ListenerManagerImplTest, DrainListenerUsesConfiguredDrainStrategy) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  worker_->callAddCompletion();
+
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
+  Network::ConnectionDrainEvent captured;
+  EXPECT_CALL(*worker_, onListenerDrain(_, _))
+      .WillOnce(
+          Invoke([&captured](uint64_t, Network::ConnectionDrainEvent event) { captured = event; }));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+  EXPECT_EQ(Server::DrainStrategy::Gradual, captured.strategy);
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+}
+
 // Verify ListenerManagerImpl::drainListener fans out worker_->onListenerDrain at the start
 // of the drain sequence, before connections are closed.
 TEST_P(ListenerManagerImplTest, DrainListenerFansOutToWorker) {
@@ -3221,13 +3262,111 @@ filter_chains:
   // drain_manager->startDrainSequence. Override the AnyNumber() default from SetUp() so we
   // assert worker->onListenerDrain is invoked exactly once.
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*worker_, onListenerDrain(_));
+  EXPECT_CALL(*worker_, onListenerDrain(_, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
 
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
 
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+}
+
+// Verify that onServerDrainStart (server-wide/admin drain) notifies connections via the worker's
+// onListenerDrain, and honors direction: an InboundOnly drain only notifies inbound listeners.
+TEST_P(ListenerManagerImplTest, OnServerDrainStartHonorsDirection) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  const std::string inbound_yaml = R"EOF(
+name: inbound
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+  ListenerHandle* inbound = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(inbound_yaml)));
+  worker_->callAddCompletion();
+
+  const std::string outbound_yaml = R"EOF(
+name: outbound
+traffic_direction: OUTBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1235
+filter_chains:
+- filters: []
+  )EOF";
+  ListenerHandle* outbound = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(outbound_yaml)));
+  worker_->callAddCompletion();
+
+  // An All drain notifies both listeners (override the AnyNumber() default from SetUp()).
+  EXPECT_CALL(*worker_, onListenerDrain(_, _)).Times(2);
+  manager_->onServerDrainStart(Network::DrainDirection::All, Network::ConnectionDrainEvent{});
+
+  // An InboundOnly drain notifies only the single inbound listener.
+  EXPECT_CALL(*worker_, onListenerDrain(_, _));
+  manager_->onServerDrainStart(Network::DrainDirection::InboundOnly,
+                               Network::ConnectionDrainEvent{});
+
+  EXPECT_CALL(*inbound, onDestroy());
+  EXPECT_CALL(*outbound, onDestroy());
+}
+
+// A server-wide drain notifies only active listeners. Listeners that are already draining are
+// deliberately skipped, because drainListener() has already notified all of their connections with
+// an earlier (and therefore further advanced) drain event. See
+// ListenerManagerImpl::onServerDrainStart().
+TEST_P(ListenerManagerImplTest, OnServerDrainStartSkipsDrainingListeners) {
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  worker_->callAddCompletion();
+
+  // Remove the listener so it moves into the draining state. It stays owned by the worker until
+  // its drain sequence completes.
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+  EXPECT_EQ(0UL, manager_->listeners().size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ListenerState::DRAINING).size());
+
+  // A server drain does not re-notify the draining listener: it is not in the active set, and its
+  // connections were already notified by removeListener() above. Overrides the AnyNumber() default
+  // from SetUp().
+  EXPECT_CALL(*worker_, onListenerDrain(_, _)).Times(0);
+  manager_->onServerDrainStart(Network::DrainDirection::All, Network::ConnectionDrainEvent{});
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
 }
@@ -8070,6 +8209,81 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
 }
 
+// A draining filter chain is notified with DrainStrategy::Immediate regardless of the configured
+// strategy to keep backwards compatibility with existing filter chain drain behavior.
+TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, FilterChainDrainUsesImmediateStrategy) {
+  // Deliberately no InSequence: this test asserts the content of the drain notification, not the
+  // ordering of the surrounding calls.
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion();
+
+  // Update foo in place so its original filter chain begins draining.
+  const auto listener_foo_update1_proto = parseListenerFromV3Yaml(R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  filter_chain_match:
+    destination_port: 1234
+  )EOF");
+
+  ListenerHandle* listener_foo_update1 = expectListenerOverridden(true, listener_foo);
+  auto duplicated_socket = new NiceMock<Network::MockListenSocket>();
+  EXPECT_CALL(*listener_factory_.socket_, duplicate())
+      .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(duplicated_socket))));
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo_update1_proto));
+
+  // Configure a gradual server drain strategy; the filter chain drain must override it.
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(600)));
+
+  Network::ConnectionDrainEvent captured;
+  // Overrides the AnyNumber() default installed by SetUp().
+  EXPECT_CALL(*worker_, onFilterChainDrain(_, _, _))
+      .WillOnce(Invoke([&captured](uint64_t, const std::list<const Network::FilterChain*>&,
+                                   Network::ConnectionDrainEvent event) { captured = event; }));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  Event::MockTimer* filter_chain_drain_timer = new Event::MockTimer(&server_.dispatcher_);
+  EXPECT_CALL(*filter_chain_drain_timer, enableTimer(std::chrono::milliseconds(600000), _));
+  listener_foo_update1->target_.ready();
+  worker_->callAddCompletion();
+
+  EXPECT_EQ(Server::DrainStrategy::Immediate, captured.strategy);
+
+  // Timer expires, the worker removes the draining filter chains, and once that completes the
+  // main thread can destroy the original listener.
+  EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
+  filter_chain_drain_timer->invokeCallback();
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callDrainFilterChainsComplete();
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+}
+
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, RemoveTheInplaceUpdatingListener) {
   InSequence s;
 
@@ -8124,7 +8338,7 @@ filter_chains:
 
   // The warmed up starts the drain timer.
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
-  EXPECT_CALL(server_.options_, drainTime()).WillOnce(Return(std::chrono::seconds(600)));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(600)));
   Event::MockTimer* filter_chain_drain_timer = new Event::MockTimer(&server_.dispatcher_);
   EXPECT_CALL(*filter_chain_drain_timer, enableTimer(std::chrono::milliseconds(600000), _));
   listener_foo_update1->target_.ready();
@@ -8208,7 +8422,7 @@ filter_chains:
 
   // The warmed up starts the drain timer.
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
-  EXPECT_CALL(server_.options_, drainTime()).WillOnce(Return(std::chrono::seconds(600)));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(600)));
   Event::MockTimer* filter_chain_drain_timer = new Event::MockTimer(&server_.dispatcher_);
   EXPECT_CALL(*filter_chain_drain_timer, enableTimer(std::chrono::milliseconds(600000), _));
   listener_foo_update1->target_.ready();
@@ -8340,7 +8554,7 @@ filter_chains:
 
   // The warmed up starts the drain timer.
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
-  EXPECT_CALL(server_.options_, drainTime()).WillOnce(Return(std::chrono::seconds(600)));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(600)));
   Event::MockTimer* filter_chain_drain_timer = new Event::MockTimer(&server_.dispatcher_);
   EXPECT_CALL(*filter_chain_drain_timer, enableTimer(std::chrono::milliseconds(600000), _));
   listener_foo_update1->target_.ready();
@@ -8446,7 +8660,7 @@ filter_chains:
 
   // The warmed up starts the drain timer.
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
-  EXPECT_CALL(server_.options_, drainTime()).WillOnce(Return(std::chrono::seconds(600)));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(600)));
   Event::MockTimer* filter_chain_drain_timer = new Event::MockTimer(&server_.dispatcher_);
   EXPECT_CALL(*filter_chain_drain_timer, enableTimer(std::chrono::milliseconds(600000), _));
   listener_foo_update1->target_.ready();

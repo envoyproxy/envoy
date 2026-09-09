@@ -245,9 +245,7 @@ void XdsVerifier::updateSotwListeners() {
       rep.state = ACTIVE;
     }
   }
-  listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
-                                  [&](auto& listener) { return listener.state == REMOVED; }),
-                   listeners_.end());
+  std::erase_if(listeners_, [&](auto& listener) { return listener.state == REMOVED; });
 }
 
 /**
@@ -268,9 +266,7 @@ void XdsVerifier::updateDeltaListeners(const envoy::config::route::v3::RouteConf
     }
   }
   // erase any active listeners that were replaced
-  listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
-                                  [&](auto& listener) { return listener.state == REMOVED; }),
-                   listeners_.end());
+  std::erase_if(listeners_, [&](auto& listener) { return listener.state == REMOVED; });
 }
 
 /**

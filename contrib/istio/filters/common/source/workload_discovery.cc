@@ -1,7 +1,5 @@
 #include "contrib/istio/filters/common/source/workload_discovery.h"
 
-#include <optional>
-
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/factory_context.h"
@@ -28,7 +26,8 @@ constexpr absl::string_view DefaultNamespace = "default";
 constexpr absl::string_view DefaultServiceAccount = "default";
 constexpr absl::string_view DefaultTrustDomain = "cluster.local";
 
-Istio::Common::WorkloadMetadataObject convert(const istio::workload::Workload& workload) {
+Istio::Common::WorkloadMetadataObjectConstSharedPtr
+convert(const istio::workload::Workload& workload) {
   auto workload_type = Istio::Common::WorkloadType::Deployment;
   switch (workload.workload_type()) {
   case istio::workload::WorkloadType::CRONJOB:
@@ -61,7 +60,7 @@ Istio::Common::WorkloadMetadataObject convert(const istio::workload::Workload& w
   }
   const auto identity =
       absl::StrCat("spiffe://", trust_domain, "/ns/", ns, "/sa/", service_account);
-  return Istio::Common::WorkloadMetadataObject(
+  return std::make_shared<const Istio::Common::WorkloadMetadataObject>(
       workload.name(), workload.cluster_id(), ns, workload.workload_name(),
       workload.canonical_name(), workload.canonical_revision(), workload.canonical_name(),
       workload.canonical_revision(), workload_type, identity, workload.locality().region(),
@@ -83,7 +82,7 @@ public:
     subscription_.start();
   }
 
-  std::optional<Istio::Common::WorkloadMetadataObject>
+  Istio::Common::WorkloadMetadataObjectConstSharedPtr
   GetMetadata(const Network::Address::InstanceConstSharedPtr& address) override {
     if (address && address->ip()) {
       if (const auto ipv4 = address->ip()->ipv4(); ipv4) {
@@ -99,13 +98,14 @@ public:
         return tls_->get(std::string(output.begin(), output.end()));
       }
     }
-    return {};
+    return nullptr;
   }
 
 private:
   using IdToAddress = absl::flat_hash_map<std::string, std::vector<std::string>>;
   using IdToAddressSharedPtr = std::shared_ptr<IdToAddress>;
-  using AddressToWorkload = absl::flat_hash_map<std::string, Istio::Common::WorkloadMetadataObject>;
+  using AddressToWorkload =
+      absl::flat_hash_map<std::string, Istio::Common::WorkloadMetadataObjectConstSharedPtr>;
   using AddressToWorkloadSharedPtr = std::shared_ptr<AddressToWorkload>;
 
   struct ThreadLocalProvider : public ThreadLocal::ThreadLocalObject {
@@ -127,13 +127,12 @@ private:
       }
     }
     size_t total() const { return address_to_workload_.size(); }
-    // Returns by-value since the flat map does not provide pointer stability.
-    std::optional<Istio::Common::WorkloadMetadataObject> get(const std::string& address) {
+    Istio::Common::WorkloadMetadataObjectConstSharedPtr get(const std::string& address) const {
       const auto it = address_to_workload_.find(address);
       if (it != address_to_workload_.end()) {
         return it->second;
       }
-      return {};
+      return nullptr;
     }
     IdToAddress id_to_address_;
     AddressToWorkload address_to_workload_;
@@ -162,7 +161,7 @@ private:
       for (const auto& resource : resources) {
         const auto& workload =
             dynamic_cast<const istio::workload::Workload&>(resource.get().resource());
-        const auto& metadata = convert(workload);
+        const auto metadata = convert(workload);
         for (const auto& addr : workload.addresses()) {
           index->emplace(addr, metadata);
         }
@@ -178,7 +177,7 @@ private:
       for (const auto& resource : added_resources) {
         const auto& workload =
             dynamic_cast<const istio::workload::Workload&>(resource.get().resource());
-        const auto& metadata = convert(workload);
+        const auto metadata = convert(workload);
         for (const auto& addr : workload.addresses()) {
           added_addresses->emplace(addr, metadata);
         }

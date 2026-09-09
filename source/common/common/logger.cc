@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/logger.h"
+
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/version/version_string.h"
