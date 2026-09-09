@@ -115,7 +115,7 @@ public:
   createRouteExtension(const Protobuf::Message& config,
                        Server::Configuration::ServerFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.router.route_extension"; }
+  std::string category() const override { return "envoy.router.route_extensions"; }
 };
 
 } // namespace Router
