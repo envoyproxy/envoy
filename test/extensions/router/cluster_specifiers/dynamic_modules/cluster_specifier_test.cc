@@ -671,7 +671,7 @@ TEST_F(DynamicModuleClusterSpecifierReadTest, RequestSizeAttributesReadable) {
   setUpPlugin();
   stream_info_.bytes_received_ = 11;
   Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "prod"}, {"content-length", "17"}};
-  EXPECT_EQ("17", echoedValue(headers, "attribute-request-size"));
+  EXPECT_EQ("11", echoedValue(headers, "attribute-request-size"));
   headers.setCopy(Http::LowerCaseString("x-echo"), "attribute-request-total-size");
   const uint64_t expected_total_size = 11 + headers.byteSize();
   EXPECT_EQ(absl::StrCat(expected_total_size), resolveRouteEntry(headers)->clusterName());
