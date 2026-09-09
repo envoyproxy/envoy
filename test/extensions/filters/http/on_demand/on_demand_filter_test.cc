@@ -134,6 +134,9 @@ TEST_F(OnDemandFilterTest, TestDecodeTrailers) {
 
 // tests onRouteConfigUpdateCompletion() when redirect contains a body with trailers (fully read)
 TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStreamWithTrailers) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   Http::TestRequestTrailerMapImpl trailers;
   Buffer::OwnedImpl buffer;
@@ -205,6 +208,9 @@ TEST_F(OnDemandFilterTest,
 // tests onRouteConfigUpdateCompletion() when redirect contains a body but not fully read
 TEST_F(OnDemandFilterTest,
        TestOnRouteConfigUpdateCompletionContinuesDecodingWithRedirectWithIncompleteBody) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   Buffer::OwnedImpl buffer;
   // Simulate request with body that hasn't ended yet
@@ -216,6 +222,9 @@ TEST_F(OnDemandFilterTest,
 
 // tests onRouteConfigUpdateCompletion() when redirect contains a fully read body
 TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStreamWithFullyReadBody) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   Buffer::OwnedImpl buffer;
   // Simulate request with body that has been fully read (end_stream = true)
@@ -227,6 +236,9 @@ TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStreamWith
 
 // tests onRouteConfigUpdateCompletion() when ActiveStream recreation fails
 TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionContinuesDecodingIfRedirectFails) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   filter_->decodeHeaders(headers, true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
@@ -236,9 +248,97 @@ TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionContinuesDecodingIfRedir
 
 // tests onRouteConfigUpdateCompletion() when route was resolved
 TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStream) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   filter_->decodeHeaders(headers, true);
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// tests onRouteConfigUpdateCompletion() with the no_recreate_stream guard ON (default).
+// Verifies that continueDecoding is called instead of recreateStream.
+TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionNoRecreateStream) {
+  Http::TestRequestHeaderMapImpl headers;
+  filter_->decodeHeaders(headers, true);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// Pin the route-cache refresh policy on the guard-on path. When VHDS resolves
+// the host (``route_exists == true``), the filter must call
+// refreshRouteConfigSnapshot() then clearRouteCache() before continueDecoding()
+// so the next route() lookup uses the post-VHDS ConfigImpl. Without this, the
+// engaged-null cached_route_ short-circuits the router and the request 404s
+// even though the vhost is now known.
+TEST_F(OnDemandFilterTest,
+       OnRouteConfigUpdateCompletionNoRecreateStreamClearsRouteCacheWhenRouteExists) {
+  Http::TestRequestHeaderMapImpl headers;
+  filter_->decodeHeaders(headers, true);
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  {
+    testing::InSequence s;
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+    EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  }
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// Counterpart of the above for the legitimate-miss case. When VHDS reports
+// the vhost as unresolvable (``route_exists == false``), the filter must NOT
+// refresh or clear the route cache: the engaged-null route is what makes the
+// router emit a 404 immediately without a redundant lookup.
+TEST_F(OnDemandFilterTest,
+       OnRouteConfigUpdateCompletionNoRecreateStreamDoesNotClearRouteCacheWhenRouteDoesNotExist) {
+  Http::TestRequestHeaderMapImpl headers;
+  filter_->decodeHeaders(headers, true);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot()).Times(0);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  filter_->onRouteConfigUpdateCompletion(false);
+}
+
+// Regression for the combined on-demand VHDS + on-demand CDS scenario. With the
+// no-recreate VHDS guard on (default) and OnDemandCds configured, a VHDS route
+// resolution whose target cluster is absent must start on-demand CDS (returning
+// StopIteration) instead of continuing straight to the router. This mirrors the
+// legacy recreateStream() path, which re-entered decodeHeaders() and thereby
+// reached the cluster-discovery step. Without the fix the guard-on path calls
+// continueDecoding() directly and the cluster is never fetched.
+TEST_F(OnDemandFilterTest, NoRecreateStreamVhdsResolutionTriggersOnDemandCds) {
+  setupWithCds();
+  Http::TestRequestHeaderMapImpl headers;
+
+  // The route is unknown until VHDS resolves the virtual host, and resolved
+  // thereafter.
+  bool vhds_resolved = false;
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Invoke([&]() -> OptRef<const Router::Route> {
+    return makeOptRefFromPtr<const Router::Route>(vhds_resolved ? decoder_callbacks_.route_.get()
+                                                                : nullptr);
+  }));
+
+  // Initial decodeHeaders: route missing -> VHDS requested, StopIteration. CDS is
+  // not reached yet because the route is still unknown.
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  // VHDS resolves the host to a route whose target cluster is absent. The filter
+  // must refresh the snapshot, clear the route cache, then start on-demand CDS and
+  // hold the stream -- no continueDecoding() and no recreateStream().
+  vhds_resolved = true;
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
   filter_->onRouteConfigUpdateCompletion(true);
 }
 

@@ -399,6 +399,14 @@ public:
   virtual void clearRouteCache() PURE;
 
   /**
+   * Re-snaps the route configuration snapshot held by the stream from the route config provider.
+   * This is intended for on-demand xDS filters (VHDS) that need the stream to observe a route
+   * config update that landed after the original request-start snapshot. Most filters should use
+   * clearRouteCache() instead, which re-evaluates routing against the existing snapshot.
+   */
+  virtual void refreshRouteConfigSnapshot() PURE;
+
+  /**
    * Refresh the target cluster but not the route cache. This is used when we want to change the
    * target cluster after modifying the request attributes.
    *

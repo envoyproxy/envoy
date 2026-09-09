@@ -232,6 +232,7 @@ public:
   MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
+  MOCK_METHOD(void, refreshRouteConfigSnapshot, ());
   MOCK_METHOD(void, refreshRouteCluster, ());
   MOCK_METHOD(void, recreateClusterInfo, ());
 

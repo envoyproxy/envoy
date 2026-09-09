@@ -4,6 +4,7 @@
 #include "envoy/grpc/status.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -353,6 +354,296 @@ TEST_P(VhdsInlineOnLdsListenerTest, InlineVhdsOnListenerAddedAfterServerIsLive) 
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "sni.lyft.com");
   cleanupUpstreamAndDownstream();
   ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+// ---------------------------------------------------------------------------
+// Regression tests for the VHDS on-demand recreate-stream crash.
+//
+// OnDemandRouteUpdate::onRouteConfigUpdateCompletion (in
+// source/extensions/filters/http/on_demand/on_demand_update.cc) historically
+// called callbacks_->recreateStream(nullptr) when VHDS successfully resolved
+// the host and the request body had been fully read. That recreate path ran
+// ActiveStream::recreateStream at source/common/http/conn_manager_impl.cc
+// which unconditionally dereferences filter_manager_.bufferedRequestData()
+// via Buffer::OwnedImpl::move -- the same null-dereference signature as the ODCDS
+// crash fixed by #43163 for the cluster-discovery path.
+//
+// The runtime guard envoy.reloadable_features.on_demand_vhds_no_recreate_stream
+// (default on) replaces recreateStream with continueDecoding in the VHDS
+// path, mirroring envoy.reloadable_features.on_demand_cluster_no_recreate_stream
+// introduced by #43163 for ODCDS. See the ``behavior_changes`` release-note
+// fragment for the full rationale.
+//
+// The tests below prepend a trivial add-header-filter *before* the
+// envoy.filters.http.on_demand filter so we can tell, at the upstream,
+// whether the decode filter chain was invoked once (no recreate, guard on)
+// or twice (recreate, guard off). The default test exercises the fix; the
+// sibling test explicitly flips the guard off to preserve coverage of the
+// legacy recreate path.
+// ---------------------------------------------------------------------------
+
+// Reuses VhdsIntegrationTest but prepends on_demand + add-header-filter to
+// the HCM filter chain. ``prependFilter`` inserts at the front of the list,
+// so calling it with ``add-header-filter`` *after* ``on_demand`` leaves the
+// final chain as: add-header-filter -> on_demand -> router.
+class OnDemandVhdsRecreateStreamRegressionTest : public VhdsIntegrationTest {
+public:
+  void initialize() override {
+    // on_demand first (ends up second in the chain after the add-header
+    // prepend below).
+    config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+    // add-header-filter last: ends up at the head of the chain, before
+    // on_demand. It stamps ``x-header-to-add: value`` on every decodeHeaders
+    // invocation, which lets us count how many times the pre-on-demand
+    // portion of the chain was executed.
+    config_helper_.prependFilter(R"EOF(
+    name: add-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
+    )EOF");
+    VhdsIntegrationTest::initialize();
+  }
+
+  // Shared test-body helper: drives an on-demand VHDS update for a
+  // header-only request (no body). Leaves ``upstream_request_`` around for
+  // the caller to make its own count-of-x-header assertion. Symmetric with
+  // ``runVhdsOnDemandWithBody`` for the body-bearing case so the two
+  // header-only parameterized tests (guard-on and guard-off) share the xDS
+  // choreography and differ only on their count expectation. This is the
+  // shape that closes the 404 regression introduced by PR #1144: even
+  // without a body, the pre-fix on-demand path 404s because the
+  // ``cached_route_`` is an engaged-null and ``snapped_route_config_``
+  // points at the pre-VHDS RouteConfiguration.
+  void runVhdsOnDemandHeaderOnly() {
+    // Establishes the RDS/VHDS streams and a default vhost of
+    // ``sni.lyft.com``. ``vhost.first`` is not yet known and will trigger
+    // VHDS on-demand discovery.
+    initialize();
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.first"},
+                                                   {"x-lyft-user-id", "123"}};
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+    // Verify on-demand VHDS discovery is triggered for the unknown vhost.
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                             {vhdsRequestResourceName("vhost.first")}, {},
+                                             vhds_stream_.get()));
+
+    // VHDS responds with the host resolved.
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "2", vhds_stream_.get(),
+        {"my_route/vhost.first"});
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+
+    waitForNextUpstreamRequest(1);
+    EXPECT_TRUE(upstream_request_->complete());
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+
+  // Shared test-body helper: drives an on-demand VHDS update that requires a
+  // body. Leaves ``upstream_request_`` around for the caller to make its own
+  // count-of-x-header assertion. Keeping the body in a helper lets the two
+  // parameterized tests (guard-on and guard-off) share the xDS
+  // choreography and differ only on their count expectation.
+  void runVhdsOnDemandWithBody() {
+    // Establishes the RDS/VHDS streams and a default vhost of
+    // ``sni.lyft.com`` (see VhdsIntegrationTest::initialize()).
+    // ``vhost.first`` is *not* known yet and will trigger VHDS on-demand
+    // discovery.
+    initialize();
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.first"},
+                                                   {"x-lyft-user-id", "123"}};
+    const std::string request_body(64, 'a');
+    IntegrationStreamDecoderPtr response =
+        codec_client_->makeRequestWithBody(request_headers, request_body, /*end_stream=*/true);
+
+    // Verify on-demand VHDS discovery is triggered for the unknown vhost.
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                             {vhdsRequestResourceName("vhost.first")}, {},
+                                             vhds_stream_.get()));
+
+    // VHDS responds with the host resolved -- this is the trigger that fires
+    // ``OnDemandRouteUpdate::onRouteConfigUpdateCompletion(true)`` on the
+    // worker via ``dispatcher_.post(...)`` from
+    // ``source/common/router/rds_impl.cc:154``.
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "2", vhds_stream_.get(),
+        {"my_route/vhost.first"});
+    // Wait for the VHDS ACK so we know the response has been applied.
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+
+    // Downstream should complete normally regardless of whether recreate or
+    // continue was taken -- the point of this test is not that it crashes
+    // (it doesn't, in isolation), but that the decode filter chain runs
+    // either once or twice depending on the guard.
+    waitForNextUpstreamRequest(1);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ(request_body, upstream_request_->body().toString());
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OnDemandVhdsRecreateStreamRegressionTest,
+                         VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
+
+// Guard-on (default) regression for a body-bearing on-demand VHDS update: the
+// resolution must resume via continueDecoding() rather than recreateStream(), so
+// the decode chain runs once. The add-header-filter prepended before on_demand
+// stamps x-header-to-add on every decodeHeaders(), so a second stamp (size == 2)
+// would reveal a chain re-run. Mirrors OnDemandClusterDiscoveryWorksWithNoRecreateStream
+// in test/extensions/filters/http/on_demand/odcds_integration_test.cc (#43163).
+TEST_P(OnDemandVhdsRecreateStreamRegressionTest,
+       VhdsOnDemandUpdateWithBodyDoesNotRerunDecodeChain) {
+  runVhdsOnDemandWithBody();
+
+  EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString("x-header-to-add")).size(), 1)
+      << "add-header-filter ran more than once: the on_demand VHDS path used "
+         "recreateStream() instead of continueDecoding().";
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Symmetric legacy-path coverage: with the guard flipped OFF, the VHDS update
+// takes the recreateStream() branch and re-runs the decode chain, so
+// add-header-filter stamps x-header-to-add twice (size == 2). Guards the
+// rollback escape-hatch.
+TEST_P(OnDemandVhdsRecreateStreamRegressionTest,
+       VhdsOnDemandUpdateWithBodyLegacyRecreateStreamRerunsDecodeChain) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.on_demand_vhds_no_recreate_stream",
+                                    "false");
+
+  runVhdsOnDemandWithBody();
+
+  EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString("x-header-to-add")).size(), 2)
+      << "legacy recreateStream() VHDS path should re-run the decode chain, "
+         "stamping x-header-to-add a second time.";
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Guard-on header-only variant: exercises the refreshRouteConfigSnapshot() +
+// clearRouteCache() sequence independently of the body-buffer mechanics.
+// Reverting either the on_demand_update.cc or conn_manager_impl.cc snapshot
+// refresh makes the resumed route() lookup use the pre-VHDS snapshot and 404.
+TEST_P(OnDemandVhdsRecreateStreamRegressionTest,
+       VhdsOnDemandUpdateHeaderOnlyDoesNotRerunDecodeChain) {
+  runVhdsOnDemandHeaderOnly();
+
+  EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString("x-header-to-add")).size(), 1)
+      << "add-header-filter ran more than once for a header-only request.";
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Symmetric legacy (guard-off) counterpart of the header-only variant above.
+TEST_P(OnDemandVhdsRecreateStreamRegressionTest,
+       VhdsOnDemandUpdateHeaderOnlyLegacyRecreateStreamRerunsDecodeChain) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.on_demand_vhds_no_recreate_stream",
+                                    "false");
+
+  runVhdsOnDemandHeaderOnly();
+
+  EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString("x-header-to-add")).size(), 2)
+      << "legacy recreateStream() VHDS path should re-run the decode chain on a "
+         "header-only request.";
+
+  cleanupUpstreamAndDownstream();
+}
+
+// After VHDS resolves the vhost, a second request for the now-known host must
+// succeed without another VHDS round-trip -- verifying the shared route provider
+// (not just per-stream snapshot state) was updated.
+TEST_P(OnDemandVhdsRecreateStreamRegressionTest, VhdsOnDemandUpdateSecondRequestUsesPostVhdsRoute) {
+  runVhdsOnDemandHeaderOnly();
+  ASSERT_TRUE(upstream_request_->complete());
+
+  // Issue a second request on the same downstream codec_client_. It must
+  // resolve directly via the now-populated route table without another VHDS
+  // round-trip -- if the provider were not updated, the on-demand filter
+  // would park the request waiting for VHDS (the test would time out) or
+  // the request would 404. Either way the failure is observable here.
+  Http::TestRequestHeaderMapImpl second_request_headers{{":method", "GET"},
+                                                        {":path", "/"},
+                                                        {":scheme", "http"},
+                                                        {":authority", "vhost.first"},
+                                                        {"x-lyft-user-id", "456"}};
+  IntegrationStreamDecoderPtr second_response =
+      codec_client_->makeHeaderOnlyRequest(second_request_headers);
+
+  // Reuse the existing fake upstream connection; ``waitForNextUpstreamRequest``
+  // accepts new streams on the existing connection or accepts a new
+  // connection, whichever the upstream pool decides.
+  waitForNextUpstreamRequest(1);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString("x-header-to-add")).size(), 1)
+      << "add-header-filter ran more than once on the second request; the "
+         "second request unexpectedly traversed the on_demand stall path.";
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(second_response->waitForEndStream());
+  EXPECT_EQ("200", second_response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Legitimate-404 path: when VHDS reports the alias unresolvable (route_exists ==
+// false), the request must 404 and the filter must NOT clear the route cache --
+// otherwise a fresh route() miss would re-post requestRouteConfigUpdate and loop.
+// Asserting exactly one VHDS DiscoveryRequest (no follow-up) verifies no loop.
+TEST_P(OnDemandVhdsRecreateStreamRegressionTest,
+       VhdsOnDemandUpdateUnknownVhostReturns404WithoutLoop) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.unknown"},
+                                                 {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Exactly one VHDS request goes out for the unknown alias.
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.unknown")}, {},
+                                           vhds_stream_.get()));
+
+  // VHDS replies that the alias cannot be resolved.
+  notifyAboutAliasResolutionFailure("2", vhds_stream_, {"my_route/vhost.unknown"});
+
+  response->waitForHeaders();
+  EXPECT_EQ("404", response->headers().getStatusValue());
+
+  // No second VHDS request should arrive for the same alias: if the fix
+  // ever clears the cached null on the route_exists=false path, the next
+  // route() call falls through to the on_demand filter again and a new
+  // requestRouteConfigUpdate is posted. compareDeltaDiscoveryRequest with
+  // an empty resource list verifies the stream is quiescent (no pending
+  // request, just the ACK for the failure response above).
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace
