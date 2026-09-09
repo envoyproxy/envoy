@@ -54,6 +54,9 @@ void initializeUpstreamTlsContextConfig(
     } else if (options.client_with_intermediate_cert_) {
       chain = rundir + "/test/config/integration/certs/client2_chain.pem";
       key = rundir + "/test/config/integration/certs/client2key.pem";
+    } else if (options.client_cert_without_intermediates_) {
+      chain = rundir + "/test/config/integration/certs/client2cert.pem";
+      key = rundir + "/test/config/integration/certs/client2key.pem";
     } else {
       chain = rundir + "/test/config/integration/certs/clientcert.pem";
       key = rundir + "/test/config/integration/certs/clientkey.pem";
