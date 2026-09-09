@@ -107,8 +107,8 @@ protected:
   std::unique_ptr<ReverseConnectionIOHandle>
   createTestIOHandle(const ReverseConnectionSocketConfig& config) {
     return std::make_unique<ReverseConnectionIOHandle>(-1, // dummy fd
-                                                       config, cluster_manager_,
-                                                       extension_.get(), *stats_scope_);
+                                                       config, cluster_manager_, extension_.get(),
+                                                       *stats_scope_);
   }
 
   // Connection Management Helpers.
