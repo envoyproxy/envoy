@@ -557,6 +557,14 @@ envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
   return nullptr;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) void envoy_dynamic_module_callback_cluster_lb_get_cluster_name(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_cluster_name: "
@@ -838,6 +846,16 @@ envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
   return false;
 }
 
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    const envoy_dynamic_module_type_module_key_value_pair*, size_t) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch: "
+      "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_cluster_scheduler_module_ptr
 envoy_dynamic_module_callback_cluster_scheduler_new(envoy_dynamic_module_type_cluster_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_scheduler_new: "
@@ -988,6 +1006,66 @@ envoy_dynamic_module_callback_cluster_config_record_histogram_value(
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_config_record_histogram_value: "
                "not implemented in this context");
   return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_counter_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t,
+    envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_config_resolve_counter_vec: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t,
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t,
+    envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_metric_counter_add(
+    envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_metric_counter_add: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_metric_gauge_set(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_metric_gauge_set: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_metric_gauge_add(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_metric_gauge_add: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_metric_gauge_sub(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_metric_gauge_sub: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_metric_histogram_record(
+    envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_metric_histogram_record: "
+               "not implemented in this context");
 }
 
 __attribute__((weak)) void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(

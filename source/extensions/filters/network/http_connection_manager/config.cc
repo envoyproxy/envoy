@@ -366,9 +366,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
-      stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
-      tracing_stats_(
-          Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
+      // http.(<stat_prefix>.)*
+      http_scope_(
+          Http::ConnectionManagerImpl::createStatsScope(context.scope(), config.stat_prefix())),
+      stats_(Http::ConnectionManagerImpl::generateStats(*http_scope_)),
+      tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats(*http_scope_)),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
       internal_address_config_(createInternalAddressConfig(config, creation_status)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
@@ -417,7 +419,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       preserve_external_request_id_(config.preserve_external_request_id()),
       always_set_request_id_in_response_(config.always_set_request_id_in_response()),
       date_provider_(date_provider),
-      listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
+      listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(config.stat_prefix(),
                                                                          context_.prefixedScope())),
       proxy_100_continue_(config.proxy_100_continue()),
       stream_error_on_invalid_http_messaging_(

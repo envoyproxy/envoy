@@ -1811,6 +1811,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     # The symbol table cluster memory tests take a while to run specially under tsan.
     deps = [
+        ":http_integration_lib",
         ":integration_lib",
         "//source/common/memory:stats_lib",
         "//source/common/runtime:runtime_features_lib",
@@ -2205,11 +2206,13 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//test/config/integration/certs:hashes",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:test_random_generator_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
