@@ -1197,6 +1197,28 @@ TEST_F(ExtAuthzHttpClientTest, TestHttpClientResetOnComplete) {
   client_->onSuccess(async_request_, std::move(check_response));
 }
 
+// The HTTP client forwards the path from the check request verbatim; query string stripping
+// (controlled by ExtAuthz.strip_query_params) happens when the check request is built, so the
+// client applies the same behavior for HTTP and gRPC services.
+TEST_F(ExtAuthzHttpClientTest, ForwardsPathVerbatim) {
+  // Initialize without a path_prefix so the forwarded path is the check request's path verbatim.
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/hello?name=value&foo=bar"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/hello?name=value&foo=bar");
+
+  // A pre-stripped path in the check request (built with strip_query_params) is forwarded as-is.
+  message_ptr = sendRequest({{":path", "/hello"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/hello");
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace Common

@@ -227,6 +227,13 @@ absl::string_view findQueryStringStart(const HeaderString& path);
 
 /**
  * Returns the path without the query string.
+ * @param path supplies a string_view possibly containing a query string.
+ * @return absl::string_view the path without query string.
+ */
+absl::string_view stripQueryString(absl::string_view path);
+
+/**
+ * Returns the path without the query string.
  * @param path supplies a HeaderString& possibly containing a query string.
  * @return std::string the path without query string.
  */

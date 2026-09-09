@@ -212,6 +212,8 @@ public:
 
   bool headersAsBytes() const { return encode_raw_headers_; }
 
+  bool stripQueryParams() const { return strip_query_params_; }
+
   Filters::Common::MutationRules::CheckResult
   checkDecoderHeaderMutation(const Filters::Common::MutationRules::CheckOperation& operation,
                              const Http::LowerCaseString& key, absl::string_view value) const {
@@ -323,6 +325,7 @@ private:
   const uint32_t max_denied_response_body_bytes_;
   const bool pack_as_bytes_;
   const bool encode_raw_headers_;
+  const bool strip_query_params_;
   const Http::Code status_on_error_;
   const bool validate_mutations_;
   Stats::Scope& scope_;

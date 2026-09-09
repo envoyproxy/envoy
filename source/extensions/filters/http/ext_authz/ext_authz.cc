@@ -134,6 +134,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
 
       encode_raw_headers_(config.encode_raw_headers()),
+      strip_query_params_(config.strip_query_params()),
 
       status_on_error_(toErrorCode(config.status_on_error().code())),
       validate_mutations_(config.validate_mutations()), scope_(scope),
@@ -423,7 +424,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
       decoder_callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
       std::move(route_metadata_context), check_request_, max_request_bytes_, config_->packAsBytes(),
       config_->headersAsBytes(), config_->includePeerCertificate(), config_->includeTLSSession(),
-      config_->destinationLabels(), config_->allowedHeadersMatcher(),
+      config_->stripQueryParams(), config_->destinationLabels(), config_->allowedHeadersMatcher(),
       config_->disallowedHeadersMatcher());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server.", *decoder_callbacks_);
