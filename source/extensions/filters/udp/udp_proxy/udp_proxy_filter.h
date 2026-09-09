@@ -680,6 +680,7 @@ protected:
 
   private:
     std::shared_ptr<Network::ConnectionInfoSetterImpl> createDownstreamConnectionInfoProvider();
+    bool handleUpstreamCreationFailure();
     void onAccessLogFlushInterval();
     void rearmAccessLogFlushTimer();
     void disableAccessLogFlushTimer();
@@ -687,6 +688,8 @@ protected:
 
     bool cluster_connections_inc_{false};
     bool on_session_complete_called_{false};
+    bool upstream_creation_failed_{false};
+    bool upstream_failure_removal_scheduled_{false};
   };
 
   using ActiveSessionSharedPtr = std::shared_ptr<ActiveSession>;
@@ -731,7 +734,7 @@ protected:
 
   private:
     void onReadReady();
-    void createUdpSocket(const Upstream::HostConstSharedPtr& host);
+    bool createUdpSocket(const Upstream::HostConstSharedPtr& host);
 
     // The socket is used for writing packets to the selected upstream host as well as receiving
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first

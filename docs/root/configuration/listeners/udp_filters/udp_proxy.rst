@@ -29,6 +29,13 @@ The UDP proxy listener filter also can operate as a *transparent* proxy if the
 :ref:`use_original_src_ip <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
 field is set to true. But please keep in mind that it does not forward the port to upstreams. It forwards only the IP address to upstreams.
 
+UDP proxy upstream sockets apply the :ref:`socket options
+<envoy_v3_api_field_config.core.v3.BindConfig.socket_options>` configured in the cluster's
+:ref:`upstream_bind_config <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_bind_config>`.
+This supports use cases such as packet marking with Linux ``SO_MARK``. When
+``use_original_src_ip`` is enabled, the cluster socket options are combined with the options required
+to select the downstream source IP per datagram.
+
 Load balancing and unhealthy host handling
 ------------------------------------------
 
