@@ -2519,7 +2519,7 @@ TEST_F(McpJsonRestBridgeStreamingFilterTest, SseResponseExceedsMaxResponseBodySi
     max_response_body_size: 10
   )yaml",
                             proto_config);
-  config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  ASSERT_OK_AND_ASSIGN(config_, McpJsonRestBridgeFilterConfig::create(proto_config));
   filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
