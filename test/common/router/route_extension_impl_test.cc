@@ -93,7 +93,7 @@ TEST_F(ApplyRouteExtensionsTest, EmptyChainsReturnTheInput) {
   EXPECT_EQ(route, apply(route));
 }
 
-// An empty chain must not turn a matched route into no route.
+// With nothing configured at any level, a nullptr route stays nullptr.
 TEST_F(ApplyRouteExtensionsTest, EmptyChainsPreserveNoRoute) { EXPECT_EQ(nullptr, apply(nullptr)); }
 
 // Levels run route configuration first, then virtual host, then route, and each extension is
