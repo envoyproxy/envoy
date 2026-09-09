@@ -98,6 +98,11 @@ public:
   void Initialize() override;
   void OnCanWrite() override;
   void OnTlsHandshakeComplete() override;
+
+  // Called by EnvoyTlsServerHandshaker once the client certificate has been validated, with the
+  // chain built during verification (leaf first, issuers following). Marks the connection's SSL
+  // info as validated; the chain serves the validated-issuer accessors.
+  void onClientCertValidated(const std::vector<bssl::UniquePtr<X509>>& validated_chain);
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
                         const quic::QuicSocketAddress& peer_address,

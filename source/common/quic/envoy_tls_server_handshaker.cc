@@ -76,5 +76,15 @@ quic::QuicAsyncStatus EnvoyTlsServerHandshaker::VerifyCertChain(
   return verifyQuicClientCertChain(certs, *context, error_details, details, out_alert);
 }
 
+void EnvoyTlsServerHandshaker::OnProofVerifyDetailsAvailable(
+    const quic::ProofVerifyDetails& verify_details) {
+  const auto& result = static_cast<const CertVerifyResult&>(verify_details);
+  if (!result.isValid()) {
+    return;
+  }
+  ASSERT(dynamic_cast<EnvoyQuicServerSession*>(session()) != nullptr);
+  static_cast<EnvoyQuicServerSession*>(session())->onClientCertValidated(result.validatedChain());
+}
+
 } // namespace Quic
 } // namespace Envoy
