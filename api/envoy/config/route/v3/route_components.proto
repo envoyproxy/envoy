@@ -45,7 +45,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -258,6 +258,20 @@ message VirtualHost {
   // For instance, if the metadata is intended for the Router filter,
   // the filter name should be specified as ``envoy.filters.http.router``.
   core.v3.Metadata metadata = 24;
+
+  // Route extensions applied to the route resolved for a request under this virtual host. An
+  // extension acts on the route, not on the request.
+  //
+  // Extensions are executed in order, and the output of each is the input of the next; see
+  // :ref:`RouteConfiguration.route_extensions
+  // <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_extensions>` for the full
+  // description. These run after the route configuration level extensions and before the
+  // :ref:`route level extensions <envoy_v3_api_field_config.route.v3.Route.route_extensions>`.
+  //
+  // As at the route configuration level, the route an extension takes may be no route at all,
+  // since the extensions run even when none of this virtual host's routes matched. An extension
+  // may therefore generate a valid route from its own logic, or drop the valid route it was given.
+  repeated core.v3.TypedExtensionConfig route_extensions = 26;
 }
 
 // A filter-defined action type.
@@ -281,7 +295,7 @@ message RouteList {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`.
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
 
@@ -420,6 +434,21 @@ message Route {
   // Only one of :ref:`per_request_buffer_limit_bytes <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>`
   // and ``request_body_buffer_limit`` may be set.
   google.protobuf.UInt64Value request_body_buffer_limit = 20;
+
+  // Route extensions applied to this route when it is matched. An extension acts on the route, not
+  // on the request.
+  //
+  // Extensions are executed in order, and the output of each is the input of the next; see
+  // :ref:`RouteConfiguration.route_extensions
+  // <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_extensions>` for the full
+  // description. These run last, after the route configuration level and :ref:`virtual host level
+  // <envoy_v3_api_field_config.route.v3.VirtualHost.route_extensions>` extensions, so the route
+  // that comes out of the last one here is the route Envoy uses for the request.
+  //
+  // Unlike the two levels above, these only run when this route matched, since there is no route
+  // to read them from otherwise. The route an extension takes may still be no route at all, if an
+  // earlier extension dropped it, in which case an extension may generate a valid one of its own.
+  repeated core.v3.TypedExtensionConfig route_extensions = 21;
 }
 
 // Compared to the :ref:`cluster <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` field that specifies a

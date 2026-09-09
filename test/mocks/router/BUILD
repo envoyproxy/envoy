@@ -22,6 +22,7 @@ envoy_cc_mock(
         "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/router:route_config_provider_manager_interface",
         "//envoy/router:route_config_update_info_interface",
+        "//envoy/router:route_extension_interface",
         "//envoy/router:router_interface",
         "//envoy/router:router_ratelimit_interface",
         "//envoy/router:scopes_interface",

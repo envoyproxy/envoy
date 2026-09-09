@@ -22,6 +22,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/route_config_update_receiver.h"
+#include "envoy/router/route_extension.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/scopes.h"
@@ -650,6 +651,18 @@ public:
   std::string name_{"fake_config"};
   envoy::config::core::v3::Metadata metadata_;
   MockRouteMetadata typed_metadata_;
+};
+
+class MockRouteExtension : public RouteExtension {
+public:
+  MockRouteExtension();
+  ~MockRouteExtension() override;
+
+  // Router::RouteExtension
+  MOCK_METHOD(OnRouteResult, onRoute,
+              (RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value),
+              (const));
 };
 
 class MockRouteConfigProvider : public RouteConfigProvider {
