@@ -12,6 +12,7 @@ envoy_cc_dyn_module_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/c:cluster_async_host_selection",
         "//test/extensions/dynamic_modules/test_data/c:cluster_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_no_op",

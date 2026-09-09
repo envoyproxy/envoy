@@ -389,8 +389,10 @@ envoy_cc_test(
     deps = [
         "//source/common/http:date_provider_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 
@@ -483,8 +485,10 @@ envoy_cc_test(
     srcs = ["user_agent_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/config:well_known_names",
         "//source/common/http:header_map_lib",
         "//source/common/http:user_agent_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",

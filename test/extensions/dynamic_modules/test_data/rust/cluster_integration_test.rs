@@ -93,6 +93,16 @@ fn new_cluster_config(
         metrics: envoy_cluster_metrics,
       }))
     },
+    "healthy_hosts_rebuild" => {
+      let counter_id = envoy_cluster_metrics
+        .define_counter("healthy_hosts_rebuilt_total")
+        .ok();
+      Some(Box::new(HealthyHostsRebuildClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
     "worker_timer" => {
       let armed_id = envoy_cluster_metrics
         .define_counter("timer_armed_total")
@@ -100,10 +110,20 @@ fn new_cluster_config(
       let fired_id = envoy_cluster_metrics
         .define_counter("timer_fired_total")
         .ok();
+      // Resolve a counter vec handle once so the timer records by handle from the worker thread.
+      let fired_handle = envoy_cluster_metrics
+        .define_counter_vec("timer_fired_by_outcome", &["outcome"])
+        .ok()
+        .and_then(|id| {
+          envoy_cluster_metrics
+            .resolve_counter_vec(id, &["fired"])
+            .ok()
+        });
       Some(Box::new(WorkerTimerClusterConfig {
         upstream_address: config_str.to_string(),
         armed_id,
         fired_id,
+        fired_handle,
         metrics: envoy_cluster_metrics,
       }))
     },
@@ -847,6 +867,7 @@ struct WorkerTimerClusterConfig {
   upstream_address: String,
   armed_id: Option<EnvoyCounterId>,
   fired_id: Option<EnvoyCounterId>,
+  fired_handle: Option<EnvoyResolvedCounter>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -857,6 +878,7 @@ impl ClusterConfig for WorkerTimerClusterConfig {
       hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
       armed_id: self.armed_id,
       fired_id: self.fired_id,
+      fired_handle: self.fired_handle,
       metrics: self.metrics.clone(),
     })
   }
@@ -867,6 +889,7 @@ struct WorkerTimerCluster {
   hosts: SharedHostList,
   armed_id: Option<EnvoyCounterId>,
   fired_id: Option<EnvoyCounterId>,
+  fired_handle: Option<EnvoyResolvedCounter>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -889,6 +912,7 @@ impl Cluster for WorkerTimerCluster {
       timer: None,
       armed_id: self.armed_id,
       fired_id: self.fired_id,
+      fired_handle: self.fired_handle,
       metrics: self.metrics.clone(),
     }))
   }
@@ -899,6 +923,7 @@ struct WorkerTimerLb {
   timer: Option<Box<dyn EnvoyClusterWorkerTimer>>,
   armed_id: Option<EnvoyCounterId>,
   fired_id: Option<EnvoyCounterId>,
+  fired_handle: Option<EnvoyResolvedCounter>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -940,6 +965,10 @@ impl ClusterLb for WorkerTimerLb {
   ) {
     if let Some(fired_id) = self.fired_id {
       let _ = self.metrics.increment_counter(fired_id, 1);
+    }
+    // Record the same fire through the resolved handle, which allocates nothing per call.
+    if let Some(fired_handle) = self.fired_handle {
+      fired_handle.add(1);
     }
     // Re-arm for periodic firing.
     timer.enable(std::time::Duration::from_millis(WORKER_TIMER_INTERVAL_MS));
@@ -1023,5 +1052,109 @@ impl ClusterLb for NativeLbTestLb {
       let _ = self.metrics.increment_counter(counter_id, 1);
     }
     HostSelectionResult::Selected(hosts.0[idx])
+  }
+}
+
+// =============================================================================
+// Healthy-partition bulk rebuild.
+// =============================================================================
+//
+// Mirrors the worker-local-rebuild flow, but on_host_membership_update rebuilds the routable set
+// from get_healthy_hosts in one ABI crossing rather than applying the member-update delta. It
+// increments a counter once the bulk read agrees with get_healthy_host_count, so the test can wait
+// for every worker to converge before routing through a pointer the bulk getter returned.
+
+const HEALTHY_HOSTS_REBUILD_ADD_EVENT_ID: u64 = 400;
+
+struct HealthyHostsRebuildClusterConfig {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for HealthyHostsRebuildClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(HealthyHostsRebuildCluster {
+      upstream_address: self.upstream_address.clone(),
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct HealthyHostsRebuildCluster {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for HealthyHostsRebuildCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    envoy_cluster.pre_init_complete();
+    let scheduler = envoy_cluster.new_scheduler();
+    scheduler.commit(HEALTHY_HOSTS_REBUILD_ADD_EVENT_ID);
+  }
+
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(HealthyHostsRebuildLb {
+      hosts: Vec::new(),
+      index: 0,
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    }))
+  }
+
+  fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
+    if event_id == HEALTHY_HOSTS_REBUILD_ADD_EVENT_ID {
+      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+    }
+  }
+}
+
+struct HealthyHostsRebuildLb {
+  hosts: Vec<usize>,
+  index: usize,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for HealthyHostsRebuildLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    if self.hosts.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    let idx = self.index % self.hosts.len();
+    self.index += 1;
+    HostSelectionResult::Selected(
+      self.hosts[idx] as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    )
+  }
+
+  fn on_host_membership_update(
+    &mut self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    _num_hosts_added: usize,
+    _num_hosts_removed: usize,
+  ) {
+    // Rebuild the routable set from the whole healthy partition in one crossing.
+    let mut healthy = Vec::new();
+    if !envoy_lb.get_healthy_hosts(0, &mut healthy) {
+      return;
+    }
+    self.hosts = healthy.iter().map(|&host| host as usize).collect();
+    // Increment once the bulk read is non-empty and agrees with the per-host count, so the test can
+    // wait for every worker to converge.
+    if !self.hosts.is_empty() && self.hosts.len() == envoy_lb.get_healthy_host_count(0) {
+      if let Some(counter_id) = self.counter_id {
+        let _ = self.metrics.increment_counter(counter_id, 1);
+      }
+    }
   }
 }

@@ -2,8 +2,8 @@
 
    Readability is the point of this file:
 
-   * 13.5px on a 1.75 line — the docs are read at arm's length, and YAML
-     indentation needs the leading to stay legible.
+   * a 1.75 line — the docs are read at arm's length, and YAML indentation
+     needs the leading to stay legible.
    * ligatures off, so `->`, `!=` and `--` are the characters you typed.
    * two-space tabs, matching the YAML the samples are written in.
    * no wrapping — a long `typed_config` URL scrolls rather than reflowing
@@ -44,7 +44,7 @@
   color: var(--envoy-ink-body);
   display: flex;
   font-family: var(--envoy-font-mono);
-  font-size: 11.5px;
+  font-size: 0.7rem;
   gap: 10px;
   line-height: 1.5;
   min-height: 34px;
@@ -60,7 +60,7 @@
 .envoy-code-lang {
   color: var(--envoy-ink-muted);
   flex: none;
-  font-size: 10px;
+  font-size: 0.625rem;
   letter-spacing: 0.1em;
   margin-left: auto;
   text-transform: uppercase;
@@ -86,7 +86,7 @@
   border: 0;
   color: var(--envoy-code-text);
   font-family: var(--envoy-font-mono);
-  font-size: 13.5px;
+  font-size: 0.85rem;
   font-variant-ligatures: none;
   line-height: 1.75;
   margin: 0;
@@ -220,8 +220,8 @@
   font-style: italic;
 }
 
-/* Tango, the style protodoc inherits, sets punctuation bold; at 13.5px that
-   makes every colon and brace heavier than the value beside it. */
+/* Tango, the style protodoc inherits, sets punctuation bold, which makes
+   every colon and brace heavier than the value beside it. */
 .envoy-content-main .rst-content .highlight .o,
 .envoy-content-main .rst-content .highlight .p {
   color: var(--envoy-code-punct);

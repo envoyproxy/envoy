@@ -380,6 +380,25 @@ TEST_P(DynamicModuleClusterIntegrationTest, MemberUpdatePackedAddress) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Drives the bulk healthy-host getter end to end. Each worker load balancer rebuilds its routable
+// set from get_healthy_hosts, confirms it agrees with get_healthy_host_count, and routes a request
+// through a host pointer the bulk getter returned.
+TEST_P(DynamicModuleClusterIntegrationTest, HealthyHostsBulkRebuild) {
+  concurrency_ = 2;
+  initializeWithDecCluster("healthy_hosts_rebuild");
+
+  // Each worker increments the counter once its bulk read agrees with the per-host count.
+  test_server_->waitForCounter("dynamicmodulescustom.healthy_hosts_rebuilt_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Verifies that the cluster lifecycle callbacks fire correctly during cluster
 // initialization.
 TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
@@ -401,7 +420,8 @@ TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
 // from choose_host (which exercises enable/enabled/disable and increments timer_armed_total). The
 // timer then fires repeatedly on the worker dispatcher and re-arms itself, so timer_fired_total
 // keeps climbing without further requests — proving the timer is created on the worker dispatcher,
-// fires on the worker thread, and re-arms.
+// fires on the worker thread, and re-arms. Each fire also records through a resolved counter handle
+// from the worker thread, exercising the resolve-then-record path end to end.
 TEST_P(DynamicModuleClusterIntegrationTest, WorkerTimerArmsFiresAndReArms) {
   initializeWithDecCluster("worker_timer");
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -418,6 +438,11 @@ TEST_P(DynamicModuleClusterIntegrationTest, WorkerTimerArmsFiresAndReArms) {
 
   // The timer fires on the worker dispatcher and re-arms, so the counter keeps climbing.
   test_server_->waitForCounter("dynamicmodulescustom.timer_fired_total", testing::Ge(3));
+
+  // Each fire also records through a resolved counter handle from the worker thread, so the tagged
+  // child stat climbs alongside timer_fired_total.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_fired_by_outcome.outcome.fired",
+                               testing::Ge(3));
 }
 
 // =============================================================================
@@ -585,9 +610,12 @@ public:
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
         TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
 
-    // Log the two dynamic-metadata values the cluster writes during host selection.
+    // Log the dynamic-metadata values the cluster writes during host selection, including the two
+    // strings written by the batch setter.
     useAccessLog("%DYNAMIC_METADATA(dynamic_modules.test:number_key)% "
-                 "%DYNAMIC_METADATA(dynamic_modules.test:string_key)%");
+                 "%DYNAMIC_METADATA(dynamic_modules.test:string_key)% "
+                 "%DYNAMIC_METADATA(dynamic_modules.test:l1_decision)% "
+                 "%DYNAMIC_METADATA(dynamic_modules.test:l2_selector)%");
 
     // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer
     // sets dynamic metadata on the request during host selection.
@@ -635,7 +663,7 @@ TEST_P(DynamicModuleClusterDynamicMetadataIntegrationTest, SetsDynamicMetadataDu
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   const std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_EQ("1234 test_value", log);
+  EXPECT_EQ("1234 test_value resolved dicer", log);
 }
 
 // =============================================================================
