@@ -299,3 +299,26 @@ The only inputs supported are request headers (via :ref:`HttpRequestHeaderMatchI
 
 .. tip::
    See the docs for the :ref:`matching API <arch_overview_matching_api>` for more information about the API as a whole.
+
+.. _arch_overview_route_extensions:
+
+Route extensions
+----------------
+
+Route extensions customize the route used for a request after the route table has resolved it.
+Extensions are configured as an ordered list at the :ref:`route configuration
+<envoy_v3_api_field_config.route.v3.RouteConfiguration.route_extensions>`, :ref:`virtual host
+<envoy_v3_api_field_config.route.v3.VirtualHost.route_extensions>` and :ref:`route
+<envoy_v3_api_field_config.route.v3.Route.route_extensions>` levels, and run as a chain in that
+order. Each extension receives the route the previous one returned and returns the route to use,
+which may be the same route, a different route, or no route.
+
+The route a chain starts from is the route resolved from the route table, which may be absent when
+nothing matched. An extension can therefore replace the matched route, produce a route when nothing
+matched, or remove the route so the request is handled as if nothing had matched. A null route means
+no route rather than a denied request, so a later extension may still produce one. The route the last
+extension returns is the route Envoy uses for the request.
+
+Clusters an extension references, for example through a request mirroring policy, are validated
+against the cluster manager at configuration load when :ref:`validate_clusters
+<envoy_v3_api_field_config.route.v3.RouteConfiguration.validate_clusters>` is enabled.

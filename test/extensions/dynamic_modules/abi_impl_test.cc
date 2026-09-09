@@ -1956,6 +1956,21 @@ WEAK_STUB(HealthCheckerGetHostMetadataBool,
 WEAK_STUB(HealthCheckerGetHostHealth,
           envoy_dynamic_module_callback_health_checker_get_host_health(nullptr))
 
+WEAK_STUB(RouteExtensionGetRequestHeadersSize,
+          envoy_dynamic_module_callback_route_extension_get_request_headers_size(nullptr))
+WEAK_STUB(RouteExtensionGetRequestHeaders,
+          envoy_dynamic_module_callback_route_extension_get_request_headers(nullptr, nullptr))
+WEAK_STUB(RouteExtensionGetRequestHeaderValue,
+          envoy_dynamic_module_callback_route_extension_get_request_header_value(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(RouteExtensionGetRandomValue,
+          envoy_dynamic_module_callback_route_extension_get_random_value(nullptr))
+WEAK_STUB(RouteExtensionSetClusterName,
+          envoy_dynamic_module_callback_route_extension_set_cluster_name(nullptr, {nullptr, 0}))
+WEAK_STUB(RouteExtensionSetRouteActionOverride,
+          envoy_dynamic_module_callback_route_extension_set_route_action_override(nullptr,
+                                                                                  {nullptr, 0}))
+
 } // namespace
 } // namespace DynamicModules
 } // namespace Extensions

@@ -651,6 +651,11 @@ EXTENSIONS = {
     "envoy.router.cluster_specifier_plugin.matcher":         "//source/extensions/router/cluster_specifiers/matcher:config",
 
     #
+    # Route extension
+    #
+    "envoy.router.route_extension.dynamic_modules":          "//source/extensions/router/route_extension/dynamic_modules:config",
+
+    #
     # Extensions for generic proxy
     #
     "envoy.filters.generic.router":                             "//source/extensions/filters/network/generic_proxy/router:config",

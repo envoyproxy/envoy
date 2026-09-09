@@ -10,6 +10,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/router/route_extension.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
@@ -19,6 +20,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/router/delegating_route_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/upstream_address.h"
@@ -33,6 +35,7 @@
 #include "test/mocks/upstream/retry_priority_factory.h"
 #include "test/mocks/upstream/test_retry_host_predicate_factory.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
@@ -12924,6 +12927,350 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   EXPECT_EQ(334U, route->requestBodyBufferLimit());
+}
+
+// A route extension used by the tests below. The command in its configuration selects the behavior.
+// "transform:cluster" overrides the cluster of the matched route, "produce:cluster" builds a route
+// when nothing matched and "drop" removes the route.
+class CommandRouteExtension : public RouteExtension {
+public:
+  CommandRouteExtension(absl::string_view mode, absl::string_view cluster)
+      : mode_(mode), cluster_(cluster), produce_base_(std::make_shared<NiceMock<MockRoute>>()) {}
+
+  RouteConstSharedPtr onRoute(RouteConstSharedPtr route, const Http::RequestHeaderMap&,
+                              const StreamInfo::StreamInfo&, uint64_t) const override {
+    if (mode_ == "reject") {
+      return route;
+    }
+    if (mode_ == "drop") {
+      return nullptr;
+    }
+    if (mode_ == "produce") {
+      if (route == nullptr) {
+        return std::make_shared<DynamicRouteEntry>(produce_base_, std::string(cluster_));
+      }
+      return route;
+    }
+    if (mode_ == "append") {
+      if (route == nullptr || route->routeEntry() == nullptr) {
+        return route;
+      }
+      std::string cluster = route->routeEntry()->clusterName() + "-" + cluster_;
+      return std::make_shared<DynamicRouteEntry>(std::move(route), std::move(cluster));
+    }
+    if (route == nullptr) {
+      return nullptr;
+    }
+    return std::make_shared<DynamicRouteEntry>(std::move(route), std::string(cluster_));
+  }
+
+  absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const override {
+    if (mode_ == "reject" && !cluster_manager.hasCluster(cluster_)) {
+      return absl::InvalidArgumentError(
+          fmt::format("route extension: unknown cluster '{}'", cluster_));
+    }
+    return absl::OkStatus();
+  }
+
+private:
+  const std::string mode_;
+  const std::string cluster_;
+  const RouteConstSharedPtr produce_base_;
+};
+
+class CommandRouteExtensionFactory : public RouteExtensionFactory {
+public:
+  absl::StatusOr<RouteExtensionSharedPtr>
+  createRouteExtension(const Protobuf::Message& config,
+                       Server::Configuration::ServerFactoryContext&) override {
+    const auto& struct_config = dynamic_cast<const Protobuf::Struct&>(config);
+    const auto field = struct_config.fields().find("command");
+    const std::string command =
+        field != struct_config.fields().end() ? field->second.string_value() : "";
+    const std::string::size_type colon = command.find(':');
+    const std::string mode = command.substr(0, colon);
+    const std::string cluster = colon == std::string::npos ? "" : command.substr(colon + 1);
+    return std::make_shared<CommandRouteExtension>(mode, cluster);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  std::string name() const override { return "envoy.router.route_extension.command"; }
+};
+
+void addRouteExtension(
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>* extensions,
+    absl::string_view command) {
+  auto* extension = extensions->Add();
+  extension->set_name("test");
+  Protobuf::Struct value;
+  (*value.mutable_fields())["command"].set_string_value(std::string(command));
+  std::ignore = extension->mutable_typed_config()->PackFrom(value);
+}
+
+class RouteExtensionTest : public testing::Test, public ConfigImplTestBase {
+protected:
+  envoy::config::route::v3::RouteConfiguration baseConfig() {
+    factory_context_.cluster_manager_.initializeClusters({"base-cluster"}, {});
+    return parseRouteConfigurationFromYaml(R"EOF(
+virtual_hosts:
+  - name: extension_vhost
+    domains: ["extension.example.com"]
+    routes:
+      - match: { prefix: "/foo" }
+        route: { cluster: base-cluster }
+  )EOF");
+  }
+
+  envoy::config::route::v3::RouteConfiguration matcherConfig() {
+    factory_context_.cluster_manager_.initializeClusters({"base-cluster"}, {});
+    return parseRouteConfigurationFromYaml(R"EOF(
+virtual_hosts:
+  - name: extension_vhost
+    domains: ["extension.example.com"]
+    matcher:
+      matcher_tree:
+        input:
+          name: request-headers
+          typed_config:
+            "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+            header_name: :path
+        prefix_match_map:
+          map:
+            "/foo":
+              action:
+                name: route
+                typed_config:
+                  "@type": type.googleapis.com/envoy.config.route.v3.RouteList
+                  routes:
+                    - match: { prefix: "/foo" }
+                      route: { cluster: base-cluster }
+  )EOF");
+  }
+
+  Http::TestRequestHeaderMapImpl matchingRequest() {
+    return genHeaders("extension.example.com", "/foo", "GET");
+  }
+
+  CommandRouteExtensionFactory factory_;
+  Registry::InjectFactory<RouteExtensionFactory> registration_{factory_};
+};
+
+TEST_F(RouteExtensionTest, RouteLevelChainOverridesCluster) {
+  auto proto_config = baseConfig();
+  addRouteExtension(
+      proto_config.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route_extensions(),
+      "transform:route-cluster");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  EXPECT_EQ("route-cluster", config.route(matchingRequest(), 0)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteExtensionTest, VirtualHostLevelChainOverridesCluster) {
+  auto proto_config = baseConfig();
+  addRouteExtension(proto_config.mutable_virtual_hosts(0)->mutable_route_extensions(),
+                    "transform:vhost-cluster");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  EXPECT_EQ("vhost-cluster", config.route(matchingRequest(), 0)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteExtensionTest, RouteConfigurationLevelChainOverridesCluster) {
+  auto proto_config = baseConfig();
+  addRouteExtension(proto_config.mutable_route_extensions(), "transform:config-cluster");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  EXPECT_EQ("config-cluster", config.route(matchingRequest(), 0)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteExtensionTest, RouteLevelChainRunsLastAndWins) {
+  auto proto_config = baseConfig();
+  addRouteExtension(proto_config.mutable_route_extensions(), "transform:config-cluster");
+  addRouteExtension(proto_config.mutable_virtual_hosts(0)->mutable_route_extensions(),
+                    "transform:vhost-cluster");
+  addRouteExtension(
+      proto_config.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route_extensions(),
+      "transform:route-cluster");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  // All three chains run in order and the route level chain runs last, so it wins.
+  EXPECT_EQ("route-cluster", config.route(matchingRequest(), 0)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteExtensionTest, ChainThatDropsTheRouteProducesNoRoute) {
+  auto proto_config = baseConfig();
+  addRouteExtension(
+      proto_config.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route_extensions(), "drop");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  EXPECT_LOG_CONTAINS("debug", "route extensions produced no route for the request",
+                      { EXPECT_EQ(nullptr, config.route(matchingRequest(), 0).route); });
+}
+
+TEST_F(RouteExtensionTest, ChainProducesRouteWhenNothingMatched) {
+  auto proto_config = baseConfig();
+  addRouteExtension(proto_config.mutable_virtual_hosts(0)->mutable_route_extensions(),
+                    "produce:produced-cluster");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  // The request path matches no route, so the virtual host chain produces one.
+  EXPECT_EQ("produced-cluster",
+            config.route(genHeaders("extension.example.com", "/no-match", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+}
+
+TEST_F(RouteExtensionTest, VirtualHostLevelChainRunsForMatcherBasedRoutes) {
+  auto proto_config = matcherConfig();
+  addRouteExtension(proto_config.mutable_virtual_hosts(0)->mutable_route_extensions(),
+                    "transform:matcher-cluster");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  EXPECT_EQ("matcher-cluster", config.route(matchingRequest(), 0)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteExtensionTest, ChainRunsConfigurationThenVirtualHostThenRouteInOrder) {
+  auto proto_config = baseConfig();
+  addRouteExtension(proto_config.mutable_route_extensions(), "append:config");
+  addRouteExtension(proto_config.mutable_virtual_hosts(0)->mutable_route_extensions(),
+                    "append:vhost");
+  addRouteExtension(
+      proto_config.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route_extensions(),
+      "append:route");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  // Each level appends its name, so the composed cluster pins the full order.
+  EXPECT_EQ("base-cluster-config-vhost-route",
+            config.route(matchingRequest(), 0)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteExtensionTest, SameLevelExtensionsRunInOrderAndProduceComposesWithTransform) {
+  auto proto_config = baseConfig();
+  addRouteExtension(proto_config.mutable_virtual_hosts(0)->mutable_route_extensions(),
+                    "produce:produced");
+  addRouteExtension(proto_config.mutable_virtual_hosts(0)->mutable_route_extensions(),
+                    "append:extra");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  // Nothing matches, so the first virtual host extension produces a route and the second appends.
+  EXPECT_EQ("produced-extra",
+            config.route(genHeaders("extension.example.com", "/no-match", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+}
+
+TEST_F(RouteExtensionTest, ProduceLeavesAMatchedRouteUnchanged) {
+  auto proto_config = baseConfig();
+  addRouteExtension(proto_config.mutable_virtual_hosts(0)->mutable_route_extensions(),
+                    "produce:produced-cluster");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  EXPECT_EQ("base-cluster", config.route(matchingRequest(), 0)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteExtensionTest, RouteLevelChainDoesNotRunWhenNothingMatched) {
+  auto proto_config = baseConfig();
+  addRouteExtension(
+      proto_config.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route_extensions(),
+      "produce:produced-cluster");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  // A route level chain belongs to a matched route, so it never runs when nothing matched.
+  EXPECT_EQ(nullptr,
+            config.route(genHeaders("extension.example.com", "/no-match", "GET"), 0).route);
+}
+
+TEST_F(RouteExtensionTest, UnknownExtensionIsRejected) {
+  auto proto_config = baseConfig();
+  auto* extension = proto_config.mutable_route_extensions()->Add();
+  extension->set_name("test");
+  extension->mutable_typed_config()->set_type_url("type.googleapis.com/test.Unknown");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  EXPECT_FALSE(creation_status_.ok());
+}
+
+TEST_F(RouteExtensionTest, UnknownVirtualHostLevelExtensionIsRejected) {
+  auto proto_config = baseConfig();
+  auto* extension = proto_config.mutable_virtual_hosts(0)->mutable_route_extensions()->Add();
+  extension->set_name("test");
+  extension->mutable_typed_config()->set_type_url("type.googleapis.com/test.Unknown");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  EXPECT_FALSE(creation_status_.ok());
+}
+
+TEST_F(RouteExtensionTest, UnknownRouteLevelExtensionIsRejected) {
+  auto proto_config = baseConfig();
+  auto* extension =
+      proto_config.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route_extensions()->Add();
+  extension->set_name("test");
+  extension->mutable_typed_config()->set_type_url("type.googleapis.com/test.Unknown");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+
+  EXPECT_FALSE(creation_status_.ok());
+}
+
+// Cluster validation runs over the route extensions at every level when validate_clusters is on.
+TEST_F(RouteExtensionTest, RouteLevelChainClusterValidationRejectsUnknownCluster) {
+  auto proto_config = baseConfig();
+  addRouteExtension(
+      proto_config.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route_extensions(),
+      "reject:missing-cluster");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_.message(), testing::HasSubstr("unknown cluster 'missing-cluster'"));
+}
+
+TEST_F(RouteExtensionTest, VirtualHostLevelChainClusterValidationRejectsUnknownCluster) {
+  auto proto_config = baseConfig();
+  addRouteExtension(proto_config.mutable_virtual_hosts(0)->mutable_route_extensions(),
+                    "reject:missing-cluster");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_.message(), testing::HasSubstr("unknown cluster 'missing-cluster'"));
+}
+
+TEST_F(RouteExtensionTest, RouteConfigurationLevelChainClusterValidationRejectsUnknownCluster) {
+  auto proto_config = baseConfig();
+  addRouteExtension(proto_config.mutable_route_extensions(), "reject:missing-cluster");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_.message(), testing::HasSubstr("unknown cluster 'missing-cluster'"));
+}
+
+TEST_F(RouteExtensionTest, ChainClusterValidationAcceptsKnownCluster) {
+  auto proto_config = baseConfig();
+  addRouteExtension(proto_config.mutable_route_extensions(), "reject:base-cluster");
+  TestConfigImpl config(proto_config, factory_context_, true, creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+}
+
+// With validate_clusters disabled the chain clusters are not checked at load, at any level.
+TEST_F(RouteExtensionTest, ChainClusterValidationSkippedWhenDisabled) {
+  auto proto_config = baseConfig();
+  addRouteExtension(proto_config.mutable_route_extensions(), "reject:missing-cluster");
+  TestConfigImpl config(proto_config, factory_context_, false, creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+}
+
+TEST_F(RouteExtensionTest, VirtualHostLevelChainClusterValidationSkippedWhenDisabled) {
+  auto proto_config = baseConfig();
+  addRouteExtension(proto_config.mutable_virtual_hosts(0)->mutable_route_extensions(),
+                    "reject:missing-cluster");
+  TestConfigImpl config(proto_config, factory_context_, false, creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+}
+
+TEST_F(RouteExtensionTest, RouteLevelChainClusterValidationSkippedWhenDisabled) {
+  auto proto_config = baseConfig();
+  addRouteExtension(
+      proto_config.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route_extensions(),
+      "reject:missing-cluster");
+  TestConfigImpl config(proto_config, factory_context_, false, creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
 }
 
 } // namespace

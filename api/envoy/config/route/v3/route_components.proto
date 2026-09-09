@@ -45,7 +45,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -258,6 +258,12 @@ message VirtualHost {
   // For instance, if the metadata is intended for the Router filter,
   // the filter name should be specified as ``envoy.filters.http.router``.
   core.v3.Metadata metadata = 24;
+
+  // Route extensions applied to the resolved route, evaluated as a chain after the :ref:`route
+  // configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_extensions>` chain
+  // and before the :ref:`route <envoy_v3_api_field_config.route.v3.Route.route_extensions>` chain.
+  // If not specified, no virtual host level extension runs.
+  repeated core.v3.TypedExtensionConfig route_extensions = 26;
 }
 
 // A filter-defined action type.
@@ -281,7 +287,7 @@ message RouteList {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`.
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
 
@@ -420,6 +426,13 @@ message Route {
   // Only one of :ref:`per_request_buffer_limit_bytes <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>`
   // and ``request_body_buffer_limit`` may be set.
   google.protobuf.UInt64Value request_body_buffer_limit = 20;
+
+  // Route extensions applied when this route is matched, evaluated as a chain after the :ref:`route
+  // configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_extensions>` and
+  // :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.route_extensions>` chains.
+  // The route the last extension returns is the route Envoy uses. If not specified, no route level
+  // extension runs.
+  repeated core.v3.TypedExtensionConfig route_extensions = 21;
 }
 
 // Compared to the :ref:`cluster <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` field that specifies a

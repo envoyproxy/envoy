@@ -802,6 +802,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   } else {
     early_data_policy_ = std::make_unique<DefaultEarlyDataPolicy>(/*allow_safe_request*/ true);
   }
+
+  auto route_extensions_or_error = createRouteExtensions(route.route_extensions(), factory_context);
+  SET_AND_RETURN_IF_NOT_OK(route_extensions_or_error.status(), creation_status);
+  route_extensions_ = std::move(route_extensions_or_error.value());
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
@@ -1346,6 +1350,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
 }
 
 absl::Status RouteEntryImplBase::validateClusters(const Upstream::ClusterManager& cm) const {
+  RETURN_IF_NOT_OK(validateRouteExtensionClusters(route_extensions_, cm));
   if (!cluster_name_.empty()) {
     return !cm.hasCluster(cluster_name_) ? absl::InvalidArgumentError(fmt::format(
                                                "route: unknown cluster '{}'", cluster_name_))
@@ -1701,6 +1706,11 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   if (virtual_host.has_metadata()) {
     metadata_ = std::make_unique<RouteMetadataPack>(virtual_host.metadata());
   }
+
+  auto route_extensions_or_error =
+      createRouteExtensions(virtual_host.route_extensions(), factory_context);
+  SET_AND_RETURN_IF_NOT_OK(route_extensions_or_error.status(), creation_status);
+  route_extensions_ = std::move(route_extensions_or_error.value());
 }
 
 CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
@@ -1783,6 +1793,15 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
       virtual_host, global_route_config, factory_context, scope, validator, init_manager);
   SET_AND_RETURN_IF_NOT_OK(host_or_error.status(), creation_status);
   shared_virtual_host_ = std::move(host_or_error.value());
+  has_config_or_vhost_route_extensions_ =
+      !shared_virtual_host_->globalRouteConfig().routeExtensions().empty() ||
+      !shared_virtual_host_->routeExtensions().empty();
+
+  if (validate_clusters) {
+    SET_AND_RETURN_IF_NOT_OK(validateRouteExtensionClusters(shared_virtual_host_->routeExtensions(),
+                                                            factory_context.clusterManager()),
+                             creation_status);
+  }
 
   switch (virtual_host.require_tls()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
@@ -1827,7 +1846,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
 RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
     const RouteCallback& cb, const RouteMatchContext& route_match_context,
     const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-    absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const {
+    absl::Span<const RouteEntryImplBaseConstSharedPtr> routes,
+    RouteEntryImplBaseConstSharedPtr* matched_entry) const {
   for (auto route = routes.begin(); route != routes.end(); ++route) {
     if (!route_match_context.headers().Path() && !(*route)->supportsPathlessHeaders()) {
       continue;
@@ -1840,6 +1860,9 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
     }
 
     if (cb == nullptr) {
+      if (!(*route)->routeExtensions().empty()) {
+        *matched_entry = *route;
+      }
       return route_entry;
     }
 
@@ -1848,6 +1871,9 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
                                       : RouteEvalStatus::HasMoreRoutes;
     RouteMatchStatus match_status = cb(route_entry, eval_status);
     if (match_status == RouteMatchStatus::Accept) {
+      if (!(*route)->routeExtensions().empty()) {
+        *matched_entry = *route;
+      }
       return route_entry;
     }
     if (match_status == RouteMatchStatus::Continue &&
@@ -1860,6 +1886,29 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
 
   ENVOY_LOG(debug, "route was resolved but final route list did not match incoming request");
   return nullptr;
+}
+
+RouteConstSharedPtr VirtualHostImpl::applyRouteExtensions(const RouteEntryImplBase* matched_entry,
+                                                          RouteConstSharedPtr route,
+                                                          const Http::RequestHeaderMap& headers,
+                                                          const StreamInfo::StreamInfo& stream_info,
+                                                          uint64_t random_value) const {
+  // Route configuration level first, then virtual host level, then the level of the matched route.
+  // Each level receives the route the previous one returned, which may be null when nothing matched
+  // or a level produced none.
+  route = runRouteExtensions(shared_virtual_host_->globalRouteConfig().routeExtensions(),
+                             std::move(route), headers, stream_info, random_value);
+  route = runRouteExtensions(shared_virtual_host_->routeExtensions(), std::move(route), headers,
+                             stream_info, random_value);
+  if (matched_entry != nullptr) {
+    route = runRouteExtensions(matched_entry->routeExtensions(), std::move(route), headers,
+                               stream_info, random_value);
+  }
+
+  if (route == nullptr) {
+    ENVOY_LOG(debug, "route extensions produced no route for the request");
+  }
+  return route;
 }
 
 RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb,
@@ -1890,6 +1939,11 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
   const RouteMatchContext route_match_context(
       headers, shared_virtual_host_->globalRouteConfig().ignorePathParametersInPathMatching());
 
+  // The resolved route, which is null when nothing matches, and the entry that owns its route level
+  // extension chain. Both are handed to the route extension chains below.
+  RouteConstSharedPtr route;
+  RouteEntryImplBaseConstSharedPtr matched_entry;
+
   if (matcher_) {
     Http::Matching::HttpMatchingDataImpl data(stream_info);
     data.onRequestHeaders(headers);
@@ -1900,25 +1954,32 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     if (match_result.isMatch()) {
       const auto result = match_result.actionByMove();
       if (result->typeUrl() == RouteMatchAction::staticTypeUrl()) {
-        return getRouteFromRoutes(
+        route = getRouteFromRoutes(
             cb, route_match_context, stream_info, random_value,
-            {std::dynamic_pointer_cast<const RouteEntryImplBase>(std::move(result))});
+            {std::dynamic_pointer_cast<const RouteEntryImplBase>(std::move(result))},
+            &matched_entry);
       } else if (result->typeUrl() == RouteListMatchAction::staticTypeUrl()) {
         const RouteListMatchAction& action = result->getTyped<RouteListMatchAction>();
-        return getRouteFromRoutes(cb, route_match_context, stream_info, random_value,
-                                  action.routes());
+        route = getRouteFromRoutes(cb, route_match_context, stream_info, random_value,
+                                   action.routes(), &matched_entry);
+      } else {
+        PANIC("Action in router matcher should be Route or RouteList");
       }
-      PANIC("Action in router matcher should be Route or RouteList");
+    } else {
+      ENVOY_LOG(debug, "failed to match incoming request: {}",
+                match_result.isNoMatch() ? "no match" : "insufficient data");
     }
-
-    ENVOY_LOG(debug, "failed to match incoming request: {}",
-              match_result.isNoMatch() ? "no match" : "insufficient data");
-
-    return nullptr;
+  } else {
+    route = getRouteFromRoutes(cb, route_match_context, stream_info, random_value, routes_,
+                               &matched_entry);
   }
 
-  // Check for a route that matches the request.
-  return getRouteFromRoutes(cb, route_match_context, stream_info, random_value, routes_);
+  // Skip the chain when no route extension applies, so the common case pays nothing extra.
+  if (!has_config_or_vhost_route_extensions_ && matched_entry == nullptr) {
+    return route;
+  }
+  return applyRouteExtensions(matched_entry.get(), std::move(route), headers, stream_info,
+                              random_value);
 }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
@@ -1965,6 +2026,13 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
           factory_context.routerContext().virtualClusterStatNames().vhost_)),
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()),
       vhost_header_(route_config.vhost_header()) {
+  // Configuration level extensions are validated here, once per route configuration, because
+  // CommonConfigImpl::create does not receive validate_clusters.
+  if (validate_clusters) {
+    SET_AND_RETURN_IF_NOT_OK(validateRouteExtensionClusters(global_route_config->routeExtensions(),
+                                                            factory_context.clusterManager()),
+                             creation_status);
+  }
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostImplSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
         virtual_host_config, global_route_config, factory_context, *vhost_scope_, validator,
@@ -2168,6 +2236,11 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
   if (config.has_metadata()) {
     metadata_ = std::make_unique<RouteMetadataPack>(config.metadata());
   }
+
+  auto route_extensions_or_error =
+      createRouteExtensions(config.route_extensions(), factory_context);
+  SET_AND_RETURN_IF_NOT_OK(route_extensions_or_error.status(), creation_status);
+  route_extensions_ = std::move(route_extensions_or_error.value());
 }
 
 absl::StatusOr<ClusterSpecifierPluginSharedPtr>
