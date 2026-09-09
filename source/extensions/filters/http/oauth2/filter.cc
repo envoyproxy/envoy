@@ -98,12 +98,91 @@ bool oauth2ChunkLargeTokenCookiesEnabled() {
       "envoy.reloadable_features.oauth2_chunk_large_token_cookies");
 }
 
-absl::optional<int> parseChunkedCookiesCount(absl::string_view count_value) {
+std::optional<int> parseChunkedCookiesCount(absl::string_view count_value) {
   int count = 0;
   if (!absl::SimpleAtoi(count_value, &count) || count < 1 || count > MaxChunksPerToken) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return count;
+}
+
+struct TokenCookieValueAndCount {
+  std::string value_;
+  std::optional<int> count_;
+};
+
+TokenCookieValueAndCount
+findTokenCookieValueAndCount(const absl::flat_hash_map<std::string, std::string>& cookies,
+                             absl::string_view key) {
+  const auto count_it = cookies.find(absl::StrCat(key, TokenCookieChunksSuffix));
+  if (count_it == cookies.end()) {
+    const auto value_it = cookies.find(key);
+    return {value_it == cookies.end() ? EMPTY_STRING : value_it->second, std::nullopt};
+  }
+
+  const std::optional<int> count = parseChunkedCookiesCount(count_it->second);
+  if (!count.has_value()) {
+    const auto value_it = cookies.find(key);
+    return {value_it == cookies.end() ? EMPTY_STRING : value_it->second, std::nullopt};
+  }
+
+  std::string value;
+  value.reserve(count.value() * MaxCookieSize);
+  for (int index = 0; index < count.value(); ++index) {
+    const auto chunk_it = cookies.find(absl::StrCat(key, "_", index));
+    if (chunk_it == cookies.end()) {
+      return {EMPTY_STRING, count};
+    }
+    value += chunk_it->second;
+  }
+  return {std::move(value), count};
+}
+
+bool hasTokenCookie(const absl::flat_hash_map<std::string, std::string>& cookies,
+                    absl::string_view key) {
+  if (cookies.contains(key) || cookies.contains(absl::StrCat(key, TokenCookieChunksSuffix))) {
+    return true;
+  }
+  for (int index = 0; index < MaxChunksPerToken; ++index) {
+    if (cookies.contains(absl::StrCat(key, "_", index))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Remove the entire bounded token-cookie namespace instead of relying on the recorded chunk count.
+// Request metadata is untrusted and may be missing or malformed, and some callers do not have
+// per-request chunk-count state available.
+void eraseTokenCookies(absl::flat_hash_map<std::string, std::string>& cookies,
+                       absl::string_view key) {
+  cookies.erase(key);
+  cookies.erase(absl::StrCat(key, TokenCookieChunksSuffix));
+  for (int index = 0; index < MaxChunksPerToken; ++index) {
+    cookies.erase(absl::StrCat(key, "_", index));
+  }
+}
+
+std::optional<size_t> tokenCookieDataSize(absl::string_view key, absl::string_view cookie_tail,
+                                          size_t max_cookie_size) {
+  constexpr size_t chunk_suffix_size = 3;
+  constexpr size_t separator_size = 1;
+  const size_t chunk_overhead =
+      key.size() + chunk_suffix_size + separator_size + cookie_tail.size();
+  if (chunk_overhead >= max_cookie_size) {
+    return std::nullopt;
+  }
+  return max_cookie_size - chunk_overhead;
+}
+
+bool tokenCookieFits(absl::string_view key, absl::string_view data, absl::string_view cookie_tail,
+                     size_t max_cookie_size) {
+  if (!oauth2ChunkLargeTokenCookiesEnabled()) {
+    return true;
+  }
+  const std::optional<size_t> chunk_size = tokenCookieDataSize(key, cookie_tail, max_cookie_size);
+  return chunk_size.has_value() &&
+         (data.size() + chunk_size.value() - 1) / chunk_size.value() <= MaxChunksPerToken;
 }
 
 constexpr int DEFAULT_CSRF_TOKEN_EXPIRES_IN = 600;
@@ -947,12 +1026,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // Decrypt the OAuth tokens and update the corresponding cookies in the request headers
-  // before forwarding the request upstream. This step must occur early to ensure that
-  // other parts of the filter can access the decrypted tokens—for example, to calculate
-  // the HMAC for the cookies.
-  decryptAndUpdateOAuthTokenCookies(headers);
-
   // Only sanitize the Authorization header if preserveAuthorizationHeader is false
   if (!config_->preserveAuthorizationHeader()) {
     // Sanitize the Authorization header, since we have no way to validate its content. Also,
@@ -979,6 +1052,12 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   if (config_->signoutPath().match(path_header->value().getStringView())) {
     return signOutUser(headers);
   }
+
+  // Decrypt the OAuth tokens and update the corresponding cookies in the request headers
+  // before forwarding the request upstream. This step must occur early to ensure that
+  // other parts of the filter can access the decrypted tokens—for example, to calculate
+  // the HMAC for the cookies.
+  decryptAndUpdateOAuthTokenCookies(headers);
 
   // The user has already logged in and not expired.
   const bool logged_in = canSkipOAuth(headers);
@@ -1180,36 +1259,36 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
 
 // Decrypt the OAuth tokens and updates the OAuth tokens in the request cookies before forwarding
 // the request upstream.
-void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const {
-  if (config_->disableTokenEncryption()) {
-    return;
-  }
-
+void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) {
   absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
   if (cookies.empty()) {
     return;
   }
 
   const CookieNames& cookie_names = config_->cookieNames();
+  token_cookie_chunk_counts_.clear();
+  bool updated = false;
+  for (const std::string* cookie_name :
+       {&cookie_names.bearer_token_, &cookie_names.id_token_, &cookie_names.refresh_token_}) {
+    if (!hasTokenCookie(cookies, *cookie_name)) {
+      continue;
+    }
 
-  const std::string encrypted_access_token = findValue(cookies, cookie_names.bearer_token_);
-  const std::string encrypted_id_token = findValue(cookies, cookie_names.id_token_);
-  const std::string encrypted_refresh_token = findValue(cookies, cookie_names.refresh_token_);
-
-  if (!encrypted_access_token.empty()) {
-    cookies.insert_or_assign(cookie_names.bearer_token_, decryptToken(encrypted_access_token));
+    auto [token, chunk_count] = findTokenCookieValueAndCount(cookies, *cookie_name);
+    if (chunk_count.has_value()) {
+      token_cookie_chunk_counts_.insert_or_assign(*cookie_name, chunk_count.value());
+    }
+    eraseTokenCookies(cookies, *cookie_name);
+    if (!token.empty()) {
+      if (!config_->disableTokenEncryption()) {
+        token = decryptToken(token);
+      }
+      cookies.insert_or_assign(*cookie_name, std::move(token));
+    }
+    updated = true;
   }
 
-  if (!encrypted_id_token.empty()) {
-    cookies.insert_or_assign(cookie_names.id_token_, decryptToken(encrypted_id_token));
-  }
-
-  if (!encrypted_refresh_token.empty()) {
-    cookies.insert_or_assign(cookie_names.refresh_token_, decryptToken(encrypted_refresh_token));
-  }
-
-  if (!encrypted_access_token.empty() || !encrypted_id_token.empty() ||
-      !encrypted_refresh_token.empty()) {
+  if (updated) {
     std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
     headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
   }
@@ -1407,33 +1486,30 @@ void OAuth2Filter::setTokenCookie(Http::ResponseHeaderMap& headers, const std::s
   // 48 cookies total. Modern browsers can handle at least 50 cookies per domain.
   // This can be made configurable in the future if needed.
 
-  // Calculate actual data space available per chunk
-  constexpr size_t chunk_suffix_size = 3; // "_15" for worst-case chunk number
-  constexpr size_t separator_size = 1;    // "=" between name and value
-  const size_t chunk_overhead =
-      key.size() + chunk_suffix_size + separator_size + cookie_tail.size();
-  const size_t max_allowed_data_size = max_cookie_size - chunk_overhead;
-
-  if (!oauth2ChunkLargeTokenCookiesEnabled() || data.size() <= max_allowed_data_size) {
-    if (data.size() > max_allowed_data_size) {
+  const std::optional<size_t> max_allowed_data_size =
+      tokenCookieDataSize(key, cookie_tail, max_cookie_size);
+  if (!oauth2ChunkLargeTokenCookiesEnabled()) {
+    if (!max_allowed_data_size.has_value() || data.size() > max_allowed_data_size.value()) {
       ENVOY_LOG_EVERY_POW_2(warn,
-                "token cookie {} size {} exceeds the max allowed cookie size {}, but chunking is "
-                "disabled",
-                key, data.size(), max_allowed_data_size);
+                            "token cookie {} exceeds the max allowed cookie size, but chunking is "
+                            "disabled",
+                            key);
     }
     setCookie(headers, key, data, cookie_tail);
     return;
   }
 
-  const size_t required_chunks =
-      (data.size() + max_allowed_data_size - 1) / max_allowed_data_size; // Ceiling division
-  if (required_chunks > MaxChunksPerToken) {
-    ENVOY_LOG_EVERY_POW_2(error, "token cookie {} too large; requires {} chunks, max allowed is {}", key,
-              required_chunks, MaxChunksPerToken);
+  ASSERT(max_allowed_data_size.has_value());
+  if (data.size() <= max_allowed_data_size.value()) {
+    setCookie(headers, key, data, cookie_tail);
     return;
   }
 
-  size_t chunk_count = setChunkedCookies(headers, key, data, cookie_tail, max_allowed_data_size);
+  const size_t required_chunks =
+      (data.size() + max_allowed_data_size.value() - 1) / max_allowed_data_size.value();
+  ASSERT(required_chunks <= MaxChunksPerToken);
+  size_t chunk_count =
+      setChunkedCookies(headers, key, data, cookie_tail, max_allowed_data_size.value());
   setCookie(headers, absl::StrCat(key, TokenCookieChunksSuffix), std::to_string(chunk_count),
             cookie_tail);
   ENVOY_LOG(debug, "token cookie {} chunked into {} cookies", key, chunk_count);
@@ -1442,37 +1518,7 @@ void OAuth2Filter::setTokenCookie(Http::ResponseHeaderMap& headers, const std::s
 std::string
 OAuth2CookieValidator::findTokenCookie(const absl::flat_hash_map<std::string, std::string>& cookies,
                                        const std::string& key_prefix) const {
-  // find the <key_prefix>_chunks cookie to determine if the cookie value is chunked.
-  auto count_it = cookies.find(absl::StrCat(key_prefix, TokenCookieChunksSuffix));
-
-  if (count_it == cookies.end()) {
-    // If <key_prefix>_chunks cookie not found, fallback to original non-chunked logic.
-    return findValue(cookies, key_prefix);
-  }
-
-  // If the <key_prefix>_chunks cookie is found, it indicates that the cookie value was chunked and
-  // needs to be combined.
-  const absl::optional<int> count = parseChunkedCookiesCount(count_it->second);
-  if (!count.has_value()) {
-    // This should not happen, last attempt to find the non-chunked cookie just in case.
-    return findValue(cookies, key_prefix);
-  }
-
-  // Combine the chunked cookie parts
-  std::string combinedValue;
-  combinedValue.reserve(count.value() * MaxCookieSize);
-
-  for (int i = 0; i < count.value(); ++i) {
-    auto cookie_chunk = key_prefix + "_" + std::to_string(i);
-    auto it = cookies.find(cookie_chunk);
-    if (it != cookies.end()) {
-      combinedValue += it->second;
-    } else {
-      ENVOY_LOG(debug, "chunked cookie {} not found", cookie_chunk);
-      return EMPTY_STRING; // similar to findValue when cookie is not found
-    }
-  }
-  return combinedValue; // Return the combined value if all chunks are present
+  return findTokenCookieValueAndCount(cookies, key_prefix).value_;
 }
 
 void OAuth2Filter::deleteTokenCookie(const Http::RequestHeaderMap& request_headers,
@@ -1498,7 +1544,7 @@ void OAuth2Filter::deleteTokenCookie(const Http::RequestHeaderMap& request_heade
   }
 
   // handle chunked cookies deletion based on the count value.
-  const absl::optional<int> count = parseChunkedCookiesCount(countValue);
+  const std::optional<int> count = parseChunkedCookiesCount(countValue);
 
   if (count.has_value()) {
     // Delete individual chunked cookies and _count cookie.
@@ -1529,6 +1575,29 @@ void OAuth2Filter::deleteTokenCookie(const Http::RequestHeaderMap& request_heade
   response_headers.addReferenceKey(
       Http::Headers::get().SetCookie,
       absl::StrCat(fmt::format(CookieDeleteFormatString, countCookieName, cookie_path),
+                   cookie_domain, maybe_secure_attr));
+}
+
+void OAuth2Filter::deleteRecordedTokenChunks(Http::ResponseHeaderMap& headers,
+                                             const std::string& cookie_name,
+                                             absl::string_view cookie_path,
+                                             absl::string_view cookie_domain,
+                                             absl::string_view maybe_secure_attr) const {
+  const auto count_it = token_cookie_chunk_counts_.find(cookie_name);
+  if (count_it == token_cookie_chunk_counts_.end()) {
+    return;
+  }
+  for (int index = 0; index < count_it->second; ++index) {
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, absl::StrCat(cookie_name, "_", index),
+                                 cookie_path),
+                     cookie_domain, maybe_secure_attr));
+  }
+  headers.addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(fmt::format(CookieDeleteFormatString,
+                               absl::StrCat(cookie_name, TokenCookieChunksSuffix), cookie_path),
                    cookie_domain, maybe_secure_attr));
 }
 
@@ -1566,7 +1635,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
     cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
   }
 
-  for (const auto& [cookie_name, cookie_path] : cookies_to_delete) {
+  const auto delete_cookie = [&](absl::string_view cookie_name, absl::string_view cookie_path) {
     // Cookie names prefixed with "__Secure-" or "__Host-" are special. They MUST be set with the
     // Secure attribute so that the browser handles their deletion properly.
     const absl::string_view maybe_secure_attr = mayAddSecureAttributeForCookie(cookie_name);
@@ -1575,7 +1644,9 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
         Http::Headers::get().SetCookie,
         absl::StrCat(fmt::format(CookieDeleteFormatString, cookie_name, cookie_path), cookie_domain,
                      maybe_secure_attr));
-  }
+  };
+
+  delete_cookie(cookies_to_delete.front().first, cookies_to_delete.front().second);
 
   // Delete token cookies and any associated chunked variants regardless of the runtime guard value.
   deleteTokenCookie(headers, *response_headers, config_->cookieNames().bearer_token_,
@@ -1587,6 +1658,10 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   deleteTokenCookie(headers, *response_headers, config_->cookieNames().refresh_token_,
                     config_->refreshTokenCookieSettings().path_, cookie_domain,
                     mayAddSecureAttributeForCookie(config_->cookieNames().refresh_token_));
+
+  for (size_t index = 1; index < cookies_to_delete.size(); ++index) {
+    delete_cookie(cookies_to_delete[index].first, cookies_to_delete[index].second);
+  }
 
   const std::string default_post_logout_redirect_url =
       absl::StrCat(headers.getSchemeValue(), "://", host_, "/");
@@ -1777,6 +1852,11 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
   // Now, we construct a redirect request to return the user to their
   // previous state and additionally set the OAuth cookies in browser.
   // The redirection should result in successfully passing this filter.
+  if (!tokenCookiesFit()) {
+    sendSecretsNotReadyResponse("OAuth token exceeds the cookie chunk limit");
+    return;
+  }
+
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
@@ -1807,10 +1887,15 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
     cookies.insert_or_assign(cookie_names.id_token_, id_token_);
   }
 
-  if (refresh_token_.empty() && cookies.contains(cookie_names.refresh_token_)) {
+  if (refresh_token_.empty() && hasTokenCookie(cookies, cookie_names.refresh_token_)) {
     // If we actually went through the refresh token flow, but we didn't get a new refresh token,
     // we want to still ensure that the old one is preserved if it was sent in a cookie.
-    refresh_token_ = findValue(cookies, cookie_names.refresh_token_);
+    refresh_token_ = findTokenCookieValueAndCount(cookies, cookie_names.refresh_token_).value_;
+  }
+
+  if (!tokenCookiesFit()) {
+    sendSecretsNotReadyResponse("OAuth token exceeds the cookie chunk limit");
+    return;
   }
 
   // The oauth_expires_, refresh_token_ and oauth_hmac_ OAuth flow cookies are intentionally not
@@ -1852,6 +1937,22 @@ Http::FilterHeadersStatus OAuth2Filter::onRefreshAccessTokenFailure() {
   return Http::FilterHeadersStatus::StopIteration;
 }
 
+bool OAuth2Filter::tokenCookiesFit() const {
+  const CookieNames& cookie_names = config_->cookieNames();
+  const auto fits = [this](absl::string_view key, absl::string_view token,
+                           const FilterConfig::CookieSettings& settings,
+                           absl::string_view expires) {
+    return token.empty() || tokenCookieFits(key, encryptToken(std::string(token)),
+                                            buildCookieTail(settings, expires), MaxCookieSize);
+  };
+  return fits(cookie_names.bearer_token_, access_token_, config_->bearerTokenCookieSettings(),
+              expires_in_) &&
+         fits(cookie_names.id_token_, id_token_, config_->idTokenCookieSettings(),
+              expires_id_token_in_) &&
+         fits(cookie_names.refresh_token_, refresh_token_, config_->refreshTokenCookieSettings(),
+              expires_refresh_token_in_);
+}
+
 void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
                                            const std::string& encoded_token) const {
   // We use HTTP Only cookies.
@@ -1876,28 +1977,69 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
   }
 
   if (!access_token_.empty()) {
-    setTokenCookie(headers, cookie_names.bearer_token_, encryptToken(access_token_),
-                   buildCookieTail(config_->bearerTokenCookieSettings(), expires_in_));
-  } else if (request_cookies.contains(cookie_names.bearer_token_)) {
+    const std::string encrypted_token = encryptToken(access_token_);
+    const std::string cookie_tail =
+        buildCookieTail(config_->bearerTokenCookieSettings(), expires_in_);
+    deleteRecordedTokenChunks(headers, cookie_names.bearer_token_,
+                              config_->bearerTokenCookieSettings().path_, cookie_domain,
+                              mayAddSecureAttributeForCookie(cookie_names.bearer_token_));
+    const std::optional<size_t> chunk_size =
+        tokenCookieDataSize(cookie_names.bearer_token_, cookie_tail, MaxCookieSize);
+    if (oauth2ChunkLargeTokenCookiesEnabled() && chunk_size.has_value() &&
+        encrypted_token.size() > chunk_size.value()) {
+      setCookie(headers, cookie_names.bearer_token_, "deleted",
+                fmt::format("; path={}; expires=Thu, 01 Jan 1970 00:00:00 GMT{}{}",
+                            config_->bearerTokenCookieSettings().path_, cookie_domain,
+                            mayAddSecureAttributeForCookie(cookie_names.bearer_token_)));
+    }
+    setTokenCookie(headers, cookie_names.bearer_token_, encrypted_token, cookie_tail);
+  } else if (hasTokenCookie(request_cookies, cookie_names.bearer_token_)) {
     deleteTokenCookie(*request_headers_, headers, cookie_names.bearer_token_,
                       config_->bearerTokenCookieSettings().path_, cookie_domain,
                       mayAddSecureAttributeForCookie(cookie_names.bearer_token_));
   }
 
   if (!id_token_.empty()) {
-    setTokenCookie(headers, cookie_names.id_token_, encryptToken(id_token_),
-                   buildCookieTail(config_->idTokenCookieSettings(), expires_id_token_in_));
-  } else if (request_cookies.contains(cookie_names.id_token_)) {
+    const std::string encrypted_token = encryptToken(id_token_);
+    const std::string cookie_tail =
+        buildCookieTail(config_->idTokenCookieSettings(), expires_id_token_in_);
+    deleteRecordedTokenChunks(headers, cookie_names.id_token_,
+                              config_->idTokenCookieSettings().path_, cookie_domain,
+                              mayAddSecureAttributeForCookie(cookie_names.id_token_));
+    const std::optional<size_t> chunk_size =
+        tokenCookieDataSize(cookie_names.id_token_, cookie_tail, MaxCookieSize);
+    if (oauth2ChunkLargeTokenCookiesEnabled() && chunk_size.has_value() &&
+        encrypted_token.size() > chunk_size.value()) {
+      setCookie(headers, cookie_names.id_token_, "deleted",
+                fmt::format("; path={}; expires=Thu, 01 Jan 1970 00:00:00 GMT{}{}",
+                            config_->idTokenCookieSettings().path_, cookie_domain,
+                            mayAddSecureAttributeForCookie(cookie_names.id_token_)));
+    }
+    setTokenCookie(headers, cookie_names.id_token_, encrypted_token, cookie_tail);
+  } else if (hasTokenCookie(request_cookies, cookie_names.id_token_)) {
     deleteTokenCookie(*request_headers_, headers, cookie_names.id_token_,
                       config_->idTokenCookieSettings().path_, cookie_domain,
                       mayAddSecureAttributeForCookie(cookie_names.id_token_));
   }
 
   if (!refresh_token_.empty()) {
-    setTokenCookie(
-        headers, cookie_names.refresh_token_, encryptToken(refresh_token_),
-        buildCookieTail(config_->refreshTokenCookieSettings(), expires_refresh_token_in_));
-  } else if (request_cookies.contains(cookie_names.refresh_token_)) {
+    const std::string encrypted_token = encryptToken(refresh_token_);
+    const std::string cookie_tail =
+        buildCookieTail(config_->refreshTokenCookieSettings(), expires_refresh_token_in_);
+    deleteRecordedTokenChunks(headers, cookie_names.refresh_token_,
+                              config_->refreshTokenCookieSettings().path_, cookie_domain,
+                              mayAddSecureAttributeForCookie(cookie_names.refresh_token_));
+    const std::optional<size_t> chunk_size =
+        tokenCookieDataSize(cookie_names.refresh_token_, cookie_tail, MaxCookieSize);
+    if (oauth2ChunkLargeTokenCookiesEnabled() && chunk_size.has_value() &&
+        encrypted_token.size() > chunk_size.value()) {
+      setCookie(headers, cookie_names.refresh_token_, "deleted",
+                fmt::format("; path={}; expires=Thu, 01 Jan 1970 00:00:00 GMT{}{}",
+                            config_->refreshTokenCookieSettings().path_, cookie_domain,
+                            mayAddSecureAttributeForCookie(cookie_names.refresh_token_)));
+    }
+    setTokenCookie(headers, cookie_names.refresh_token_, encrypted_token, cookie_tail);
+  } else if (hasTokenCookie(request_cookies, cookie_names.refresh_token_)) {
     deleteTokenCookie(*request_headers_, headers, cookie_names.refresh_token_,
                       config_->refreshTokenCookieSettings().path_, cookie_domain,
                       mayAddSecureAttributeForCookie(cookie_names.refresh_token_));
@@ -2139,7 +2281,7 @@ void OAuth2Filter::removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const
 
   cookies.erase(cookie_names.oauth_hmac_);
   cookies.erase(cookie_names.oauth_expires_);
-  cookies.erase(cookie_names.refresh_token_);
+  eraseTokenCookies(cookies, cookie_names.refresh_token_);
 
   auto eraseCookieWithSuffix = [&cookies](const std::string& base_name) {
     // Keep removing the legacy cookie name while we support mixed-version clusters.
@@ -2175,11 +2317,11 @@ void OAuth2Filter::removeOAuthTokenCookies(Http::RequestHeaderMap& headers) cons
   const CookieNames& cookie_names = config_->cookieNames();
 
   // Remove all authentication credential cookies.
-  cookies.erase(cookie_names.bearer_token_);
-  cookies.erase(cookie_names.id_token_);
+  eraseTokenCookies(cookies, cookie_names.bearer_token_);
+  eraseTokenCookies(cookies, cookie_names.id_token_);
   cookies.erase(cookie_names.oauth_hmac_);
   cookies.erase(cookie_names.oauth_expires_);
-  cookies.erase(cookie_names.refresh_token_);
+  eraseTokenCookies(cookies, cookie_names.refresh_token_);
 
   std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
   headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);

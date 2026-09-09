@@ -448,6 +448,9 @@ private:
   std::string host_;
   std::string original_request_url_;
   std::string flow_id_;
+  // Populated once while normalizing each request's token cookies so response writes can delete
+  // the chunked representation that was present on that request.
+  absl::flat_hash_map<std::string, int> token_cookie_chunk_counts_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
 
@@ -478,6 +481,7 @@ private:
   const char* mayAddSecureAttributeForCookie(absl::string_view cookie_name) const;
   void setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
                                const std::string& encoded_token) const;
+  bool tokenCookiesFit() const;
   void addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers,
                                     absl::string_view flow_id) const;
   void setCookie(Http::ResponseHeaderMap& headers, const std::string& key, const std::string& value,
@@ -488,10 +492,17 @@ private:
   void setTokenCookie(Http::ResponseHeaderMap& headers, const std::string& key,
                       const std::string& data, const std::string& cookie_tail,
                       const size_t max_cookie_size = MaxCookieSize) const;
+  // Adds expired Set-Cookie response headers that instruct the client to delete the token cookie
+  // representation found in the request. This does not delete server-side state.
   void deleteTokenCookie(const Http::RequestHeaderMap& headers,
                          Http::ResponseHeaderMap& response_headers, const std::string& cookie_name,
                          absl::string_view cookie_path, absl::string_view cookie_domain,
                          absl::string_view maybe_secure_attr) const;
+  // Adds expired Set-Cookie response headers that instruct the client to delete token chunks
+  // recorded during request normalization. This does not delete server-side state.
+  void deleteRecordedTokenChunks(Http::ResponseHeaderMap& headers, const std::string& cookie_name,
+                                 absl::string_view cookie_path, absl::string_view cookie_domain,
+                                 absl::string_view maybe_secure_attr) const;
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                                  const absl::string_view path_str) const;
@@ -499,7 +510,7 @@ private:
                                          const absl::string_view state) const;
   bool validateCsrfToken(const Http::RequestHeaderMap& headers, const std::string& csrf_token,
                          absl::string_view flow_id) const;
-  void decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
+  void decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers);
   std::string encryptToken(const std::string& token) const;
   std::string decryptToken(const std::string& encrypted_token) const;
   void removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const;
