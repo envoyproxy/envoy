@@ -187,7 +187,10 @@ public:
    */
   Api::IoCallUint64Result close() override;
 
-  /** Stop reverse-connection maintenance on listener teardown. */
+  /**
+   * Stop reverse-connection maintenance on listener teardown. On the owning worker this also
+   * shuts down in-flight handshake wrappers and deferred-deletes them.
+   */
   void resetFileEvents() override;
 
   /**

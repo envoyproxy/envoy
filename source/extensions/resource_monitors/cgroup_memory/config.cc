@@ -16,11 +16,13 @@ absl::StatusOr<Server::ResourceMonitorPtr>
 CgroupMemoryMonitorFactory::createResourceMonitorFromProtoTyped(
     const envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig& config,
     Server::Configuration::ResourceMonitorFactoryContext& context) {
-  return std::make_unique<CgroupMemoryMonitor>(config, context.api().fileSystem());
+  auto reader_or_error = CgroupMemoryStatsReader::create(context.api().fileSystem());
+  RETURN_IF_NOT_OK(reader_or_error.status());
+  return std::make_unique<CgroupMemoryMonitor>(config, std::move(reader_or_error.value()));
 }
 
 /**
- * Static registration for the cgroup memory monitor factory. @see RegistryFactory.
+ * Static registration for the cgroup memory resource monitor factory. @see RegistryFactory.
  */
 REGISTER_FACTORY(CgroupMemoryMonitorFactory, Server::Configuration::ResourceMonitorFactory);
 

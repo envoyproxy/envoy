@@ -84,7 +84,7 @@ bazel test --config=clang //test/... --test_env=HEAPCHECK=
 
 ### Dependency locations
 
-Depdendencies are configured in `bazel/repository_locations.bzl`, for API deps its `api/bazel/repository_locations.bzl`
+Dependencies are configured in `MODULE.bazel` and the Bazel registry; metadata is in `bazel/deps.yaml` and `api/bazel/deps.yaml`
 
 See `bazel/repositories.bzl` for setup - eg this is where any patching is controlled.
 
@@ -172,7 +172,7 @@ bazel run --config=clang //tools/dependency:check -- -v warn -c release_dates re
 
 ### Adding or updating dependencies
 
-1. Check [bazel/repository_locations.bzl](https://github.com/envoyproxy/envoy/blob/main/bazel/repository_locations.bzl) for existing dependencies
+1. Check `MODULE.bazel` and the Bazel registry for existing dependencies
 2. See [bazel/EXTERNAL_DEPS.md](https://github.com/envoyproxy/envoy/blob/main/bazel/EXTERNAL_DEPS.md) for how to add/update dependencies
 3. **Always run dependency validation after changes:**
    ```bash

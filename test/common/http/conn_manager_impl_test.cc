@@ -612,6 +612,7 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
+  EXPECT_CALL(*filter, onLocalReply(_));
   EXPECT_CALL(*filter, encodeHeaders(_, true));
   EXPECT_CALL(*filter, encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
@@ -659,6 +660,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
       }));
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, onLocalReply(_));
   EXPECT_CALL(*filter, encodeHeaders(_, true));
   EXPECT_CALL(*filter, encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))

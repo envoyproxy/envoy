@@ -75,10 +75,7 @@ py_binary(
     name = "format_api",
     srcs = ["format_api.py"],
     data = ["//:.clang-format"],
-    deps = [
-        ":data",
-        "//tools/api_proto_plugin:utils",
-    ],
+    deps = [":data"],
 )
 
 genrule(

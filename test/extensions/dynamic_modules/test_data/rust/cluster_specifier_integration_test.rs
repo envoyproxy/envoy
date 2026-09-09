@@ -5,8 +5,8 @@
 //! can control every branch, and it exercises the full cluster specifier context ABI surface:
 //! request headers (single value, indexed value, count, and bulk iteration), stream info attributes
 //! (string, int, and bool), dynamic metadata, the route name, the random value, the scalar route
-//! action setters, the named route action overrides, and the configuration metrics recorded on each
-//! selection.
+//! action setters, the named route action overrides, the route metadata setters, and the
+//! configuration metrics recorded on each selection.
 //!
 //! The headers the module reads are:
 //!   `env`               the cluster to route to, prefixed with the `specifier_config` bytes.
@@ -22,6 +22,13 @@
 //!                       a test can assert on what the module read across the ABI boundary.
 //!   `x-retry-cluster`   the cluster to route to once the first upstream attempt has been made, so
 //!                       that a test can tell that a retry re-entered the module.
+//!   `x-route-meta-string` a string value set as route metadata under `envoy.test.route`.
+//!   `x-route-meta-number` a number value set as route metadata under `envoy.test.route`.
+//!   `x-route-meta-bool`   a bool value set as route metadata under `envoy.test.route`.
+//!   `x-route-meta-struct` merges a fixed `google.protobuf.Struct` into the route metadata under
+//!                         `envoy.test.route`.
+//!   `x-route-typed-meta`  a serialized `google.protobuf.Any` set as typed route metadata. A value
+//!                         of `throw` picks one the registered factory rejects.
 //!
 //! A scalar header holding `max` selects the largest value the SDK type can express, which exercises
 //! the saturating conversion at the ABI boundary.
@@ -201,6 +208,54 @@ impl ClusterSpecifierConfig for TestClusterSpecifierConfig {
       });
     if let Some(priority) = priority {
       ctx.set_priority(priority);
+    }
+
+    // Route metadata setters, each guarded by its own header so a test can drive them in isolation.
+    // The values are layered onto the matched route so filters and access logs observe them.
+    if let Some(value) = ctx.get_request_header("x-route-meta-string") {
+      ctx.set_route_metadata_string("envoy.test.route", "string_key", &buffer_to_string(value));
+    }
+    if let Some(value) = ctx
+      .get_request_header("x-route-meta-number")
+      .and_then(|buffer| {
+        std::str::from_utf8(buffer.as_slice())
+          .ok()?
+          .parse::<f64>()
+          .ok()
+      })
+    {
+      ctx.set_route_metadata_number("envoy.test.route", "number_key", value);
+    }
+    if let Some(value) = ctx.get_request_header("x-route-meta-bool") {
+      ctx.set_route_metadata_bool("envoy.test.route", "bool_key", value.as_slice() == b"true");
+    }
+    if ctx.get_request_header("x-route-meta-struct").is_some() {
+      // Hand-encoded google.protobuf.Struct because the test module has no protobuf dependency.
+      //   0a 1a                      field 1 (fields) length 26
+      //     0a 0a "struct_key"       entry key
+      //     12 0c 1a 0a "struct-val" entry value, a string Value
+      let serialized_struct: &[u8] = &[
+        0x0a, 0x1a, 0x0a, 0x0a, 0x73, 0x74, 0x72, 0x75, 0x63, 0x74, 0x5f, 0x6b, 0x65, 0x79, 0x12,
+        0x0c, 0x1a, 0x0a, 0x73, 0x74, 0x72, 0x75, 0x63, 0x74, 0x2d, 0x76, 0x61, 0x6c,
+      ];
+      ctx.set_route_metadata_struct("envoy.test.route", serialized_struct);
+    }
+    if let Some(value) = ctx.get_request_header("x-route-typed-meta") {
+      // Hand-encoded google.protobuf.Any because the test module has no protobuf dependency. A
+      // `throw` value picks a type_url the registered factory rejects, any other value picks one it
+      // accepts.
+      let serialized_any: &[u8] = if value.as_slice() == b"throw" {
+        //   0a 07 74 2f 74 68 72 6f 77   field 1 (type_url) = "t/throw"
+        //   12 02 01 02                  field 2 (value)    = 0x01 0x02
+        &[
+          0x0a, 0x07, 0x74, 0x2f, 0x74, 0x68, 0x72, 0x6f, 0x77, 0x12, 0x02, 0x01, 0x02,
+        ]
+      } else {
+        //   0a 03 74 2f 78   field 1 (type_url) = "t/x"
+        //   12 02 01 02      field 2 (value)    = 0x01 0x02
+        &[0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02]
+      };
+      ctx.set_route_typed_metadata("envoy.test.typed_route", serialized_any);
     }
 
     // Record the selection so an integration test can observe the values that crossed the ABI

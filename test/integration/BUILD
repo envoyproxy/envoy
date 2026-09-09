@@ -492,6 +492,7 @@ envoy_cc_test_binary(
         "//source/exe:platform_impl_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/least_request:config",
         "//source/extensions/load_balancing_policies/random:config",
@@ -1136,9 +1137,9 @@ envoy_cc_test(
     ],
     deps = envoy_select_enable_http3([
         ":http_protocol_integration_lib",
-        "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/tls:connection_info_impl_base_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ]),
 )
@@ -1811,6 +1812,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     # The symbol table cluster memory tests take a while to run specially under tsan.
     deps = [
+        ":http_integration_lib",
         ":integration_lib",
         "//source/common/memory:stats_lib",
         "//source/common/runtime:runtime_features_lib",
@@ -2205,11 +2207,13 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//test/config/integration/certs:hashes",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:test_random_generator_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -2271,6 +2275,7 @@ envoy_cc_test(
         "//source/extensions/upstreams/http/tcp:config",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",
+        "//test/integration/filters:stop_in_headers_continue_in_data_filter_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/test_common:logging_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -2753,6 +2758,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -3201,4 +3207,17 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_test(
+    name = "quic_mtls_integration_test",
+    srcs = envoy_select_enable_http3(["quic_mtls_integration_test.cc"]),
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = envoy_select_enable_http3([
+        ":quic_http_integration_test_lib",
+        "//source/common/quic:quic_ssl_connection_info_lib",
+        "//test/test_common:utility_lib",
+    ]),
 )

@@ -131,11 +131,7 @@ function cp_binary_for_image_build() {
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
-  if [[ -n "$ENVOY_CI_BZLMOD" ]]; then
-      cp -f bazel-bin/external/su-exec~/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
-  else
-      cp -f bazel-bin/external/su-exec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
-  fi
+  cp -f bazel-bin/external/su-exec+/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
 
   # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
@@ -239,7 +235,9 @@ function bazel_envoy_api_go_build() {
     setup_clang_toolchain
     GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
     GO_TARGETS=(@envoy_api//...)
-    read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
+    read -r -a GO_PROTOS <<< "$(\
+        bazel query --consistent_labels "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" \
+        | tr '\n' ' ')"
     echo "${GO_PROTOS[@]}" | grep -q envoy_api || echo "No go proto targets found"
     bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
             --experimental_proto_descriptor_sets_include_source_info \
@@ -250,14 +248,13 @@ function bazel_envoy_api_go_build() {
     echo "Copying go protos -> build_go"
     BAZEL_BIN="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" bazel-bin)"
     for GO_PROTO in "${GO_PROTOS[@]}"; do
-            # strip @envoy_api//
-        RULE_DIR="$(echo "${GO_PROTO:12}" | cut -d: -f1)"
-        PROTO="$(echo "${GO_PROTO:12}" | cut -d: -f2)"
-        if [[ -n "$ENVOY_CI_BZLMOD" ]]; then
-            INPUT_DIR="${BAZEL_BIN}/external/envoy_api~/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
-        else
-            INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
-        fi
+        LABEL_PATH="${GO_PROTO#*//}"
+        RULE_DIR="${LABEL_PATH%%:*}"
+        PROTO="${LABEL_PATH#*:}"
+        REPO_LABEL="${GO_PROTO%%//*}"
+        REPO_NAME="${REPO_LABEL#@}"
+        REPO_NAME="${REPO_NAME#@}"
+        INPUT_DIR="${BAZEL_BIN}/external/${REPO_NAME}/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
         OUTPUT_DIR="build_go/${RULE_DIR}"
         mkdir -p "$OUTPUT_DIR"
         if [[ ! -e "$INPUT_DIR" ]]; then
@@ -285,19 +282,20 @@ function build_openssl() {
     bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
 }
 
-# Run a bazel query, staying quiet on success but surfacing stderr and the exit
+# Run a bazel cquery, staying quiet on success but surfacing stderr and the exit
 # code on failure, so a broken query fails the job instead of silently selecting
-# no tests. Query results go to stdout.
-function run_bazel_query() {
+# no tests. Results go to stdout as plain labels.
+function run_bazel_cquery() {
     local err out rc=0
     err="$(mktemp)"
-    out="$(bazel query "${BAZEL_QUERY_OPTIONS[@]}" "$1" 2>"$err")" || rc=$?
+    out="$(bazel cquery "${BAZEL_QUERY_OPTIONS[@]}" \
+                 --output=starlark --starlark:expr=target.label "$1" 2>"$err")" || rc=$?
     if [[ $rc -ne 0 ]]; then
-        echo "ERROR: bazel query failed (exit ${rc}): $1" >&2
+        echo "ERROR: bazel cquery failed (exit ${rc}): $1" >&2
         cat "$err" >&2
     fi
     rm -f "$err"
-    printf '%s' "$out"
+    printf '%s' "$out" | sed 's|^@@||'
     return "$rc"
 }
 
@@ -307,6 +305,7 @@ function build_openssl_presubmit() {
     # full suite still runs on post-submit via the regular "openssl" target.
     BAZEL_BUILD_OPTIONS+=("--config=openssl")
     setup_clang_toolchain
+    BAZEL_QUERY_OPTIONS+=("--config=openssl")
 
     echo "Bazel fastbuild build with OpenSSL..."
     bazel_envoy_binary_build fastbuild
@@ -325,6 +324,15 @@ function build_openssl_presubmit() {
     # Resolve each changed file to its Bazel label so tests can be selected from
     # the real dependency graph rather than by guessing test paths from source
     # paths (the test tree is not a 1:1 mirror of the source tree).
+    #
+    # Failing to diff is fatal: an empty file list would otherwise select no
+    # tests and report a green job that tested nothing.
+    local changed_files
+    if ! changed_files="$(git diff --name-only "$merge_base" HEAD)"; then
+        echo "ERROR: unable to diff ${merge_base}..HEAD; cannot determine affected tests." >&2
+        return 1
+    fi
+
     local -a changed_labels=()
     local global_config_changed=false
     while IFS= read -r file; do
@@ -336,9 +344,19 @@ function build_openssl_presubmit() {
             .bazelrc|.bazelversion|WORKSPACE|WORKSPACE.bazel|MODULE.bazel|MODULE.bazel.lock|bazel/*)
                 global_config_changed=true
                 ;;
-            # BUILD/.bzl changes affect the whole package.
+            # BUILD/.bzl changes affect the whole package. A root-level one
+            # (dirname ".") would yield the invalid pattern "//./..."; treat it
+            # as global build config instead. Only add the package pattern if it
+            # actually contains targets -- a .bzl in a non-package dir would
+            # otherwise make the rdeps set() query fail.
             *BUILD|*BUILD.bazel|*.bzl)
-                changed_labels+=("//$(dirname "$file")/...")
+                local dir
+                dir="$(dirname "$file")"
+                if [[ "$dir" == "." ]]; then
+                    global_config_changed=true
+                elif bazel query "${BAZEL_QUERY_OPTIONS[@]}" "//${dir}/..." >/dev/null 2>&1; then
+                    changed_labels+=("//${dir}/...")
+                fi
                 ;;
             # Tolerate files Bazel doesn't know about (docs, unwired sources).
             *)
@@ -347,13 +365,13 @@ function build_openssl_presubmit() {
                 [[ -n "$label" ]] && changed_labels+=("$label")
                 ;;
         esac
-    done < <(git diff --name-only "$merge_base" HEAD 2>/dev/null)
+    done < <(printf '%s\n' "$changed_files")
 
     # Tier 1: tests depending on the changed files. closure(//test/...) already
     # contains their //source/... deps, so it is a sufficient rdeps universe.
     local tier1_tests=""
     if [[ ${#changed_labels[@]} -gt 0 ]]; then
-        tier1_tests="$(run_bazel_query \
+        tier1_tests="$(run_bazel_cquery \
             "kind(test, rdeps(//test/... + //compat/openssl/test/..., set(${changed_labels[*]})))")"
     fi
 
@@ -363,7 +381,7 @@ function build_openssl_presubmit() {
     local tier2_tests=""
     if [[ "$global_config_changed" == "true" ]]; then
         echo "Global/build-config change detected; adding OpenSSL crypto-surface tests."
-        tier2_tests="$(run_bazel_query \
+        tier2_tests="$(run_bazel_cquery \
             "kind(test, rdeps(//test/... + //compat/openssl/test/..., //source/common/tls/... + //source/extensions/transport_sockets/tls/... + //compat/openssl/...))")"
     fi
 
@@ -451,32 +469,6 @@ case $CI_TARGET in
             #   --run_under=@envoy//bazel/tests:verify_tap_test.sh \
             #   //test/extensions/transport_sockets/tls/integration:ssl_integration_test
         # fi
-        ;;
-
-    cache-create)
-        if [[ -z "${ENVOY_CACHE_TARGETS}" ]]; then
-            echo "ENVOY_CACHE_TARGETS not set" >&2
-            exit 1
-        fi
-        if [[ -z "${ENVOY_CACHE_ROOT}" ]]; then
-            echo "ENVOY_CACHE_ROOT not set" >&2
-            exit 1
-        fi
-        ENVOY_CACHE_OUTPUT_BASE="${ENVOY_CACHE_OUTPUT_BASE:-base}"
-        setup_clang_toolchain
-        echo "Fetching cache: ${ENVOY_CACHE_TARGETS}"
-        if [[ -n "${ENVOY_CACHE_WORKING_DIR}" ]]; then
-            cd "${ENVOY_CACHE_WORKING_DIR}"
-        fi
-        bazel --output_user_root="${ENVOY_CACHE_ROOT}" \
-              --output_base="${ENVOY_CACHE_ROOT}/${ENVOY_CACHE_OUTPUT_BASE}" \
-              --nowrite_command_log \
-              aquery "deps(${ENVOY_CACHE_TARGETS})" \
-              --repository_cache="${ENVOY_REPOSITORY_CACHE}" \
-              "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" \
-              > /dev/null
-        TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
-        echo "Generated cache: ${TOTAL_SIZE}"
         ;;
 
     deflake)
@@ -614,14 +606,14 @@ case $CI_TARGET in
 
     config)
         setup_clang_toolchain
-        if [[ -z "$ENVOY_SKIP_CONFIGS_STATIC" ]]; then
-            echo "running static config validation"
-            bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy//test/config_test:static_config_validation
-        fi
         if [[ -e repo.bazelrc ]]; then
             cp -a repo.bazelrc "${ENVOY_DOCS_PATH}"
         fi
         pushd "$ENVOY_DOCS_PATH"
+        if [[ -z "$ENVOY_SKIP_CONFIGS_STATIC" ]]; then
+            echo "running static config validation"
+            bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy//test/config_test:static_config_validation
+        fi
         ENVOY_CONFIG_CONTRIB_LIB="${ENVOY_CONFIG_CONTRIB_LIB:-@envoy//contrib:contrib_test_lib}"
         ENVOY_CONFIGS_CORE="${ENVOY_CONFIGS_CORE:-//test/config:configs}"
         ENVOY_CONFIGS_CONTRIB="${ENVOY_CONFIGS_CONTRIB:-//test/config:contrib_configs}"
@@ -696,16 +688,6 @@ case $CI_TARGET in
               //tools/dependency:validate_reachability_test
         echo "dependency graph structure..."
         "${ENVOY_SRCDIR}/tools/dependency/validate_graph_structure.sh"
-        # Validate repository metadata.
-        echo "check repositories..."
-        "${ENVOY_SRCDIR}/tools/check_repositories.sh"
-        echo "check dependencies..."
-        # Using todays date as an action_env expires the NIST cache daily, which is the update frequency
-        # TODO(phlax): Re-enable cve tests
-        bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
-              -- -v warn \
-                 -c release_dates releases
-        # Run dependabot tests
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
@@ -920,6 +902,15 @@ case $CI_TARGET in
         bazel info "${BAZEL_BUILD_OPTIONS[@]}"
         ;;
 
+    lockfiles|lockfiles.regenerate)
+        # TODO(phlax): Add other lockfiles here and a check path
+        for module_dir in . "$ENVOY_DOCS_PATH" api/ mobile/ bazel/tests/external/; do
+            pushd "$module_dir"
+            bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --lockfile_mode=update
+            popd
+        done
+        ;;
+
     msan)
         setup_clang_toolchain
         echo "bazel MSAN debug build with tests"
@@ -1011,11 +1002,18 @@ case $CI_TARGET in
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
               "${BAZEL_RELEASE_OPTIONS[@]}" \
               --remote_download_outputs=toplevel \
-              //distribution/binary:release
+              //distribution/binary:release \
+              //distribution/binary:release_docker
         # Copy release binaries to binary export directory
         cp -a \
            "bazel-bin/distribution/binary/release.tar.zst" \
            "${ENVOY_BINARY_DIR}/release.tar.zst"
+        # Copy the docker-only release tarball (carries the vrp test certs, see
+        # distribution/binary/BUILD) to the binary export directory. This is
+        # only consumed by the `docker` CI target below, never by signing.
+        cp -a \
+           "bazel-bin/distribution/binary/release.docker.tar.zst" \
+           "${ENVOY_BINARY_DIR}/release.docker.tar.zst"
         # Grab the schema_validator_tool
         # TODO(phlax): bundle this with the release when #26390 is resolved
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \

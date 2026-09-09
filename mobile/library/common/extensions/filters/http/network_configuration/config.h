@@ -16,16 +16,17 @@ namespace NetworkConfiguration {
  * Config registration for the network_configuration filter. @see NamedHttpFilterConfigFactory.
  */
 class NetworkConfigurationFilterFactory
-    : public Common::FactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoymobile::extensions::filters::http::network_configuration::NetworkConfiguration> {
 public:
-  NetworkConfigurationFilterFactory() : FactoryBase("network_configuration") {}
+  NetworkConfigurationFilterFactory() : UnifiedFactoryBase("network_configuration") {}
 
 private:
-  ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<::Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoymobile::extensions::filters::http::network_configuration::NetworkConfiguration&
           config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 DECLARE_FACTORY(NetworkConfigurationFilterFactory);

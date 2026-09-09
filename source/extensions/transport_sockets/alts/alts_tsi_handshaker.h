@@ -33,7 +33,8 @@ public:
       size_t bytes_to_send_size, std::unique_ptr<AltsHandshakeResult> handshake_result)>;
 
   static std::unique_ptr<AltsTsiHandshaker>
-  createForClient(std::shared_ptr<grpc::Channel> handshaker_service_channel);
+  createForClient(std::shared_ptr<grpc::Channel> handshaker_service_channel,
+                  absl::string_view target_name = "");
   static std::unique_ptr<AltsTsiHandshaker>
   createForServer(std::shared_ptr<grpc::Channel> handshaker_service_channel);
 
@@ -48,10 +49,12 @@ public:
   static std::size_t computeMaxFrameSize(const grpc::gcp::HandshakerResult& result);
 
 private:
-  AltsTsiHandshaker(bool is_client, std::shared_ptr<grpc::Channel> handshaker_service_channel);
+  AltsTsiHandshaker(bool is_client, std::shared_ptr<grpc::Channel> handshaker_service_channel,
+                    absl::string_view target_name = "");
 
   const bool is_client_;
   const std::shared_ptr<grpc::Channel> handshaker_service_channel_;
+  const std::string target_name_;
 
   bool has_sent_initial_handshake_message_ = false;
   bool is_handshake_complete_ = false;

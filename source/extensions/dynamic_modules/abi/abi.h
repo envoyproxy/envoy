@@ -9505,6 +9505,40 @@ typedef enum {
 typedef void* envoy_dynamic_module_type_cluster_config_envoy_ptr;
 
 /**
+ * envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr is an opaque handle to one child
+ * counter of a cluster counter vec, already resolved for a specific label-value tuple.
+ *
+ * Incrementing a counter vec by id resolves its label values on every call, which allocates and
+ * rebuilds the tagged stat name each time. A module on a per-request path resolves the tuple once
+ * with envoy_dynamic_module_callback_cluster_config_resolve_counter_vec and then increments by
+ * handle, which allocates nothing.
+ *
+ * OWNERSHIP: Envoy owns the pointer. It stays valid until
+ * envoy_dynamic_module_on_cluster_config_destroy is called for the owning configuration.
+ */
+typedef void* envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr is an opaque handle to one child gauge
+ * of a cluster gauge vec, already resolved for a specific label-value tuple. See
+ * envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr for why this exists.
+ *
+ * OWNERSHIP: Envoy owns the pointer. It stays valid until
+ * envoy_dynamic_module_on_cluster_config_destroy is called for the owning configuration.
+ */
+typedef void* envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr is an opaque handle to one child
+ * histogram of a cluster histogram vec, already resolved for a specific label-value tuple. See
+ * envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr for why this exists.
+ *
+ * OWNERSHIP: Envoy owns the pointer. It stays valid until
+ * envoy_dynamic_module_on_cluster_config_destroy is called for the owning configuration.
+ */
+typedef void* envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr;
+
+/**
  * envoy_dynamic_module_type_cluster_config_module_ptr is a pointer to an in-module cluster
  * configuration corresponding to an Envoy cluster configuration. The config is responsible for
  * creating new cluster instances.
@@ -10066,6 +10100,30 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
 envoy_dynamic_module_type_cluster_host_envoy_ptr
 envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts writes every healthy host pointer at
+ * the given priority level into a module-owned array, in the same order
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host reports. It reads the whole partition
+ * in one ABI crossing instead of one crossing per host.
+ *
+ * Nothing is written unless every healthy host fits, so a caller whose buffer is too small sizes
+ * the retry from hosts_size_out rather than acting on a partial partition.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
+ * @param priority is the priority level.
+ * @param hosts_out is the array to fill, owned by the module. May be null only when hosts_capacity
+ * is zero.
+ * @param hosts_capacity is the number of elements hosts_out can hold.
+ * @param hosts_size_out is set to the number of healthy hosts at this priority level, whether or
+ * not they fit. Set to zero when the priority level does not exist. Must not be null.
+ * @return true when every healthy host was written, false when the priority level does not exist or
+ * hosts_capacity is smaller than hosts_size_out.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* hosts_out, size_t hosts_capacity,
+    size_t* hosts_size_out);
 
 // =============================================================================
 // Cluster LB Host Information Callbacks
@@ -10634,6 +10692,113 @@ envoy_dynamic_module_callback_cluster_config_increment_counter(
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value);
 
+// ------------------ Cluster resolved metric handles ------------------------
+//
+// The id-plus-label-values callbacks above resolve the label tuple on every call, which allocates
+// per label value and rebuilds the tagged stat name. A module writing metrics on a per-request path
+// resolves each tuple once through the callbacks below and then records by handle, which allocates
+// nothing and builds no name. The handles stay valid until the owning configuration is destroyed,
+// so a module resolves them once per configuration and keeps them.
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_resolve_counter_vec resolves one label-value tuple
+ * of a previously defined counter vec to a handle.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the counter vec previously defined using the config.
+ * @param label_values is the label values to resolve, one per label name given when the counter
+ * vec was defined.
+ * @param label_values_length is the number of label values. **IT MUST MATCH THE LABEL NAMES GIVEN
+ * WHEN THE COUNTER WAS DEFINED.**
+ * @param counter_ptr receives the handle. Must not be null. Left untouched on failure.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_counter_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr* counter_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec resolves one label-value tuple of
+ * a previously defined gauge vec to a handle. See
+ * envoy_dynamic_module_callback_cluster_config_resolve_counter_vec for the parameter and return
+ * contract.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr* gauge_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec resolves one label-value tuple
+ * of a previously defined histogram vec to a handle. See
+ * envoy_dynamic_module_callback_cluster_config_resolve_counter_vec for the parameter and return
+ * contract.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr* histogram_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_counter_add adds to a resolved counter. Safe from
+ * any thread. A null handle is ignored.
+ *
+ * @param counter_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_counter_vec.
+ * @param value is the amount to add.
+ */
+void envoy_dynamic_module_callback_cluster_metric_counter_add(
+    envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr counter_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_gauge_set sets a resolved gauge. Safe from any
+ * thread. A null handle is ignored.
+ *
+ * @param gauge_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec.
+ * @param value is the amount to set.
+ */
+void envoy_dynamic_module_callback_cluster_metric_gauge_set(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_gauge_add adds to a resolved gauge. Safe from any
+ * thread. A null handle is ignored.
+ *
+ * @param gauge_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec.
+ * @param value is the amount to add.
+ */
+void envoy_dynamic_module_callback_cluster_metric_gauge_add(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_gauge_sub subtracts from a resolved gauge. Safe from
+ * any thread. A null handle is ignored.
+ *
+ * @param gauge_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec.
+ * @param value is the amount to subtract.
+ */
+void envoy_dynamic_module_callback_cluster_metric_gauge_sub(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_histogram_record records a value on a resolved
+ * histogram. Safe to call from any Envoy worker or main thread. A null handle is ignored.
+ *
+ * @param histogram_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec.
+ * @param value is the value to record.
+ */
+void envoy_dynamic_module_callback_cluster_metric_histogram_record(
+    envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr histogram_envoy_ptr,
+    uint64_t value);
+
 /**
  * envoy_dynamic_module_callback_cluster_config_define_gauge is called by the module during
  * initialization to create a template for generating Stats::Gauges with the given name and
@@ -11004,6 +11169,27 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_strin
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch sets multiple
+ * string-valued dynamic metadata entries on the request under a single namespace in one call. It is
+ * equivalent to calling
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string once per entry but
+ * resolves the namespace and merges into the metadata struct only once. Existing entries with the
+ * same key are overwritten. Within a single call, a later entry overwrites an earlier entry with
+ * the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ * @return true if the values were set, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
 /**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
@@ -15204,6 +15390,88 @@ bool envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_respo
 bool envoy_dynamic_module_callback_cluster_specifier_set_route_action_override(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name);
+
+// ------------------- Cluster Specifier Callbacks - Route Metadata ------------
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number sets the number value
+ * of the route metadata under the given namespace and key. The entry is layered onto the metadata
+ * of the matched route, so consumers that read route metadata, such as the rate limit ROUTE_ENTRY
+ * action or the METADATA(ROUTE) formatter, observe it. An existing entry with the same namespace
+ * and key is overwritten, while the other entries of the matched route stay in effect.
+ *
+ * The metadata takes effect only when the select call reports a decision. A select that reports
+ * none changes nothing, and a decision that sets no metadata drops what an earlier decision set.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the number value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string sets the string value
+ * of the route metadata under the given namespace and key. It behaves like
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number but stores a string.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the string value to set. Envoy copies the buffer.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool sets the bool value of
+ * the route metadata under the given namespace and key. It behaves like
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number but stores a bool.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the bool value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct merges a serialized
+ * google.protobuf.Struct into the route metadata under the given namespace. Existing entries with
+ * the same key are overwritten, while the others stay in effect. If the buffer does not parse as a
+ * google.protobuf.Struct, this is a no-op.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata sets the typed route
+ * metadata under the given namespace from a serialized google.protobuf.Any, replacing an existing
+ * entry, so a typed metadata factory registered for the namespace can parse it out of
+ * typedMetadata(). If the buffer does not parse as a google.protobuf.Any, this is a no-op.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param serialized_any is the serialized google.protobuf.Any value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
 
 // =============================================================================
 // Cluster Specifier Callbacks - Metrics

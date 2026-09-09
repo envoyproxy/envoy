@@ -117,6 +117,59 @@ Lua script as follows:
     :linenos:
     :caption: :download:`lua-filter-override.yaml <_include/lua-filter-override.yaml>`
 
+.. _config_http_filters_lua_package_paths:
+
+Requiring Lua modules
+---------------------
+
+:ref:`source_codes <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>` selects
+which script a route runs; it does not make those scripts available to ``require``. To load a Lua
+module, add the location it lives in to the interpreter's search path with :ref:`package_paths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_paths>`, or, for modules which are
+loadable C libraries, :ref:`package_cpaths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_cpaths>`:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.lua
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+      package_paths:
+      - /etc/envoy/lua/?.lua
+      - /etc/envoy/lua/?/init.lua
+      package_cpaths:
+      - /etc/envoy/lua/?.so
+      default_source_code:
+        inline_string: |
+          local json = require("dkjson")
+
+          function envoy_on_request(request_handle)
+            -- Do something with json.
+          end
+
+Each entry is one Lua path pattern, in which ``?`` is replaced by the required module's name. The
+entries are joined with ``;`` in the order given and placed ahead of the interpreter's built-in
+search path, which is kept, so a module present in both places resolves to the configured copy.
+
+The patterns are in place before any configured code runs, including the run that validates the
+configuration at load time. A ``require`` at the top level of a script whose module cannot be found
+is therefore a configuration error rather than a per-request failure.
+
+Passing that check is not the end of it: every worker builds its own Lua VM and runs the script
+again to do so, loading the modules independently, and those VMs are created after the
+configuration has been accepted. The files a script requires must therefore stay readable for as
+long as the process runs, not only while the configuration is being loaded.
+
+A route which supplies its own :ref:`source_code
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` runs in its own Lua
+VM, which the filter-level patterns do not reach; configure :ref:`package_paths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.package_paths>` on the route as
+well. A route which selects a script by :ref:`name
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`, or which configures no
+script at all, runs in a VM belonging to the filter and already has the filter-level patterns; its
+own patterns are unused.
+
 Upstream Filter
 ---------------
 
@@ -692,6 +745,37 @@ which means the signature is verified; otherwise, the second element will store 
   local base64_encoded = handle:base64Escape("input string")
 
 Encodes the input string as base64. This can be useful for escaping binary data.
+
+.. _config_http_filters_lua_stream_handle_api_base64_decode:
+
+``base64Decode()``
+^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local decoded = handle:base64Decode("aW5wdXQgc3RyaW5n")
+
+Decodes a base64 encoded string, the inverse of :ref:`base64Escape()
+<config_http_filters_lua_stream_handle_api_base64_escape>`. Returns ``nil`` if the input is not
+valid base64, so a value taken from a header or an upstream body can be checked rather than
+having to be trusted:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local claim = request_handle:headers():get("x-encoded-claim")
+    if claim ~= nil then
+      local decoded = request_handle:base64Decode(claim)
+      if decoded == nil then
+        request_handle:respond({[":status"] = "400"}, "malformed claim")
+        return
+      end
+      request_handle:headers():add("x-decoded-claim", decoded)
+    end
+  end
+
+The decoded value may contain NUL bytes, since base64 carries arbitrary binary data; Lua strings
+are length-counted, so this is preserved.
 
 ``timestamp()``
 ^^^^^^^^^^^^^^^

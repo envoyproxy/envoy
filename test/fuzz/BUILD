@@ -54,6 +54,7 @@ envoy_cc_test_library(
     hdrs = ["fuzz_runner.h"],
     deps = [
         ":fuzzed_data_provider",
+        "//bazel/deps:libprotobuf-mutator",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
@@ -61,7 +62,6 @@ envoy_cc_test_library(
         "//source/common/http/http2:codec_lib",
         "//source/exe:process_wide_lib",
         "//test/test_common:environment_lib",
-        "@libprotobuf-mutator//:libprotobuf_mutator",
     ],
 )
 
@@ -105,9 +105,9 @@ envoy_cc_test_library(
     srcs = ["validated_input_generator.cc"],
     hdrs = ["validated_input_generator.h"],
     deps = [
+        "//bazel/deps:libprotobuf-mutator",
         "//test/fuzz:mutable_visitor_lib",
         "//test/fuzz:random_lib",
-        "@libprotobuf-mutator//:libprotobuf_mutator",
         "@protoc-gen-validate//validate:cc_validate",
         "@xds//udpa/type/v1:pkg_cc_proto",
         "@xds//xds/type/v3:pkg_cc_proto",

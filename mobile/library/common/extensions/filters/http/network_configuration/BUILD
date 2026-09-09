@@ -51,5 +51,6 @@ envoy_cc_extension(
     deps = [
         ":network_configuration_filter_lib",
         "@envoy//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy//source/server:generic_factory_context_lib",
     ],
 )

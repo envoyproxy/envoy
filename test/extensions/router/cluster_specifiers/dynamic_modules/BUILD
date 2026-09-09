@@ -4,14 +4,14 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
-    "envoy_extension_cc_test",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_extension_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "cluster_specifier_test",
     srcs = ["cluster_specifier_test.cc"],
     data = [
@@ -41,7 +41,7 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_extension_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -50,6 +50,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.router.cluster_specifier_plugin.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/extensions/formatter/metadata:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/router/cluster_specifiers/dynamic_modules:config",
         "//test/integration:http_integration_lib",

@@ -769,9 +769,9 @@ void OverloadManagerImpl::Resource::onSuccess(const ResourceUsage& usage) {
   pressure_gauge_.set(usage.resource_pressure_ * 100); // convert to percent
 }
 
-void OverloadManagerImpl::Resource::onFailure(const EnvoyException& error) {
+void OverloadManagerImpl::Resource::onFailure(const absl::Status& error) {
   pending_update_ = false;
-  ENVOY_LOG(info, "Failed to update resource {}: {}", name_, error.what());
+  ENVOY_LOG(info, "Failed to update resource {}: {}", name_, error.message());
   failed_updates_counter_.inc();
 }
 

@@ -18,6 +18,7 @@ import (
 func init() {
 	sdk.RegisterHttpFilterConfigFactories(map[string]shared.HttpFilterConfigFactory{
 		"passthrough":                  &PassthroughConfigFactory{},
+		"local_reply_response_headers": &LocalReplyResponseHeadersConfigFactory{},
 		"header_callbacks_on_creation": &HeaderCallbacksOnCreationConfigFactory{},
 		"header_callbacks":             &HeaderCallbacksConfigFactory{},
 		"per_route_config":             &PerRouteConfigFactory{},
@@ -100,6 +101,36 @@ func (p *ConfigSchedulerFilter) OnRequestHeaders(headers shared.HeaderMap,
 // -----------------------------------------------------------------------------
 // Passthrough
 // -----------------------------------------------------------------------------
+
+// LocalReplyResponseHeadersConfigFactory builds a filter that only records that its
+// response-headers callback ran. Used to check that the callback still fires when the response is a
+// local reply the module did not send, such as a `direct_response` route.
+type LocalReplyResponseHeadersConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *LocalReplyResponseHeadersConfigFactory) Create(_ shared.HttpFilterConfigHandle,
+	_ []byte) (shared.HttpFilterFactory, error) {
+	return &LocalReplyResponseHeadersFilterFactory{}, nil
+}
+
+type LocalReplyResponseHeadersFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *LocalReplyResponseHeadersFilterFactory) Create(shared.HttpFilterHandle) shared.HttpFilter {
+	return &LocalReplyResponseHeadersFilter{}
+}
+
+type LocalReplyResponseHeadersFilter struct {
+	shared.EmptyHttpFilter
+}
+
+func (f *LocalReplyResponseHeadersFilter) OnResponseHeaders(headers shared.HeaderMap,
+	_ bool) shared.HeadersStatus {
+	headers.Set("on-response-headers", "called")
+	return shared.HeadersStatusContinue
+}
 
 type PassthroughConfigFactory struct {
 	shared.EmptyHttpFilterConfigFactory
@@ -1490,27 +1521,47 @@ type LogLevelConfigFactory struct {
 
 func (f *LogLevelConfigFactory) Create(handle shared.HttpFilterConfigHandle,
 	config []byte) (shared.HttpFilterFactory, error) {
-	return &LogLevelFilterFactory{}, nil
+	return &LogLevelFilterFactory{
+		configLogLevel:     handle.GetLogLevel(),
+		configInfoEnabled:  handle.IsLogLevelEnabled(shared.LogLevelInfo),
+		configErrorEnabled: handle.IsLogLevelEnabled(shared.LogLevelError),
+	}, nil
 }
 
 type LogLevelFilterFactory struct {
 	shared.EmptyHttpFilterFactory
+	configLogLevel     shared.LogLevel
+	configInfoEnabled  bool
+	configErrorEnabled bool
 }
 
 func (f *LogLevelFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
-	return &LogLevelFilter{handle: handle}
+	return &LogLevelFilter{
+		handle:             handle,
+		configLogLevel:     f.configLogLevel,
+		configInfoEnabled:  f.configInfoEnabled,
+		configErrorEnabled: f.configErrorEnabled,
+	}
 }
 
 type LogLevelFilter struct {
 	shared.EmptyHttpFilter
-	handle shared.HttpFilterHandle
+	handle             shared.HttpFilterHandle
+	configLogLevel     shared.LogLevel
+	configInfoEnabled  bool
+	configErrorEnabled bool
 }
 
 func (p *LogLevelFilter) OnResponseHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
+	// tests http filter handle
 	headers.Set("x-log-level", strconv.FormatUint(uint64(p.handle.GetLogLevel()), 10))
 	headers.Set("x-log-info-enabled", strconv.FormatBool(p.handle.IsLogLevelEnabled(shared.LogLevelInfo)))
 	headers.Set("x-log-error-enabled", strconv.FormatBool(p.handle.IsLogLevelEnabled(shared.LogLevelError)))
+	// tests filter config handle
+	headers.Set("x-config-log-level", strconv.FormatUint(uint64(p.configLogLevel), 10))
+	headers.Set("x-config-log-info-enabled", strconv.FormatBool(p.configInfoEnabled))
+	headers.Set("x-config-log-error-enabled", strconv.FormatBool(p.configErrorEnabled))
 	return shared.HeadersStatusContinue
 }
 

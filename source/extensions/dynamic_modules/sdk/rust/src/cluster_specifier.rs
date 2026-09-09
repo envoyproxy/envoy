@@ -433,6 +433,78 @@ impl ClusterSpecifierContext {
       )
     }
   }
+
+  /// Set a number-typed route metadata value under the given namespace and key.
+  ///
+  /// The entry is layered onto the metadata of the matched route, so consumers that read route
+  /// metadata, such as the rate limit `ROUTE_ENTRY` action or the `METADATA(ROUTE)` formatter,
+  /// observe it. An existing entry with the same namespace and key is overwritten. Route metadata
+  /// takes effect only when [`ClusterSpecifierConfig::on_select`] returns `true`.
+  pub fn set_route_metadata_number(&mut self, namespace: &str, key: &str, value: f64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(namespace),
+        crate::str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  /// Set a string-typed route metadata value under the given namespace and key.
+  ///
+  /// It behaves like [`Self::set_route_metadata_number`] but stores a string.
+  pub fn set_route_metadata_string(&mut self, namespace: &str, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(namespace),
+        crate::str_to_module_buffer(key),
+        crate::str_to_module_buffer(value),
+      )
+    }
+  }
+
+  /// Set a bool-typed route metadata value under the given namespace and key.
+  ///
+  /// It behaves like [`Self::set_route_metadata_number`] but stores a bool.
+  pub fn set_route_metadata_bool(&mut self, namespace: &str, key: &str, value: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(namespace),
+        crate::str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  /// Merge a serialized `google.protobuf.Struct` into the route metadata under the given namespace.
+  ///
+  /// Existing entries with the same key are overwritten, while the others stay in effect. A buffer
+  /// that does not parse as a `google.protobuf.Struct` is a no-op.
+  pub fn set_route_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(namespace),
+        crate::bytes_to_module_buffer(serialized_struct),
+      )
+    }
+  }
+
+  /// Set the typed route metadata under the given namespace from a `google.protobuf.Any`, replacing
+  /// an existing entry. A typed metadata factory registered for the namespace parses it out of
+  /// `typedMetadata`. A buffer that does not parse as a `google.protobuf.Any` is a no-op.
+  pub fn set_route_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(namespace),
+        crate::bytes_to_module_buffer(serialized_any),
+      )
+    }
+  }
 }
 
 /// Convert a duration to the millisecond count the ABI takes, saturating instead of wrapping.

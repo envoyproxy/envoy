@@ -131,6 +131,7 @@ public:
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
   MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const));
+  MOCK_METHOD(void, setAbortiveClose, ());
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion), (const));
@@ -402,6 +403,7 @@ public:
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
   MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const));
+  MOCK_METHOD(void, setAbortiveClose, ());
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr& option));
@@ -604,6 +606,13 @@ public:
   MOCK_METHOD(void, deliver, (uint32_t dest_worker_index, UdpRecvData&& data));
 };
 
+class MockNonDispatchedUdpPacketHandler : public NonDispatchedUdpPacketHandler {
+public:
+  ~MockNonDispatchedUdpPacketHandler() override;
+
+  MOCK_METHOD(void, handle, (uint32_t worker_index, const UdpRecvData& packet));
+};
+
 class MockIp : public Address::Ip {
 public:
   MockIp();
@@ -715,6 +724,9 @@ public:
   ~MockUdpReadFilterCallbacks() override;
 
   MOCK_METHOD(UdpListener&, udpListener, ());
+  MOCK_METHOD(UdpHotRestartSessionHandlePtr, registerHotRestartSession,
+              (const Address::InstanceConstSharedPtr& local_address,
+               const Address::InstanceConstSharedPtr& peer_address));
 
   testing::NiceMock<MockUdpListener> udp_listener_;
 };

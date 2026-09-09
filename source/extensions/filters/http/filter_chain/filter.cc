@@ -64,7 +64,8 @@ absl::StatusOr<FilterFactoriesVector> createFilterFactoriesFromConfig(
 
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         filter_config, context.messageValidationVisitor(), factory);
-    auto callback_or_error = factory.createFilterFactoryFromProto(*message, stats_prefix, context);
+    auto callback_or_error =
+        Server::Configuration::createHttpFilterFactory(factory, *message, stats_prefix, context);
     RETURN_IF_NOT_OK_REF(callback_or_error.status());
 
     auto filter_config_provider =

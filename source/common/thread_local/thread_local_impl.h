@@ -54,6 +54,7 @@ private:
 
     InstanceImpl& parent_;
     const uint32_t index_;
+    InitializeCb initialize_cb_;
   };
 
   struct ThreadLocalData {
