@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.client_cert.v3alpha;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.client_cert.v3alpha";
+option java_outer_classname = "ClientCertProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/http/client_cert/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Client certificate forwarding (RFC 9440)]
+//
+// Filter that forwards the downstream mTLS client certificate to the upstream using the
+// ``Client-Cert`` and ``Client-Cert-Chain`` HTTP header fields standardized by
+// `RFC 9440 <https://www.rfc-editor.org/rfc/rfc9440.html>`_. Any occurrence of these
+// headers in the incoming request is always removed before forwarding, as required by
+// RFC 9440 section 2.4.
+// [#extension: envoy.filters.http.client_cert]
+
+message ClientCertConfig {
+  // If true, the optional ``Client-Cert-Chain`` header is also emitted, containing the
+  // validated certificate chain of the downstream client certificate (excluding the leaf
+  // certificate, which is carried by ``Client-Cert``). Disabled by default because the
+  // header can be large for long certificate chains.
+  bool set_client_cert_chain = 1;
+}
