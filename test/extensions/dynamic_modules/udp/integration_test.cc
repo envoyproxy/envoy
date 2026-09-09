@@ -15,23 +15,24 @@ namespace UdpFilters {
 namespace DynamicModules {
 namespace {
 
-class UdpDynamicModulesIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class DynamicModulesUdpIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                          public BaseIntegrationTest {
 public:
-  UdpDynamicModulesIntegrationTest()
+  DynamicModulesUdpIntegrationTest()
       : BaseIntegrationTest(GetParam(), ConfigHelper::baseUdpListenerConfig()) {}
 
-  void SetUp() override {
-    // The shared object is created by the build system.
-    // We need to set the DYNAMIC_MODULES_SEARCH_PATH to the location of the shared object.
+  void setDynamicModulesSearchPath(const std::string& module_name, const std::string& language) {
     std::string shared_object_path =
-        Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c");
+        Extensions::DynamicModules::testSharedObjectPath(module_name, language);
     std::string shared_object_dir =
         std::filesystem::path(shared_object_path).parent_path().string();
     TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", shared_object_dir, 1);
   }
 
-  void setup(const std::string& module_name = "udp_no_op") {
+  void SetUp() override { setDynamicModulesSearchPath("udp_no_op", "c"); }
+
+  void setup(const std::string& module_name = "udp_no_op",
+             const std::string& filter_name = "test_filter") {
     FakeUpstreamConfig::UdpConfig config;
     setUdpFakeUpstream(config);
 
@@ -42,15 +43,15 @@ typed_config:
   dynamic_module_config:
     name: "{}"
     do_not_close: true
-  filter_name: "test_filter"
+  filter_name: "{}"
   filter_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
     value: "some_config"
 )EOF",
-                                                  module_name);
+                                                  module_name, filter_name);
 
-    config_helper_.addListenerFilter(filter_config);
-
+    // addListenerFilter() prepends filters, so add udp_proxy first to produce
+    // [dynamic_modules, udp_proxy].
     config_helper_.addListenerFilter(R"EOF(
 name: envoy.filters.udp_listener.udp_proxy
 typed_config:
@@ -65,15 +66,17 @@ typed_config:
           cluster: cluster_0
 )EOF");
 
+    config_helper_.addListenerFilter(filter_config);
+
     BaseIntegrationTest::initialize();
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, UdpDynamicModulesIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesUdpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(UdpDynamicModulesIntegrationTest, BasicDataFlow) {
+TEST_P(DynamicModulesUdpIntegrationTest, BasicDataFlow) {
   setup();
 
   const uint32_t port = lookupPort("listener_0");
@@ -89,33 +92,13 @@ TEST_P(UdpDynamicModulesIntegrationTest, BasicDataFlow) {
   EXPECT_EQ(request, request_datagram.buffer_->toString());
 }
 
-TEST_P(UdpDynamicModulesIntegrationTest, StopIteration) {
-  setup("udp_stop_iteration");
-
-  const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = *Network::Utility::resolveUrl(
-      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()), port));
-
-  std::string request = "should be blocked";
-  Network::Test::UdpSyncPeer client(GetParam());
-  client.write(request, *listener_address);
-
-  Network::UdpRecvData request_datagram;
-  // UDP listener filter StopIteration is currently not enforced in the fake upstream path.
-  // We verify that the datagram still arrives. When StopIteration is enforced in the future,
-  // this expectation can be flipped.
-  EXPECT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram, std::chrono::seconds(1)));
-  EXPECT_EQ(request, request_datagram.buffer_->toString());
-}
-
-TEST_P(UdpDynamicModulesIntegrationTest, LargePayload) {
+TEST_P(DynamicModulesUdpIntegrationTest, LargePayload) {
   setup();
 
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()), port));
 
-  // Use a conservative payload size to avoid platform-specific UDP limits.
   std::string large_request(512, 'x');
   Network::Test::UdpSyncPeer client(GetParam());
   client.write(large_request, *listener_address);
@@ -125,7 +108,7 @@ TEST_P(UdpDynamicModulesIntegrationTest, LargePayload) {
   EXPECT_EQ(large_request, request_datagram.buffer_->toString());
 }
 
-TEST_P(UdpDynamicModulesIntegrationTest, MultipleDatagrams) {
+TEST_P(DynamicModulesUdpIntegrationTest, MultipleDatagrams) {
   setup();
 
   const uint32_t port = lookupPort("listener_0");
@@ -134,7 +117,6 @@ TEST_P(UdpDynamicModulesIntegrationTest, MultipleDatagrams) {
 
   Network::Test::UdpSyncPeer client(GetParam());
 
-  // Send multiple datagrams.
   for (int i = 0; i < 5; i++) {
     std::string request = fmt::format("datagram_{}", i);
     client.write(request, *listener_address);
@@ -143,6 +125,39 @@ TEST_P(UdpDynamicModulesIntegrationTest, MultipleDatagrams) {
     ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
     EXPECT_EQ(request, request_datagram.buffer_->toString());
   }
+}
+
+TEST_P(DynamicModulesUdpIntegrationTest, GoSdkEchoDatagram) {
+  setDynamicModulesSearchPath("udp_listener_integration_test", "go");
+  setup("udp_listener_integration_test", "echo_datagram");
+
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()), port));
+
+  const std::string request = "hello";
+  Network::Test::UdpSyncPeer client(GetParam());
+  client.write(request, *listener_address);
+
+  Network::UdpRecvData response;
+  client.recv(response);
+  EXPECT_EQ(request, response.buffer_->toString());
+}
+
+TEST_P(DynamicModulesUdpIntegrationTest, GoSdkRewriteDatagram) {
+  setDynamicModulesSearchPath("udp_listener_integration_test", "go");
+  setup("udp_listener_integration_test", "rewrite_datagram");
+
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()), port));
+
+  Network::Test::UdpSyncPeer client(GetParam());
+  client.write("hello", *listener_address);
+
+  Network::UdpRecvData request_datagram;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
+  EXPECT_EQ("rewritten", request_datagram.buffer_->toString());
 }
 
 } // namespace

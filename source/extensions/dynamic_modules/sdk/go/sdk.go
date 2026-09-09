@@ -11,6 +11,7 @@ import (
 var httpFilterConfigFactoryRegistry = make(map[string]shared.HttpFilterConfigFactory)
 var listenerFilterConfigFactoryRegistry = make(map[string]shared.ListenerFilterConfigFactory)
 var networkFilterConfigFactoryRegistry = make(map[string]shared.NetworkFilterConfigFactory)
+var udpListenerFilterConfigFactoryRegistry = make(map[string]shared.UdpListenerFilterConfigFactory)
 var statSinkConfigFactoryRegistry = make(map[string]shared.StatSinkConfigFactory)
 
 // NewHttpFilterFactory creates a new plugin factory for the given plugin name and unparsed config.
@@ -91,6 +92,36 @@ func RegisterNetworkFilterConfigFactories(factories map[string]shared.NetworkFil
 			panic("network filter config factory already registered: " + name)
 		}
 		networkFilterConfigFactoryRegistry[name] = factory
+	}
+}
+
+// NewUdpListenerFilterFactory creates a new UDP listener filter factory for the given plugin name
+// and unparsed config.
+func NewUdpListenerFilterFactory(handle shared.UdpListenerFilterConfigHandle, name string,
+	unparsedConfig []byte) (shared.UdpListenerFilterFactory, error) {
+	configFactory := udpListenerFilterConfigFactoryRegistry[name]
+	if configFactory == nil {
+		return nil, fmt.Errorf("failed to get UDP listener filter config factory for %s", name)
+	}
+	return configFactory.Create(handle, unparsedConfig)
+}
+
+// GetUdpListenerFilterConfigFactory gets the UDP listener filter config factory for the given
+// plugin name.
+func GetUdpListenerFilterConfigFactory(name string) shared.UdpListenerFilterConfigFactory {
+	return udpListenerFilterConfigFactoryRegistry[name]
+}
+
+// RegisterUdpListenerFilterConfigFactories registers UDP listener filter config factories for
+// plugins in the composer binary itself. This function MUST only be called from init() functions.
+func RegisterUdpListenerFilterConfigFactories(
+	factories map[string]shared.UdpListenerFilterConfigFactory,
+) {
+	for name, factory := range factories {
+		if _, ok := udpListenerFilterConfigFactoryRegistry[name]; ok {
+			panic("UDP listener filter config factory already registered: " + name)
+		}
+		udpListenerFilterConfigFactoryRegistry[name] = factory
 	}
 }
 

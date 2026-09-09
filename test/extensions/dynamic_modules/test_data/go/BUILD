@@ -11,3 +11,5 @@ test_program(name = "listener_integration_test")
 test_program(name = "network_integration_test")
 
 test_program(name = "stat_sink_integration_test")
+
+test_program(name = "udp_listener_integration_test")
