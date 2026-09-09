@@ -1133,6 +1133,37 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPat
   doRemoteClose();
 }
 
+TEST_F(HttpConnectionManagerImplTest,
+       TestStopSingleIterationHeadersSecondFilterDoesNotContinueTrailers) {
+  setup(SetupOpts().setTracing(false));
+  setUpEncoderAndDecoder(true, false);
+
+  // decoder_filters_[1] stops on headers.
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, _))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  // decoder_filters_[0] continues data, but stops iteration on trailers.
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // When decoder_filters_[1]'s continueDecoding() is called, data goes through
+  // the second filter, but trailers DO NOT because decoder_filters_[0] stopped trailers.
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_)).Times(0);
+  decoder_filters_[1]->callbacks_->continueDecoding();
+
+  // Now decoder_filters_[0] continues decoding, which forwards trailers to decoder_filters_[1].
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  decoder_filters_[0]->callbacks_->continueDecoding();
+
+  doRemoteClose();
+}
+
 TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnEncodingPath) {
   setup(SetupOpts().setTracing(false));
   setUpEncoderAndDecoder(false, false);

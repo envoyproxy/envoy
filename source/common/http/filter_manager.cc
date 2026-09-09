@@ -139,7 +139,14 @@ void ActiveStreamFilterBase::commonContinue() {
   }
 
   if (had_trailers_before_data) {
-    doTrailers();
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.filter_manager_continue_trailers_only_when_end_stream")) {
+      if (iterate_from_current_filter_ || end_stream_) {
+        doTrailers();
+      }
+    } else {
+      doTrailers();
+    }
   }
 
   iterate_from_current_filter_ = false;
