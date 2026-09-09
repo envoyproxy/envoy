@@ -370,6 +370,12 @@ void MessageStreamer::emitAny(const Protobuf::Message& message, BufferStreamer::
     any = &copy;
   }
 
+  // An Any holding nothing is an empty object, the @type only shows up once there is one.
+  if (any->type_url().empty() && any->value().empty()) {
+    BufferStreamer::MapPtr map = level.addMap();
+    return;
+  }
+
   ProtobufTypes::MessagePtr packed = ProtobufMessage::Helper::typeUrlToMessage(any->type_url());
   if (packed == nullptr || !MessageUtil::unpackTo(*any, *packed).ok()) {
     BufferStreamer::MapPtr map = level.addMap();

@@ -190,6 +190,20 @@ TEST(MessageStreamerTest, AnyOfUnknownType) {
             stream(message).first);
 }
 
+TEST(MessageStreamerTest, EmptyAny) {
+  TestMessage message;
+  message.mutable_any();
+  message.add_repeated_any();
+  expectSameJson(message);
+}
+
+TEST(MessageStreamerTest, AnyWithoutTypeUrl) {
+  TestMessage message;
+  message.mutable_any()->set_value("not a type url in sight");
+  // Proto calls this one a broken Any and refuses the whole message, there is nothing to match.
+  EXPECT_EQ(R"([{"any":{"@type":""}}])", stream(message).first);
+}
+
 TEST(MessageStreamerTest, DynamicMessages) {
   TestMessage generated;
   generated.mutable_duration()->set_seconds(5);
