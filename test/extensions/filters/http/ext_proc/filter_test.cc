@@ -6774,6 +6774,81 @@ TEST_F(HttpFilterTest, LocalResponseStarted) {
   filter_->onDestroy();
 }
 
+TEST_F(HttpFilterTest, EmitClientSpanDefault) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  EXPECT_CALL(*client_ptr_, start(_, _, _, _))
+      .WillOnce(Invoke(
+          [this](ExternalProcessorCallbacks& callbacks,
+                 const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                 const Envoy::Http::AsyncClient::StreamOptions& options,
+                 Envoy::Http::StreamFilterSidestreamWatermarkCallbacks& watermark_callbacks) {
+            EXPECT_EQ(std::nullopt, options.sampled_);
+            return doStart(callbacks, config_with_hash_key, options, watermark_callbacks);
+          }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, std::nullopt);
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, EmitClientSpanDisabled) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  emit_client_span: false
+  )EOF");
+
+  EXPECT_CALL(*client_ptr_, start(_, _, _, _))
+      .WillOnce(Invoke(
+          [this](ExternalProcessorCallbacks& callbacks,
+                 const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                 const Envoy::Http::AsyncClient::StreamOptions& options,
+                 Envoy::Http::StreamFilterSidestreamWatermarkCallbacks& watermark_callbacks) {
+            EXPECT_EQ(std::make_optional(false), options.sampled_);
+            return doStart(callbacks, config_with_hash_key, options, watermark_callbacks);
+          }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, std::nullopt);
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, EmitClientSpanPerRouteOverride) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  emit_client_span: true
+  )EOF");
+
+  envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute route_proto;
+  route_proto.mutable_overrides()->mutable_emit_client_span()->set_value(false);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  EXPECT_CALL(*client_ptr_, start(_, _, _, _))
+      .WillOnce(Invoke(
+          [this](ExternalProcessorCallbacks& callbacks,
+                 const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                 const Envoy::Http::AsyncClient::StreamOptions& options,
+                 Envoy::Http::StreamFilterSidestreamWatermarkCallbacks& watermark_callbacks) {
+            EXPECT_EQ(std::make_optional(false), options.sampled_);
+            return doStart(callbacks, config_with_hash_key, options, watermark_callbacks);
+          }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, std::nullopt);
+  filter_->onDestroy();
+}
+
 } // namespace
 
 } // namespace ExternalProcessing
