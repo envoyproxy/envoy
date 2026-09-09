@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -72,6 +73,38 @@ public:
                 buildDescriptorStatus(
                     1, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MINUTE, "", 2,
                     3),
+            },
+            {
+                Envoy::RateLimit::Descriptor(),
+            },
+        },
+        // Unit multiplier is applied to the quota policy window
+        {
+            {{"x-ratelimit-limit", "5, 5;w=30;name=\"first\", 10;w=600;name=\"second\""},
+             {"x-ratelimit-remaining", "2"},
+             {"x-ratelimit-reset", "3"}},
+            {},
+            {buildDescriptorStatus(
+                 5, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::SECOND, "first", 2,
+                 3, 30),
+             buildDescriptorStatus(
+                 10, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MINUTE, "second",
+                 5, 6, 10)},
+            {
+                Envoy::RateLimit::Descriptor(),
+                Envoy::RateLimit::Descriptor(),
+            },
+        },
+        // Unit multiplier calculation does not overflow uint32_t
+        {
+            {{"x-ratelimit-limit", "1, 1;w=135446088615120000"},
+             {"x-ratelimit-remaining", "2"},
+             {"x-ratelimit-reset", "3"}},
+            {},
+            {
+                buildDescriptorStatus(
+                    1, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::YEAR, "", 2, 3,
+                    std::numeric_limits<uint32_t>::max()),
             },
             {
                 Envoy::RateLimit::Descriptor(),
@@ -211,7 +244,7 @@ TEST_P(RateLimitHeadersTest, RateLimitHeadersTest) {
 
 TEST_P(RateLimitHeadersTest, TestUintConversions) {
   const absl::flat_hash_map<envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit,
-                            uint32_t>
+                            uint64_t>
       unit_map = {
           {envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::SECOND, 1},
           {envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MINUTE, 60},

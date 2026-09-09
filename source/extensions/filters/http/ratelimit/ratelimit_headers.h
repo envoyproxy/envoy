@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
 
 namespace Envoy {
@@ -13,7 +15,7 @@ public:
                               const Filters::Common::RateLimit::DescriptorStatusList& statuses,
                               Http::ResponseHeaderMap& headers);
 
-  static uint32_t
+  static uint64_t
   convertRateLimitUnit(envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit unit);
 };
 
