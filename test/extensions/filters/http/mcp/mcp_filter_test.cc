@@ -694,7 +694,7 @@ TEST_F(McpFilterTest, RejectModeRejectsNonJsonRpc) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
-TEST_F(McpFilterTest, SupportedProtocolVersionContinues) {
+TEST_F(McpFilterTest, SupportedProtocolVersionAllowed) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.mutable_protocol_versions()->add_supported("2026-07-28");
