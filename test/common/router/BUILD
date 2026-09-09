@@ -49,11 +49,13 @@ envoy_cc_test_library(
     deps = [
         ":route_fuzz_proto_cc_proto",
         "//envoy/common:hashable_interface",
+        "//envoy/router:route_extension_interface",
         "//source/common/config:metadata_lib",
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/router:config_lib",
+        "//source/common/router:delegating_route_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
         "//source/common/stream_info:upstream_address_lib",
@@ -65,6 +67,7 @@ envoy_cc_test_library(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:retry_priority_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
@@ -180,6 +183,24 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "route_extension_impl_test",
+    srcs = ["route_extension_impl_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//envoy/router:route_extension_interface",
+        "//source/common/protobuf",
+        "//source/common/router:route_extension_lib",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
