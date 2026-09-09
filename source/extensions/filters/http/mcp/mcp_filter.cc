@@ -162,7 +162,6 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
       attribute_source_(proto_config.attribute_source()),
       early_terminate_when_routable_(proto_config.early_terminate_when_routable()),
       protocol_versions_(proto_config.protocol_versions()),
-      error_reply_format_(proto_config.error_reply_format()),
       metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
@@ -674,11 +673,6 @@ void McpFilter::sendUnsupportedProtocolVersionReply(absl::string_view requested_
   const std::string error_msg =
       absl::StrCat("Unsupported MCP protocol version: ", requested_version);
 
-  if (config_->errorReplyFormat() == envoy::extensions::filters::http::mcp::v3::Mcp::FORMAT_TEXT) {
-    sendErrorReply(error_msg, Filters::Common::Mcp::Status::NotJsonRpc);
-    return;
-  }
-
   const auto status = Filters::Common::Mcp::Status::NotJsonRpc;
   recordErrorState(error_msg, status);
 
@@ -712,11 +706,6 @@ void McpFilter::sendUnsupportedProtocolVersionReply(absl::string_view requested_
 }
 
 void McpFilter::sendHeaderMismatchReply(absl::string_view error_msg) {
-  if (config_->errorReplyFormat() == envoy::extensions::filters::http::mcp::v3::Mcp::FORMAT_TEXT) {
-    sendErrorReply(error_msg, Filters::Common::Mcp::Status::NotJsonRpc);
-    return;
-  }
-
   const auto status = Filters::Common::Mcp::Status::NotJsonRpc;
   recordErrorState(error_msg, status);
 
