@@ -124,13 +124,6 @@ envoy_quiche_platform_impl_cc_library(
     ],
 )
 
-# Empty stub, remove once bazel-registry drops quiche_mem_slice_impl_lib
-# quiche_http_header_block_lib reaches quiche_callbacks.h only through this dep
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_mem_slice_impl_lib",
-    deps = ["@quiche//:quiche_common_callbacks"],
-)
-
 envoy_quiche_platform_impl_cc_library(
     name = "quiche_lower_case_string_impl_lib",
     hdrs = ["quiche_lower_case_string_impl.h"],
