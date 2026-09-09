@@ -520,7 +520,12 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
     return false;
   });
   redact(typed_message.get(), ancestor_is_sensitive);
-  repack(typed_message.get(), reflection, value_field_descriptor);
+  TRY_ASSERT_MAIN_THREAD { repack(typed_message.get(), reflection, value_field_descriptor); }
+  END_TRY CATCH(const EnvoyException& e, {
+    ENVOY_LOG_MISC(warn, "Could not repack {} with type URL {}: {}", opaque_type_name, type_url,
+                   e.what());
+    return false;
+  });
   return true;
 }
 
