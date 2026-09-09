@@ -37,6 +37,7 @@ absl::StatusOr<Network::DnsResolverSharedPtr> ClusterDnsResolverCache::getOrCrea
       ENVOY_LOG_MISC(trace, "reusing shared DNS resolver for config hash {}", key);
       return resolver;
     }
+    resolvers_.erase(it);
   }
 
   auto resolver_or_error =
