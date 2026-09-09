@@ -27,9 +27,9 @@ public:
     ON_CALL(context_.server_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(context_.server_context_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
     ON_CALL(context_.server_context_, runtime()).WillByDefault(ReturnRef(runtime_));
-    ON_CALL(context_, statsScope())
-        .WillByDefault(
-            testing::Invoke([this]() -> Stats::Scope& { return cluster_->info()->statsScope(); }));
+    ON_CALL(context_, statsScope()).WillByDefault(testing::Invoke([this]() -> Stats::Scope& {
+      return cluster_->info()->statsScope();
+    }));
   }
   std::shared_ptr<MockClusterMockPrioritySet> cluster_{
       std::make_shared<NiceMock<MockClusterMockPrioritySet>>()};
