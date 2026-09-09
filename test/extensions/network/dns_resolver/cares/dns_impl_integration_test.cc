@@ -64,9 +64,8 @@ TEST_P(DnsImplIntegrationTest, StrictDnsWithCaresResolver) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-class SharedDnsResolverIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
-      public HttpIntegrationTest {
+class SharedDnsResolverIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                         public HttpIntegrationTest {
 public:
   SharedDnsResolverIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()),
@@ -99,10 +98,10 @@ public:
     auto resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
     ON_CALL(*resolver, resolve(_, _, _))
         .WillByDefault(Invoke([](const std::string&, Network::DnsLookupFamily,
-                                     Network::DnsResolver::ResolveCb callback) {
-          callback(Network::DnsResolver::ResolutionStatus::Completed, "",
-                   TestUtility::makeDnsResponse(
-                       {Network::Test::getLoopbackAddressString(GetParam())}));
+                                 Network::DnsResolver::ResolveCb callback) {
+          callback(
+              Network::DnsResolver::ResolutionStatus::Completed, "",
+              TestUtility::makeDnsResponse({Network::Test::getLoopbackAddressString(GetParam())}));
           return nullptr;
         }));
     return resolver;
@@ -132,10 +131,9 @@ TEST_P(SharedDnsResolverIntegrationTest, RuntimeGuardDisablesResolverSharing) {
 
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .Times(2)
-      .WillRepeatedly(Invoke([this](Event::Dispatcher&, Api::Api&,
-                                    const envoy::config::core::v3::TypedExtensionConfig&) {
-        return makeResolver();
-      }));
+      .WillRepeatedly(Invoke(
+          [this](Event::Dispatcher&, Api::Api&,
+                 const envoy::config::core::v3::TypedExtensionConfig&) { return makeResolver(); }));
 
   initialize();
 }
