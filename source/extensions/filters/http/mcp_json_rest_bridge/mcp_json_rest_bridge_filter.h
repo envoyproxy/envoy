@@ -6,7 +6,6 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
@@ -15,13 +14,11 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/bridge_status.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/sse_response_extractor.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/hash/hash.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp" // IWYU pragma: keep
@@ -61,6 +58,8 @@ public:
   getToolsListHttpRule(absl::string_view host, absl::string_view path) const;
 
   const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }
+  const std::string& maxSupportedProtocolVersion() const { return max_supported_protocol_version_; }
+  bool enableStatelessProtocol() const { return enable_stateless_protocol_; }
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
@@ -122,6 +121,8 @@ private:
   absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
   std::string fallback_protocol_version_;
+  std::string max_supported_protocol_version_;
+  bool enable_stateless_protocol_ = false;
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
   bool clear_route_cache_;
