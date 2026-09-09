@@ -77,11 +77,15 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
   }
 
   uint32_t removed = 0;
-  for (const auto& resource_name : removed_resources) {
-    if (cm_.removeCluster(resource_name)) {
+  if (!removed_resources.empty()) {
+    std::vector<std::string> removed_resources_vec(removed_resources.begin(), removed_resources.end());
+    std::vector<std::string> removed_clusters = cm_.removeClusters(removed_resources_vec);
+    removed = removed_clusters.size();
+    if (removed > 0) {
       any_applied = true;
-      ENVOY_LOG(debug, "{}: remove cluster '{}'", name_, resource_name);
-      ++removed;
+      for (const auto& resource_name : removed_clusters) {
+        ENVOY_LOG(debug, "{}: remove cluster '{}'", name_, resource_name);
+      }
     }
   }
 

@@ -122,7 +122,7 @@ resources:
   auto response2 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_yaml);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({"cluster1"})));
-  EXPECT_CALL(cm_, removeCluster("cluster1", false)).WillOnce(Return(true));
+  EXPECT_CALL(cm_, removeClusters(std::vector<std::string>{"cluster1"}, false)).WillOnce(Return(std::vector<std::string>{"cluster1"}));
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response2);
   EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()));
@@ -227,7 +227,7 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
     }
     Protobuf::RepeatedPtrField<std::string> removed;
     *removed.Add() = "cluster_1";
-    EXPECT_CALL(cm_, removeCluster(StrEq("cluster_1"), false)).WillOnce(Return(true));
+    EXPECT_CALL(cm_, removeClusters(std::vector<std::string>{"cluster_1"}, false)).WillOnce(Return(std::vector<std::string>{"cluster_1"}));
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(resources);
     EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed, "v2"));
@@ -321,7 +321,7 @@ resources:
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({"cluster1", "cluster2"})));
   expectAdd("cluster1", "1");
   expectAdd("cluster3", "1");
-  EXPECT_CALL(cm_, removeCluster("cluster2", false));
+  EXPECT_CALL(cm_, removeClusters(std::vector<std::string>{"cluster2"}, false)).WillOnce(Return(std::vector<std::string>{"cluster2"}));
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response2);
   EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()));
@@ -421,8 +421,7 @@ resources:
   expectAdd("sotw_cluster_2", "1");
   // Crucially, it should ONLY remove the cluster it knew about ("sotw_cluster_1").
   // "od_cluster_1" should NOT be removed.
-  EXPECT_CALL(cm_, removeCluster("sotw_cluster_1", false));
-  EXPECT_CALL(cm_, removeCluster("od_cluster_1", false)).Times(0);
+  EXPECT_CALL(cm_, removeClusters(std::vector<std::string>{"sotw_cluster_1"}, false)).WillOnce(Return(std::vector<std::string>{"sotw_cluster_1"}));
 
   EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources2.refvec_, response2.version_info()));
   EXPECT_EQ("1", cds_->versionInfo());
@@ -466,7 +465,7 @@ resources:
   // The existing cluster is updated.
   expectAdd("sotw_cluster_1", "1");
   // No clusters should be removed.
-  EXPECT_CALL(cm_, removeCluster(_, false)).Times(0);
+  EXPECT_CALL(cm_, removeClusters(_, false)).Times(0);
 
   EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources2.refvec_, response2.version_info()));
   EXPECT_EQ("1", cds_->versionInfo());
