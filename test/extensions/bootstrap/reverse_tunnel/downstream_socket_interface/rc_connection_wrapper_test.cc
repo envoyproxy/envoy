@@ -106,9 +106,8 @@ protected:
 
   std::unique_ptr<ReverseConnectionIOHandle>
   createTestIOHandle(const ReverseConnectionSocketConfig& config) {
-    int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
-    EXPECT_GE(test_fd, 0);
-    return std::make_unique<ReverseConnectionIOHandle>(test_fd, config, cluster_manager_,
+    return std::make_unique<ReverseConnectionIOHandle>(-1, // dummy fd
+                                                       config, cluster_manager_,
                                                        extension_.get(), *stats_scope_);
   }
 
@@ -1885,10 +1884,8 @@ protected:
   void SetUp() override {
     stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
 
-    // Create a mock IO handle.
-    auto mock_io_handle = std::make_unique<NiceMock<Network::MockConnection>>();
     io_handle_ = std::make_unique<ReverseConnectionIOHandle>(
-        7, // dummy fd
+        -1, // dummy fd
         ReverseConnectionSocketConfig{}, cluster_manager_,
         nullptr,        // extension
         *stats_scope_); // Use the created scope
