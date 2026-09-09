@@ -8,6 +8,7 @@
 #include "source/extensions/quic/connection_id_generator/deterministic/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/extensions/udp_packet_writer/default/config.h"
 
 #include "test/common/http/common.h"
@@ -30,7 +31,8 @@
 #include "library/common/network/network_types.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
+#include "quiche/common/quiche_endian.h"
+#include "quiche/quic/core/scone.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -1929,48 +1931,87 @@ TEST_P(ClientIntegrationTest, HttpsWithEarlyData) {
   }
 }
 
+// Synthesizes a self-contained 7-byte SCONE long-header packet.
+static std::string buildSconeHeader(uint8_t signal) {
+  uint8_t first_byte = static_cast<uint8_t>(0xc0 | ((signal >> 1) & 0x3f));
+  quic::QuicVersionLabel version =
+      (signal & 0x01) ? quic::kSconeVersionHigh : quic::kSconeVersionLow;
+  std::string header;
+  header.push_back(static_cast<char>(first_byte));
+  uint32_t net_version = quiche::QuicheEndian::HostToNet32(version);
+  header.append(reinterpret_cast<const char*>(&net_version), sizeof(net_version));
+  header.push_back(0); // 0-length DCID
+  header.push_back(0); // 0-length SCID
+  return header;
+}
+
 class MockRecvMsgOsSysCalls : public Api::OsSysCallsImpl {
 public:
-  MockRecvMsgOsSysCalls() {
-    ON_CALL(*this, recvmsg(_, _, _))
-        .WillByDefault(Invoke([this](os_fd_t sockfd, msghdr* msg, int flags) {
-          auto result = Api::OsSysCallsImpl::recvmsg(sockfd, msg, flags);
-          int16_t bandwidth = scone_bandwidth_.exchange(-1);
-          if (result.return_value_ <= 0 || bandwidth == -1) {
-            return result;
-          }
+  Api::SysCallSizeResult recvmsg(os_fd_t sockfd, msghdr* msg, int flags) override {
+    auto result = Api::OsSysCallsImpl::recvmsg(sockfd, msg, flags);
+    if (result.return_value_ <= 0 || scone_bandwidth_.load() == -1) {
+      return result;
+    }
 
-          std::vector<char> new_buffer(result.return_value_);
-          if (quic::test::MaybeUpdateSconePacket(
-                  reinterpret_cast<const char*>(msg->msg_iov[0].iov_base), new_buffer.data(),
-                  result.return_value_, static_cast<uint8_t>(bandwidth))) {
-            memcpy(msg->msg_iov[0].iov_base, new_buffer.data(), result.return_value_);
-          }
-          return result;
-        }));
+    if (msg == nullptr || msg->msg_name == nullptr || msg->msg_namelen == 0 ||
+        msg->msg_iov == nullptr || msg->msg_iovlen == 0 || msg->msg_iov[0].iov_base == nullptr) {
+      return result;
+    }
+
+    uint32_t target_port = upstream_port_.load();
+    if (target_port != 0) {
+      auto addr_or_error = Network::Address::addressFromSockAddr(
+          *reinterpret_cast<const sockaddr_storage*>(msg->msg_name), msg->msg_namelen);
+      if (!addr_or_error.ok() || addr_or_error.value()->ip() == nullptr ||
+          addr_or_error.value()->ip()->port() != target_port) {
+        return result;
+      }
+    }
+
+    int16_t bandwidth = scone_bandwidth_.exchange(-1);
+    if (bandwidth == -1) {
+      return result;
+    }
+
+    std::string scone_header = buildSconeHeader(static_cast<uint8_t>(bandwidth));
+    size_t old_len = result.return_value_;
+    if (scone_header.length() + old_len > msg->msg_iov[0].iov_len) {
+      return result;
+    }
+
+    const char* old_buffer = reinterpret_cast<const char*>(msg->msg_iov[0].iov_base);
+    std::vector<char> coalesced(scone_header.length() + old_len);
+    memcpy(coalesced.data(), scone_header.data(), scone_header.length());
+    memcpy(coalesced.data() + scone_header.length(), old_buffer, old_len);
+
+    memcpy(msg->msg_iov[0].iov_base, coalesced.data(), coalesced.size());
+    result.return_value_ = coalesced.size();
+    return result;
   }
 
-  MOCK_METHOD(Api::SysCallSizeResult, recvmsg, (os_fd_t sockfd, msghdr* msg, int flags),
-              (override));
-
   std::atomic<int16_t> scone_bandwidth_{-1};
+  std::atomic<uint32_t> upstream_port_{0};
 };
 
 TEST_P(ClientIntegrationTest, SconeValuePropagation) {
-  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+  if (getCodecType() != Http::CodecType::HTTP3) {
     return;
   }
 
-  const int16_t bandwidth_initial = 127;
-  const int16_t bandwidth_throttled = 50;
+  const uint8_t signal_initial = 2;
+  const int64_t bandwidth_initial = quic::GetSconeBandwidths()[signal_initial].ToKBitsPerSecond();
+  const uint8_t signal_throttled = 0;
+  const int64_t bandwidth_throttled =
+      quic::GetSconeBandwidths()[signal_throttled].ToKBitsPerSecond();
 
   MockRecvMsgOsSysCalls sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
 
   builder_.enableScone(true);
   initialize();
+  sys_calls.upstream_port_.store(fake_upstreams_[0]->localAddress()->ip()->port());
 
-  // 1. Stream 1: Receives initial bandwidth (127 kbps)
+  // 1. Stream 1: Receives initial bandwidth
   int64_t captured_scone_max_kbps1 = -1;
   int64_t captured_scone_timestamp_ms1 = -1;
   uint64_t connection_id_1 = 0;
@@ -1986,10 +2027,10 @@ TEST_P(ClientIntegrationTest, SconeValuePropagation) {
   };
 
   stream_ = createNewStream(std::move(stream_callbacks1));
-  sys_calls.scone_bandwidth_.store(bandwidth_initial);
+  sys_calls.scone_bandwidth_.store(signal_initial);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
-  cc_.terminal_callback_->waitReady();
+  terminal_callback_.waitReady();
 
   EXPECT_EQ(captured_scone_max_kbps1, bandwidth_initial);
   EXPECT_GT(captured_scone_timestamp_ms1, 0);
@@ -2009,18 +2050,16 @@ TEST_P(ClientIntegrationTest, SconeValuePropagation) {
     connection_id_2 = intel.connection_id;
   };
 
-  ConditionalInitializer terminal_callback2;
-  cc_.terminal_callback_ = &terminal_callback2;
   auto stream2 = createNewStream(std::move(stream_callbacks2));
   stream2->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
-  terminal_callback2.waitReady();
+  terminal_callback_.waitReady();
 
   EXPECT_EQ(captured_scone_max_kbps2, bandwidth_initial);
   EXPECT_EQ(captured_scone_timestamp_ms2, captured_scone_timestamp_ms1);
   EXPECT_EQ(connection_id_2, connection_id_1);
 
-  // 3. Stream 3: Bandwidth changes dynamically (throttled to 50 kbps)
+  // 3. Stream 3: Bandwidth changes dynamically
   int64_t captured_scone_max_kbps3 = -1;
   int64_t captured_scone_timestamp_ms3 = -1;
   uint64_t connection_id_3 = 0;
@@ -2035,60 +2074,56 @@ TEST_P(ClientIntegrationTest, SconeValuePropagation) {
     connection_id_3 = intel.connection_id;
   };
 
-  ConditionalInitializer terminal_callback3;
-  cc_.terminal_callback_ = &terminal_callback3;
-  sys_calls.scone_bandwidth_.store(bandwidth_throttled);
+  sys_calls.scone_bandwidth_.store(signal_throttled);
 
   auto stream3 = createNewStream(std::move(stream_callbacks3));
   stream3->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
-  terminal_callback3.waitReady();
+  terminal_callback_.waitReady();
 
   EXPECT_EQ(captured_scone_max_kbps3, bandwidth_throttled);
   EXPECT_GT(captured_scone_timestamp_ms3, captured_scone_timestamp_ms2);
   EXPECT_EQ(connection_id_3, connection_id_1);
+
+  TearDown();
 }
 
 TEST_P(ClientIntegrationTest, SconeValuePropagationDelayed) {
-  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+  if (getCodecType() != Http::CodecType::HTTP3) {
     return;
   }
 
-  const int16_t expected_bandwidth = 50;
+  autonomous_upstream_ = false;
+  const uint8_t signal = 2;
+  const int64_t expected_bandwidth = quic::GetSconeBandwidths()[signal].ToKBitsPerSecond();
 
   MockRecvMsgOsSysCalls sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
 
   builder_.enableScone(true);
   initialize();
+  sys_calls.upstream_port_.store(fake_upstreams_[0]->localAddress()->ip()->port());
 
-  int64_t captured_scone_max_kbps_headers = -1;
-  int64_t captured_scone_max_kbps_data = -1;
-  int64_t captured_scone_timestamp_ms_headers = -1;
-  int64_t captured_scone_timestamp_ms_data = -1;
-
-  absl::Notification headers_received;
-  absl::Notification data_received;
+  std::atomic<int64_t> captured_scone_max_kbps_headers{-1};
+  std::atomic<int64_t> captured_scone_max_kbps_data{-1};
+  std::atomic<int64_t> captured_scone_timestamp_ms_headers{-1};
+  std::atomic<int64_t> captured_scone_timestamp_ms_data{-1};
 
   EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
   stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers, bool,
                                      envoy_stream_intel intel) {
     cc_.on_headers_calls_++;
     cc_.status_ = absl::StrCat(headers.getStatusValue());
-    captured_scone_max_kbps_headers = intel.scone_max_kbps;
-    captured_scone_timestamp_ms_headers = intel.scone_timestamp_ms;
-    if (!headers_received.HasBeenNotified()) {
-      headers_received.Notify();
-    }
+    captured_scone_max_kbps_headers.store(intel.scone_max_kbps);
+    captured_scone_timestamp_ms_headers.store(intel.scone_timestamp_ms);
+    sys_calls.scone_bandwidth_.store(signal);
+    upstream_request_->encodeData(10, true);
   };
   stream_callbacks.on_data_ = [&](const Buffer::Instance&, uint64_t, bool,
                                   envoy_stream_intel intel) {
     cc_.on_data_calls_++;
-    captured_scone_max_kbps_data = intel.scone_max_kbps;
-    captured_scone_timestamp_ms_data = intel.scone_timestamp_ms;
-    if (!data_received.HasBeenNotified()) {
-      data_received.Notify();
-    }
+    captured_scone_max_kbps_data.store(intel.scone_max_kbps);
+    captured_scone_timestamp_ms_data.store(intel.scone_timestamp_ms);
   };
 
   stream_ = createNewStream(std::move(stream_callbacks));
@@ -2103,70 +2138,63 @@ TEST_P(ClientIntegrationTest, SconeValuePropagationDelayed) {
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
-  headers_received.WaitForNotification();
-
-  EXPECT_EQ(captured_scone_max_kbps_headers, -1);
-  EXPECT_EQ(captured_scone_timestamp_ms_headers, -1);
-
-  sys_calls.scone_bandwidth_.store(expected_bandwidth);
-
-  upstream_request_->encodeData(10, false);
-
-  data_received.WaitForNotification();
-
-  EXPECT_EQ(captured_scone_max_kbps_data, expected_bandwidth);
-  EXPECT_GT(captured_scone_timestamp_ms_data, 0);
-
-  upstream_request_->encodeData(0, true);
-
   terminal_callback_.waitReady();
+
+  EXPECT_EQ(captured_scone_max_kbps_headers.load(), -1);
+  EXPECT_EQ(captured_scone_timestamp_ms_headers.load(), -1);
+
+  EXPECT_EQ(captured_scone_max_kbps_data.load(), expected_bandwidth);
+  EXPECT_GT(captured_scone_timestamp_ms_data.load(), 0);
+
+  ASSERT_TRUE(upstream_connection_->close());
+  ASSERT_TRUE(upstream_connection_->waitForDisconnect());
+  upstream_connection_.reset();
+
+  TearDown();
 }
 
 TEST_P(ClientIntegrationTest, SconeValuePropagationMultipleUpdates) {
-  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+  if (getCodecType() != Http::CodecType::HTTP3) {
     return;
   }
 
-  const int16_t expected_bandwidth_1 = 10;
-  const int16_t expected_bandwidth_2 = 20;
+  autonomous_upstream_ = false;
+  const uint8_t signal_1 = 0;
+  const int64_t expected_bandwidth_1 = quic::GetSconeBandwidths()[signal_1].ToKBitsPerSecond();
+  const uint8_t signal_2 = 2;
+  const int64_t expected_bandwidth_2 = quic::GetSconeBandwidths()[signal_2].ToKBitsPerSecond();
 
   MockRecvMsgOsSysCalls sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
 
   builder_.enableScone(true);
   initialize();
+  sys_calls.upstream_port_.store(fake_upstreams_[0]->localAddress()->ip()->port());
 
-  int64_t captured_scone_max_kbps_headers = -1;
-  int64_t captured_scone_max_kbps_data = -1;
-  int64_t captured_scone_timestamp_ms_headers = -1;
-  int64_t captured_scone_timestamp_ms_data = -1;
-
-  absl::Notification headers_received;
-  absl::Notification data_received;
+  std::atomic<int64_t> captured_scone_max_kbps_headers{-1};
+  std::atomic<int64_t> captured_scone_max_kbps_data{-1};
+  std::atomic<int64_t> captured_scone_timestamp_ms_headers{-1};
+  std::atomic<int64_t> captured_scone_timestamp_ms_data{-1};
 
   EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
   stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers, bool,
                                      envoy_stream_intel intel) {
     cc_.on_headers_calls_++;
     cc_.status_ = absl::StrCat(headers.getStatusValue());
-    captured_scone_max_kbps_headers = intel.scone_max_kbps;
-    captured_scone_timestamp_ms_headers = intel.scone_timestamp_ms;
-    if (!headers_received.HasBeenNotified()) {
-      headers_received.Notify();
-    }
+    captured_scone_max_kbps_headers.store(intel.scone_max_kbps);
+    captured_scone_timestamp_ms_headers.store(intel.scone_timestamp_ms);
+    sys_calls.scone_bandwidth_.store(signal_2);
+    upstream_request_->encodeData(10, true);
   };
   stream_callbacks.on_data_ = [&](const Buffer::Instance&, uint64_t, bool,
                                   envoy_stream_intel intel) {
     cc_.on_data_calls_++;
-    captured_scone_max_kbps_data = intel.scone_max_kbps;
-    captured_scone_timestamp_ms_data = intel.scone_timestamp_ms;
-    if (!data_received.HasBeenNotified()) {
-      data_received.Notify();
-    }
+    captured_scone_max_kbps_data.store(intel.scone_max_kbps);
+    captured_scone_timestamp_ms_data.store(intel.scone_timestamp_ms);
   };
 
   stream_ = createNewStream(std::move(stream_callbacks));
-  sys_calls.scone_bandwidth_.store(expected_bandwidth_1);
+  sys_calls.scone_bandwidth_.store(signal_1);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
 
@@ -2178,28 +2206,24 @@ TEST_P(ClientIntegrationTest, SconeValuePropagationMultipleUpdates) {
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
-  headers_received.WaitForNotification();
-
-  EXPECT_EQ(captured_scone_max_kbps_headers, expected_bandwidth_1);
-  EXPECT_GT(captured_scone_timestamp_ms_headers, 0);
-
-  sys_calls.scone_bandwidth_.store(expected_bandwidth_2);
-
-  upstream_request_->encodeData(10, false);
-
-  data_received.WaitForNotification();
-
-  EXPECT_EQ(captured_scone_max_kbps_data, expected_bandwidth_2);
-  EXPECT_GT(captured_scone_timestamp_ms_data, 0);
-  EXPECT_GE(captured_scone_timestamp_ms_data, captured_scone_timestamp_ms_headers);
-
-  upstream_request_->encodeData(0, true);
-
   terminal_callback_.waitReady();
+
+  EXPECT_EQ(captured_scone_max_kbps_headers.load(), expected_bandwidth_1);
+  EXPECT_GT(captured_scone_timestamp_ms_headers.load(), 0);
+
+  EXPECT_EQ(captured_scone_max_kbps_data.load(), expected_bandwidth_2);
+  EXPECT_GT(captured_scone_timestamp_ms_data.load(), 0);
+  EXPECT_GE(captured_scone_timestamp_ms_data.load(), captured_scone_timestamp_ms_headers.load());
+
+  ASSERT_TRUE(upstream_connection_->close());
+  ASSERT_TRUE(upstream_connection_->waitForDisconnect());
+  upstream_connection_.reset();
+
+  TearDown();
 }
 
 TEST_P(ClientIntegrationTest, SconeDisabled) {
-  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+  if (getCodecType() != Http::CodecType::HTTP3) {
     return;
   }
 
@@ -2210,6 +2234,7 @@ TEST_P(ClientIntegrationTest, SconeDisabled) {
 
   builder_.enableScone(false);
   initialize();
+  sys_calls.upstream_port_.store(fake_upstreams_[0]->localAddress()->ip()->port());
 
   int64_t captured_scone_max_kbps = 0;
   int64_t captured_scone_timestamp_ms = 0;
@@ -2228,10 +2253,12 @@ TEST_P(ClientIntegrationTest, SconeDisabled) {
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
 
-  cc_.terminal_callback_->waitReady();
+  terminal_callback_.waitReady();
 
   EXPECT_EQ(captured_scone_max_kbps, -1);
   EXPECT_EQ(captured_scone_timestamp_ms, -1);
+
+  TearDown();
 }
 
 TEST_P(ClientIntegrationTest, DrainConnectionsBySocketTag) {
