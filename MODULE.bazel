@@ -147,6 +147,14 @@ single_version_override(
     version = "3.20.1.envoy",
 )
 
+# Backports https://github.com/bazelbuild/rules_swift/pull/1535 onto 2.5.0 to drop
+# the "No 'swiftc' executable found in $PATH" DEBUG message printed on every build.
+# Upstream only shipped the fix in 3.0.0, which is compatibility_level 3.
+single_version_override(
+    module_name = "rules_swift",
+    version = "2.5.0.envoy",
+)
+
 single_version_override(
     module_name = "proxy-wasm-cpp-sdk",
     version = "0.0.0-250925-e5256b0.envoy",
