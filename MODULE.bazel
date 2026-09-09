@@ -99,6 +99,7 @@ bazel_dep(name = "rules_proto_grpc_cpp", version = "5.8.0")
 bazel_dep(name = "rules_python", version = "2.2.0")
 bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
 bazel_dep(name = "rules_shell", version = "0.8.0")
+bazel_dep(name = "rules_swift", version = "2.5.0.envoy")
 bazel_dep(name = "spdlog", version = "1.16.0")
 bazel_dep(name = "sql-parser", version = "0.0.0-260715-52e5ad1.envoy")
 bazel_dep(name = "su-exec", version = "0.3")
@@ -145,14 +146,6 @@ local_path_override(
 single_version_override(
     module_name = "rules_apple",
     version = "3.20.1.envoy",
-)
-
-# Backports https://github.com/bazelbuild/rules_swift/pull/1535 onto 2.5.0 to drop
-# the "No 'swiftc' executable found in $PATH" DEBUG message printed on every build.
-# Upstream only shipped the fix in 3.0.0, which is compatibility_level 3.
-single_version_override(
-    module_name = "rules_swift",
-    version = "2.5.0.envoy",
 )
 
 single_version_override(
