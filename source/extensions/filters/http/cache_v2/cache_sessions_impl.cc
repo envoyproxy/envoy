@@ -373,10 +373,12 @@ void CacheSession::onCacheError() {
     postUpstreamPassThrough(std::move(sub), CacheEntryStatus::LookupError);
   }
   for (BodySubscriber& sub : body_subscribers_) {
-    sub.callback_(nullptr, EndStream::Reset);
+    sub.dispatcher().post(
+        [cb = std::move(sub.callback_)]() mutable { cb(nullptr, EndStream::Reset); });
   }
   for (TrailerSubscriber& sub : trailer_subscribers_) {
-    sub.callback_(nullptr, EndStream::Reset);
+    sub.dispatcher().post(
+        [cb = std::move(sub.callback_)]() mutable { cb(nullptr, EndStream::Reset); });
   }
   lookup_subscribers_.clear();
   body_subscribers_.clear();
@@ -417,13 +419,11 @@ void CacheSession::abortBodyOutOfRangeSubscribers() {
   std::erase_if(body_subscribers_, [this, end_stream, &cache_sessions](
                                        BodySubscriber& bs) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
     if (bs.range_.begin() >= body_length_available_) {
-      if (bs.range_.begin() == body_length_available_) {
-        auto cb = std::move(bs.callback_);
-        bs.dispatcher().post(
-            [cb = std::move(cb), end_stream]() mutable { cb(nullptr, end_stream); });
-      } else {
-        bs.callback_(nullptr, EndStream::Reset);
-      }
+      const EndStream subscriber_end_stream =
+          (bs.range_.begin() == body_length_available_) ? end_stream : EndStream::Reset;
+      bs.dispatcher().post([cb = std::move(bs.callback_), subscriber_end_stream]() mutable {
+        cb(nullptr, subscriber_end_stream);
+      });
       if (cache_sessions) {
         cache_sessions->stats().subCacheSessionsSubscribers(1);
       }
