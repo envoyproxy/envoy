@@ -104,6 +104,24 @@ TEST(MessageStreamerTest, Maps) {
   expectSameJson(message);
 }
 
+TEST(MessageStreamerTest, DISABLED_MapWithDuplicateKey) {
+  TestMessage message;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(R"EOF(
+int64_keyed {
+  key: 0
+  value: "first"
+}
+int64_keyed {
+  key: 0
+  value: "second"
+}
+)EOF",
+                                                    &message));
+  expectSameJson(message);
+  // This is what it should produce, output checked for parity above is unparseable.
+  EXPECT_EQ(R"([{"int64_keyed":{"0":"second"}}])", stream(message).first);
+}
+
 TEST(MessageStreamerTest, Wrappers) {
   TestMessage message;
   message.mutable_wrapped_double()->set_value(1.5);
