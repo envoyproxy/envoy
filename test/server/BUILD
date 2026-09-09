@@ -9,7 +9,7 @@ load(
     "envoy_select_admin_functionality",
     "envoy_select_hot_restart",
 )
-load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//bazel:extension_configs.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
@@ -131,10 +131,13 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
+        "//source/common/network:utility_lib",
         "//source/server:active_udp_listener",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
