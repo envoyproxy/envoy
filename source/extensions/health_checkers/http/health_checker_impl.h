@@ -97,7 +97,7 @@ private:
     // Handles events on `negotiating_connection_` before it has a codec client.
     void onNegotiatingConnectionEvent(Network::ConnectionEvent event);
     // Aborts and disposes of `negotiating_connection_`, if any.
-    void resetNegotiatingConnection();
+    void abortNegotiatingConnection();
 
     // ActiveHealthCheckSession
     void onInterval() override;

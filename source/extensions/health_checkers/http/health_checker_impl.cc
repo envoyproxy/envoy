@@ -245,7 +245,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSessi
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onDeferredDelete() {
-  resetNegotiatingConnection();
+  abortNegotiatingConnection();
   if (client_) {
     // If there is an active request it will get reset, so make sure we ignore the reset.
     expect_reset_ = true;
@@ -253,7 +253,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onDeferredDelete() {
   }
 }
 
-void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::resetNegotiatingConnection() {
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::abortNegotiatingConnection() {
   if (negotiating_connection_ == nullptr) {
     return;
   }
@@ -325,7 +325,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
     // Negotiating over TLS: the codec comes from the ALPN protocol, unknown until the handshake
     // completes. So only connect here and return; onNegotiatingConnectionEvent() then chooses the
     // codec and sends the request once Connected arrives.
-    if (parent_.negotiateCodec() && conn.connection_->ssl() != nullptr) {
+    const bool select_codec_from_alpn =
+        parent_.negotiateCodec() && conn.connection_->ssl() != nullptr;
+    if (select_codec_from_alpn) {
       expect_reset_ = false;
       reuse_connection_ = parent_.reuse_connection_;
       negotiating_connection_ = std::move(conn.connection_);
@@ -369,7 +371,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onNegotiatingConnectio
     negotiating_connection_->removeConnectionCallbacks(negotiating_connection_callback_impl_);
     parent_.dispatcher_.deferredDelete(std::move(negotiating_connection_));
     if (!expect_reset_) {
-      // handleFailure() may deferred delete this session, so nothing may be touched afterwards.
       handleFailure(envoy::data::core::v3::NETWORK);
     }
     return;
@@ -587,9 +588,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   if (negotiating_connection_) {
     ENVOY_CONN_LOG(debug, "connect timeout health_flags={}", *negotiating_connection_,
                    HostUtility::healthFlagsToString(*host_));
-    // The caller records the timeout as a failure. resetNegotiatingConnection() detaches the
+    // The caller records the timeout as a failure. abortNegotiatingConnection() detaches the
     // callbacks before closing, so the close it triggers is not reported a second time.
-    resetNegotiatingConnection();
+    abortNegotiatingConnection();
     return;
   }
 
