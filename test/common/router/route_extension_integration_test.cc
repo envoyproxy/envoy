@@ -116,7 +116,7 @@ public:
 
   // Sends a request through the proxy and returns the value the extensions left on the test header
   // of the request the upstream saw, or nullopt if they left none.
-  absl::optional<std::string> upstreamTestHeader() {
+  std::optional<std::string> upstreamTestHeader() {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     waitForNextUpstreamRequest();
@@ -126,7 +126,7 @@ public:
 
     const auto header = upstream_request_->headers().get(testHeader());
     if (header.empty()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return std::string(header[0]->value().getStringView());
   }
@@ -154,7 +154,7 @@ TEST_F(RouteExtensionIntegrationTest, RouteLevelExtension) {
 // With no extension configured the route is untouched.
 TEST_F(RouteExtensionIntegrationTest, NoExtensionLeavesTheRouteAlone) {
   initializeWithExtensionsAt(false, false, false);
-  EXPECT_EQ(absl::nullopt, upstreamTestHeader());
+  EXPECT_EQ(std::nullopt, upstreamTestHeader());
 }
 
 // All three levels compose. Each level wraps the route produced by the one before it, so the

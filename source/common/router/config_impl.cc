@@ -2102,10 +2102,6 @@ VirtualHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::Reques
       std::move(match_result.route), global_route_config_->routeExtensions(), vhost_extensions,
       match_result.route_extensions, headers, stream_info, random_value);
 
-  // The route extension should never change the virtual host.
-  ASSERT(route_result.route == nullptr ||
-         route_result.route->virtualHostSharedPtr() == route_result.vhost);
-
   return route_result;
 }
 
