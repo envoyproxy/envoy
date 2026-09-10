@@ -192,7 +192,7 @@ private:
   // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
   std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
 
-  uint32_t worker_index_;
+  uint32_t worker_index_ = 0;
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP

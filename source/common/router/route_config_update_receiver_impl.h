@@ -38,10 +38,10 @@ class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver,
 public:
   RouteConfigUpdateReceiverImpl(Rds::ProtoTraits& proto_traits,
                                 Server::Configuration::ServerFactoryContext& factory_context,
-                                const std::string& stat_prefix)
+                                const std::string& stat_prefix, bool from_rds)
       : config_traits_(factory_context.messageValidationContext().dynamicValidationVisitor()),
         base_(config_traits_, proto_traits, factory_context), factory_context_(factory_context),
-        stat_prefix_(stat_prefix) {}
+        stat_prefix_(stat_prefix), from_rds_(from_rds) {}
   ~RouteConfigUpdateReceiverImpl() override {
     base_.warmer_.setObserver({});
     base_.warmer_.abortWarming();
@@ -105,7 +105,11 @@ private:
 
   Rds::RouteConfigUpdateReceiverImpl base_;
   Server::Configuration::ServerFactoryContext& factory_context_;
+  // The parent prefix alone, for example 'http.<stat_prefix>.'. A VHDS subscription of a route
+  // configuration delivered over RDS is nested under that route configuration's own 'rds.'
+  // namespace, which `from_rds_` selects.
   const std::string stat_prefix_;
+  const bool from_rds_ = false;
   // The VHDS subscription of the currently published route configuration, if it configures VHDS.
   // It is created and replaced by onRdsUpdate(), which is where the per-update init manager that
   // its initial fetch warms up with lives.

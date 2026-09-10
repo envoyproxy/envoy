@@ -13,6 +13,7 @@ RANDOMKEY
 SLOWLOG
 addend
 addrlen
+connectionless
 defragmentation
 evictable
 flushdb
@@ -202,6 +203,7 @@ ECDH
 ECDHE
 ECDS
 ECDSA
+sigalgs
 ECONNREFUSED
 ECONNRESET
 EDESTRUCTION
@@ -388,6 +390,7 @@ NOCHECKRESP
 NODATA
 NODELAY
 NODELETE
+NOERROR
 NOLINT
 NOLINTBEGIN
 NOLINTEND
@@ -612,6 +615,7 @@ XN
 XNOR
 XSS
 YAML
+YYYY
 ZXID
 absl
 accesslog
@@ -906,6 +910,7 @@ extrahelp
 faceplant
 facto
 failover
+faketime
 fallbacks
 fanout
 fastbuild
@@ -1247,6 +1252,7 @@ pfctl
 pipelined
 pipelining
 pkey
+pkix
 plaintext
 pluggable
 pointee
