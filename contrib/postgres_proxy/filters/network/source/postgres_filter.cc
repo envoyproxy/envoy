@@ -7,6 +7,7 @@
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "contrib/postgres_proxy/filters/network/source/postgres_decoder.h"
+#include "source/extensions/filters/common/rbac/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -205,9 +206,7 @@ void PostgresFilter::processQuery(const std::string& sql) {
 }
 
 bool PostgresFilter::onSSLRequest() {
-  if (config_->downstream_ssl_ ==
-          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE &&
-      !config_->terminate_ssl_) {
+  if (shouldPassthroughSSL()) {
     // Signal to the decoder to continue.
     return true;
   }
@@ -287,6 +286,38 @@ bool PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& dat
   }
 
   return encrypted;
+}
+
+bool PostgresFilter::authorizeStartup() {
+  // set basic attributes to metadata
+  Protobuf::Struct metadata;
+  auto& fields = *metadata.mutable_fields();
+  for (const auto& [key, val] : decoder_->getAttributes()) {
+    fields[key].set_string_value(val);
+  }
+  
+  auto& info = read_callbacks_->connection().streamInfo();
+  info.setDynamicMetadata(NetworkFilterNames::get().PostgresProxy, metadata);
+  std::string log_policy_id;
+  const bool allowed = config_->engine_->handleAction(read_callbacks_->connection(), info, &log_policy_id);
+  
+  if (!allowed) {
+    rejectStartup(log_policy_id);
+    return false;
+  }
+  config_->stats_.authorization_allowed_.inc();
+  return true;
+}
+
+void PostgresFilter::rejectStartup(absl::string_view log_policy_id) {
+  config_->stats_.authorization_denied_.inc();
+  
+  // send error response to downstream client
+  auto response = encoder_->buildErrorResponse("FATAL", "connection denied by Envoy proxy: rbac denied", "28000");
+  write_callbacks_->injectWriteDataToFilterChain(response, false);
+  // close downstream client connection
+  read_callbacks_->connection().streamInfo().setConnectionTerminationDetails(Filters::Common::RBAC::responseDetail(log_policy_id));
+  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
 void PostgresFilter::verifyDownstreamSSL() {

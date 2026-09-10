@@ -1,5 +1,8 @@
 #include <format>
 
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.h"
+
 #include "source/common/network/connection_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/server_context_config_impl.h"
@@ -17,6 +20,7 @@
 
 #include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.validate.h"
+#include "contrib/postgres/protocol/postgres_protocol.h"
 #include "contrib/postgres_proxy/filters/network/test/postgres_integration_test.pb.h"
 #include "contrib/postgres_proxy/filters/network/test/postgres_integration_test.pb.validate.h"
 #include "contrib/postgres_proxy/filters/network/test/postgres_test_utils.h"
@@ -747,6 +751,150 @@ TEST_P(UpstreamAndDownstreamSSLIntegrationTest, ServerRejectsSSL) {
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamAndDownstreamSSLIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+class RbacPostgresIntegrationTest : public DownstreamSSLPostgresIntegrationTest {
+public:
+  void SetUp() override {}
+
+  void initializeRbac(const std::string& identity, bool defer_upstream = false) {
+    config_helper_.addConfigModifier([identity, defer_upstream](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* chain =
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy postgres;
+      ASSERT_TRUE(chain->filters(0).typed_config().UnpackTo(&postgres));
+      postgres.mutable_enable_sql_parsing()->set_value(false);
+      auto& policy = (*postgres.mutable_rules()->mutable_policies())["client"];
+      policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact(
+          identity);
+      auto* metadata =
+          policy.add_permissions()->mutable_sourced_metadata()->mutable_metadata_matcher();
+      metadata->set_filter("envoy.filters.network.postgres_proxy");
+      metadata->add_path()->set_key("database");
+      metadata->mutable_value()->mutable_string_match()->set_exact("testdb");
+      ASSERT_THAT(chain->mutable_filters(0)->mutable_typed_config()->PackFrom(postgres), true);
+      if (defer_upstream) {
+        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp;
+        ASSERT_TRUE(chain->filters(1).typed_config().UnpackTo(&tcp));
+        tcp.set_upstream_connect_mode(
+            envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+        tcp.mutable_max_early_data_bytes()->set_value(16384);
+        ASSERT_THAT(chain->mutable_filters(1)->mutable_typed_config()->PackFrom(tcp), true);
+      }
+
+      envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig starttls;
+      ASSERT_TRUE(chain->transport_socket().typed_config().UnpackTo(&starttls));
+      auto* tls = starttls.mutable_tls_socket_config();
+      tls->mutable_require_client_certificate()->set_value(true);
+      tls->mutable_common_tls_context()
+          ->mutable_validation_context()
+          ->mutable_trusted_ca()
+          ->set_filename(TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+      ASSERT_THAT(chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(starttls),
+                  true);
+    });
+    BaseIntegrationTest::initialize();
+  }
+
+  void enableClientTls(const IntegrationTcpClientPtr& client) {
+    auto manager = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+        server_factory_context_);
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls;
+    auto* cert = tls.mutable_common_tls_context()->add_tls_certificates();
+    cert->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+    cert->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+    NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
+    ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+    auto config = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(tls, context);
+    auto factory = *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
+        std::move(config), *manager, *client_store_.rootScope());
+    auto* connection = dynamic_cast<Network::ConnectionImpl*>(client->connection());
+    connection->transportSocket() = factory->createTransportSocket(
+        nullptr, connection->streamInfo().upstreamInfo()->upstreamHost());
+    connection->transportSocket()->setTransportSocketCallbacks(*connection);
+  }
+
+  void checkAuthorization(const std::string& identity, bool allowed) {
+    initializeRbac(identity);
+    auto client = makeTcpConnection(lookupPort("listener_0"));
+    FakeRawConnectionPtr upstream;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+    Buffer::OwnedImpl ssl_request;
+    ssl_request.writeBEInt<uint32_t>(8);
+    ssl_request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_CODE);
+    ASSERT_TRUE(client->write(ssl_request.toString()));
+    client->waitForData("S", true);
+    enableClientTls(client);
+
+    using namespace std::literals::string_literals;
+    const std::string attributes = "user\0postgres\0database\0testdb\0\0"s;
+    Buffer::OwnedImpl startup;
+    startup.writeBEInt<uint32_t>(8 + attributes.size());
+    startup.writeBEInt<uint32_t>(0x00030000);
+    startup.add(attributes);
+    ASSERT_TRUE(client->write(startup.toString()));
+    if (allowed) {
+      std::string received;
+      ASSERT_TRUE(upstream->waitForData(startup.length(), &received));
+      ASSERT_THAT(received, startup.toString());
+      test_server_->waitForCounter("postgres.postgres_stats.authorization_allowed", Eq(1));
+      client->close();
+    } else {
+      client->waitForData("28000", false);
+      client->waitForDisconnect();
+      ASSERT_THAT(client->data(), testing::HasSubstr("28000"));
+      test_server_->waitForCounter("postgres.postgres_stats.authorization_denied", Eq(1));
+    }
+    ASSERT_TRUE(upstream->waitForDisconnect());
+    if (!allowed) {
+      std::string received;
+      ASSERT_TRUE(upstream->waitForData(0, &received));
+      ASSERT_THAT(received, "");
+    }
+  }
+
+  Stats::IsolatedStoreImpl client_store_;
+};
+
+TEST_P(RbacPostgresIntegrationTest, AllowsValidatedUriSan) {
+  checkAuthorization("spiffe://lyft.com/frontend-team", true);
+}
+
+TEST_P(RbacPostgresIntegrationTest, AllowsValidatedDnsSan) {
+  checkAuthorization("www.lyft.com", true);
+}
+
+TEST_P(RbacPostgresIntegrationTest, FlushesDenialForUnmatchedIdentity) {
+  checkAuthorization("spiffe://example.com/other", false);
+}
+
+TEST_P(RbacPostgresIntegrationTest, DenialDoesNotOpenDeferredUpstream) {
+  initializeRbac("spiffe://example.com/other", true);
+  auto client = makeTcpConnection(lookupPort("listener_0"));
+  Buffer::OwnedImpl ssl_request;
+  ssl_request.writeBEInt<uint32_t>(8);
+  ssl_request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_CODE);
+  ASSERT_TRUE(client->write(ssl_request.toString()));
+  client->waitForData("S", true);
+  enableClientTls(client);
+  using namespace std::literals::string_literals;
+  const std::string attributes = "user\0postgres\0database\0testdb\0\0"s;
+  Buffer::OwnedImpl startup;
+  startup.writeBEInt<uint32_t>(8 + attributes.size());
+  startup.writeBEInt<uint32_t>(0x00030000);
+  startup.add(attributes);
+  ASSERT_TRUE(client->write(startup.toString()));
+  client->waitForData("28000", false);
+  client->waitForDisconnect();
+  ASSERT_THAT(client->data(), testing::HasSubstr("28000"));
+  test_server_->waitForCounter("postgres.postgres_stats.authorization_denied", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(0));
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RbacPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 } // namespace PostgresProxy
