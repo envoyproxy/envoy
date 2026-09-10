@@ -21,17 +21,17 @@ bazel_dep(name = "boringssl", version = "0.20260413.0")
 bazel_dep(name = "boringssl-fips", version = "0.20260413.0.envoy")
 bazel_dep(name = "boringssl-source", version = "0.20260413.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy")
-bazel_dep(name = "brotli", version = "1.2.0")
+bazel_dep(name = "brotli", version = "1.2.0.bcr.1")
 bazel_dep(name = "buildifier_prebuilt", version = "8.2.1.1", repo_name = "buildifier")
 bazel_dep(name = "c-ares", version = "1.34.6")
 bazel_dep(name = "cel-cpp", version = "0.14.0.envoy")
 bazel_dep(name = "cel-spec", version = "0.25.2", repo_name = "dev_cel")
 bazel_dep(name = "colm", version = "0.14.7-211228-2d8ba76.envoy")
 bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
-bazel_dep(name = "dd-trace-cpp", version = "2.0.0.envoy")
+bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "emsdk", version = "4.0.23.envoy")
-bazel_dep(name = "envoy_api", version = "1.40.0-dev.20260903.16b0d47.envoy")
-bazel_dep(name = "envoy_toolshed", version = "0.4.13.envoy")
+bazel_dep(name = "envoy_api", version = "1.40.0-dev")
+bazel_dep(name = "envoy_toolshed", version = "0.4.15.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19.envoy")
 bazel_dep(name = "fmt", version = "12.1.0")
 bazel_dep(name = "gazelle", version = "0.47.0")
@@ -46,9 +46,9 @@ bazel_dep(name = "grpc-httpjson-transcoding", version = "0.0.0-20250507-a6e226f.
 bazel_dep(name = "hessian2-codec", version = "0.0.0-250114-6f5a647.envoy")
 bazel_dep(name = "hyperscan", version = "5.4.2.envoy")
 bazel_dep(name = "icu", version = "78.2.envoy")
-bazel_dep(name = "ipp-crypto", version = "1.3.0.envoy")
+bazel_dep(name = "ipp-crypto", version = "2.2.0.envoy")
 bazel_dep(name = "jemalloc", version = "5.3.0-bcr.4")
-bazel_dep(name = "kafka", version = "3.9.1.envoy")
+bazel_dep(name = "kafka", version = "3.9.2.envoy")
 bazel_dep(name = "libcircllhist", version = "0.3.2.envoy")
 bazel_dep(name = "libmaxminddb", version = "1.12.2")
 bazel_dep(name = "libprotobuf-mutator", version = "1.5.bcr.1")
@@ -56,8 +56,8 @@ bazel_dep(name = "librdkafka", version = "2.6.0.envoy")
 bazel_dep(name = "libevent", version = "2.2.2-alpha.envoy")
 bazel_dep(name = "libbpf", version = "1.7.0.envoy")
 bazel_dep(name = "libsxg", version = "0.0.0-210708-beaa393.envoy")
-bazel_dep(name = "liburing", version = "2.13.envoy")
-bazel_dep(name = "toolchains_llvm", version = "1.8.0.envoy")
+bazel_dep(name = "liburing", version = "2.15.envoy")
+bazel_dep(name = "toolchains_llvm", version = "1.9.0.envoy")
 bazel_dep(name = "lz4", version = "1.10.0.bcr.2.envoy")
 bazel_dep(name = "luajit", version = "0.0.0-260126-871db2c.envoy")
 bazel_dep(name = "msgpack-cxx", version = "7.0.0.envoy")
@@ -66,13 +66,13 @@ bazel_dep(name = "numactl", version = "2.0.19")
 bazel_dep(name = "nlohmann_json", version = "3.12.0")
 bazel_dep(name = "ocp-diag-core", version = "0.0.0-230505-e965ac0.envoy")
 bazel_dep(name = "openssl", version = "3.5.7.envoy")
-bazel_dep(name = "opentelemetry-cpp", version = "1.24.0.envoy")
+bazel_dep(name = "opentelemetry-cpp", version = "1.28.0.envoy")
 bazel_dep(name = "opentelemetry-proto", version = "1.8.0")
-bazel_dep(name = "perfetto", version = "53.0.envoy")
+bazel_dep(name = "perfetto", version = "57.2.envoy")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "prometheus-metrics-model", version = "0.6.2.envoy", repo_name = "prometheus_metrics_model")
 bazel_dep(name = "protobuf", version = "35.1.bcr.envoy")
-bazel_dep(name = "protoc-gen-validate", version = "1.3.0.envoy")
+bazel_dep(name = "protoc-gen-validate", version = "1.3.3.envoy")
 bazel_dep(name = "proto-converter", version = "0.0.0-20240625-1db7653.envoy")
 bazel_dep(name = "proto-field-extraction", version = "0.0.0-240710-d5d39f0.envoy")
 bazel_dep(name = "proto-processing", version = "0.0.0-250110-279353c.envoy")
@@ -80,9 +80,9 @@ bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
 bazel_dep(name = "proxy-wasm-cpp-sdk", version = "0.0.0-250925-e5256b0.envoy")
 bazel_dep(name = "proxy-wasm-rust-sdk", version = "0.2.4-251205-5283e57.envoy")
 bazel_dep(name = "qat-zstd", version = "1.0.0.envoy")
-bazel_dep(name = "qatlib", version = "25.08.0.envoy")
-bazel_dep(name = "qatzip", version = "1.3.1.envoy")
-bazel_dep(name = "quiche", version = "0.0.0-260824-0140828.envoy")
+bazel_dep(name = "qatlib", version = "26.02.0.envoy")
+bazel_dep(name = "qatzip", version = "1.3.2.envoy")
+bazel_dep(name = "quiche", version = "0.0.0-260831-5c9cc6b.envoy")
 bazel_dep(name = "ragel", version = "7.0.4-211228-d4577c9.envoy")
 bazel_dep(name = "re2", version = "2025-08-12.bcr.1")
 bazel_dep(name = "rules_apple", version = "3.20.1.envoy")
@@ -99,12 +99,13 @@ bazel_dep(name = "rules_proto_grpc_cpp", version = "5.8.0")
 bazel_dep(name = "rules_python", version = "2.2.0")
 bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
 bazel_dep(name = "rules_shell", version = "0.8.0")
+bazel_dep(name = "rules_swift", version = "2.5.0.envoy")
 bazel_dep(name = "spdlog", version = "1.16.0")
 bazel_dep(name = "sql-parser", version = "0.0.0-260715-52e5ad1.envoy")
 bazel_dep(name = "su-exec", version = "0.3")
 bazel_dep(name = "tclap", version = "1.2.5")
-bazel_dep(name = "tcmalloc", version = "0.0.0-20241022-5da4a88.envoy")
-bazel_dep(name = "thrift", version = "0.22.0.envoy")
+bazel_dep(name = "tcmalloc", version = "0.0.0-250926-12f2552.envoy")
+bazel_dep(name = "thrift", version = "0.24.0.envoy")
 bazel_dep(name = "uadk", version = "2.9.envoy")
 bazel_dep(name = "v8", version = "14.6.202.10.envoy")
 bazel_dep(name = "vectorscan", version = "5.4.11.envoy")
@@ -118,7 +119,7 @@ bazel_dep(name = "yaml-cpp", version = "0.8.0")
 bazel_dep(name = "yq.bzl", version = "0.1.1.envoy")
 bazel_dep(name = "zipkin-api", version = "1.0.0.envoy")
 bazel_dep(name = "zlib-ng", version = "2.3.2.envoy")
-bazel_dep(name = "zstd", version = "1.5.7")
+bazel_dep(name = "zstd", version = "1.5.7.bcr.1")
 
 ####################################################################################
 # deps: Dev
@@ -127,6 +128,9 @@ bazel_dep(name = "zstd", version = "1.5.7")
 bazel_dep(name = "google_benchmark", version = "1.9.5", dev_dependency = True, repo_name = "benchmark")
 
 bazel_dep(name = "rules_fuzzing", version = "0.6.0")
+
+fuzzing_ext = use_extension("@rules_fuzzing//fuzzing/private:extensions.bzl", "non_module_dependencies")
+use_repo(fuzzing_ext, "rules_fuzzing_oss_fuzz")
 
 bazel_dep(name = "rules_shellcheck", version = "0.4.0", dev_dependency = True, repo_name = "shellcheck")
 
@@ -149,6 +153,11 @@ single_version_override(
     version = "0.0.0-250925-e5256b0.envoy",
 )
 
+single_version_override(
+    module_name = "boringssl",
+    version = "0.20260413.0",
+)
+
 # testing/debugging
 # local_path_override(
 #     module_name = "envoy_toolshed",
@@ -157,8 +166,8 @@ single_version_override(
 
 # git_override(
 #     module_name = "envoy_toolshed",
-#     commit = "9e1dcf88ddb6523306b8fadd3d2c50c96a474426",
-#     remote = "https://github.com/phlax/toolshed",
+#     commit = "0f2dbc8122e776c57901bcd835e9f2526c03cf4d",
+#     remote = "https://github.com/envoyproxy/toolshed",
 #     strip_prefix = "bazel",
 # )
 
@@ -181,6 +190,11 @@ use_repo(sanitizer_ext, "msan_libs", "tsan_libs")
 grcov_ext = use_extension("@envoy_toolshed//coverage/grcov:extensions.bzl", "grcov_extension")
 grcov_ext.setup()
 use_repo(grcov_ext, "grcov")
+
+# Prebuilt wee8 (V8) static library, selected via the //bazel:v8_engine flag.
+wee8_ext = use_extension("@envoy_toolshed//v8:extensions.bzl", "wee8_prebuilt_extension")
+wee8_ext.setup()
+use_repo(wee8_ext, "wee8_prebuilt_x86_64", "wee8_prebuilt_x86_64_libstdcxx", "wee8_prebuilt_aarch64")
 
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.cxx_cross_lib(
@@ -321,8 +335,8 @@ go_deps.module(
 )
 go_deps.module(
     path = "google.golang.org/protobuf",
-    sum = "h1:AYd7cD/uASjIL6Q9LiTjz8JLcrh/88q5UObnmY3aOOE=",
-    version = "v1.36.10",
+    sum = "h1:fV6ZwhNocDyBLK0dj+fg8ektcVegBBuEolpbTQyBNVE=",
+    version = "v1.36.11",
 )
 use_repo(
     go_deps,

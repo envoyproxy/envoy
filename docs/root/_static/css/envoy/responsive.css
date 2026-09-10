@@ -76,17 +76,23 @@
 
 @media screen and (max-width: 1100px) {
   /* below this the margin is too tight to hang the anchor in it */
-  .envoy-content-main .rst-content a.headerlink {
-    left: auto;
-    margin-left: 0.4em;
-    position: static;
+  .envoy-content-main .rst-content h1 > a.headerlink,
+  .envoy-content-main .rst-content h2 > a.headerlink,
+  .envoy-content-main .rst-content h3 > a.headerlink,
+  .envoy-content-main .rst-content h4 > a.headerlink,
+  .envoy-content-main .rst-content h5 > a.headerlink,
+  .envoy-content-main .rst-content h6 > a.headerlink {
+    margin: 0 0 0 0.2em;
+    position: relative;
+    right: auto;
+    top: auto;
   }
 }
 
 @media screen and (max-width: 640px) {
   body,
   body.wy-body-for-nav {
-    font-size: 15.5px;
+    font-size: 0.95rem;
   }
 
   .envoy-doc-topbar {
@@ -101,17 +107,17 @@
   }
 
   .envoy-content-main .rst-content h1 {
-    font-size: 27px;
+    font-size: 1.7rem;
   }
 
   .envoy-content-main .rst-content h2 {
-    font-size: 20px;
+    font-size: 1.25rem;
     margin-top: 40px;
   }
 
   .envoy-content-main .rst-content .highlight pre,
   .envoy-content-main .rst-content pre.literal-block {
-    font-size: 13px;
+    font-size: 0.8rem;
   }
 
   .envoy-search-panel {

@@ -24,7 +24,7 @@ Building Envoy has the following requirements:
 * Recent GCC/Clang versions - please see :repo:`bazel/README.md#supported-compiler-versions` for current requirements.
 * About 2GB of RAM per core (so 32GB of RAM for 8 cores with hyperthreading). See
   :ref:`this FAQ entry <faq_build_speed>` for more information on build performance.
-* These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.
+* The dependencies declared in :repo:`MODULE.bazel` and the Bazel registries.
 
 Please note that for Clang/LLVM 8 and lower, Envoy may need to be built with ``--define tcmalloc=gperftools``
 as the new tcmalloc code is not guaranteed to compile with lower versions of Clang.
@@ -45,7 +45,7 @@ Building Envoy for Windows has the following requirements:
 * The Windows 10 SDK, version 1803 (10.0.17134.12). Some features may require a newer SDK.
 * `Build Tools for Visual Studio 2019 <https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019>`_
 * The `MSYS2 toolchain <https://www.msys2.org/>`_
-* These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.
+* The dependencies declared in :repo:`MODULE.bazel` and the Bazel registries.
 
 Detailed instructions
 ---------------------

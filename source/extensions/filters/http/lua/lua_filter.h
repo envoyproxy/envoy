@@ -37,9 +37,10 @@ struct LuaFilterStats {
 class PerLuaCodeSetup : Logger::Loggable<Logger::Id::lua> {
 public:
   // creation_status is set (and construction stops early) if the supplied code cannot be parsed.
-  PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                  Stats::Gauge& vm_count_gauge, uint32_t concurrency,
-                  absl::Status& creation_status);
+  PerLuaCodeSetup(const std::string& lua_code,
+                  const Filters::Common::Lua::PackagePaths& package_paths,
+                  ThreadLocal::SlotAllocator& tls, Stats::Gauge& vm_count_gauge,
+                  uint32_t concurrency, absl::Status& creation_status);
   ~PerLuaCodeSetup();
 
   Extensions::Filters::Common::Lua::CoroutinePtr createCoroutine() {

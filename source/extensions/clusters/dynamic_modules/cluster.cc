@@ -801,18 +801,22 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {nullptr};
   }
 
-  // Pre-capture the worker dispatcher and prepare the cancellation flag before calling into the
-  // module. The module's choose_host may spawn a background thread that calls
-  // async_host_selection_complete, which reads these fields. Setting them beforehand establishes
-  // a happens-before relationship via the thread::spawn synchronization in the module.
+  // Pre-capture the worker dispatcher and register the per-selection cancellation flag before
+  // calling into the module. The module's choose_host may spawn a background thread that calls
+  // async_host_selection_complete, which reads both. Publishing them beforehand establishes a
+  // happens-before relationship via the thread::spawn synchronization in the module.
+  //
+  // The flag and the registry entry are keyed by `context`, not held in a single slot on this load
+  // balancer, because a worker serves many concurrent async selections. A single slot would let a
+  // cancellation on one selection suppress the completion of an unrelated one.
   const auto* connection = context != nullptr ? context->downstreamConnection() : nullptr;
-  active_async_dispatcher_ = connection != nullptr ? &connection->dispatcher() : nullptr;
-  // Capture the worker dispatcher for worker timer creation. Sticky: keep any previously captured
-  // dispatcher when this call has no connection, since the worker dispatcher is stable.
-  if (active_async_dispatcher_ != nullptr) {
-    worker_dispatcher_ = active_async_dispatcher_;
+  // Sticky: keep any previously captured dispatcher when this call has no connection, since the
+  // worker dispatcher is stable for the worker's life.
+  if (connection != nullptr) {
+    worker_dispatcher_.store(&connection->dispatcher(), std::memory_order_release);
   }
-  active_async_cancelled_ = std::make_shared<std::atomic<bool>>(false);
+  auto cancelled = std::make_shared<std::atomic<bool>>(false);
+  async_selections_->add(context, cancelled);
 
   envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle = nullptr;
@@ -820,16 +824,17 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
                                                           &async_handle);
 
   if (async_handle != nullptr) {
-    // Async pending: the module will call the completion callback later.
+    // Async pending: the module will call the completion callback later. The `cancelable` holds the
+    // registry so it can drop its entry even if it outlives this load balancer.
     auto cancelable = std::make_unique<DynamicModuleAsyncHostSelectionHandle>(
         async_handle, in_module_lb_,
-        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_, active_async_cancelled_);
+        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_, std::move(cancelled),
+        async_selections_, context);
     return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
   }
 
-  // Synchronous result or no host. Clear the async state.
-  active_async_dispatcher_ = nullptr;
-  active_async_cancelled_ = nullptr;
+  // Synchronous result or no host. Nothing will complete for this context, so drop its entry.
+  async_selections_->remove(context);
 
   if (host_ptr == nullptr) {
     return {nullptr};
@@ -841,6 +846,11 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 }
 
 DynamicModuleAsyncHostSelectionHandle::~DynamicModuleAsyncHostSelectionHandle() {
+  // Drop the registry entry first. Once it is gone the completion callback drops the event instead
+  // of touching a LoadBalancerContext the router is about to reclaim.
+  if (registry_ != nullptr) {
+    registry_->remove(context_);
+  }
   // Free the module-side async handle. The cancel function takes ownership of the handle and
   // drops it, so this works for both cancellation and normal completion paths.
   if (async_handle_ != nullptr && cancel_fn_ != nullptr) {

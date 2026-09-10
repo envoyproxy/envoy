@@ -166,6 +166,7 @@ envoy_cc_test_library(
         "//source/common/http/http2:conn_pool_lib",
         "//source/common/router:context_lib",
         "//test/integration:integration_lib",
+        "//test/integration:utility_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",

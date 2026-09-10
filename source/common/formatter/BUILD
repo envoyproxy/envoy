@@ -99,6 +99,7 @@ envoy_cc_library(
         "//source/common/common:fmt_lib",
         "//source/common/common:statusor_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 

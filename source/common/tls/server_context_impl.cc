@@ -106,6 +106,35 @@ ServerContextImpl::ServerContextImpl(
   if (!creation_status.ok()) {
     return;
   }
+
+  // Validate certificate-level tls_params so bad values are rejected at config load rather than
+  // failing every handshake. Validation happens here, and not while parsing the shared certificate
+  // config, because client contexts ignore tls_params and must not be rejected for it.
+  //
+  // Nothing is applied to the SSL_CTX. Per-certificate params belong to the per-connection SSL
+  // object, which is where they are set once a certificate has been selected. Mutating a
+  // certificate's SSL_CTX would also leak its restrictions to other certificates, since
+  // connections are created from tls_contexts_[0] and SSL_new snapshots the group list and version
+  // bounds from it. So validation uses a throwaway SSL_CTX.
+  for (const Ssl::TlsContext& ctx : tls_contexts_) {
+    if (!ctx.tls_params_.has_value()) {
+      continue;
+    }
+    const Ssl::TlsParams& params = ctx.tls_params_.value();
+    const Utility::EffectiveTlsParams effective = Utility::effectiveTlsParams(
+        params, ctx.provides_ciphers_and_curves_, ctx.provides_sigalgs_);
+    bssl::UniquePtr<SSL_CTX> validation_ctx(SSL_CTX_new(TLS_method()));
+    creation_status = Utility::validateCipherCurveAndSigalgsOnSslCtx(
+        effective.cipher_suites, effective.ecdh_curves, effective.signature_algorithms,
+        validation_ctx.get());
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+    if (params.compliance_policy.has_value()) {
+      creation_status = Utility::applyCompliancePolicyToSslCtx(params.compliance_policy.value(),
+                                                               validation_ctx.get());
+      RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+    }
+  }
+
   // If creation failed, do not create the selector.
   if (add_selector) {
     tls_certificate_selector_ = config.tlsCertificateSelectorFactory().create(*this);
@@ -458,7 +487,8 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
       return Ssl::CurveNIDVector{};
     }
     // All tls_context_ share the same set of enabled ciphers, so we can just look at the base
-    // context.
+    // context. Per-certificate cipher_suites are applied to the per-connection SSL object after
+    // selection, so they do not differentiate the contexts here.
     if (tls_contexts_[0].isCipherEnabled(cipher_id, client_version)) {
       return client_capabilities;
     }

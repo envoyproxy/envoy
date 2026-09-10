@@ -78,10 +78,12 @@ public:
 
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
+  uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
   bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
   ApiProtocol defaultApiProtocol() const { return default_api_protocol_; }
   const std::string& metadataNamespace() const { return metadata_namespace_; }
+  bool synthesizeUsageTrailers() const { return synthesize_usage_trailers_; }
   uint32_t maxSseEventSize() const { return max_sse_event_size_; }
   uint32_t maxJsonBodySize() const { return max_json_body_size_; }
   uint32_t maxParsedSseEvents() const { return max_parsed_sse_events_; }
@@ -93,10 +95,12 @@ private:
   mutable AiProtocolManagerStats stats_;
   const bool request_handling_enabled_ = false;
   const bool parse_unconfigured_routes_ = false;
+  const uint32_t inline_string_threshold_bytes_ = 0;
   const bool token_usage_enabled_ = false;
   const bool include_unconfigured_routes_ = false;
   const ApiProtocol default_api_protocol_ = ApiProtocol::Unspecified;
   const std::string metadata_namespace_;
+  const bool synthesize_usage_trailers_ = false;
   const uint32_t max_sse_event_size_ = 0;
   const uint32_t max_json_body_size_ = 0;
   const uint32_t max_parsed_sse_events_ = 0;
@@ -224,9 +228,14 @@ private:
   // what makes a parse failure fatal.
   bool isAiEndpoint() const { return route_has_request_; }
 
+  // The inline-string threshold for this stream: the route's payload schema
+  // when it pins one, otherwise the filter's configured default.
+  uint32_t inlineStringThresholdBytes() const;
+
   // Publish the accumulated token usage as dynamic metadata and account stats.
   // Called exactly once, at response end of stream (data or trailers).
-  void finalizeResponseHandling();
+  // Returns whether a record was published for this stream.
+  bool finalizeResponseHandling();
 
   // Finalizes the decode path when the full request body (and optional trailers) has been received.
   // Sets endStream on decode_manager_ and executes the AI filter chain or replays the body.

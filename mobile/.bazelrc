@@ -4,11 +4,6 @@
 # Envoy Mobile Bazel build/test options.
 try-import ../.bazelrc
 
-common --enable_bzlmod
-common --noenable_workspace
-common --@envoy//bazel:enable_bzlmod=True
-
-
 #############################################################################
 # global
 #############################################################################

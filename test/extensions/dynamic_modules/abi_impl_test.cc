@@ -404,6 +404,9 @@ WEAK_STUB(ClusterLbGetHealthyHostCount,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(nullptr, 0))
 WEAK_STUB(ClusterLbGetHealthyHost,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host(nullptr, 0, 0))
+WEAK_STUB(ClusterLbGetHealthyHosts,
+          envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(nullptr, 0, nullptr, 0,
+                                                                     nullptr))
 WEAK_STUB(ClusterLbContextComputeHashKey,
           envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(nullptr, nullptr))
 WEAK_STUB(ClusterLbContextGetDownstreamHeadersSize,
@@ -441,6 +444,9 @@ WEAK_STUB(ClusterLbContextSetFilterStateTyped,
           envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(nullptr,
                                                                                   {nullptr, 0},
                                                                                   {nullptr, 0}))
+WEAK_STUB(ClusterLbContextSetDynamicMetadataStringBatch,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+              nullptr, {nullptr, 0}, nullptr, 0))
 WEAK_STUB(ClusterLbGetClusterName,
           envoy_dynamic_module_callback_cluster_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(ClusterLbGetHostsCount,
@@ -531,6 +537,22 @@ WEAK_STUB(ClusterConfigDefineHistogram,
 WEAK_STUB(ClusterConfigRecordHistogramValue,
           envoy_dynamic_module_callback_cluster_config_record_histogram_value(nullptr, 0, nullptr,
                                                                               0, 0))
+WEAK_STUB(ClusterConfigResolveCounterVec,
+          envoy_dynamic_module_callback_cluster_config_resolve_counter_vec(nullptr, 0, nullptr, 0,
+                                                                           nullptr))
+WEAK_STUB(ClusterConfigResolveGaugeVec,
+          envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec(nullptr, 0, nullptr, 0,
+                                                                         nullptr))
+WEAK_STUB(ClusterConfigResolveHistogramVec,
+          envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec(nullptr, 0, nullptr, 0,
+                                                                             nullptr))
+WEAK_STUB(ClusterMetricCounterAdd,
+          envoy_dynamic_module_callback_cluster_metric_counter_add(nullptr, 0))
+WEAK_STUB(ClusterMetricGaugeSet, envoy_dynamic_module_callback_cluster_metric_gauge_set(nullptr, 0))
+WEAK_STUB(ClusterMetricGaugeAdd, envoy_dynamic_module_callback_cluster_metric_gauge_add(nullptr, 0))
+WEAK_STUB(ClusterMetricGaugeSub, envoy_dynamic_module_callback_cluster_metric_gauge_sub(nullptr, 0))
+WEAK_STUB(ClusterMetricHistogramRecord,
+          envoy_dynamic_module_callback_cluster_metric_histogram_record(nullptr, 0))
 WEAK_STUB(ClusterWorkerTimerNew, envoy_dynamic_module_callback_cluster_worker_timer_new(nullptr))
 WEAK_STUB(ClusterWorkerTimerEnable,
           envoy_dynamic_module_callback_cluster_worker_timer_enable(nullptr, 0))
@@ -1885,6 +1907,45 @@ WEAK_STUB(ClusterSpecifierConfigRecordHistogramValue,
           envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(nullptr, 0,
                                                                                         nullptr, 0,
                                                                                         0))
+
+WEAK_STUB(EarlyHeaderMutationAddHeader,
+          envoy_dynamic_module_callback_early_header_mutation_add_header(nullptr, {nullptr, 0},
+                                                                         {nullptr, 0}))
+WEAK_STUB(EarlyHeaderMutationGetAttributeBool,
+          envoy_dynamic_module_callback_early_header_mutation_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetAttributeInt,
+          envoy_dynamic_module_callback_early_header_mutation_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetAttributeString,
+          envoy_dynamic_module_callback_early_header_mutation_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetDynamicMetadata,
+          envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetDynamicMetadataBool,
+          envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_bool(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetFilterStateBytes,
+          envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes(nullptr,
+                                                                                     {nullptr, 0},
+                                                                                     nullptr))
+WEAK_STUB(EarlyHeaderMutationGetHeaderValue,
+          envoy_dynamic_module_callback_early_header_mutation_get_header_value(nullptr,
+                                                                               {nullptr, 0},
+                                                                               nullptr, 0, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetHeaders,
+          envoy_dynamic_module_callback_early_header_mutation_get_headers(nullptr, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetHeadersSize,
+          envoy_dynamic_module_callback_early_header_mutation_get_headers_size(nullptr))
+WEAK_STUB(EarlyHeaderMutationRemoveHeader,
+          envoy_dynamic_module_callback_early_header_mutation_remove_header(nullptr, {nullptr, 0}))
+WEAK_STUB(EarlyHeaderMutationSetHeader,
+          envoy_dynamic_module_callback_early_header_mutation_set_header(nullptr, {nullptr, 0},
+                                                                         {nullptr, 0}))
 
 WEAK_STUB(FormatterGetAccessLogType,
           envoy_dynamic_module_callback_formatter_get_access_log_type(nullptr))

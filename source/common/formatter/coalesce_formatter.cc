@@ -3,6 +3,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/formatter/builtin_command_parser_factory_helper.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -51,7 +52,10 @@ absl::StatusOr<FormatterProviderPtr> CoalesceFormatter::create(absl::string_view
     formatters.push_back(std::move(formatter_or_error.value()));
   }
 
-  return std::make_unique<CoalesceFormatter>(std::move(formatters), max_length);
+  const bool accept_empty_values = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.coalesce_formatter_accept_empty_values");
+  return std::make_unique<CoalesceFormatter>(std::move(formatters), max_length,
+                                             accept_empty_values);
 }
 
 absl::StatusOr<FormatterProviderPtr>
@@ -121,12 +125,17 @@ std::optional<std::string>
 CoalesceFormatter::format(const Context& context, const StreamInfo::StreamInfo& stream_info) const {
   for (const auto& formatter : formatters_) {
     auto result = formatter->format(context, stream_info);
-    if (result.has_value() && !result.value().empty()) {
-      if (max_length_.has_value()) {
-        SubstitutionFormatUtils::truncate(result.value(), max_length_.value());
-      }
-      return result;
+    if (!result.has_value()) {
+      continue;
     }
+    // An empty result is only accepted when the runtime guard is enabled.
+    if (result.value().empty() && !accept_empty_values_) {
+      continue;
+    }
+    if (max_length_.has_value()) {
+      SubstitutionFormatUtils::truncate(result.value(), max_length_.value());
+    }
+    return result;
   }
   return std::nullopt;
 }
@@ -135,21 +144,21 @@ Protobuf::Value CoalesceFormatter::formatValue(const Context& context,
                                                const StreamInfo::StreamInfo& stream_info) const {
   for (const auto& formatter : formatters_) {
     auto result = formatter->formatValue(context, stream_info);
-    // Check if this is a valid non-null value.
-    if (result.kind_case() != Protobuf::Value::KIND_NOT_SET &&
-        result.kind_case() != Protobuf::Value::kNullValue) {
-      // For string values, also check if empty.
-      if (result.kind_case() == Protobuf::Value::kStringValue) {
-        if (!result.string_value().empty()) {
-          if (max_length_.has_value() && result.string_value().size() > max_length_.value()) {
-            result.set_string_value(result.string_value().substr(0, max_length_.value()));
-          }
-          return result;
-        }
-      } else {
-        return result;
+    // Skip values that are not set or are explicitly null.
+    if (result.kind_case() == Protobuf::Value::KIND_NOT_SET ||
+        result.kind_case() == Protobuf::Value::kNullValue) {
+      continue;
+    }
+    if (result.kind_case() == Protobuf::Value::kStringValue) {
+      // An empty string is only accepted when the runtime guard is enabled.
+      if (result.string_value().empty() && !accept_empty_values_) {
+        continue;
+      }
+      if (max_length_.has_value() && result.string_value().size() > max_length_.value()) {
+        result.set_string_value(result.string_value().substr(0, max_length_.value()));
       }
     }
+    return result;
   }
   return SubstitutionFormatUtils::unspecifiedValue();
 }
