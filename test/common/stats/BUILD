@@ -437,6 +437,21 @@ envoy_benchmark_test(
 )
 
 envoy_cc_benchmark_binary(
+    name = "thread_local_store_merge_speed_test",
+    srcs = ["thread_local_store_merge_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/stats:thread_local_store_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "thread_local_store_merge_speed_test_benchmark_test",
+    benchmark_binary = "thread_local_store_merge_speed_test",
+)
+
+envoy_cc_benchmark_binary(
     name = "dec_ref_count_speed_test",
     srcs = ["dec_ref_count_speed_test.cc"],
     rbe_pool = "linux_x64_small",
