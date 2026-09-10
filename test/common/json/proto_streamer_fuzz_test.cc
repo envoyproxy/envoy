@@ -204,6 +204,22 @@ DEFINE_PROTO_FUZZER(const TestMessage& input) {
       Protobuf::Value>
       value_kind = {[](Protobuf::Value* value, unsigned int) { makeValueComparable(*value); }};
 
+  ABSL_ATTRIBUTE_UNUSED static protobuf_mutator::libfuzzer::PostProcessorRegistration<
+      Protobuf::Duration>
+      duration_range = {[](Protobuf::Duration* duration, unsigned int) {
+        if (!Protobuf::util::TimeUtil::IsDurationValid(*duration)) {
+          duration->Clear();
+        }
+      }};
+
+  ABSL_ATTRIBUTE_UNUSED static protobuf_mutator::libfuzzer::PostProcessorRegistration<
+      Protobuf::Timestamp>
+      timestamp_range = {[](Protobuf::Timestamp* timestamp, unsigned int) {
+        if (!Protobuf::util::TimeUtil::IsTimestampValid(*timestamp)) {
+          timestamp->Clear();
+        }
+      }};
+
   for (const bool redact : {false, true}) {
     checkAgainstPrinter(input, redact);
   }
