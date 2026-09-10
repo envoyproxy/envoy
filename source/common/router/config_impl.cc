@@ -40,6 +40,7 @@
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/http/path_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/init/manager_impl.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -48,6 +49,7 @@
 #include "source/common/router/matcher_visitor.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
@@ -1943,6 +1945,174 @@ const DomainEntry* RouteMatcher::findWildcardDomainEntry(
   return nullptr;
 }
 
+namespace {
+
+/**
+ * Isolated validation context used to sequentially validate virtual hosts and their route
+ * structures at configuration ingestion time without polluting global server state or leaking
+ * init manager handles.
+ */
+class IsolatedValidationContext : public Server::Configuration::ServerFactoryContext {
+public:
+  explicit IsolatedValidationContext(Server::Configuration::ServerFactoryContext& parent_context)
+      : parent_context_(parent_context), isolated_store_(parent_context.scope().symbolTable()),
+        isolated_scope_(isolated_store_.rootScope()),
+        isolated_init_manager_("isolated_validation") {}
+
+  // Server::Configuration::ServerFactoryContext
+  Stats::Scope& scope() override { return *isolated_scope_; }
+  Stats::Scope& serverScope() override { return *isolated_scope_; }
+  Init::Manager& initManager() override { return isolated_init_manager_; }
+
+  Upstream::ClusterManager& clusterManager() override { return parent_context_.clusterManager(); }
+  Envoy::Config::XdsManager& xdsManager() override { return parent_context_.xdsManager(); }
+  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
+    return parent_context_.httpServerPropertiesCacheManager();
+  }
+  Event::Dispatcher& mainThreadDispatcher() override {
+    return parent_context_.mainThreadDispatcher();
+  }
+  const Server::Options& options() override { return parent_context_.options(); }
+  const LocalInfo::LocalInfo& localInfo() const override { return parent_context_.localInfo(); }
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return parent_context_.messageValidationContext();
+  }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return parent_context_.messageValidationVisitor();
+  }
+  Envoy::Runtime::Loader& runtime() override { return parent_context_.runtime(); }
+  Singleton::Manager& singletonManager() override { return parent_context_.singletonManager(); }
+  ThreadLocal::Instance& threadLocal() override { return parent_context_.threadLocal(); }
+  OptRef<Server::Admin> admin() override { return parent_context_.admin(); }
+  TimeSource& timeSource() override { return parent_context_.timeSource(); }
+  AccessLog::AccessLogManager& accessLogManager() override {
+    return parent_context_.accessLogManager();
+  }
+  Api::Api& api() override { return parent_context_.api(); }
+  Http::Context& httpContext() override { return parent_context_.httpContext(); }
+  Grpc::Context& grpcContext() override { return parent_context_.grpcContext(); }
+  Router::Context& routerContext() override { return parent_context_.routerContext(); }
+  ProcessContextOptRef processContext() override { return parent_context_.processContext(); }
+  Envoy::Server::DrainManager& drainManager() override { return parent_context_.drainManager(); }
+  Server::ServerLifecycleNotifier& lifecycleNotifier() override {
+    return parent_context_.lifecycleNotifier();
+  }
+  Regex::Engine& regexEngine() override { return parent_context_.regexEngine(); }
+  Server::Configuration::StatsConfig& statsConfig() override {
+    return parent_context_.statsConfig();
+  }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override {
+    return parent_context_.bootstrap();
+  }
+  Server::OverloadManager& overloadManager() override { return parent_context_.overloadManager(); }
+  Server::OverloadManager& nullOverloadManager() override {
+    return parent_context_.nullOverloadManager();
+  }
+  bool healthCheckFailed() const override { return parent_context_.healthCheckFailed(); }
+  Ssl::ContextManager& sslContextManager() override { return parent_context_.sslContextManager(); }
+  Secret::SecretManager& secretManager() override { return parent_context_.secretManager(); }
+
+private:
+  Server::Configuration::ServerFactoryContext& parent_context_;
+  Stats::IsolatedStoreImpl isolated_store_;
+  Stats::ScopeSharedPtr isolated_scope_;
+  Init::ManagerImpl isolated_init_manager_;
+};
+
+bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_proto,
+                             bool validate_clusters,
+                             Server::Configuration::ServerFactoryContext& factory_context) {
+  // 1. VirtualHost-level safety checks:
+  if (!envoy::config::route::v3::VirtualHost_TlsRequirementType_IsValid(
+          vhost_proto.require_tls())) {
+    return true;
+  }
+  if (vhost_proto.has_matcher()) {
+    return true;
+  }
+  if (!vhost_proto.typed_per_filter_config().empty()) {
+    return true;
+  }
+  if (!vhost_proto.request_headers_to_add().empty() ||
+      !vhost_proto.request_headers_to_remove().empty() ||
+      !vhost_proto.response_headers_to_add().empty() ||
+      !vhost_proto.response_headers_to_remove().empty()) {
+    return true;
+  }
+  if (vhost_proto.has_retry_policy() || vhost_proto.has_hedge_policy()) {
+    return true;
+  }
+  if (!vhost_proto.rate_limits().empty()) {
+    return true;
+  }
+  if (!vhost_proto.request_mirror_policies().empty()) {
+    return true;
+  }
+  if (!vhost_proto.virtual_clusters().empty()) {
+    return true;
+  }
+  if (vhost_proto.has_cors() || vhost_proto.has_metadata()) {
+    return true;
+  }
+
+  // 2. Check all routes
+  for (const auto& route : vhost_proto.routes()) {
+    const auto path_case = route.match().path_specifier_case();
+    if (path_case != envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix &&
+        path_case != envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath) {
+      return true;
+    }
+    if (!route.match().headers().empty() || !route.match().query_parameters().empty() ||
+        !route.match().cookies().empty() || !route.match().dynamic_metadata().empty() ||
+        !route.match().filter_state().empty() || route.match().has_tls_context() ||
+        route.match().has_grpc() || route.match().has_runtime_fraction()) {
+      return true;
+    }
+
+    if (!route.typed_per_filter_config().empty() || !route.request_headers_to_add().empty() ||
+        !route.request_headers_to_remove().empty() || !route.response_headers_to_add().empty() ||
+        !route.response_headers_to_remove().empty() || route.has_metadata() ||
+        route.has_decorator() || route.has_tracing()) {
+      return true;
+    }
+
+    if (route.action_case() != envoy::config::route::v3::Route::ActionCase::kRoute) {
+      return true;
+    }
+
+    const auto& route_action = route.route();
+    if (route_action.cluster().empty() || route_action.has_weighted_clusters() ||
+        route_action.has_cluster_specifier_plugin() ||
+        route_action.has_inline_cluster_specifier_plugin() ||
+        !route_action.cluster_header().empty()) {
+      return true;
+    }
+
+    if (route_action.has_retry_policy() || route_action.has_hedge_policy() ||
+        !route_action.rate_limits().empty() || !route_action.request_mirror_policies().empty() ||
+        !route_action.hash_policy().empty() || route_action.has_cors() ||
+        !route_action.upgrade_configs().empty() || !route_action.prefix_rewrite().empty() ||
+        route_action.has_regex_rewrite() || !route_action.path_rewrite().empty() ||
+        route_action.has_path_rewrite_policy() || !route_action.host_rewrite_literal().empty() ||
+        !route_action.host_rewrite_header().empty() || route_action.has_host_rewrite_path_regex() ||
+        !route_action.host_rewrite().empty() || route_action.has_auto_host_rewrite() ||
+        route_action.append_x_forwarded_host() || route_action.has_internal_redirect_policy() ||
+        route_action.has_metadata_match() || route_action.has_early_data_policy()) {
+      return true;
+    }
+
+    if (validate_clusters) {
+      if (!factory_context.clusterManager().hasCluster(route_action.cluster())) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+} // namespace
+
 absl::StatusOr<std::unique_ptr<RouteMatcher>>
 RouteMatcher::create(const envoy::config::route::v3::RouteConfiguration& route_config,
                      const CommonConfigSharedPtr& global_route_config,
@@ -1974,6 +2144,21 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     DomainEntrySharedPtr domain_entry;
     if (deferred_vhost_enabled) {
+      if (requiresProbeValidation(virtual_host_config, validate_clusters, factory_context)) {
+        // Sequential probe validation using an isolated validation context.
+        IsolatedValidationContext validation_context(factory_context);
+        auto isolated_vhost_scope = validation_context.scope().scopeFromStatName(
+            factory_context.routerContext().virtualClusterStatNames().vhost_);
+        absl::Status validation_status = absl::OkStatus();
+        VirtualHostImpl probe_vhost(
+            virtual_host_config, global_route_config, validation_context, *isolated_vhost_scope,
+            validator, validation_context.initManager(), validate_clusters, validation_status);
+        if (!validation_status.ok()) {
+          creation_status = validation_status;
+          return;
+        }
+      }
+
       auto init_object = std::make_shared<VirtualHostInitializationObject>(
           virtual_host_config, global_route_config, factory_context, vhost_scope_, validator,
           init_manager, validate_clusters);

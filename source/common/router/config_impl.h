@@ -509,7 +509,8 @@ using HeaderMutationsPtr = std::unique_ptr<Http::HeaderMutations>;
  * Encapsulates the configuration and factory context required to construct a VirtualHostImpl
  * on-demand.
  */
-struct VirtualHostInitializationObject {
+
+struct VirtualHostInitializationObject : Logger::Loggable<Logger::Id::router> {
   VirtualHostInitializationObject(const envoy::config::route::v3::VirtualHost& vhost_proto,
                                   const CommonConfigSharedPtr& global_route_config,
                                   Server::Configuration::ServerFactoryContext& factory_context,
@@ -521,14 +522,22 @@ struct VirtualHostInitializationObject {
         validator_(validator), init_manager_(init_manager), validate_clusters_(validate_clusters) {}
 
   std::shared_ptr<const VirtualHostImpl> createVirtualHost() const {
-    absl::Status creation_status = absl::OkStatus();
-    auto vhost = std::make_shared<VirtualHostImpl>(
-        vhost_proto_, global_route_config_, factory_context_, *vhost_stats_scope_, validator_,
-        init_manager_, validate_clusters_, creation_status);
-    if (!creation_status.ok()) {
+    try {
+      absl::Status creation_status = absl::OkStatus();
+      auto vhost = std::make_shared<VirtualHostImpl>(
+          vhost_proto_, global_route_config_, factory_context_, *vhost_stats_scope_, validator_,
+          init_manager_, /*validate_clusters=*/false, creation_status);
+      if (!creation_status.ok()) {
+        ENVOY_LOG(error, "Failed to initialize deferred virtual host '{}': {}", vhost_proto_.name(),
+                  creation_status.message());
+        return nullptr;
+      }
+      return vhost;
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(error, "Exception initializing deferred virtual host '{}': {}", vhost_proto_.name(),
+                e.what());
       return nullptr;
     }
-    return vhost;
   }
 
   const envoy::config::route::v3::VirtualHost vhost_proto_;
@@ -560,7 +569,7 @@ public:
    * @param eager_vhost the eagerly instantiated VirtualHostImpl shared pointer.
    */
   explicit DomainEntry(VirtualHostImplSharedPtr eager_vhost)
-      : active_vhost_ref_(std::move(eager_vhost)), active_vhost_(active_vhost_ref_.get()) {}
+      : active_vhost_(eager_vhost.get()), active_vhost_ref_(std::move(eager_vhost)) {}
 
   /**
    * Returns the active VirtualHostImpl, instantiating and atomically publishing it via

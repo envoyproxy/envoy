@@ -4055,7 +4055,7 @@ virtual_hosts:
   auto mock_cluster_specifier_plugin = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
 
   EXPECT_CALL(factory, createClusterSpecifierPlugin(_, _))
-      .WillOnce(Return(mock_cluster_specifier_plugin));
+      .WillRepeatedly(Return(mock_cluster_specifier_plugin));
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
@@ -11781,6 +11781,9 @@ public:
 };
 
 TEST_F(PerFilterConfigsInitManagerTest, InitManagerIsPropagatedToEveryLevel) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "false"}});
   const std::string yaml = R"EOF(
 typed_per_filter_config:
   test.filter:
@@ -11825,6 +11828,79 @@ virtual_hosts:
   // configuration rather than the one of the server factory context.
   EXPECT_THAT(factory_.init_managers_,
               ElementsAre(&init_manager_, &init_manager_, &init_manager_, &init_manager_));
+}
+
+TEST_F(PerFilterConfigsInitManagerTest, InitManagerIsIsolatedDuringDeferredProbeValidation) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+  const std::string yaml = R"EOF(
+typed_per_filter_config:
+  test.filter:
+    "@type": type.googleapis.com/google.protobuf.Timestamp
+    value:
+      seconds: 1
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    typed_per_filter_config:
+      test.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+        value:
+          seconds: 2
+    routes:
+      - match: { prefix: "/" }
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+            value:
+              seconds: 3
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+                typed_per_filter_config:
+                  test.filter:
+                    "@type": type.googleapis.com/google.protobuf.Timestamp
+                    value:
+                      seconds: 4
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+
+  auto config_status =
+      ConfigImpl::create(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                         ProtobufMessage::getNullValidationVisitor(), init_manager_, true);
+  EXPECT_TRUE(config_status.ok());
+  auto config = std::move(config_status.value());
+
+  // During route configuration creation with deferred virtual hosts:
+  // 1. Top-level typed_per_filter_config uses &init_manager_.
+  // 2. Probe validation of the virtual host, route, and weighted cluster uses an isolated throwaway
+  // Init::Manager.
+  ASSERT_EQ(factory_.init_managers_.size(), 4);
+  EXPECT_EQ(factory_.init_managers_[0], &init_manager_);
+  EXPECT_NE(factory_.init_managers_[1], &init_manager_);
+  EXPECT_NE(factory_.init_managers_[2], &init_manager_);
+  EXPECT_NE(factory_.init_managers_[3], &init_manager_);
+
+  // All 3 probe init managers should be the same isolated manager instance.
+  EXPECT_EQ(factory_.init_managers_[1], factory_.init_managers_[2]);
+  EXPECT_EQ(factory_.init_managers_[2], factory_.init_managers_[3]);
+
+  // Now simulate on-demand lazy inflation on a worker thread.
+  auto headers = genHeaders("bar", "/", "GET");
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  auto route = config->route(headers, stream_info, 0);
+  EXPECT_NE(route.route, nullptr);
+
+  // Lazy inflation should have instantiated the virtual host, route, and weighted cluster filter
+  // configs attaching them to &init_manager_.
+  ASSERT_EQ(factory_.init_managers_.size(), 7);
+  EXPECT_EQ(factory_.init_managers_[4], &init_manager_);
+  EXPECT_EQ(factory_.init_managers_[5], &init_manager_);
+  EXPECT_EQ(factory_.init_managers_[6], &init_manager_);
 }
 
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {
@@ -12953,7 +13029,7 @@ virtual_hosts:
   // Match exact domain
   Http::TestRequestHeaderMapImpl headers_exact = genHeaders("exact.example.com", "/exact", "GET");
   const auto route_exact = config.route(headers_exact, 0);
-  ASSERT_NE(nullptr, route_exact);
+  ASSERT_NE(nullptr, route_exact.route);
   EXPECT_EQ("cluster_exact", route_exact->routeEntry()->clusterName());
   EXPECT_EQ("vhost_exact", route_exact->virtualHost().name());
 
@@ -12961,7 +13037,7 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl headers_wildcard =
       genHeaders("foo.wildcard.com", "/wildcard", "GET");
   const auto route_wildcard = config.route(headers_wildcard, 0);
-  ASSERT_NE(nullptr, route_wildcard);
+  ASSERT_NE(nullptr, route_wildcard.route);
   EXPECT_EQ("cluster_wildcard", route_wildcard->routeEntry()->clusterName());
   EXPECT_EQ("vhost_wildcard", route_wildcard->virtualHost().name());
 }
@@ -12993,19 +13069,19 @@ virtual_hosts:
   // Initial lookup triggers lazy compilation and CAS publication
   Http::TestRequestHeaderMapImpl headers1 = genHeaders("app1.example.com", "/foo", "GET");
   const auto route1_first = config.route(headers1, 0);
-  ASSERT_NE(nullptr, route1_first);
+  ASSERT_NE(nullptr, route1_first.route);
   EXPECT_EQ("cluster1", route1_first->routeEntry()->clusterName());
   EXPECT_EQ("vhost1", route1_first->virtualHost().name());
 
   // Subsequent lookup hits the cached active_vhost_ pointer
   const auto route1_second = config.route(headers1, 0);
-  ASSERT_NE(nullptr, route1_second);
+  ASSERT_NE(nullptr, route1_second.route);
   EXPECT_EQ(&route1_first->virtualHost(), &route1_second->virtualHost());
 
   // App2 on-demand inflation
   Http::TestRequestHeaderMapImpl headers2 = genHeaders("app2.example.com", "/bar", "GET");
   const auto route2 = config.route(headers2, 0);
-  ASSERT_NE(nullptr, route2);
+  ASSERT_NE(nullptr, route2.route);
   EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
   EXPECT_EQ("vhost2", route2->virtualHost().name());
 }
@@ -13061,7 +13137,7 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("service.sub.example.com", "/", "GET");
     const auto route = config.route(headers, 0);
-    ASSERT_NE(nullptr, route);
+    ASSERT_NE(nullptr, route.route);
     EXPECT_EQ("vhost_exact", route->virtualHost().name());
   }
 
@@ -13069,13 +13145,13 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("foo.sub.example.com", "/", "GET");
     const auto route = config.route(headers, 0);
-    ASSERT_NE(nullptr, route);
+    ASSERT_NE(nullptr, route.route);
     EXPECT_EQ("vhost_long_suffix", route->virtualHost().name());
   }
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("foo.example.com", "/", "GET");
     const auto route = config.route(headers, 0);
-    ASSERT_NE(nullptr, route);
+    ASSERT_NE(nullptr, route.route);
     EXPECT_EQ("vhost_short_suffix", route->virtualHost().name());
   }
 
@@ -13083,13 +13159,13 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("service.sub.org", "/", "GET");
     const auto route = config.route(headers, 0);
-    ASSERT_NE(nullptr, route);
+    ASSERT_NE(nullptr, route.route);
     EXPECT_EQ("vhost_long_prefix", route->virtualHost().name());
   }
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("service.net", "/", "GET");
     const auto route = config.route(headers, 0);
-    ASSERT_NE(nullptr, route);
+    ASSERT_NE(nullptr, route.route);
     EXPECT_EQ("vhost_short_prefix", route->virtualHost().name());
   }
 
@@ -13097,7 +13173,7 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("unmatched.other.org", "/", "GET");
     const auto route = config.route(headers, 0);
-    ASSERT_NE(nullptr, route);
+    ASSERT_NE(nullptr, route.route);
     EXPECT_EQ("vhost_default", route->virtualHost().name());
   }
 }
@@ -13137,7 +13213,7 @@ virtual_hosts:
         Http::TestRequestHeaderMapImpl headers =
             genHeaders("concurrent.example.com", "/test", "GET");
         const auto route = config.route(headers, 0);
-        if (route != nullptr && route->routeEntry()->clusterName() == "concurrent_cluster" &&
+        if (route.route != nullptr && route->routeEntry()->clusterName() == "concurrent_cluster" &&
             route->virtualHost().name() == "concurrent_vhost") {
           success_count.fetch_add(1, std::memory_order_relaxed);
         }
@@ -13175,7 +13251,7 @@ virtual_hosts:
   // 1. Initial request inflates the virtual host
   Http::TestRequestHeaderMapImpl headers = genHeaders("evictable.example.com", "/test", "GET");
   const auto route1 = config.route(headers, 0);
-  ASSERT_NE(nullptr, route1);
+  ASSERT_NE(nullptr, route1.route);
   EXPECT_EQ("evictable_vhost", route1->virtualHost().name());
 
   // 2. Idle eviction attempt with current_time_ms < last_access + idle_ttl should not evict
@@ -13189,7 +13265,7 @@ virtual_hosts:
 
   // 4. Subsequent request transparently re-inflates the virtual host on demand
   const auto route2 = config.route(headers, 0);
-  ASSERT_NE(nullptr, route2);
+  ASSERT_NE(nullptr, route2.route);
   EXPECT_EQ("evictable_vhost", route2->virtualHost().name());
   EXPECT_EQ("evictable_cluster", route2->routeEntry()->clusterName());
 }
@@ -13235,10 +13311,10 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl h2 = genHeaders("vhost2.example.com", "/", "GET");
   Http::TestRequestHeaderMapImpl h3 = genHeaders("vhost3.example.com", "/", "GET");
   Http::TestRequestHeaderMapImpl h4 = genHeaders("vhost4.example.com", "/", "GET");
-  EXPECT_NE(nullptr, config.route(h1, 0));
-  EXPECT_NE(nullptr, config.route(h2, 0));
-  EXPECT_NE(nullptr, config.route(h3, 0));
-  EXPECT_NE(nullptr, config.route(h4, 0));
+  EXPECT_NE(nullptr, config.route(h1, 0).route);
+  EXPECT_NE(nullptr, config.route(h2, 0).route);
+  EXPECT_NE(nullptr, config.route(h3, 0).route);
+  EXPECT_NE(nullptr, config.route(h4, 0).route);
 
   // 2. Budgeted sweep: inspect 2 entries at a time with cursor
   size_t cursor = 0;
@@ -13253,10 +13329,207 @@ virtual_hosts:
   EXPECT_EQ(0, cursor); // Cursor wrapped back to 0
 
   // 3. Transparently re-inflate all hosts on subsequent traffic
-  EXPECT_NE(nullptr, config.route(h1, 0));
-  EXPECT_NE(nullptr, config.route(h2, 0));
-  EXPECT_NE(nullptr, config.route(h3, 0));
-  EXPECT_NE(nullptr, config.route(h4, 0));
+  EXPECT_NE(nullptr, config.route(h1, 0).route);
+  EXPECT_NE(nullptr, config.route(h2, 0).route);
+  EXPECT_NE(nullptr, config.route(h3, 0).route);
+  EXPECT_NE(nullptr, config.route(h4, 0).route);
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostValidationRejectsInvalidRoute) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+
+  // Virtual host with a missing/unknown cluster when validate_clusters is true
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: valid_vhost
+  domains: ["valid.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "existing_cluster" }
+- name: invalid_vhost
+  domains: ["invalid.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "non_existent_cluster" }
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"existing_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  // Ingestion should fail immediately because invalid_vhost references a non-existent cluster
+  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_.message(),
+              testing::HasSubstr("route: unknown cluster 'non_existent_cluster'"));
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostValidationRejectsInvalidMatcher) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: matcher_vhost
+  domains: ["matcher.example.com"]
+  routes:
+  - match: { safe_regex: { regex: "[" } }
+    route: { cluster: "some_cluster" }
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some_cluster"}, {});
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                         true, creation_status_),
+                          EnvoyException, "missing ]");
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostValidationRejectsMissingClusterSpecifierPlugin) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: vhost
+  domains: ["csp.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { inline_cluster_specifier_plugin: { extension: { name: "custom", typed_config: { "@type": "type.googleapis.com/google.protobuf.Struct" } } } }
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostValidationIsolatesInitManagerAndStats) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: isolated_vhost
+  domains: ["isolated.example.com"]
+  virtual_clusters:
+  - name: cluster1
+    headers:
+    - name: ":path"
+      string_match:
+        prefix: "/cluster"
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_isolated" }
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster_isolated"}, {});
+
+  // Ingest config
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_OK(creation_status_);
+
+  // Verify that prior to any request, the virtual host remains dormant (activeVirtualHost() ==
+  // nullptr)
+  EXPECT_EQ(1, config.totalDomainEntries());
+
+  // First request should lazily instantiate the virtual host and succeed
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("isolated.example.com", "/cluster/test", "GET");
+  const auto route = config.route(headers, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("isolated_vhost", route->virtualHost().name());
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostFastPathBypassesProbeValidation) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: fast_path_vhost
+  domains: ["fast-path.example.com"]
+  routes:
+  - match: { prefix: "/api" }
+    route: { cluster: "fast_path_cluster" }
+  - match: { path: "/exact" }
+    route: { cluster: "fast_path_cluster" }
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"fast_path_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_OK(creation_status_);
+  EXPECT_EQ(1, config.totalDomainEntries());
+
+  // Lazy inflation on request
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("fast-path.example.com", "/api/v1/test", "GET");
+  const auto route = config.route(headers, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("fast_path_vhost", route->virtualHost().name());
+  EXPECT_EQ("fast_path_cluster", route->routeEntry()->clusterName());
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostSelectiveProbeRejectsInvalidPolicy) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+
+  // Virtual host with conflicting rewrite policies (should trigger probe validation and be
+  // rejected)
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: invalid_policy_vhost
+  domains: ["invalid-policy.example.com"]
+  routes:
+  - match: { prefix: "/test" }
+    route:
+      cluster: "some_cluster"
+      prefix_rewrite: "/rewritten"
+      regex_rewrite:
+        pattern: { google_re2: {}, regex: "^/test/(.*)" }
+        substitution: "/\\1"
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_.message(),
+              testing::HasSubstr(
+                  "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy"));
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostSelectiveProbeClusterValidation) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: vhost_valid
+  domains: ["valid.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_exists" }
+- name: vhost_missing_cluster
+  domains: ["missing.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_missing" }
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster_exists"}, {});
+
+  // With validate_clusters = true, vhost_missing_cluster must be probed and fail ingestion
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_.message(),
+              testing::HasSubstr("route: unknown cluster 'cluster_missing'"));
 }
 
 } // namespace
