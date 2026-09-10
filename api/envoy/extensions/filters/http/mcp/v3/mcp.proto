@@ -156,7 +156,6 @@ message Mcp {
 
   // MCP protocol revisions accepted by the filter.
   ProtocolVersions protocol_versions = 10;
-
 }
 
 // Parser configuration with method-specific rules.
