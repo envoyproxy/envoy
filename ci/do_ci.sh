@@ -42,6 +42,117 @@ _realpath() {
 
 ENVOY_DOCS_PATH="${ENVOY_DOCS_PATH:-./docs}"
 ENVOY_DOCS_PATH="$(_realpath "$ENVOY_DOCS_PATH")"
+readonly LOCKFILE_PATHSPEC=':(glob)**/MODULE.bazel.lock'
+readonly -a REGISTRY_BAZELRC_FILES=(
+    ".bazelrc"
+    "api/.bazelrc"
+    "bazel/tests/external/.bazelrc"
+)
+
+lockfiles_check() {
+    lockfiles_generate
+    if [[ -n "$(git status --porcelain -- "$LOCKFILE_PATHSPEC")" ]]; then
+        git --no-pager diff -- "$LOCKFILE_PATHSPEC"
+        echo >&2
+        echo "Lockfiles are not in sync, please run: ci/do_ci.sh lockfiles" >&2
+        echo >&2
+        exit 1
+    fi
+}
+
+lockfiles_generate() {
+    local module_dir
+    for module_dir in . "$ENVOY_DOCS_PATH" api/ mobile/ bazel/tests/external/; do
+        pushd "$module_dir" > /dev/null
+        bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --lockfile_mode=update
+        popd > /dev/null
+    done
+}
+
+registry_current_hash() {
+    local bazelrc
+    local hash
+    local current_hash=""
+
+    for bazelrc in "${REGISTRY_BAZELRC_FILES[@]}"; do
+        hash="$(sed -n -E \
+            's#^common --registry=https://raw\.githubusercontent\.com/envoyproxy/bazel-registry/([0-9a-f]+)$#\1#p' \
+            "$bazelrc")"
+        if [[ -z "${hash}" ]]; then
+            echo "Failed to determine current registry hash from ${bazelrc}" >&2
+            return 1
+        fi
+        if [[ -n "${current_hash}" && "${current_hash}" != "${hash}" ]]; then
+            echo "Registry hash mismatch: ${bazelrc} has ${hash}, expected ${current_hash}" >&2
+            return 1
+        fi
+        current_hash="${hash}"
+    done
+
+    echo "${current_hash}"
+}
+
+registry_check() {
+    local registry_repo="${ENVOY_REGISTRY_REPO:-https://github.com/envoyproxy/bazel-registry}"
+    local registry_branch="${ENVOY_REGISTRY_BRANCH:-main}"
+    local registry_hash
+    local registry_dir
+    local tags
+    local version
+
+    registry_hash="$(registry_current_hash)"
+    version="$(cat VERSION.txt)"
+
+    registry_dir="$(mktemp -d)"
+    # shellcheck disable=SC2064
+    trap "rm -rf '${registry_dir}'" RETURN
+    # Blobless bare clone: history/tags without file contents.
+    git clone --quiet --bare --filter=blob:none "${registry_repo}" "${registry_dir}"
+
+    if ! git -c safe.bareRepository=all -C "${registry_dir}" \
+        cat-file -e "${registry_hash}^{commit}" 2>/dev/null; then
+        echo "Registry commit ${registry_hash} not found in ${registry_repo}" >&2
+        return 1
+    fi
+    if ! git -c safe.bareRepository=all -C "${registry_dir}" \
+        merge-base --is-ancestor "${registry_hash}" "${registry_branch}"; then
+        echo "Registry commit ${registry_hash} is not an ancestor of ${registry_branch}" >&2
+        return 1
+    fi
+    echo "Registry commit ${registry_hash} is an ancestor of ${registry_branch}"
+
+    tags="$(git -c safe.bareRepository=all -C "${registry_dir}" tag --points-at "${registry_hash}")"
+    if [[ -n "${tags}" ]]; then
+        echo "Registry commit ${registry_hash} is tagged: ${tags//$'\n'/ }"
+        return 0
+    fi
+    if [[ "${version}" == *-dev ]]; then
+        echo "WARNING: registry commit ${registry_hash} is not a tagged version (ok for ${version})" >&2
+        return 0
+    fi
+    echo "Registry commit ${registry_hash} is not a tagged version, required for release ${version}" >&2
+    return 1
+}
+
+registry_bump() {
+    local registry_hash="$1"
+    local bazelrc
+    local old_hash
+
+    old_hash="$(registry_current_hash)"
+
+    for bazelrc in "${REGISTRY_BAZELRC_FILES[@]}"; do
+        if [[ "${old_hash}" == "${registry_hash}" ]]; then
+            echo "${bazelrc}: ${old_hash} -> ${registry_hash} (unchanged)"
+            continue
+        fi
+
+        sed -i -E \
+            "s#^(common --registry=https://raw\\.githubusercontent\\.com/envoyproxy/bazel-registry/)[0-9a-f]+\$#\1${registry_hash}#" \
+            "$bazelrc"
+        echo "${bazelrc}: ${old_hash} -> ${registry_hash}"
+    done
+}
 
 setup_clang_toolchain() {
     local config
@@ -688,6 +799,10 @@ case $CI_TARGET in
               //tools/dependency:validate_reachability_test
         echo "dependency graph structure..."
         "${ENVOY_SRCDIR}/tools/dependency/validate_graph_structure.sh"
+        echo "Check bazel registry ..."
+        registry_check
+        echo "Check bazel lockfiles ..."
+        lockfiles_check
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
@@ -902,13 +1017,12 @@ case $CI_TARGET in
         bazel info "${BAZEL_BUILD_OPTIONS[@]}"
         ;;
 
-    lockfiles|lockfiles.regenerate)
-        # TODO(phlax): Add other lockfiles here and a check path
-        for module_dir in . "$ENVOY_DOCS_PATH" api/ mobile/ bazel/tests/external/; do
-            pushd "$module_dir"
-            bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --lockfile_mode=update
-            popd
-        done
+    lockfiles|lockfiles.regenerate|lockfiles.check)
+        if [[ "$CI_TARGET" == "lockfiles.check" ]]; then
+            lockfiles_check
+        else
+            lockfiles_generate
+        fi
         ;;
 
     msan)
@@ -947,6 +1061,29 @@ case $CI_TARGET in
               @envoy_repo//:publish \
               -- --repo="$ENVOY_REPO" \
                  "${PUBLISH_ARGS[@]}"
+        ;;
+
+    registry|registry.check)
+        if [[ "$CI_TARGET" == "registry.check" ]]; then
+            registry_check
+            exit 0
+        fi
+        if [[ -n "$ENVOY_REGISTRY_HASH" ]]; then
+            registry_hash="$ENVOY_REGISTRY_HASH"
+        else
+            registry_hash="$(
+                git ls-remote \
+                    "${ENVOY_REGISTRY_REPO:-https://github.com/envoyproxy/bazel-registry}" \
+                    refs/heads/main \
+                    | cut -f1
+            )"
+        fi
+        if [[ -z "${registry_hash}" ]]; then
+            echo "Failed to determine Envoy bazel-registry hash" >&2
+            exit 1
+        fi
+        registry_bump "$registry_hash"
+        lockfiles_generate
         ;;
 
     release|release.server_only|release.test_only)
