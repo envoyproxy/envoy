@@ -644,6 +644,13 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
       }
     }
   }
+
+  // Protobuf aborts printing a Value with no kind, so null takes the place of a cleared one.
+  if (ancestor_is_sensitive && descriptor->full_name() == "google.protobuf.Value" &&
+      reflection->GetOneofFieldDescriptor(*reflectable_message, descriptor->oneof_decl(0)) ==
+          nullptr) {
+    reflection->SetEnumValue(&(*reflectable_message), descriptor->FindFieldByName("null_value"), 0);
+  }
 }
 
 } // namespace

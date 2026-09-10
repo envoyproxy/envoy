@@ -33,6 +33,19 @@ bool hasSpecialRepresentation(const Protobuf::Message& message) {
   }
 }
 
+// Whether `field` holds a Value with no kind.
+bool holdsKindlessValue(const Protobuf::Message& message, const Field& field) {
+  if (field.cpp_type() != Field::CPPTYPE_MESSAGE || field.is_repeated()) {
+    return false;
+  }
+  const Protobuf::Descriptor& descriptor = *field.message_type();
+  if (descriptor.full_name() != "google.protobuf.Value") {
+    return false;
+  }
+  const Protobuf::Message& value = message.GetReflection()->GetMessage(message, &field);
+  return value.GetReflection()->GetOneofFieldDescriptor(value, descriptor.oneof_decl(0)) == nullptr;
+}
+
 constexpr absl::string_view RedactedText = "[redacted]";
 
 const std::string& redactedBase64() {
@@ -181,6 +194,9 @@ void MessageStreamer::emitNextField(Frame& frame) {
       (frame.ancestor_is_sensitive_ || MessageUtil::isSensitiveField(field));
   // A cleared field is unset, so it drops out of the output instead of printing a default.
   if (frame.field_is_sensitive_ && redactionClears(field)) {
+    return;
+  }
+  if (!frame.field_is_sensitive_ && holdsKindlessValue(frame.message_, field)) {
     return;
   }
 
@@ -372,7 +388,7 @@ void MessageStreamer::emitSpecialRepresentation(const Protobuf::Message& message
   const ProtobufTypes::MessagePtr redacted = is_sensitive ? redactedCopy(message, true) : nullptr;
   const absl::StatusOr<std::string> json =
       MessageUtil::getJsonStringFromMessage(redacted == nullptr ? message : *redacted);
-  if (json.ok()) {
+  if (json.ok() && !json->empty()) {
     level.addRawJson(*json);
   } else {
     level.addNull();

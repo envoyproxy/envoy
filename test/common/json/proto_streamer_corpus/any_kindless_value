@@ -1,0 +1,34 @@
+any {
+  [type.googleapis.com/google.protobuf.Value] {
+    // TODO: Remove this when protobuf stops aborting
+    null_value: NULL_VALUE
+  }
+}
+repeated_any {
+  [type.googleapis.com/google.protobuf.Value] {
+    number_value: 1.5
+  }
+}
+sensitive {
+  insensitive_any {
+    [type.googleapis.com/google.protobuf.Value] {
+      // TODO: Remove this when protobuf stops aborting
+      null_value: NULL_VALUE
+    }
+  }
+  sensitive_any {
+    [type.googleapis.com/google.protobuf.Value] {
+      string_value: "secret"
+    }
+  }
+  insensitive_repeated_any {
+    [type.googleapis.com/test.common.json.TestMessage] {
+      any {
+        [type.googleapis.com/google.protobuf.Value] {
+          // TODO: Remove this when protobuf stops aborting
+          null_value: NULL_VALUE
+        }
+      }
+    }
+  }
+}

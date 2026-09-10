@@ -1,4 +1,5 @@
 #include <array>
+#include <cmath>
 #include <tuple>
 
 #include "source/common/buffer/buffer_impl.h"
@@ -67,12 +68,28 @@ void removeUnserializableUtf8Strings(Protobuf::Message& message,
 
 void makeComparable(Protobuf::Message& message);
 
+// A missing kind aborts the printer as an Any payload,
+// fixed in protobuf fabd22a45435ac239dd86371f8814a4ad74fe123.
+void makeValueComparable(Protobuf::Value& value) {
+  if (value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+    value.set_null_value(Protobuf::NULL_VALUE);
+  } else if (value.kind_case() == Protobuf::Value::kNumberValue &&
+             !std::isfinite(value.number_value())) {
+    value.set_number_value(0);
+  }
+}
+
 void makeAnyComparable(Protobuf::Any& any) {
   ProtobufTypes::MessagePtr packed = ProtobufMessage::Helper::typeUrlToMessage(any.type_url());
   if (packed == nullptr) {
     return;
   }
   std::ignore = packed->ParsePartialFromString(any.value());
+  // The mutator only sees an Any's payload as bytes, so the registration below never reaches one.
+  if (Protobuf::Value* value = Protobuf::DynamicCastMessage<Protobuf::Value>(packed.get());
+      value != nullptr) {
+    makeValueComparable(*value);
+  }
   makeComparable(*packed);
   // Writing back what parsed makes the payload well formed.
   any.set_value(packed->SerializeAsString());
@@ -182,6 +199,10 @@ DEFINE_PROTO_FUZZER(const TestMessage& input) {
         }
         typed_struct->set_type_url(KnownTypeUrls[seed % KnownTypeUrls.size()]);
       }};
+
+  ABSL_ATTRIBUTE_UNUSED static protobuf_mutator::libfuzzer::PostProcessorRegistration<
+      Protobuf::Value>
+      value_kind = {[](Protobuf::Value* value, unsigned int) { makeValueComparable(*value); }};
 
   for (const bool redact : {false, true}) {
     checkAgainstPrinter(input, redact);

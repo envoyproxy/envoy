@@ -561,6 +561,21 @@ TEST_F(ProtobufUtilityTest, IsSensitiveField) {
   EXPECT_FALSE(MessageUtil::isSensitiveField(*descriptor.FindFieldByName("insensitive_string")));
 }
 
+TEST_F(ProtobufUtilityTest, RedactValue) {
+  Protobuf::Struct structured;
+  (*structured.mutable_fields())["number"].set_number_value(1.5);
+  (*structured.mutable_fields())["text"].set_string_value("This field should be redacted.");
+  envoy::test::Sensitive actual;
+  std::ignore = actual.mutable_sensitive_any()->PackFrom(structured);
+
+  MessageUtil::redact(actual);
+
+  Protobuf::Struct redacted;
+  ASSERT_TRUE(actual.sensitive_any().UnpackTo(&redacted));
+  EXPECT_EQ(Protobuf::Value::kNullValue, redacted.fields().at("number").kind_case());
+  EXPECT_EQ("[redacted]", redacted.fields().at("text").string_value());
+}
+
 // Fields that are values in a sensitive map should be redacted.
 TEST_F(ProtobufUtilityTest, RedactMap) {
   envoy::test::Sensitive actual, expected;

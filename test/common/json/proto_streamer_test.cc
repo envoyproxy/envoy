@@ -206,6 +206,13 @@ TEST(MessageStreamerTest, DynamicMessages) {
   expectSameJson(*dynamic);
 }
 
+TEST(MessageStreamerTest, ValueWithNoKindIsLeftOut) {
+  TestMessage message;
+  message.mutable_value();
+  message.set_bool_value(true);
+  expectSameJson(message);
+}
+
 TEST(MessageStreamerTest, Structs) {
   TestMessage message;
   (*message.mutable_structured()->mutable_fields())["key"].set_string_value("value");
@@ -306,6 +313,17 @@ value:
 )EOF",
                             *sensitive.mutable_sensitive_typed_struct());
   expectSameRedactedJson(sensitive);
+}
+
+TEST(MessageStreamerTest, RedactedValueIsNull) {
+  envoy::test::Sensitive sensitive;
+  Protobuf::Value value;
+  value.set_number_value(0.25);
+  std::ignore = sensitive.mutable_sensitive_any()->PackFrom(value);
+  EXPECT_EQ(
+      R"([{"sensitive_any":{"@type":"type.googleapis.com/google.protobuf.Value","value":null}}])",
+      stream(sensitive, {.preserve_proto_field_names_ = true, .redact_sensitive_fields_ = true})
+          .first);
 }
 
 TEST(MessageStreamerTest, EmitsInPieces) {
