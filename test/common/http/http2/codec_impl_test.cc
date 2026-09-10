@@ -4556,9 +4556,9 @@ TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProc
   EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(1, 3));
 }
 
-// Regression test for reentrant encoding during connection-level low watermark callbacks. This
-// test intentionally fails until onUnderlyingConnectionBelowWriteBufferLowWatermark() tolerates an
-// encode operation reordering active_streams_ while it is traversing the list.
+// Regression test for reentrant encoding during connection-level low watermark callbacks. The
+// callback fanout must tolerate an encode operation reordering active_streams_ while still
+// notifying every stream exactly once in the original LRU order.
 TEST_P(Http2CodecImplTest, LowWatermarkCallbackCanReorderActiveStreams) {
   initialize();
 
@@ -4601,6 +4601,7 @@ TEST_P(Http2CodecImplTest, LowWatermarkCallbackCanReorderActiveStreams) {
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark());
   EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
   client_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1, 5, 3));
   driveToCompletion();
 }
 
