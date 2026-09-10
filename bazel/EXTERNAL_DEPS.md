@@ -19,9 +19,11 @@ build process.
    `deps` attribute.
 3. `bazel test //test/...`
 
-## External CMake (preferred)
+## External CMake
 
-This is the preferred style of adding dependencies that use CMake for their build system.
+Dependencies that have to be built with CMake are discouraged - they are slow to build, harder to
+cache and do not integrate with the Bazel toolchain configuration. Prefer a native Bazel build,
+and only fall back to CMake if there is no viable alternative.
 
 1. Add a `bazel_dep` for the module in [`MODULE.bazel`](../MODULE.bazel) and add or update its
    entry in the [Envoy Bazel registry](https://github.com/envoyproxy/bazel-registry). The registry
