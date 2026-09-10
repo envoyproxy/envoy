@@ -136,6 +136,8 @@ struct Response {
 };
 
 using ResponsePtr = std::unique_ptr<Response>;
+using ResponseSharedPtr = std::shared_ptr<Response>;
+using ResponseConstSharedPtr = std::shared_ptr<const Response>;
 
 /**
  * Async callbacks used during check() calls.

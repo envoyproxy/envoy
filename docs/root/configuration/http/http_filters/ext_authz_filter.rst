@@ -176,6 +176,19 @@ In this configuration:
 This pattern provides clean separation between the decision logic (in the Lua filter) and the authorization
 enforcement (in ext_authz), while ensuring the ext_authz filter is only instantiated and invoked when needed.
 
+ExtAuthz Caching
+----------------
+.. _config_http_filters_ext_authz_caching:
+
+The External Authorization filter supports caching authorization decisions to bypass the external authorization service call.
+
+To enable this, configure the :ref:`cache <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.cache>` field with a cache extension configuration. The extension must implement the ``envoy.filters.http.ext_authz.cache`` interface.
+
+When caching is enabled, the filter will:
+1. Perform a cache lookup using the request attributes.
+2. If a cache hit occurs, the filter will bypass the external service call and apply the cached response (OK with mutations, Denied, or Error) directly.
+3. If a cache miss occurs, the filter will proceed with the live call to the external authorization service and, upon receiving a response, will populate the cache with the response.
+
 Statistics
 ----------
 .. _config_http_filters_ext_authz_stats:
