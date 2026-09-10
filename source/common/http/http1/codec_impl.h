@@ -257,6 +257,11 @@ public:
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return codec_settings_.enable_trailers_; }
   virtual bool sendFullyQualifiedUrl() const { return codec_settings_.send_fully_qualified_url_; }
+#ifndef ENVOY_ENABLE_UHV
+  // Latched value of the `validate_upstream_headers` runtime feature, read once per connection
+  // instead of on every encoded request.
+  bool shouldValidateUpstreamHeaders() const { return validate_upstream_headers_; }
+#endif
   HeaderKeyFormatterOptConstRef formatter() const {
     return makeOptRefFromPtr(encode_only_header_key_formatter_.get());
   }
@@ -323,6 +328,9 @@ protected:
   StreamInfo::BytesMeterSharedPtr bytes_meter_before_stream_;
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
+#ifndef ENVOY_ENABLE_UHV
+  const bool validate_upstream_headers_ = false;
+#endif
 
 private:
   enum class HeaderParsingState { Field, Value, Done };

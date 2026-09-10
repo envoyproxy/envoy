@@ -606,9 +606,7 @@ TEST_P(QuicHttpIntegrationTest, DoNotValidatePseudoHeaders) {
 }
 
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
-  // The test client uses Envoy's HTTP/3 codec, which validates the headers it encodes. Turn that
-  // off so the invalid header reaches the server codec under test.
-  disableCodecHeaderValidation();
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
 
   initialize();
 

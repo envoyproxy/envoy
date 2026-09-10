@@ -20,7 +20,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread_annotations.h"
-#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
@@ -378,7 +377,6 @@ void HttpIntegrationTest::useAccessLog(
 }
 
 HttpIntegrationTest::~HttpIntegrationTest() {
-  Http::HeaderUtility::disable_request_header_validation_for_tests_ = false;
   // Make sure any open streams have been closed. If there's an open stream, the decoder will
   // be out of scope, and so open streams result in writing to freed memory.
   if (codec_client_) {
