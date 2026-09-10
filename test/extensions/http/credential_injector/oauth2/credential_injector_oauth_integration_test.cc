@@ -832,8 +832,8 @@ typed_config:
   oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
   encodeGoodJsonResponseBody();
 
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -883,8 +883,8 @@ typed_config:
   oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
   encodeGoodJsonResponseBody();
 
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
