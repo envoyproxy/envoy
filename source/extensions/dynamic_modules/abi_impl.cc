@@ -39,32 +39,27 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
 }
 
 void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
-                                       envoy_dynamic_module_type_module_buffer message) {
-  absl::string_view message_view(message.ptr, message.length);
+                                       envoy_dynamic_module_type_module_buffer message,
+                                       envoy_dynamic_module_type_module_buffer source_file,
+                                       uint32_t source_line) {
   spdlog::logger& logger = Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules);
-
-  switch (level) {
-  case envoy_dynamic_module_type_log_level_Trace:
-    ENVOY_LOG_TO_LOGGER(logger, trace, "{}", message_view);
-    break;
-  case envoy_dynamic_module_type_log_level_Debug:
-    ENVOY_LOG_TO_LOGGER(logger, debug, "{}", message_view);
-    break;
-  case envoy_dynamic_module_type_log_level_Info:
-    ENVOY_LOG_TO_LOGGER(logger, info, "{}", message_view);
-    break;
-  case envoy_dynamic_module_type_log_level_Warn:
-    ENVOY_LOG_TO_LOGGER(logger, warn, "{}", message_view);
-    break;
-  case envoy_dynamic_module_type_log_level_Error:
-    ENVOY_LOG_TO_LOGGER(logger, error, "{}", message_view);
-    break;
-  case envoy_dynamic_module_type_log_level_Critical:
-    ENVOY_LOG_TO_LOGGER(logger, critical, "{}", message_view);
-    break;
-  default:
-    break;
+  const auto spdlog_level = static_cast<spdlog::level::level_enum>(level);
+  // Ignore Off and any out-of-range value, which also guards spdlog against an invalid level.
+  if (spdlog_level < spdlog::level::trace || spdlog_level > spdlog::level::critical) {
+    return;
   }
+  if (!Envoy::Logger::should_log || spdlog_level < logger.level()) {
+    return;
+  }
+  absl::string_view message_view(message.ptr, message.length);
+  // spdlog reads the source file as a null-terminated C string, so materialize one from the
+  // module-owned buffer before building the source location.
+  const std::string source_file_str =
+      source_file.ptr == nullptr ? std::string() : std::string(source_file.ptr, source_file.length);
+  // Log directly with the module source location. The ENVOY_LOG macros would bake in this file and
+  // line instead.
+  logger.log(spdlog::source_loc{source_file_str.c_str(), static_cast<int>(source_line), ""},
+             spdlog_level, "{}", message_view);
 }
 
 envoy_dynamic_module_type_log_level envoy_dynamic_module_callback_get_log_level() {

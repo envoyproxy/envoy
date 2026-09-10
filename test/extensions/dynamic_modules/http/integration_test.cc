@@ -259,6 +259,42 @@ TEST_P(DynamicModulesIntegrationTest, LogLevel) {
                         .getStringView());
 }
 
+// The log callback reports the module source location of the log statement rather than a location
+// inside Envoy. This exercises each SDK's call-site capture end to end.
+TEST_P(DynamicModulesIntegrationTest, LogReportsModuleSourceLocation) {
+#ifdef __APPLE__
+  if (GetParam() == "go") {
+    GTEST_SKIP() << "Go module deadlocks server teardown on macOS, see #46905";
+  }
+#endif
+  const std::string expected_source_file = GetParam() == "go"    ? "http_integration_test.go"
+                                           : GetParam() == "cpp" ? "http_integration_test.cc"
+                                                                 : "http_integration_test.rs";
+
+  initializeFilter("passthrough");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  Envoy::LogLevelSetter save_levels(spdlog::level::info);
+  Envoy::StartStopRecording recording(Envoy::GetLogSink());
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+
+  // The passthrough filter logs from on_request_headers. That line must carry the module source
+  // location instead of a location inside Envoy.
+  bool found = false;
+  for (const std::string& message : recording.messages()) {
+    if (message.find("on_request_headers called") == std::string::npos) {
+      continue;
+    }
+    found = true;
+    EXPECT_NE(std::string::npos, message.find(expected_source_file)) << message;
+    EXPECT_EQ(std::string::npos, message.find("abi_impl.cc")) << message;
+  }
+  EXPECT_TRUE(found);
+}
+
 // A `direct_response` route is served as a local reply. The module did not send it, so its
 // response callbacks must still run. Regression test for the C++ SDK, which set the same
 // `local_reply_sent_` flag on the local-reply notification that it sets when the module itself

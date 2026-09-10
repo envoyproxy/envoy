@@ -35,5 +35,28 @@ TEST(SdkMocksTest, RefreshRouteClusterIsMockable) {
   handle.refreshRouteCluster();
 }
 
+// Verifies that `DYM_LOG` forwards the caller source location to the handle log method.
+TEST(SdkMocksTest, DymLogForwardsCallerSourceLocation) {
+  testing::StrictMock<MockHttpFilterHandle> handle;
+  EXPECT_CALL(handle, logEnabled(LogLevel::Info)).WillOnce(testing::Return(true));
+  std::source_location captured{};
+  EXPECT_CALL(handle, log(LogLevel::Info, std::string_view("hello 1"), testing::_))
+      .WillOnce([&captured](LogLevel, std::string_view, std::source_location location) {
+        captured = location;
+      });
+  const int expected_line = __LINE__ + 1;
+  DYM_LOG(handle, LogLevel::Info, "hello {}", 1);
+  EXPECT_EQ(expected_line, static_cast<int>(captured.line()));
+  EXPECT_NE(std::string_view::npos,
+            std::string_view(captured.file_name()).find("sdk_mocks_test.cc"));
+}
+
+// Verifies that `DYM_LOG` skips the log call when the level is disabled.
+TEST(SdkMocksTest, DymLogSkipsWhenLevelDisabled) {
+  testing::StrictMock<MockHttpFilterHandle> handle;
+  EXPECT_CALL(handle, logEnabled(LogLevel::Trace)).WillOnce(testing::Return(false));
+  DYM_LOG(handle, LogLevel::Trace, "should not log");
+}
+
 } // namespace DynamicModules
 } // namespace Envoy
