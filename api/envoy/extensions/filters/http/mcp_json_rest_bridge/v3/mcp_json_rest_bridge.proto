@@ -160,9 +160,9 @@ message ServerInfo {
   // The maximum MCP protocol version supported by this MCP endpoint.
   //
   // Supported values are ``2025-11-25`` and ``2026-07-28``. Versions prior
-  //   to ``2025-11-25`` are rejected because the filter unconditionally supports features
-  //   up to ``2025-11-25`` and does not support downgrading below that baseline.
-  // - If not provided: Defaults to ``2025-11-25``.
+  // to ``2025-11-25`` are rejected because the filter unconditionally supports features
+  // up to ``2025-11-25`` and does not support downgrading below that baseline.
+  // If not provided: Defaults to ``2025-11-25``.
   //
   // Example value: "2026-07-28"
   google.protobuf.StringValue max_supported_protocol_version = 1
