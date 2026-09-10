@@ -28,10 +28,8 @@ namespace AiProtocolManager {
 // magnitude below it.
 constexpr uint64_t MaxSafeCount = (uint64_t(1) << 53) - 1;
 
-// Response strings are upstream-controlled; the cap keeps one response from
-// turning into a multi-megabyte metadata value or access-log entry. A string
-// offloaded as an external reference is not a string node and reads as
-// absent.
+// Provider- and client-controlled strings; the cap keeps one record from
+// turning into a multi-megabyte metadata value or access-log entry.
 constexpr size_t MaxStringValueSize = 256;
 
 // Whether a present-but-null object position is benignly absent or malformed.
@@ -49,9 +47,19 @@ std::optional<uint64_t> readCount(const nlohmann::json& json, const std::string&
                                   bool& malformed,
                                   NullPolicy null_policy = NullPolicy::NullIsMalformed);
 
-// Read a non-empty string value of at most MaxStringValueSize; anything else
-// reads as absent.
+// Read a non-empty string of at most MaxStringValueSize; anything else reads as
+// absent, an offloaded external reference included. The overload reads the same
+// value and flags a present but unusable one; null is absent, not malformed.
 std::optional<std::string> readString(const nlohmann::json& json, const std::string& key);
+std::optional<std::string> readString(const nlohmann::json& json, const std::string& key,
+                                      bool& malformed);
+
+// Read a boolean, or an array's direct element count. A present value of the
+// wrong type is malformed; null is absent, which is how these wire formats
+// spell "unset".
+std::optional<bool> readBool(const nlohmann::json& json, const std::string& key, bool& malformed);
+std::optional<uint32_t> readArrayLength(const nlohmann::json& json, const std::string& key,
+                                        bool& malformed);
 
 // Read a nested object, applying the null policy above.
 const nlohmann::json* readObject(const nlohmann::json& json, const std::string& key,

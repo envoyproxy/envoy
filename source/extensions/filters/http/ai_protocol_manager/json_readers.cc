@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
 
 #include <cmath>
+#include <limits>
 
 #include "nlohmann/json.hpp"
 
@@ -54,15 +55,52 @@ std::optional<uint64_t> readCount(const nlohmann::json& json, const std::string&
 }
 
 std::optional<std::string> readString(const nlohmann::json& json, const std::string& key) {
+  bool ignored = false;
+  return readString(json, key, ignored);
+}
+
+std::optional<std::string> readString(const nlohmann::json& json, const std::string& key,
+                                      bool& malformed) {
   const auto it = json.find(key);
-  if (it == json.end() || !it->is_string()) {
+  if (it == json.end() || it->is_null()) {
+    return std::nullopt;
+  }
+  // An offloaded string rides the DOM as a binary node, so it lands here too.
+  if (!it->is_string()) {
+    malformed = true;
     return std::nullopt;
   }
   const auto& value = it->get_ref<const std::string&>();
-  if (value.empty() || value.size() > MaxStringValueSize) {
+  if (value.size() > MaxStringValueSize) {
+    malformed = true;
     return std::nullopt;
   }
-  return value;
+  return value.empty() ? std::nullopt : std::optional<std::string>(value);
+}
+
+std::optional<bool> readBool(const nlohmann::json& json, const std::string& key, bool& malformed) {
+  const auto it = json.find(key);
+  if (it == json.end() || it->is_null()) {
+    return std::nullopt;
+  }
+  if (!it->is_boolean()) {
+    malformed = true;
+    return std::nullopt;
+  }
+  return it->get<bool>();
+}
+
+std::optional<uint32_t> readArrayLength(const nlohmann::json& json, const std::string& key,
+                                        bool& malformed) {
+  const auto it = json.find(key);
+  if (it == json.end() || it->is_null()) {
+    return std::nullopt;
+  }
+  if (!it->is_array() || it->size() > std::numeric_limits<uint32_t>::max()) {
+    malformed = true;
+    return std::nullopt;
+  }
+  return static_cast<uint32_t>(it->size());
 }
 
 const nlohmann::json* readObject(const nlohmann::json& json, const std::string& key,

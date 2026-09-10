@@ -1,6 +1,5 @@
 #include "source/extensions/filters/ai/request_info/request_info_extractor.h"
 
-#include <limits>
 #include <string>
 #include <utility>
 
@@ -18,14 +17,15 @@ namespace RequestInfo {
 
 using HttpFilters::AiProtocolManager::ApiProtocol;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
+using HttpFilters::AiProtocolManager::MaxStringValueSize;
 using HttpFilters::AiProtocolManager::NullPolicy;
+using HttpFilters::AiProtocolManager::readArrayLength;
+using HttpFilters::AiProtocolManager::readBool;
 using HttpFilters::AiProtocolManager::readCount;
 using HttpFilters::AiProtocolManager::readObject;
+using HttpFilters::AiProtocolManager::readString;
 
 namespace {
-
-// Client-controlled strings; the cap keeps the published record small.
-constexpr size_t MaxModelBytes = 256;
 
 struct KeyValues {
   const std::string Model{"model"};
@@ -43,48 +43,7 @@ struct KeyValues {
 };
 using Keys = ConstSingleton<KeyValues>;
 
-// Null reads as absent throughout: these APIs document it as "unset".
-
-std::optional<std::string> readString(const nlohmann::json& json, const std::string& key,
-                                      bool& malformed) {
-  const auto it = json.find(key);
-  if (it == json.end() || it->is_null()) {
-    return std::nullopt;
-  }
-  // An offloaded string is a binary node, so it lands here too.
-  if (!it->is_string() || it->get_ref<const std::string&>().size() > MaxModelBytes) {
-    malformed = true;
-    return std::nullopt;
-  }
-  const std::string& value = it->get_ref<const std::string&>();
-  return value.empty() ? std::nullopt : std::optional<std::string>(value);
-}
-
-std::optional<bool> readBool(const nlohmann::json& json, const std::string& key, bool& malformed) {
-  const auto it = json.find(key);
-  if (it == json.end() || it->is_null()) {
-    return std::nullopt;
-  }
-  if (!it->is_boolean()) {
-    malformed = true;
-    return std::nullopt;
-  }
-  return it->get<bool>();
-}
-
-std::optional<uint32_t> readArrayLength(const nlohmann::json& json, const std::string& key,
-                                        bool& malformed) {
-  const auto it = json.find(key);
-  if (it == json.end() || it->is_null()) {
-    return std::nullopt;
-  }
-  if (!it->is_array() || it->size() > std::numeric_limits<uint32_t>::max()) {
-    malformed = true;
-    return std::nullopt;
-  }
-  return static_cast<uint32_t>(it->size());
-}
-
+// These APIs document null as "unset", so a null limit is absent, not malformed.
 std::optional<uint64_t> readLimit(const nlohmann::json& json, const std::string& key,
                                   bool& malformed) {
   return readCount(json, key, malformed, NullPolicy::AllowNullAsAbsent);
@@ -154,7 +113,7 @@ void readGeminiTarget(absl::string_view path, RequestAttributes& attrs) {
   } else {
     return;
   }
-  if (model.size() > MaxModelBytes) {
+  if (model.size() > MaxStringValueSize) {
     attrs.malformed = true;
     return;
   }

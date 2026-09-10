@@ -1,6 +1,7 @@
 #include <string>
 
 #include "source/extensions/filters/ai/request_info/request_info_extractor.h"
+#include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 
 #include "absl/strings/string_view.h"
@@ -16,8 +17,7 @@ namespace {
 using HttpFilters::AiProtocolManager::ApiProtocol;
 using HttpFilters::AiProtocolManager::apiProtocolName;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
-
-constexpr size_t MaxModelBytes = 256;
+using HttpFilters::AiProtocolManager::MaxStringValueSize;
 
 nlohmann::json parse(const std::string& json) {
   nlohmann::json result = nlohmann::json::parse(json, nullptr, /*allow_exceptions=*/false);
@@ -147,7 +147,7 @@ TEST(RequestInfoExtractorTest, GeminiIgnoresUnrecognizedTarget) {
 TEST(RequestInfoExtractorTest, GeminiOversizedPathModelFlagsAndKeepsStream) {
   const RequestAttributes attrs =
       extract(ApiProtocol::GeminiGenerateContent, "{}",
-              "/v1beta/models/" + std::string(MaxModelBytes + 1, 'm') + ":streamGenerateContent");
+              "/v1beta/models/" + std::string(MaxStringValueSize + 1, 'm') + ":streamGenerateContent");
   EXPECT_TRUE(attrs.model.empty());
   EXPECT_EQ(attrs.stream, true);
   EXPECT_TRUE(attrs.malformed);
@@ -232,7 +232,7 @@ TEST(RequestInfoExtractorTest, OffloadedModelReadsAsAbsentAndFlags) {
 TEST(RequestInfoExtractorTest, OversizedModelReadsAsAbsentAndFlags) {
   const RequestAttributes attrs =
       extract(ApiProtocol::OpenAiChatCompletions,
-              R"({"model":")" + std::string(MaxModelBytes + 1, 'm') + R"("})");
+              R"({"model":")" + std::string(MaxStringValueSize + 1, 'm') + R"("})");
   EXPECT_TRUE(attrs.model.empty());
   EXPECT_TRUE(attrs.malformed);
 }
