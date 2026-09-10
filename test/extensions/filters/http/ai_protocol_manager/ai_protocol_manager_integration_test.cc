@@ -727,7 +727,8 @@ public:
     test_processor_.shutdown();
   }
 
-  void initializeWithExtProc(bool upstream_filter, bool trailer_mode = false) {
+  void initializeWithExtProc(bool upstream_filter, bool trailer_mode = false,
+                             bool synthesize_trailers = false) {
     // The processor captures the metadata_context of the stream-terminating
     // message -- the end-of-stream response_body message, or the
     // response_trailers message when the response ends in trailers;
@@ -754,15 +755,26 @@ public:
         });
 
     // AI Protocol Manager first...
-    config_helper_.prependFilter(R"EOF(
+    std::string aipm_yaml = R"EOF(
 name: envoy.filters.http.ai_protocol_manager
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
   response_handling:
     token_usage:
       include_unconfigured_routes: true
-)EOF",
-                                 /*downstream=*/!upstream_filter);
+)EOF";
+    if (synthesize_trailers) {
+      aipm_yaml = R"EOF(
+name: envoy.filters.http.ai_protocol_manager
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+  response_handling:
+    token_usage:
+      include_unconfigured_routes: true
+      usage_signal: SYNTHESIZE_TRAILERS
+)EOF";
+    }
+    config_helper_.prependFilter(aipm_yaml, /*downstream=*/!upstream_filter);
 
     // ...then ext_proc prepended to the head of the downstream chain: encoder
     // filters run in reverse list order, so in the downstream installation the
@@ -883,6 +895,24 @@ TEST_P(AiProtocolManagerExtProcIntegrationTest, TrailerEndedResponseForwardsMeta
 TEST_P(AiProtocolManagerExtProcIntegrationTest, UpstreamTrailerEndedResponseForwardsMetadata) {
   initializeWithExtProc(/*upstream_filter=*/true, /*trailer_mode=*/true);
   runJsonUsageRequest(/*end_with_trailers=*/true);
+  expectUsageMetadataAtProcessor();
+}
+
+// Verifies upstream SYNTHESIZE_TRAILERS forwards metadata to downstream ext_proc trailers.
+TEST_P(AiProtocolManagerExtProcIntegrationTest,
+       UpstreamSynthesizedTrailersForwardsMetadataToExtProc) {
+  initializeWithExtProc(/*upstream_filter=*/true, /*trailer_mode=*/true,
+                        /*synthesize_trailers=*/true);
+  runJsonUsageRequest(/*end_with_trailers=*/false);
+  expectUsageMetadataAtProcessor();
+}
+
+// Verifies downstream SYNTHESIZE_TRAILERS forwards metadata to downstream ext_proc trailers.
+TEST_P(AiProtocolManagerExtProcIntegrationTest,
+       DownstreamSynthesizedTrailersForwardsMetadataToExtProc) {
+  initializeWithExtProc(/*upstream_filter=*/false, /*trailer_mode=*/true,
+                        /*synthesize_trailers=*/true);
+  runJsonUsageRequest(/*end_with_trailers=*/false);
   expectUsageMetadataAtProcessor();
 }
 

@@ -21,7 +21,7 @@ bazel_dep(name = "boringssl", version = "0.20260413.0")
 bazel_dep(name = "boringssl-fips", version = "0.20260413.0.envoy")
 bazel_dep(name = "boringssl-source", version = "0.20260413.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy")
-bazel_dep(name = "brotli", version = "1.2.0")
+bazel_dep(name = "brotli", version = "1.2.0.bcr.1")
 bazel_dep(name = "buildifier_prebuilt", version = "8.2.1.1", repo_name = "buildifier")
 bazel_dep(name = "c-ares", version = "1.34.6")
 bazel_dep(name = "cel-cpp", version = "0.14.0.envoy")
@@ -31,7 +31,7 @@ bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "emsdk", version = "4.0.23.envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.4.14.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.4.15.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19.envoy")
 bazel_dep(name = "fmt", version = "12.1.0")
 bazel_dep(name = "gazelle", version = "0.47.0")
@@ -128,6 +128,9 @@ bazel_dep(name = "google_benchmark", version = "1.9.5", dev_dependency = True, r
 
 bazel_dep(name = "rules_fuzzing", version = "0.6.0")
 
+fuzzing_ext = use_extension("@rules_fuzzing//fuzzing/private:extensions.bzl", "non_module_dependencies")
+use_repo(fuzzing_ext, "rules_fuzzing_oss_fuzz")
+
 bazel_dep(name = "rules_shellcheck", version = "0.4.0", dev_dependency = True, repo_name = "shellcheck")
 
 ####################################################################################
@@ -162,8 +165,8 @@ single_version_override(
 
 # git_override(
 #     module_name = "envoy_toolshed",
-#     commit = "9e1dcf88ddb6523306b8fadd3d2c50c96a474426",
-#     remote = "https://github.com/phlax/toolshed",
+#     commit = "0f2dbc8122e776c57901bcd835e9f2526c03cf4d",
+#     remote = "https://github.com/envoyproxy/toolshed",
 #     strip_prefix = "bazel",
 # )
 

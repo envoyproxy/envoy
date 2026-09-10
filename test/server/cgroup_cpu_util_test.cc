@@ -144,6 +144,17 @@ TEST_F(CgroupCpuUtilTest, GetCurrentCgroupPath_OnlyNonCpuV1) {
   EXPECT_FALSE(result.has_value()); // No v2 and no v1 CPU = nullopt
 }
 
+TEST_F(CgroupCpuUtilTest, GetCurrentCgroupPath_ControllerNameContainingCpu) {
+  fs_.setFileContents("/proc/self/cgroup", "2:cpuset:/foo\n"
+                                           "3:cpuacct:/bar\n"
+                                           "0::/v2\n");
+
+  auto result = CgroupCpuUtil::TestUtil::getCurrentCgroupPath(fs_);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result.value().relative_path, "/v2");
+  EXPECT_EQ(result.value().version, "v2");
+}
+
 // =============================================================================
 // Test: unescapePath
 // =============================================================================
@@ -317,6 +328,17 @@ TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_V2) {
   auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
   ASSERT_TRUE(mount_opt.has_value());
   EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup"); // Should return v2 mount point
+}
+
+TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_ControllerNameContainingCpu) {
+  std::string mountinfo = "25 21 0:22 / /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n"
+                          "59 22 0:43 / /sys/fs/cgroup/cpuset rw - cgroup cgroup rw,cpuset\n"
+                          "60 22 0:44 / /sys/fs/cgroup/cpuacct rw - cgroup cgroup rw,cpuacct\n";
+  fs_.setFileContents("/proc/self/mountinfo", mountinfo);
+
+  auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
+  ASSERT_TRUE(mount_opt.has_value());
+  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup");
 }
 
 TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_Mixed_V1Wins) {

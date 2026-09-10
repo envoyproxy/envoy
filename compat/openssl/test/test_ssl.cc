@@ -8,6 +8,10 @@
 #include <openssl/tls1.h>
 #include <sys/socket.h>
 
+#ifdef BSSL_COMPAT
+#include <ossl.h> // For ossl_SSL_SESSION_get0_hostname() (no BoringSSL equivalent exists).
+#endif
+
 #include <future>
 #include <thread>
 
@@ -1618,6 +1622,73 @@ TEST(SSLTest, test_SSL_get_servername_null_inside_select_certificate_cb) {
 
   ASSERT_TRUE(CompleteHandshakes(client_ssl.get(), server_ssl.get()));
 }
+
+#ifdef BSSL_COMPAT
+// Verifies that the compat layer persists the client's SNI into the server-side SSL_SESSION after a
+// full handshake, which is what makes SSL_get_servername() return the SNI on a *resumed* TLSv1.2
+// server connection (see SSL_get_servername() in ssl_lib.c, which returns the session hostname when
+// sc->hit).
+//
+// BoringSSL persists the SNI into the session automatically. Plain OpenSSL only does so when a
+// servername callback acknowledges the name (returns SSL_TLSEXT_ERR_OK); Envoy drives certificate
+// selection through the ClientHello callback (SSL_CTX_set_select_certificate_cb) and installs no
+// servername callback, so without help the name would be lost on resumption. The compat layer's
+// SSL_CTX_set_select_certificate_cb() therefore installs a default servername callback, and this
+// test guards that behavior.
+//
+// This is validated by inspecting the stored session hostname rather than by performing an actual
+// resumption because the bssl-compat unit-test harness cannot drive a session resumption round-trip
+// (see the skipped SSLVersionTest.SameKeyResume / SessionIDContext). The end-to-end resumption
+// behavior is covered by //test/extensions/clusters/dynamic_modules:integration_test.
+TEST(SSLTest, test_SSL_get_servername_persisted_to_session) {
+  static const char SERVERNAME[]{"www.example.com"};
+
+  TempFile server_2_key_pem{server_2_key_pem_str};
+  TempFile server_2_cert_chain_pem{server_2_cert_chain_pem_str};
+
+  bssl::UniquePtr<SSL_CTX> server_ctx(SSL_CTX_new(TLS_server_method()));
+  bssl::UniquePtr<SSL_CTX> client_ctx(SSL_CTX_new(TLS_client_method()));
+
+  // The session only carries the SNI in TLSv1.2 and below (in TLSv1.3 the SNI is not associated
+  // with the session), so force TLSv1.2.
+  ASSERT_TRUE(SSL_CTX_set_max_proto_version(server_ctx.get(), TLS1_2_VERSION));
+  ASSERT_TRUE(SSL_CTX_set_max_proto_version(client_ctx.get(), TLS1_2_VERSION));
+
+  // Drive certificate selection through the ClientHello callback (as Envoy does) and, crucially, do
+  // NOT install a servername callback: the persistence must come from the compat layer's default.
+  SSL_CTX_set_select_certificate_cb(
+      server_ctx.get(),
+      [](const SSL_CLIENT_HELLO*) -> ssl_select_cert_result_t { return ssl_select_cert_success; });
+  ASSERT_TRUE(SSL_CTX_use_certificate_chain_file(server_ctx.get(), server_2_cert_chain_pem.path()));
+  ASSERT_TRUE(
+      SSL_CTX_use_PrivateKey_file(server_ctx.get(), server_2_key_pem.path(), SSL_FILETYPE_PEM));
+  SSL_CTX_set_verify(client_ctx.get(), SSL_VERIFY_NONE, nullptr);
+
+  int sockets[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sockets));
+  SocketCloser close[]{sockets[0], sockets[1]};
+
+  bssl::UniquePtr<SSL> server_ssl(SSL_new(server_ctx.get()));
+  ASSERT_TRUE(SSL_set_fd(server_ssl.get(), sockets[0]));
+  SSL_set_accept_state(server_ssl.get());
+
+  bssl::UniquePtr<SSL> client_ssl(SSL_new(client_ctx.get()));
+  ASSERT_TRUE(SSL_set_fd(client_ssl.get(), sockets[1]));
+  ASSERT_TRUE(SSL_set_tlsext_host_name(client_ssl.get(), SERVERNAME));
+  SSL_set_connect_state(client_ssl.get());
+
+  ASSERT_TRUE(CompleteHandshakes(client_ssl.get(), server_ssl.get()));
+
+  // The SNI must have been stored into the server-side session. Without the compat layer's default
+  // servername callback this would be null, and SSL_get_servername() would then return null on a
+  // resumed server connection.
+  SSL_SESSION* session = SSL_get_session(server_ssl.get());
+  ASSERT_TRUE(session);
+  const char* stored_name = ossl_SSL_SESSION_get0_hostname(session);
+  ASSERT_TRUE(stored_name);
+  ASSERT_STREQ(SERVERNAME, stored_name);
+}
+#endif // BSSL_COMPAT
 
 #ifdef BSSL_COMPAT
 // Tests for segv when calling SSL_CIPHER_get_min_version() on a cipher that is
