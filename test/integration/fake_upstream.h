@@ -523,6 +523,12 @@ public:
   testing::AssertionResult
   waitForHalfClose(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
+  // Wait for the current fake-upstream dispatcher callback to unwind and for callbacks already
+  // queued on the dispatcher to complete.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForDispatcherBarrier(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   virtual void initialize() {
     absl::MutexLock lock(lock_);
     initialized_ = true;
@@ -904,12 +910,6 @@ public:
   Event::DispatcherPtr& dispatcher() { return dispatcher_; }
   absl::Mutex& lock() { return lock_; }
 
-  // Run a callback on the fake upstream dispatcher and wait for it to complete. This can also be
-  // used as a barrier to wait for callbacks that were already running or queued on the dispatcher.
-  ABSL_MUST_USE_RESULT
-  AssertionResult
-  runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
-                               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void runOnDispatcherThread(std::function<void()> cb);
 
 protected:
@@ -1043,6 +1043,9 @@ private:
   SharedConnectionWrapper& consumeConnection(bool defer_read_enable = false)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   Network::FilterStatus onRecvDatagram(Network::UdpRecvData& data);
+  AssertionResult
+  runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
+                               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const envoy::config::core::v3::Http3ProtocolOptions http3_options_;

@@ -649,7 +649,7 @@ void BaseIntegrationTest::cleanUpXdsConnection() {
     RELEASE_ASSERT(result, result.message());
     // The disconnect notification can run inside another fake-upstream event callback. Wait for
     // that callback to unwind before destroying the connection wrapper it may still reference.
-    result = xds_upstream_->runOnDispatcherThreadAndWait([] { return AssertionSuccess(); });
+    result = xds_connection_->waitForDispatcherBarrier();
     RELEASE_ASSERT(result, result.message());
     xds_connection_.reset();
   }
