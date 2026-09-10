@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/stats/stats_matcher.h"
@@ -33,6 +34,32 @@ namespace Stats {
  * histograms, one to collect the values and other as backup that is used for merge process. The
  * swap happens during the merge process.
  */
+class TlsHistogramState {
+public:
+  enum class State : uint8_t { Empty, Inline, MaterializedEmpty, MaterializedUsed };
+
+  TlsHistogramState() = default;
+  ~TlsHistogramState();
+
+  TlsHistogramState(const TlsHistogramState&) = delete;
+  TlsHistogramState& operator=(const TlsHistogramState&) = delete;
+
+  void insert(hist_bucket_t bucket, uint64_t count, std::optional<uint32_t> initial_bins);
+  histogram_t* histogram() const {
+    return state_ == State::MaterializedUsed ? histogram_ : nullptr;
+  }
+  bool mergeInlineInto(histogram_t* target);
+  void clear();
+
+private:
+  histogram_t* histogram_{nullptr};
+  uint64_t inline_count_{0};
+  hist_bucket_t inline_bucket_{};
+  State state_{State::Empty};
+};
+
+static_assert(sizeof(TlsHistogramState) == 24);
+
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit, StatName tag_extracted_name,
@@ -68,9 +95,10 @@ public:
 
 private:
   const Histogram::Unit unit_;
+  const std::optional<uint32_t> initial_bins_;
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
   uint64_t current_active_{0};
-  histogram_t* histograms_[2];
+  TlsHistogramState histograms_[2];
   std::atomic<bool> used_;
   const std::thread::id created_thread_id_;
   SymbolTable& symbol_table_;

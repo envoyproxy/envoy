@@ -2,9 +2,11 @@
 
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <list>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
@@ -18,6 +20,7 @@
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/tag_utility.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/str_join.h"
 #include "symbol_table.h"
 
@@ -1086,33 +1089,91 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
   return *hist_tls_ptr;
 }
 
+TlsHistogramState::~TlsHistogramState() {
+  if (histogram_ != nullptr) {
+    hist_free(histogram_);
+  }
+}
+
+void TlsHistogramState::insert(hist_bucket_t bucket, uint64_t count,
+                               std::optional<uint32_t> initial_bins) {
+  if (count == 0) {
+    return;
+  }
+
+  if (state_ == State::Empty) {
+    inline_bucket_ = bucket;
+    inline_count_ = count;
+    state_ = State::Inline;
+    return;
+  }
+
+  if (state_ == State::Inline) {
+    if (inline_bucket_.val == bucket.val && inline_bucket_.exp == bucket.exp) {
+      const uint64_t new_count = inline_count_ + count;
+      inline_count_ = new_count < inline_count_ ? UINT64_MAX : new_count;
+      return;
+    }
+
+    histogram_ = initial_bins.has_value() ? hist_alloc_nbins(static_cast<int>(initial_bins.value()))
+                                          : hist_alloc();
+    hist_insert_raw(histogram_, inline_bucket_, inline_count_);
+    state_ = State::MaterializedUsed;
+  } else if (state_ == State::MaterializedEmpty) {
+    state_ = State::MaterializedUsed;
+  }
+
+  hist_insert_raw(histogram_, bucket, count);
+}
+
+bool TlsHistogramState::mergeInlineInto(histogram_t* target) {
+  if (state_ != State::Inline) {
+    return false;
+  }
+
+  hist_insert_raw(target, inline_bucket_, inline_count_);
+  clear();
+  return true;
+}
+
+void TlsHistogramState::clear() {
+  if (state_ == State::Inline) {
+    inline_count_ = 0;
+    inline_bucket_ = {};
+    state_ = State::Empty;
+  } else if (state_ == State::MaterializedUsed) {
+    hist_clear(histogram_);
+    state_ = State::MaterializedEmpty;
+  }
+}
+
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
                                                    StatName tag_extracted_name,
                                                    StatNameTagSpan stat_name_tags,
                                                    SymbolTable& symbol_table,
                                                    std::optional<uint32_t> bins)
     : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, symbol_table), unit_(unit),
-      used_(false), created_thread_id_(std::this_thread::get_id()), symbol_table_(symbol_table) {
-  histograms_[0] = bins ? hist_alloc_nbins(bins.value()) : hist_alloc();
-  histograms_[1] = bins ? hist_alloc_nbins(bins.value()) : hist_alloc();
-}
+      initial_bins_(bins), used_(false), created_thread_id_(std::this_thread::get_id()),
+      symbol_table_(symbol_table) {}
 
-ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
-  MetricImpl::clear(symbol_table_);
-  hist_free(histograms_[0]);
-  hist_free(histograms_[1]);
-}
+ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() { MetricImpl::clear(symbol_table_); }
 
 void ThreadLocalHistogramImpl::recordValue(uint64_t value) {
   ASSERT(std::this_thread::get_id() == created_thread_id_);
-  hist_insert_intscale(histograms_[current_active_], value, 0, 1);
+  histograms_[current_active_].insert(int_scale_to_hist_bucket(value, 0), 1, initial_bins_);
   used_ = true;
 }
 
 void ThreadLocalHistogramImpl::merge(histogram_t* target) {
-  histogram_t** other_histogram = &histograms_[otherHistogramIndex()];
-  hist_accumulate(target, other_histogram, 1);
-  hist_clear(*other_histogram);
+  TlsHistogramState& state = histograms_[otherHistogramIndex()];
+  if (!state.mergeInlineInto(target)) {
+    histogram_t* source = state.histogram();
+    if (source != nullptr) {
+      const histogram_t* const_sources[] = {source};
+      hist_accumulate(target, const_sources, 1);
+      state.clear();
+    }
+  }
 }
 
 ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
