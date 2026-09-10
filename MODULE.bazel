@@ -118,7 +118,7 @@ bazel_dep(name = "yaml-cpp", version = "0.8.0")
 bazel_dep(name = "yq.bzl", version = "0.1.1.envoy")
 bazel_dep(name = "zipkin-api", version = "1.0.0.envoy")
 bazel_dep(name = "zlib-ng", version = "2.3.2.envoy")
-bazel_dep(name = "zstd", version = "1.5.7")
+bazel_dep(name = "zstd", version = "1.5.7.bcr.1")
 
 ####################################################################################
 # deps: Dev
