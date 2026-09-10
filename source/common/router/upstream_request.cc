@@ -268,11 +268,14 @@ void UpstreamRequest::cleanUp() {
 }
 
 void UpstreamRequest::upstreamLog(AccessLog::AccessLogType access_log_type) {
-  const Formatter::Context log_context{parent_.downstreamHeaders(),
-                                       upstream_headers_.get(),
-                                       upstream_trailers_.get(),
-                                       {},
-                                       access_log_type};
+  Formatter::Context log_context{parent_.downstreamHeaders(),
+                                 upstream_headers_.get(),
+                                 upstream_trailers_.get(),
+                                 {},
+                                 access_log_type};
+  if (parent_.downstreamTrailers() != nullptr) {
+    log_context.setRequestTrailers(*parent_.downstreamTrailers());
+  }
 
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
     upstream_log->log(log_context, stream_info_);
