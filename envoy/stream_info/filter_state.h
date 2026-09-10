@@ -249,7 +249,7 @@ public:
   static std::optional<FilterStateIndex> nameToIndex(absl::string_view name);
 
   virtual void setIndexedData(
-      FilterStateIndex index, absl::string_view data_name, std::shared_ptr<Object> data,
+      FilterStateIndex index, std::shared_ptr<Object> data,
       LifeSpan life_span = LifeSpan::FilterChain,
       StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
 

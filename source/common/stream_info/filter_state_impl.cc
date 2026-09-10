@@ -77,7 +77,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
                               StreamSharingMayImpactPooling stream_sharing) {
   auto index = FilterState::nameToIndex(data_name);
   if (index.has_value()) {
-    setIndexedData(index.value(), data_name, data, life_span, stream_sharing);
+    setIndexedData(index.value(), data, life_span, stream_sharing);
     return;
   }
   if (life_span > life_span_) {
@@ -209,8 +209,8 @@ bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) con
   return data_storage_.contains(data_name);
 }
 
-void FilterStateImpl::setIndexedData(FilterStateIndex index, absl::string_view data_name,
-                                     std::shared_ptr<Object> data, FilterState::LifeSpan life_span,
+void FilterStateImpl::setIndexedData(FilterStateIndex index, std::shared_ptr<Object> data,
+                                     FilterState::LifeSpan life_span,
                                      StreamSharingMayImpactPooling stream_sharing) {
   const size_t idx = static_cast<size_t>(index);
   if (idx >= static_cast<size_t>(FilterStateIndex::MaxIndex)) {
@@ -225,7 +225,7 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, absl::string_view d
       return;
     }
     maybeCreateParent(nullptr);
-    parent_->setIndexedData(index, data_name, data, life_span, stream_sharing);
+    parent_->setIndexedData(index, data, life_span, stream_sharing);
     return;
   }
   if (parent_ && parent_->hasIndexedData(index)) {

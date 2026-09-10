@@ -60,6 +60,10 @@ private:
   std::unique_ptr<FilterStateImpl> filter_state_;
 };
 
+class A : public FilterState::Object {};
+class B : public A {};
+class C : public B {};
+
 } // namespace
 
 TEST_F(FilterStateImplTest, Simple) {
@@ -187,16 +191,6 @@ TEST_F(FilterStateImplTest, WrongTypeGet) {
   EXPECT_EQ(5, filterState().getDataReadOnly<TestStoredTypeTracking>("test_name")->access());
   EXPECT_EQ(nullptr, filterState().getDataReadOnly<SimpleType>("test_name"));
 }
-
-namespace {
-
-class A : public FilterState::Object {};
-
-class B : public A {};
-
-class C : public B {};
-
-} // namespace
 
 TEST_F(FilterStateImplTest, FungibleInheritance) {
   filterState().setData("testB", std::make_unique<B>(), FilterState::LifeSpan::FilterChain);
@@ -385,8 +379,7 @@ TEST_F(FilterStateImplTest, IndexedFilterStateBasicCrud) {
   const std::string name = std::string(FilterState::indexToName(FilterStateIndex::LocalReplyOwner));
 
   // Test basic set/get by index
-  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, "my_indexed_key",
-                               std::make_shared<SimpleType>(42),
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(42),
                                FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::LocalReplyOwner));
   EXPECT_EQ(42, filterState()
@@ -407,16 +400,14 @@ TEST_F(FilterStateImplTest, IndexedFilterStateBasicCrud) {
 
   // Test set by index and retrieve by name (transparent optimization)
   resetFilterState();
-  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, name,
-                               std::make_shared<SimpleType>(200),
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(200),
                                FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filterState().hasData<SimpleType>(name));
   EXPECT_EQ(200, filterState().getDataReadOnly<SimpleType>(name)->access());
 
   // Legacy Name-Based Mutable Retrieval of Indexed Data
   resetFilterState();
-  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, name,
-                               std::make_shared<SimpleType>(500),
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(500),
                                FilterState::LifeSpan::FilterChain);
   auto* obj_mutable = filterState().getDataMutable<SimpleType>(name);
   ASSERT_NE(nullptr, obj_mutable);
@@ -424,8 +415,7 @@ TEST_F(FilterStateImplTest, IndexedFilterStateBasicCrud) {
 
   // hasDataWithName legacy check with an indexed key name
   resetFilterState();
-  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, name,
-                               std::make_shared<SimpleType>(42),
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(42),
                                FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filterState().hasDataWithName(name));
 }
@@ -435,8 +425,7 @@ TEST_F(FilterStateImplTest, IndexedFilterStateParentPropagation) {
 
   // Test parent propagation of indexed data (Read-only)
   auto parent_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
-  parent_state->setIndexedData(FilterStateIndex::LocalReplyOwner, name,
-                               std::make_shared<SimpleType>(200),
+  parent_state->setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(200),
                                FilterState::LifeSpan::Connection);
   auto child_state =
       std::make_shared<FilterStateImpl>(parent_state, FilterState::LifeSpan::FilterChain);
@@ -447,7 +436,7 @@ TEST_F(FilterStateImplTest, IndexedFilterStateParentPropagation) {
 
   // Test parent propagation of indexed data (Mutable/Shared)
   auto parent_shared = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
-  parent_shared->setIndexedData(FilterStateIndex::LocalReplyOwner, name,
+  parent_shared->setIndexedData(FilterStateIndex::LocalReplyOwner,
                                 std::make_shared<SimpleType>(600),
                                 FilterState::LifeSpan::Connection);
   FilterStateImpl child_shared(parent_shared, FilterState::LifeSpan::FilterChain);
@@ -460,8 +449,7 @@ TEST_F(FilterStateImplTest, IndexedFilterStateParentPropagation) {
   auto parent_state_2 = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
   FilterStateImpl child_state_2(parent_state_2, FilterState::LifeSpan::FilterChain);
   EXPECT_FALSE(child_state_2.hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::Connection));
-  parent_state_2->setIndexedData(FilterStateIndex::LocalReplyOwner, name,
-                                 std::make_shared<SimpleType>(1),
+  parent_state_2->setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(1),
                                  FilterState::LifeSpan::Connection);
   EXPECT_TRUE(child_state_2.hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::Connection));
 }
@@ -470,8 +458,7 @@ TEST_F(FilterStateImplTest, IndexedFilterStateUpstreamSharing) {
   const std::string name = std::string(FilterState::indexToName(FilterStateIndex::LocalReplyOwner));
 
   // Test objectsSharedWithUpstreamConnection (SharedWithUpstreamConnection)
-  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, name,
-                               std::make_shared<SimpleType>(300),
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(300),
                                FilterState::LifeSpan::FilterChain,
                                StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   auto shared_objects = filterState().objectsSharedWithUpstreamConnection();
@@ -480,8 +467,7 @@ TEST_F(FilterStateImplTest, IndexedFilterStateUpstreamSharing) {
 
   // Test objectsSharedWithUpstreamConnection (SharedWithUpstreamConnectionOnce)
   resetFilterState();
-  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, name,
-                               std::make_shared<SimpleType>(300),
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(300),
                                FilterState::LifeSpan::FilterChain,
                                StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce);
   shared_objects = filterState().objectsSharedWithUpstreamConnection();
@@ -490,39 +476,37 @@ TEST_F(FilterStateImplTest, IndexedFilterStateUpstreamSharing) {
 
   // Test objectsSharedWithUpstreamConnection (None)
   resetFilterState();
-  filterState().setIndexedData(
-      FilterStateIndex::LocalReplyOwner, name, std::make_shared<SimpleType>(300),
-      FilterState::LifeSpan::FilterChain, StreamSharingMayImpactPooling::None);
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(300),
+                               FilterState::LifeSpan::FilterChain,
+                               StreamSharingMayImpactPooling::None);
   shared_objects = filterState().objectsSharedWithUpstreamConnection();
   EXPECT_TRUE(shared_objects->empty());
 }
 
 TEST_F(FilterStateImplTest, IndexedFilterStateDoubleSetConflict) {
-  const std::string name = std::string(FilterState::indexToName(FilterStateIndex::LocalReplyOwner));
-
   // 1. Conflict: parent/longer lifespan set first, then child/shorter lifespan set second
-  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, name,
-                               std::make_shared<SimpleType>(1), FilterState::LifeSpan::Connection);
-  EXPECT_ENVOY_BUG(filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, name,
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(1),
+                               FilterState::LifeSpan::Connection);
+  EXPECT_ENVOY_BUG(filterState().setIndexedData(FilterStateIndex::LocalReplyOwner,
                                                 std::make_shared<SimpleType>(2),
                                                 FilterState::LifeSpan::FilterChain),
                    "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
 
   // 2. Conflict: with a real parent instance
   auto parent = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
-  parent->setIndexedData(FilterStateIndex::LocalReplyOwner, name, std::make_shared<SimpleType>(1),
+  parent->setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(1),
                          FilterState::LifeSpan::Connection);
   FilterStateImpl child(parent, FilterState::LifeSpan::FilterChain);
-  EXPECT_ENVOY_BUG(child.setIndexedData(FilterStateIndex::LocalReplyOwner, name,
+  EXPECT_ENVOY_BUG(child.setIndexedData(FilterStateIndex::LocalReplyOwner,
                                         std::make_shared<SimpleType>(2),
                                         FilterState::LifeSpan::FilterChain),
                    "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
 
   // 3. Conflict: child/shorter lifespan set first, then parent/longer lifespan set second
   resetFilterState();
-  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, name,
-                               std::make_shared<SimpleType>(1), FilterState::LifeSpan::FilterChain);
-  EXPECT_ENVOY_BUG(filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, name,
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(1),
+                               FilterState::LifeSpan::FilterChain);
+  EXPECT_ENVOY_BUG(filterState().setIndexedData(FilterStateIndex::LocalReplyOwner,
                                                 std::make_shared<SimpleType>(2),
                                                 FilterState::LifeSpan::Connection),
                    "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
@@ -563,8 +547,7 @@ TEST_F(FilterStateImplTest, IndexedFilterStateUtilities) {
   EXPECT_EQ(nullptr, filterState().getIndexedDataSharedMutableGeneric(FilterStateIndex::MaxIndex));
 
   // setIndexedData with invalid index should return immediately with no-op
-  filterState().setIndexedData(FilterStateIndex::MaxIndex, "invalid",
-                               std::make_shared<SimpleType>(500),
+  filterState().setIndexedData(FilterStateIndex::MaxIndex, std::make_shared<SimpleType>(500),
                                FilterState::LifeSpan::FilterChain);
 
   // indexToName boundary checks

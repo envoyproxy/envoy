@@ -397,7 +397,7 @@ void ActiveStreamFilterBase::sendLocalReply(
     const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   if (!streamInfo().filterState()->hasIndexedData(StreamInfo::FilterStateIndex::LocalReplyOwner)) {
     streamInfo().filterState()->setIndexedData(
-        StreamInfo::FilterStateIndex::LocalReplyOwner, LocalReplyFilterStateKey,
+        StreamInfo::FilterStateIndex::LocalReplyOwner,
         std::make_shared<LocalReplyOwnerObject>(filter_context_.config_name),
         StreamInfo::FilterState::LifeSpan::FilterChain);
   }

@@ -34,7 +34,7 @@ BENCHMARK(BM_FilterStateStringLookup);
 static void BM_FilterStateIndexedLookup(benchmark::State& state) {
   FilterStateImpl filter_state(FilterState::LifeSpan::FilterChain);
   const std::string name = std::string(FilterState::indexToName(FilterStateIndex::LocalReplyOwner));
-  filter_state.setIndexedData(FilterStateIndex::LocalReplyOwner, name,
+  filter_state.setIndexedData(FilterStateIndex::LocalReplyOwner,
                               std::make_shared<SimpleType>(42), FilterState::LifeSpan::FilterChain);
 
   for (auto _ : state) {
@@ -60,7 +60,7 @@ static void BM_FilterStateIndexedCycle(benchmark::State& state) {
   const std::string name = std::string(FilterState::indexToName(FilterStateIndex::LocalReplyOwner));
   for (auto _ : state) {
     FilterStateImpl filter_state(FilterState::LifeSpan::FilterChain);
-    filter_state.setIndexedData(FilterStateIndex::LocalReplyOwner, name,
+    filter_state.setIndexedData(FilterStateIndex::LocalReplyOwner,
                                 std::make_shared<SimpleType>(42),
                                 FilterState::LifeSpan::FilterChain);
     auto* obj = filter_state.getIndexedDataReadOnly<SimpleType>(FilterStateIndex::LocalReplyOwner);

@@ -46,7 +46,7 @@ public:
   FilterState::ObjectsPtr objectsSharedWithUpstreamConnection() const override;
 
   void setIndexedData(
-      FilterStateIndex index, absl::string_view data_name, std::shared_ptr<Object> data,
+      FilterStateIndex index, std::shared_ptr<Object> data,
       FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain,
       StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) override;
   const Object* getIndexedDataReadOnlyGeneric(FilterStateIndex index) const override;
