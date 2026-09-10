@@ -132,8 +132,18 @@ void MessageStreamer::emitNamedMessage(const Protobuf::Message& message,
     return;
   }
 
-  Frame& frame = owned == nullptr ? pushFrame(message, level, is_sensitive)
-                                  : pushOwnedFrame(std::move(owned), level, is_sensitive);
+  Frame& frame = [&]() -> Frame& {
+    // A TypedStruct has to be reified before it can be redacted, see redactOpaque in
+    // source/common/protobuf/utility.cc. The copy comes back redacted, so nothing below it is.
+    if (options_.redact_sensitive_fields_ && isTypedStruct(*message.GetDescriptor())) {
+      return pushOwnedFrame(redactedCopy(message, is_sensitive), level, false);
+    } else if (owned == nullptr) {
+      return pushFrame(message, level, is_sensitive);
+    } else {
+      return pushOwnedFrame(std::move(owned), level, is_sensitive);
+    }
+  }();
+
   if (!type_url.empty()) {
     frame.map_->addKey("@type");
     frame.map_->addString(type_url);
