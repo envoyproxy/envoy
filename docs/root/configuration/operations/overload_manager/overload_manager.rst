@@ -155,6 +155,11 @@ The following overload actions are supported:
       When the action is in a *scaled active* state, the idle timer threshold is still respected.
       Note that this action is currently only supported for HTTP/3 QUIC connections.
 
+  * - envoy.overload_actions.shutdown
+    - Envoy will shut itself down once the action has stayed *saturated* for a configured duration,
+      leaving it to the supervising process to restart it. See
+      :ref:`below <config_overload_manager_shutdown>` for details on configuration.
+
 .. _config_overload_manager_shrink_heap:
 
 Shrink Heap
@@ -192,6 +197,60 @@ Example configuration:
     :caption: :download:`shrink_heap_overload.yaml <_include/shrink_heap_overload.yaml>`
 
 If no ``typed_config`` is provided, the action will use default values.
+
+.. _config_overload_manager_shutdown:
+
+Shutdown
+^^^^^^^^
+
+Overload conditions are expected to be transient. One that persists can leave Envoy in a state
+that only a restart clears: a memory leak or heap fragmentation, for example, can hold the memory
+pressure above the threshold that made Envoy stop accepting requests, so the pressure never drops
+and Envoy never recovers. The ``envoy.overload_actions.shutdown`` overload action detects that
+state and exits the process. Restarting Envoy is left to whatever supervises it, such as
+Kubernetes, systemd, or the :ref:`hot restart wrapper <operations_hot_restarter>`. Envoy does not
+restart itself.
+
+The action requires a :ref:`ShutdownConfig <envoy_v3_api_msg_config.overload.v3.ShutdownConfig>`
+``typed_config``:
+
+.. list-table::
+  :header-rows: 1
+  :widths: 1, 1, 2
+
+  * - Parameter
+    - Default
+    - Description
+  * - saturation_duration
+    - required
+    - How long the action must stay continuously saturated before Envoy shuts down
+  * - max_jitter
+    - 0s
+    - Upper bound of a random delay added to ``saturation_duration`` each time the countdown starts
+
+Envoy shuts down only once the action has been saturated without interruption for
+``saturation_duration``. Any recovery cancels the countdown, which starts again from zero the next
+time the action saturates. A restarted Envoy therefore has to stay saturated for that long before
+it can shut down again, which is what bounds how often the deployment restarts. Choose a value
+comfortably longer than the time a healthy Envoy needs to start up and work off a traffic spike.
+Set ``max_jitter`` when a fleet of Envoys shares the same overload condition, so that they do not
+all exit at the same instant.
+
+Envoy shuts down the same way it does for a graceful restart: it fails its health check, stops
+accepting new connections, drain closes established ones over :option:`--drain-time-s` at the rate
+set by :option:`--drain-strategy`, and exits when that window closes. Lower
+:option:`--drain-time-s` if the default delays the restart more than the deployment can afford. The
+action increments ``overload.envoy.overload_actions.shutdown.shutdown_count`` when it decides to
+shut Envoy down.
+
+Example configuration:
+
+.. literalinclude:: _include/shutdown_overload.yaml
+    :language: yaml
+    :lines: 44-58
+    :emphasize-lines: 7-15
+    :linenos:
+    :caption: :download:`shutdown_overload.yaml <_include/shutdown_overload.yaml>`
 
 Load Shed Points
 ----------------

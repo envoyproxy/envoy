@@ -269,6 +269,27 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   codec_client_->close();
 }
 
+TEST_P(OverloadIntegrationTest, ShutDownWhenSaturationPersists) {
+  // The long drain time keeps the server up after it decides to shut down, so that the test can
+  // observe the decision rather than race the process exiting.
+  drain_time_ = std::chrono::seconds(999);
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.shutdown"
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ShutdownConfig
+        saturation_duration: 1s
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.95
+    )EOF"));
+
+  updateResource(0.95);
+  test_server_->waitForCounter("overload.envoy.overload_actions.shutdown.shutdown_count", Eq(1));
+  test_server_->waitForGauge("server.live", Eq(0));
+}
+
 TEST_P(OverloadIntegrationTest, BypassOverloadManagerTest) {
   initializeWithBypassOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(

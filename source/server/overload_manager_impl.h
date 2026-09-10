@@ -171,6 +171,9 @@ public:
   getShrinkHeapConfig() const override {
     return shrink_heap_config_;
   }
+  std::optional<envoy::config::overload::v3::ShutdownConfig> getShutdownConfig() const override {
+    return shutdown_config_;
+  }
 
 protected:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
@@ -260,6 +263,7 @@ private:
   ActionToCallbackMap action_to_callbacks_;
 
   std::optional<envoy::config::overload::v3::ShrinkHeapConfig> shrink_heap_config_;
+  std::optional<envoy::config::overload::v3::ShutdownConfig> shutdown_config_;
 };
 
 } // namespace Server
