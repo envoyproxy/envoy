@@ -40,21 +40,13 @@ absl::StatusOr<Http::FilterFactoryCb> CompressorFilterFactory::createFilterFacto
   };
 }
 
-absl::StatusOr<Http::FilterFactoryCb> CompressorFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-    const std::string& stats_prefix, DualInfo info,
-    Server::Configuration::ServerFactoryContext& context) {
-  Server::GenericFactoryContextImpl generic_context(
-      context, info.scope, context.messageValidationVisitor(), &info.init_manager);
-  return createFilterFactory(proto_config, stats_prefix, generic_context);
-}
-
 absl::StatusOr<Http::FilterFactoryCb>
 CompressorFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
+  Server::GenericFactoryContextImpl generic_context(
+      context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
   return createFilterFactory(proto_config, extra_context.stats_prefix, generic_context);
 }
 

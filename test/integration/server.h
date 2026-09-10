@@ -107,6 +107,19 @@ public:
     return wrapped_scope_->counterFromTaggedName(base_name, name_tags, tagged_name);
   }
 
+  Counter& counterFromMergedStatName(StatName tagged_name, StatName base_name,
+                                     std::optional<StatNameTagSpan> tags) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->counterFromMergedStatName(tagged_name, base_name, tags);
+  }
+
+  Gauge& gaugeFromMergedStatName(StatName tagged_name, StatName base_name,
+                                 std::optional<StatNameTagSpan> tags,
+                                 Gauge::ImportMode import_mode) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->gaugeFromMergedStatName(tagged_name, base_name, tags, import_mode);
+  }
+
   Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                              StatName tagged_name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
@@ -210,6 +223,8 @@ public:
   uint64_t latch() override { return counter_->latch(); }
   void reset() override { return counter_->reset(); }
   uint64_t value() const override { return counter_->value(); }
+  bool noTagExtraction() const override { return counter_->noTagExtraction(); }
+  void markAsNoTagExtraction() override { counter_->markAsNoTagExtraction(); }
   void incRefCount() override { counter_->incRefCount(); }
   bool decRefCount() override { return counter_->decRefCount(); }
   uint32_t use_count() const override { return counter_->use_count(); }
@@ -291,11 +306,17 @@ private:
 };
 
 /**
- * This is a variant of the isolated store that has locking across all operations so that it can
- * be used during the integration tests.
+ * This is a thread-safe wrapper around a stats store. By default it owns an isolated store, but it
+ * can also wrap an externally owned store so its test-facing state remains authoritative.
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
+  TestIsolatedStoreImpl()
+      : owned_store_(std::make_unique<IsolatedStoreImpl>()), store_(*owned_store_) {}
+  explicit TestIsolatedStoreImpl(SymbolTable& symbol_table)
+      : owned_store_(std::make_unique<IsolatedStoreImpl>(symbol_table)), store_(*owned_store_) {}
+  explicit TestIsolatedStoreImpl(Store& store) : store_(store) {}
+
   // Stats::Store
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
@@ -342,8 +363,8 @@ public:
     Thread::LockGuard lock(lock_);
     store_.deliverHistogramToSinks(histogram, value);
   }
-  NullGaugeImpl& nullGauge() override { return store_.nullGauge(); }
-  NullCounterImpl& nullCounter() override { return store_.nullCounter(); }
+  Gauge& nullGauge() override { return store_.nullGauge(); }
+  Counter& nullCounter() override { return store_.nullCounter(); }
   ScopeSharedPtr rootScope() override {
     Thread::LockGuard lock(lock_);
     if (lazy_default_scope_ == nullptr) {
@@ -408,7 +429,8 @@ public:
 
 private:
   mutable Thread::MutexBasicLockable lock_;
-  IsolatedStoreImpl store_;
+  std::unique_ptr<IsolatedStoreImpl> owned_store_;
+  Store& store_;
   PostMergeCb merge_cb_;
   ScopeSharedPtr lazy_default_scope_;
   uint32_t eviction_count_{0};
@@ -449,6 +471,9 @@ public:
   ~IntegrationTestServer() override;
 
   void waitUntilListenersReady();
+
+  // Wait until callbacks already running or queued on every server worker have completed.
+  void waitForWorkerThreads();
 
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value);

@@ -59,6 +59,19 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
   }
 }
 
+void IoSocketHandleImpl::setAbortiveClose() {
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
+  // Enabling SO_LINGER with a timeout of zero results in an abortive close.
+  struct linger l;
+  l.l_onoff = 1;
+  l.l_linger = 0;
+  auto res = setOption(SOL_SOCKET, SO_LINGER, &l, sizeof(l));
+  if (res.return_value_ < 0) {
+    ENVOY_LOG_EVERY_POW_2(error, "rst setting so_linger=0 failed on fd {}", fd_);
+  }
+#endif
+}
+
 Api::IoCallUint64Result IoSocketHandleImpl::close() {
   if (file_event_) {
     file_event_.reset();
@@ -146,6 +159,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
   return result;
 }
 
+Api::IoCallUint64Result IoSocketHandleImpl::send(const void* buffer, size_t length) {
+  return sysCallResultToIoCallResult(
+      Api::OsSysCallsSingleton::get().send(fd_, const_cast<void*>(buffer), length, 0));
+}
+
 Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
                                                     uint64_t num_slice, int flags,
                                                     const Address::Ip* self_ip,
@@ -165,15 +183,15 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       num_slices_to_write++;
     }
   }
-  if (num_slices_to_write == 0) {
-    return Api::ioCallUint64ResultNoError();
-  }
+
+  uint8_t empty_payload = 0;
+  iovec empty_iov{&empty_payload, 0};
 
   msghdr message;
   message.msg_name = reinterpret_cast<void*>(sock_addr);
   message.msg_namelen = address_base->sockAddrLen();
-  message.msg_iov = iov.begin();
-  message.msg_iovlen = num_slices_to_write;
+  message.msg_iov = num_slices_to_write == 0 ? &empty_iov : iov.begin();
+  message.msg_iovlen = num_slices_to_write == 0 ? 1 : num_slices_to_write;
   message.msg_flags = 0;
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   if (self_ip == nullptr) {

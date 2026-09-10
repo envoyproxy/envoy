@@ -4,7 +4,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
-load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//bazel:extension_configs.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
@@ -14,7 +14,7 @@ envoy_package()
 envoy_cc_test_binary(
     name = "schema_validator_tool",
     srcs = ["schema_validator.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [":schema_validator_lib"] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),

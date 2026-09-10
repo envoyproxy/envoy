@@ -15,7 +15,11 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -516,8 +520,7 @@ TEST(GetAllMatchingHeaderNames, SingleMatchSingleValue) {
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
-  ASSERT_EQ(result.size(), 1);
-  EXPECT_TRUE(result.contains("accept"));
+  EXPECT_THAT(result, UnorderedElementsAre("accept"));
 }
 
 TEST(GetAllMatchingHeaderNames, SingleMatchMultiValue) {
@@ -532,8 +535,7 @@ TEST(GetAllMatchingHeaderNames, SingleMatchMultiValue) {
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
-  ASSERT_EQ(result.size(), 1);
-  EXPECT_TRUE(result.contains("accept"));
+  EXPECT_THAT(result, UnorderedElementsAre("accept"));
 }
 
 TEST(GetAllMatchingHeaderNames, MultipleMatches) {
@@ -550,9 +552,7 @@ TEST(GetAllMatchingHeaderNames, MultipleMatches) {
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
-  ASSERT_EQ(result.size(), 2);
-  EXPECT_TRUE(result.contains("accept"));
-  EXPECT_TRUE(result.contains("accept-language"));
+  EXPECT_THAT(result, UnorderedElementsAre("accept", "accept-language"));
 }
 
 struct ParseCommaDelimitedHeaderTestCase {

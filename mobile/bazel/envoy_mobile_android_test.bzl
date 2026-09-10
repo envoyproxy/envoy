@@ -41,7 +41,7 @@ def envoy_mobile_android_test(name, srcs, test_class, native_lib_name = "", deps
         "@maven//:org_hamcrest_hamcrest",
         "@maven//:com_google_truth_truth",
         "@maven//:org_robolectric_shadows_framework",
-        "@robolectric//bazel:android-all",
+        "@rules_robolectric//bazel:android-all",
     ]
     if _contains_all(srcs, ".java"):
         android_local_test(

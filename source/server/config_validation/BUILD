@@ -63,7 +63,7 @@ envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":admin_lib",
         ":api_lib",

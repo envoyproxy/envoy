@@ -3,15 +3,22 @@
 #include <openssl/ssl.h>
 #include <openssl/x509_vfy.h>
 
+#include <chrono>
 #include <cstddef>
 #include <initializer_list>
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "envoy/common/platform.h"
 
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+
 #include "test/test_common/logging.h"
 
+#include "quiche/quic/core/quic_packet_writer_wrapper.h"
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 
 namespace Envoy {
@@ -657,6 +664,95 @@ TEST_P(QuicHttpIntegrationTest, Http3ClientKeepalive) {
   EXPECT_LE(quic_connection_->GetStats().ping_frames_sent, expected_pings);
 }
 
+class ReorderingTestWriter : public quic::QuicPacketWriterWrapper {
+public:
+  quic::WriteResult WritePacket(const char* buffer, size_t buf_len,
+                                const quic::QuicIpAddress& self_address,
+                                const quic::QuicSocketAddress& peer_address,
+                                quic::PerPacketOptions* options,
+                                const quic::QuicPacketWriterParams& params) override {
+    if (hold_packets_) {
+      held_packets_.emplace_back(buffer, buf_len);
+      self_address_ = self_address;
+      peer_address_ = peer_address;
+      return quic::WriteResult(quic::WRITE_STATUS_OK, buf_len);
+    }
+    return quic::QuicPacketWriterWrapper::WritePacket(buffer, buf_len, self_address, peer_address,
+                                                      options, params);
+  }
+
+  void flushHeldPackets() {
+    for (const auto& packet : held_packets_) {
+      quic::QuicPacketWriterWrapper::WritePacket(packet.data(), packet.size(), self_address_,
+                                                 peer_address_, nullptr,
+                                                 quic::QuicPacketWriterParams());
+    }
+    held_packets_.clear();
+  }
+
+  bool hold_packets_{false};
+  std::vector<std::string> held_packets_;
+  quic::QuicIpAddress self_address_;
+  quic::QuicSocketAddress peer_address_;
+};
+
+TEST_P(QuicHttpIntegrationTest, DatagramAfterRequestCompleteUaf) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        auto* direct_response = route->mutable_direct_response();
+        direct_response->set_status(200);
+        direct_response->mutable_body()->set_inline_string("foo");
+      });
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":scheme", "https"},
+                                                 {":authority", "example.com"},
+                                                 {":path", "/"},
+                                                 {"capsule-protocol", "?1"}};
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto* quic_session = static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  ASSERT_NE(quic_session, nullptr);
+  auto* client_connection = static_cast<EnvoyQuicClientConnection*>(quic_session->connection());
+  auto real_writer =
+      std::make_unique<EnvoyQuicPacketWriter>(std::make_unique<Network::UdpDefaultWriter>(
+          client_connection->connectionSocket()->ioHandle()));
+  auto* delaying_writer = new ReorderingTestWriter();
+  delaying_writer->set_writer(real_writer.release());
+  client_connection->SetQuicPacketWriter(delaying_writer, true);
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Hold any ACK packets so that the QUIC stream remains alive in Envoy while the Envoy HTTP
+  // decoder gets destroyed.
+  delaying_writer->hold_packets_ = true;
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  delaying_writer->hold_packets_ = false;
+  uint64_t stream_id_to_write = 0;
+  std::string payload = "AAAAAAAA";
+  size_t slice_length = quic::QuicDataWriter::GetVarInt62Len(stream_id_to_write) + payload.length();
+  quiche::QuicheBuffer buffer(quic_session->connection()->helper()->GetStreamSendBufferAllocator(),
+                              slice_length);
+  quic::QuicDataWriter writer(slice_length, buffer.data());
+  writer.WriteVarInt62(stream_id_to_write);
+  writer.WriteBytes(payload.data(), payload.length());
+  quiche::QuicheMemSlice slice(std::move(buffer));
+  quic_session->SendDatagram(std::move(slice));
+
+  Event::TimerPtr timer(dispatcher_->createTimer([this, delaying_writer]() -> void {
+    delaying_writer->flushHeldPackets();
+    dispatcher_->exit();
+  }));
+  timer->enableTimer(std::chrono::milliseconds(1));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  cleanupUpstreamAndDownstream();
+}
+
 TEST_P(QuicHttpIntegrationTest, Http3ClientKeepaliveDisabled) {
   initialize();
 
@@ -860,8 +956,6 @@ TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -898,8 +992,6 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_"
                                     "quic_notify_stream_soon_to_destroy",
                                     "true");
@@ -961,40 +1053,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
   codec_client_->close();
 }
 
-TEST_P(QuicHttpIntegrationTest, DeferredLoggingDisabled) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "false");
-  useAccessLog(
-      "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
-      "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
-      "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
-      "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
-      "METADATA("
-      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
-  initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  sendRequestAndWaitForResponse(default_request_headers_, /*request_size=*/0,
-                                default_response_headers_,
-                                /*response_size=*/0,
-                                /*upstream_index=*/0, TestUtility::DefaultTimeout);
-  codec_client_->close();
-
-  // Do not flush client acks.
-  std::string log = waitForAccessLog(access_log_name_, 0, false, nullptr);
-  std::vector<std::string> metrics = absl::StrSplit(log, ',');
-  ASSERT_EQ(metrics.size(), 21);
-  EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
-  EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
-  EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
-  EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
-  EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
-  EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
-  EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
-}
-
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -1023,8 +1082,6 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -1095,8 +1152,6 @@ TEST_P(QuicHttpIntegrationTest, DISABLED_DeferredLoggingWithEnvoyReset) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -1175,8 +1230,6 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithRetransmission) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog("%BYTES_RETRANSMITTED%,%PACKETS_RETRANSMITTED%");
   initialize();
 

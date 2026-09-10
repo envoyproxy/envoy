@@ -16,8 +16,12 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "re2/re2.h"
+
+using testing::Contains;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -640,9 +644,7 @@ TEST(InternalMixedVariableLiteralParsing, PathPatternWithMixedVariables) {
   EXPECT_EQ(pattern->debugString(), "/api/v{version}/users/{id}.json");
 
   // Check that it captures the right variables
-  EXPECT_EQ(pattern->captured_variables_.size(), 2);
-  EXPECT_TRUE(pattern->captured_variables_.contains("version"));
-  EXPECT_TRUE(pattern->captured_variables_.contains("id"));
+  EXPECT_THAT(pattern->captured_variables_, UnorderedElementsAre("version", "id"));
 
   // Test regex generation and matching
   std::string regex = toRegexPattern(pattern.value());

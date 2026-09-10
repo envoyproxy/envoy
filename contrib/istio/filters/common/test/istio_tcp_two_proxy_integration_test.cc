@@ -1,3 +1,4 @@
+#include <format>
 #include <string>
 #include <vector>
 
@@ -116,7 +117,7 @@ typed_config:
 
   void initializeTcpProxies() {
     const std::string certs = TestEnvironment::runfilesPath("test/config/integration/certs");
-    const std::string downstream_tls = fmt::format(R"EOF(
+    const std::string downstream_tls = std::format(R"EOF(
 name: envoy.transport_sockets.tls
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext

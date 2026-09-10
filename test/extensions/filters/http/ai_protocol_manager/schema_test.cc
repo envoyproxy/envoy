@@ -328,10 +328,12 @@ TEST(SchemaTest, NullableValidation) {
 }
 
 TEST(SchemaTest, RequestResponseAndPayloadSchema) {
-  // Default RequestSchema.
+  // Default RequestSchema. An unpinned inline-string threshold reads as absent,
+  // which is what leaves the filter's configured default in force.
   RequestSchema default_req;
   EXPECT_TRUE(default_req.streamableFieldOrder().empty());
   EXPECT_TRUE(default_req.offloadableFieldPaths().empty());
+  EXPECT_FALSE(default_req.inlineStringThresholdBytes().has_value());
   EXPECT_THAT(default_req.validate(nlohmann::json::object()), IsOk());
 
   // Default ResponseSchema.
@@ -356,6 +358,14 @@ TEST(SchemaTest, RequestResponseAndPayloadSchema) {
             std::vector<std::string>{"prompt"});
   EXPECT_EQ(payload_schema.responseSchema().streamableFieldOrder(),
             std::vector<std::string>{"data"});
+  EXPECT_FALSE(payload_schema.requestInlineStringThresholdBytes().has_value());
+
+  // A pinned threshold is carried through the payload schema, which is what the
+  // filter reads in preference to its configured default.
+  RequestSchema pinned_req(Schema::object({{"prompt", Schema::string().offloadable()}}));
+  pinned_req.inlineStringThresholdBytes(256);
+  EXPECT_EQ(pinned_req.inlineStringThresholdBytes(), 256);
+  EXPECT_EQ(PayloadSchema(pinned_req).requestInlineStringThresholdBytes(), 256);
 
   // Validate request via JsonWithExtBuf and nlohmann::json.
   JsonWithExtBuf doc;

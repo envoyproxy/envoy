@@ -517,13 +517,15 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 }
 
+SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager);
+
 std::shared_ptr<FcdsSharedFilterChainManager>
 ListenerImpl::maybeCreateFilterChainManager(const envoy::config::listener::v3::Listener& config) {
   if (config.has_fcds_config()) {
     return parent_.server_.serverFactoryContext()
         .singletonManager()
         .getTyped<FcdsSharedFilterChainManager>(
-            std::string(FcdsSharedFilterChainManagerName),
+            SINGLETON_MANAGER_REGISTERED_NAME(fcds_shared_filter_chain_manager),
             [this]() -> Singleton::InstanceSharedPtr {
               return std::make_shared<FcdsSharedFilterChainManager>(
                   parent_.server_.serverFactoryContext(), *parent_.factory_);
@@ -740,10 +742,17 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
   udp_listener_config_ = std::make_shared<UdpListenerConfigImpl>(config.udp_listener_config());
   ProtobufTypes::MessagePtr udp_packet_packet_writer_config;
   if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
+    // When `udp_packet_packet_writer_config` specifies a QUIC-specific packet writer factory
+    // (implementing Quic::QuicPacketWriterFactoryFactory),
+    // getFactory<Network::UdpPacketWriterFactoryFactory>() returns nullptr. Thus, a null check is
+    // necessary here.
     auto* factory_factory = Config::Utility::getFactory<Network::UdpPacketWriterFactoryFactory>(
         config.udp_listener_config().udp_packet_packet_writer_config());
-    udp_listener_config_->writer_factory_ = factory_factory->createUdpPacketWriterFactory(
-        config.udp_listener_config().udp_packet_packet_writer_config(), *listener_factory_context_);
+    if (factory_factory != nullptr) {
+      udp_listener_config_->writer_factory_ = factory_factory->createUdpPacketWriterFactory(
+          config.udp_listener_config().udp_packet_packet_writer_config(),
+          *listener_factory_context_);
+    }
   }
   if (config.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC

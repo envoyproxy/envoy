@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     name = "ext_authz_test",
     srcs = ["ext_authz_test.cc"],
     extension_names = ["envoy.filters.network.ext_authz"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
@@ -39,7 +39,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.ext_authz"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/network/ext_authz:config",
         "//test/mocks/protobuf:protobuf_mocks",
@@ -61,7 +61,7 @@ envoy_cc_fuzz_test(
     name = "ext_authz_fuzz_test",
     srcs = ["ext_authz_fuzz_test.cc"],
     corpus = "ext_authz_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",
@@ -80,7 +80,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.network.ext_authz"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/ssl:ssl_lib",
         "//source/common/tls:context_config_lib",

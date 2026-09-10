@@ -13,6 +13,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
+using testing::Key;
 using ::testing::Return;
 
 namespace Envoy {
@@ -150,7 +152,7 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfiguredServiceNameDisabled) {
   // Verify that service.name attribute is NOT present
   EXPECT_TRUE(resource.attributes_.find("service.name") == resource.attributes_.end());
   // Verify other attributes are still present since only service.name was disabled
-  EXPECT_TRUE(resource.attributes_.find("telemetry.sdk.language") != resource.attributes_.end());
+  EXPECT_THAT(resource.attributes_, Contains(Key("telemetry.sdk.language")));
 }
 
 // Verifies it is possible to configure multiple resource detectors

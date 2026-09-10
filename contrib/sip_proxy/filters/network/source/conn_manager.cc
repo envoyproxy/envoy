@@ -1,5 +1,6 @@
 #include "contrib/sip_proxy/filters/network/source/conn_manager.h"
 
+#include <format>
 #include <optional>
 
 #include "envoy/common/exception.h"
@@ -219,7 +220,7 @@ void ConnectionManager::continueHandling(const std::string& key, bool try_next_a
             // When onPoolFailure, continueHandling with try_next_affinity, but there is no next
             // affinity, need throw exception and response with 503.
             auto ex = AppException(AppExceptionType::InternalError,
-                                   fmt::format("envoy can't establish connection to {}", key));
+                                   std::format("envoy can't establish connection to {}", key));
             sendLocalReply(*(metadata), ex, false);
             setLocalResponseSent(metadata->transactionId().value());
 

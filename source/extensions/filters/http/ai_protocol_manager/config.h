@@ -11,19 +11,19 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 
 class AiProtocolManagerFilterConfigFactory
-    : public Common::DualFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager,
           envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute> {
 public:
   AiProtocolManagerFilterConfigFactory()
-      : DualFactoryBase("envoy.filters.http.ai_protocol_manager") {}
+      : UnifiedFactoryBase("envoy.filters.http.ai_protocol_manager") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager&
           proto_config,
-      const std::string& stats_prefix, DualInfo info,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

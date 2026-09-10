@@ -372,6 +372,35 @@ TEST_F(JsonWithExtBufParserTest, MixedInlineAndOffloadedValues) {
   EXPECT_LT(system_ref.offset, user_ref.offset);
 }
 
+// Gemini streamed root arrays reach candidates[].content.parts[].functionCall
+// .args (depth 9+, and `args` is an arbitrary object): well within the raised
+// nesting bound.
+TEST_F(JsonWithExtBufParserTest, GeminiFunctionCallDepthParses) {
+  JsonWithExtBufParser parser({});
+  const std::string body =
+      R"([{"candidates":[{"content":{"parts":[{"functionCall":{"name":"f",)"
+      R"("args":{"location":{"city":"sf"}}}}]}}],)"
+      R"("usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":9,"totalTokenCount":15}}])";
+  ASSERT_TRUE(parser.feed(body, /*end_stream=*/true).ok());
+  const auto doc = parser.takeDocument();
+  EXPECT_EQ(doc.json()[0]["usageMetadata"]["totalTokenCount"], 15);
+}
+
+// The node budget bounds DOM amplification: a document of many tiny scalars
+// fails parsing once it exceeds max_nodes, regardless of its byte size.
+TEST_F(JsonWithExtBufParserTest, NodeBudgetBoundsAmplification) {
+  JsonWithExtBufParser::Config config;
+  config.max_nodes = 16;
+  JsonWithExtBufParser parser(config);
+  std::string body = "[";
+  for (int i = 0; i < 32; ++i) {
+    absl::StrAppend(&body, i == 0 ? "1" : ",1");
+  }
+  absl::StrAppend(&body, "]");
+  const absl::Status status = parser.feed(body, /*end_stream=*/true);
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status.message(), testing::HasSubstr("node budget"));
+}
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

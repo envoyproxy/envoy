@@ -50,7 +50,7 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
           max_bson_depth](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ProdProxyFilter>(
         stat_prefix, context.scope(), context.serverFactoryContext().runtime(), access_log,
-        fault_config, context.drainDecision(),
+        fault_config, context.drainDecision(), context.serverFactoryContext(),
         context.serverFactoryContext().mainThreadDispatcher().timeSource(), emit_dynamic_metadata,
         stats, max_bson_depth));
   };

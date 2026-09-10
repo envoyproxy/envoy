@@ -17,15 +17,16 @@ namespace TestKeyValueStore {
  * Config registration for the TestKeyValueStore filter. @see NamedHttpFilterConfigFactory.
  */
 class TestKeyValueStoreFilterFactory
-    : public Common::FactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoymobile::extensions::filters::http::test_kv_store::TestKeyValueStore> {
 public:
-  TestKeyValueStoreFilterFactory() : FactoryBase("test_kv_store") {}
+  TestKeyValueStoreFilterFactory() : UnifiedFactoryBase("test_kv_store") {}
 
 private:
-  ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<::Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoymobile::extensions::filters::http::test_kv_store::TestKeyValueStore& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 DECLARE_FACTORY(TestKeyValueStoreFilterFactory);

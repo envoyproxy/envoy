@@ -136,6 +136,7 @@ MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
   ON_CALL(*this, usesVhds()).WillByDefault(Return(false));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
+  ON_CALL(*this, ignorePathParametersInPathMatching()).WillByDefault(Return(false));
 }
 
 MockConfig::~MockConfig() = default;
@@ -207,6 +208,9 @@ MockRouteConfigProvider::~MockRouteConfigProvider() = default;
 
 MockRouteConfigProviderManager::MockRouteConfigProviderManager() = default;
 MockRouteConfigProviderManager::~MockRouteConfigProviderManager() = default;
+
+MockVhdsConfigUpdateReceiver::MockVhdsConfigUpdateReceiver() = default;
+MockVhdsConfigUpdateReceiver::~MockVhdsConfigUpdateReceiver() = default;
 
 MockScopedConfig::MockScopedConfig() {
   ON_CALL(*this, getRouteConfig(_)).WillByDefault(Return(route_config_));

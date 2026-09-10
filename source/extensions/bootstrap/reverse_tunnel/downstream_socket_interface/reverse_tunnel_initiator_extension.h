@@ -119,6 +119,11 @@ public:
   uint64_t maxReconnectBackoffMs() const { return max_reconnect_backoff_ms_; }
 
   /**
+   * @return the configured host re-check interval, in milliseconds.
+   */
+  uint64_t maintainIntervalMs() const { return maintain_interval_ms_; }
+
+  /**
    * @return reference to the configured HTTP handshake request path.
    */
   const std::string& handshakeRequestPath() const { return handshake_request_path_; }
@@ -200,6 +205,7 @@ private:
   std::string stat_prefix_; // Reverse connection stats prefix
   bool enable_detailed_stats_{false};
   uint64_t max_reconnect_backoff_ms_{};
+  uint64_t maintain_interval_ms_{};
   std::string handshake_request_path_;
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
   bool use_http_upgrade_{false};

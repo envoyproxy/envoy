@@ -92,7 +92,7 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   const auto tracestate_values = OpenTelemetryConstants::get().TRACE_STATE.getAll(trace_context_);
 
   SpanContext parent_context(version, trace_id, span_id, sampled,
-                             absl::StrJoin(tracestate_values, ","));
+                             absl::StrJoin(tracestate_values, ","), /*is_remote=*/true);
   return parent_context;
 }
 

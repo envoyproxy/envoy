@@ -23,7 +23,7 @@ public:
 
 private:
   // Common::FactoryBase
-  Server::ResourceMonitorPtr createResourceMonitorFromProtoTyped(
+  absl::StatusOr<Server::ResourceMonitorPtr> createResourceMonitorFromProtoTyped(
       const envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig& config,
       Server::Configuration::ResourceMonitorFactoryContext& context) override;
 };

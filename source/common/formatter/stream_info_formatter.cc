@@ -1,5 +1,7 @@
 #include "source/common/formatter/stream_info_formatter.h"
 
+#include <string>
+
 #include "source/common/common/random_generator.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
@@ -142,15 +144,40 @@ MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& 
 }
 
 std::optional<std::string>
-MetadataFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
+MetadataFormatter::format(const Context&, const StreamInfo::StreamInfo& stream_info) const {
   auto metadata = get_func_(stream_info);
   return (metadata != nullptr) ? formatMetadata(*metadata) : std::nullopt;
 }
 
-Protobuf::Value MetadataFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
+Protobuf::Value MetadataFormatter::formatValue(const Context&,
+                                               const StreamInfo::StreamInfo& stream_info) const {
   auto metadata = get_func_(stream_info);
   return formatMetadataValue((metadata != nullptr) ? *metadata
                                                    : envoy::config::core::v3::Metadata());
+}
+
+bool MetadataFormatter::formatTo(std::string& sink, const Context& context,
+                                 const StreamInfo::StreamInfo& stream_info) const {
+  // TODO(wbpcode): To optimize the implementation in the future to avoid
+  // unnecessary string copy or memory allocation.
+  const auto value = format(context, stream_info);
+  if (!value.has_value()) {
+    return false;
+  }
+  sink.append(*value);
+  return true;
+}
+
+void MetadataFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                      const StreamInfo::StreamInfo& stream_info) const {
+  // TODO(wbpcode): To optimize the implementation in the future to avoid
+  // unnecessary string copy or memory allocation.
+  const auto value = formatValue(context, stream_info);
+  if (value.kind_case() == Protobuf::Value::kNullValue ||
+      value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+    return;
+  }
+  sink.addValue(value);
 }
 
 // TODO(glicht): Consider adding support for route/listener/cluster metadata as suggested by
@@ -273,7 +300,7 @@ struct StringFieldVisitor {
 };
 
 std::optional<std::string>
-FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
+FilterStateFormatter::format(const Context&, const StreamInfo::StreamInfo& stream_info) const {
   const Envoy::StreamInfo::FilterState::Object* state = filterState(stream_info);
   if (!state) {
     return std::nullopt;
@@ -324,7 +351,8 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
   }
 }
 
-Protobuf::Value FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
+Protobuf::Value FilterStateFormatter::formatValue(const Context&,
+                                                  const StreamInfo::StreamInfo& stream_info) const {
   const Envoy::StreamInfo::FilterState::Object* state = filterState(stream_info);
   if (!state) {
     return SubstitutionFormatUtils::unspecifiedValue();
@@ -367,11 +395,43 @@ Protobuf::Value FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& 
   }
 }
 
+bool FilterStateFormatter::formatTo(std::string& sink, const Context& context,
+                                    const StreamInfo::StreamInfo& stream_info) const {
+  const std::optional<std::string> value = format(context, stream_info);
+  if (!value.has_value()) {
+    return false;
+  }
+  sink.append(*value);
+  return true;
+}
+
+void FilterStateFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                         const StreamInfo::StreamInfo& stream_info) const {
+  // Filter state can serialize as a proto, so the value is handed to the sink as one and the
+  // sink decides how to render it.
+  const Protobuf::Value value = formatValue(context, stream_info);
+  if (value.kind_case() == Protobuf::Value::kNullValue ||
+      value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+    // Keep the sink unmodified if no value is extracted and the caller can decide how to
+    // handle the missing value.
+    return;
+  }
+  sink.addValue(value);
+}
+
 const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointGetter>
     CommonDurationFormatter::KnownTimePointGetters{
         {FirstDownstreamRxByteReceived,
          [](const StreamInfo::StreamInfo& stream_info) -> std::optional<MonotonicTime> {
            return stream_info.startTimeMonotonic();
+         }},
+        {LastDownstreamHeaderRxByteReceived,
+         [](const StreamInfo::StreamInfo& stream_info) -> std::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->lastDownstreamHeaderRxByteReceived();
+           }
+           return {};
          }},
         {LastDownstreamRxByteReceived,
          [](const StreamInfo::StreamInfo& stream_info) -> std::optional<MonotonicTime> {
@@ -578,19 +638,42 @@ CommonDurationFormatter::getDurationCount(const StreamInfo::StreamInfo& info) co
 }
 
 std::optional<std::string>
-CommonDurationFormatter::format(const StreamInfo::StreamInfo& info) const {
+CommonDurationFormatter::format(const Context&, const StreamInfo::StreamInfo& info) const {
   auto duration = getDurationCount(info);
   if (!duration.has_value()) {
     return std::nullopt;
   }
   return fmt::format_int(duration.value()).str();
 }
-Protobuf::Value CommonDurationFormatter::formatValue(const StreamInfo::StreamInfo& info) const {
+Protobuf::Value CommonDurationFormatter::formatValue(const Context&,
+                                                     const StreamInfo::StreamInfo& info) const {
   auto duration = getDurationCount(info);
   if (!duration.has_value()) {
     return SubstitutionFormatUtils::unspecifiedValue();
   }
   return ValueUtil::numberValue(duration.value());
+}
+
+bool CommonDurationFormatter::formatTo(std::string& sink, const Context&,
+                                       const StreamInfo::StreamInfo& info) const {
+  auto duration = getDurationCount(info);
+  if (!duration.has_value()) {
+    return false;
+  }
+  const fmt::format_int formatted(duration.value());
+  sink.append(formatted.data(), formatted.size());
+  return true;
+}
+
+void CommonDurationFormatter::formatValueTo(ValueSink& sink, const Context&,
+                                            const StreamInfo::StreamInfo& info) const {
+  auto duration = getDurationCount(info);
+  if (!duration.has_value()) {
+    // Keep the sink unmodified if no value is extracted and the caller can decide how to
+    // handle the missing value.
+    return;
+  }
+  sink.addNumber(duration.value());
 }
 
 // A SystemTime formatter that extracts the startTime from StreamInfo. Must be provided
@@ -666,7 +749,7 @@ SystemTimeFormatter::SystemTimeFormatter(absl::string_view format, TimeFieldExtr
 }
 
 std::optional<std::string>
-SystemTimeFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
+SystemTimeFormatter::format(const Context&, const StreamInfo::StreamInfo& stream_info) const {
   const auto time_field = (*time_field_extractor_)(stream_info);
   if (!time_field.has_value()) {
     return std::nullopt;
@@ -677,7 +760,7 @@ SystemTimeFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
   return date_formatter_.fromTime(time_field.value());
 }
 
-bool SystemTimeFormatter::formatTo(std::string& sink,
+bool SystemTimeFormatter::formatTo(std::string& sink, const Context&,
                                    const StreamInfo::StreamInfo& stream_info) const {
   const auto time_field = (*time_field_extractor_)(stream_info);
   if (!time_field.has_value()) {
@@ -691,11 +774,12 @@ bool SystemTimeFormatter::formatTo(std::string& sink,
   return true;
 }
 
-Protobuf::Value SystemTimeFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
-  return ValueUtil::optionalStringValue(format(stream_info));
+Protobuf::Value SystemTimeFormatter::formatValue(const Context& context,
+                                                 const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::optionalStringValue(format(context, stream_info));
 }
 
-void SystemTimeFormatter::formatValueTo(ValueSink& sink,
+void SystemTimeFormatter::formatValueTo(ValueSink& sink, const Context&,
                                         const StreamInfo::StreamInfo& stream_info) const {
   const auto time_field = (*time_field_extractor_)(stream_info);
   if (!time_field.has_value()) {
@@ -723,11 +807,24 @@ EnvironmentFormatter::EnvironmentFormatter(absl::string_view key,
   str_.set_string_value(DefaultUnspecifiedValueString);
 }
 
-std::optional<std::string> EnvironmentFormatter::format(const StreamInfo::StreamInfo&) const {
+std::optional<std::string> EnvironmentFormatter::format(const Context&,
+                                                        const StreamInfo::StreamInfo&) const {
   return str_.string_value();
 }
-Protobuf::Value EnvironmentFormatter::formatValue(const StreamInfo::StreamInfo&) const {
+Protobuf::Value EnvironmentFormatter::formatValue(const Context&,
+                                                  const StreamInfo::StreamInfo&) const {
   return str_;
+}
+
+bool EnvironmentFormatter::formatTo(std::string& sink, const Context&,
+                                    const StreamInfo::StreamInfo&) const {
+  sink.append(str_.string_value());
+  return true;
+}
+
+void EnvironmentFormatter::formatValueTo(ValueSink& sink, const Context&,
+                                         const StreamInfo::StreamInfo&) const {
+  sink.addString(str_.string_value());
 }
 
 RequestedServerNameFormatter::RequestedServerNameFormatter(HostFormatterSource source,
@@ -773,7 +870,8 @@ RequestedServerNameFormatter::create(absl::string_view source, absl::string_view
 }
 
 std::optional<std::string>
-RequestedServerNameFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
+RequestedServerNameFormatter::format(const Context&,
+                                     const StreamInfo::StreamInfo& stream_info) const {
   std::optional<std::string> result;
   switch (source_) {
   case SNI:
@@ -837,8 +935,31 @@ RequestedServerNameFormatter::getHostFromHeaders(const StreamInfo::StreamInfo& s
 }
 
 Protobuf::Value
-RequestedServerNameFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
-  return ValueUtil::optionalStringValue(format(stream_info));
+RequestedServerNameFormatter::formatValue(const Context& context,
+                                          const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::optionalStringValue(format(context, stream_info));
+}
+
+bool RequestedServerNameFormatter::formatTo(std::string& sink, const Context& context,
+                                            const StreamInfo::StreamInfo& stream_info) const {
+  auto result = format(context, stream_info);
+  if (!result.has_value()) {
+    return false;
+  }
+  sink.append(result.value());
+  return true;
+}
+
+void RequestedServerNameFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                                 const StreamInfo::StreamInfo& stream_info) const {
+  auto result = formatValue(context, stream_info);
+  if (result.kind_case() == Protobuf::Value::kNullValue ||
+      result.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+    // Keep the sink unmodified if no value is extracted and the caller can decide how to
+    // handle the missing value.
+    return;
+  }
+  sink.addValue(result);
 }
 
 // StreamInfo std::string formatter provider.
@@ -849,15 +970,12 @@ public:
   StreamInfoStringFormatterProvider(FieldExtractor f) : field_extractor_(f) {}
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatTo;
-  using StreamInfoFormatterProvider::formatValue;
-  using StreamInfoFormatterProvider::formatValueTo;
-  std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
+  std::optional<std::string> format(const Context&,
+                                    const StreamInfo::StreamInfo& stream_info) const override {
     return field_extractor_(stream_info);
   }
-  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override {
+  bool formatTo(std::string& sink, const Context&,
+                const StreamInfo::StreamInfo& stream_info) const override {
     const auto value = field_extractor_(stream_info);
     if (!value.has_value()) {
       return false;
@@ -865,10 +983,12 @@ public:
     sink.append(*value);
     return true;
   }
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const Context&,
+                              const StreamInfo::StreamInfo& stream_info) const override {
     return ValueUtil::optionalStringValue(field_extractor_(stream_info));
   }
-  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override {
+  void formatValueTo(ValueSink& sink, const Context&,
+                     const StreamInfo::StreamInfo& stream_info) const override {
     const auto value = field_extractor_(stream_info);
     if (!value.has_value()) {
       // Keep the sink unmodified if no value is extracted and the caller can decide how to
@@ -893,19 +1013,16 @@ public:
   StreamInfoStringViewFormatterProvider(FieldExtractor f) : field_extractor_(std::move(f)) {}
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatTo;
-  using StreamInfoFormatterProvider::formatValue;
-  using StreamInfoFormatterProvider::formatValueTo;
-  std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
+  std::optional<std::string> format(const Context&,
+                                    const StreamInfo::StreamInfo& stream_info) const override {
     const auto value = field_extractor_(stream_info);
     if (!value.has_value()) {
       return std::nullopt;
     }
     return std::string(*value);
   }
-  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override {
+  bool formatTo(std::string& sink, const Context&,
+                const StreamInfo::StreamInfo& stream_info) const override {
     const auto value = field_extractor_(stream_info);
     if (!value.has_value()) {
       return false;
@@ -913,14 +1030,16 @@ public:
     sink.append(*value);
     return true;
   }
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const Context&,
+                              const StreamInfo::StreamInfo& stream_info) const override {
     const auto value = field_extractor_(stream_info);
     if (!value.has_value()) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
     return ValueUtil::stringValue(std::string(*value));
   }
-  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override {
+  void formatValueTo(ValueSink& sink, const Context&,
+                     const StreamInfo::StreamInfo& stream_info) const override {
     const auto value = field_extractor_(stream_info);
     if (!value.has_value()) {
       // Keep the sink unmodified if no value is extracted and the caller can decide how to
@@ -943,12 +1062,8 @@ public:
   StreamInfoDurationFormatterProvider(FieldExtractor f) : field_extractor_(f) {}
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatTo;
-  using StreamInfoFormatterProvider::formatValue;
-  using StreamInfoFormatterProvider::formatValueTo;
-  std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
+  std::optional<std::string> format(const Context&,
+                                    const StreamInfo::StreamInfo& stream_info) const override {
     const auto millis = extractMillis(stream_info);
     if (!millis) {
       return std::nullopt;
@@ -956,7 +1071,8 @@ public:
 
     return fmt::format_int(millis.value()).str();
   }
-  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override {
+  bool formatTo(std::string& sink, const Context&,
+                const StreamInfo::StreamInfo& stream_info) const override {
     const auto millis = extractMillis(stream_info);
     if (!millis) {
       return false;
@@ -966,7 +1082,8 @@ public:
     sink.append(formatted.data(), formatted.size());
     return true;
   }
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const Context&,
+                              const StreamInfo::StreamInfo& stream_info) const override {
     const auto millis = extractMillis(stream_info);
     if (!millis) {
       return SubstitutionFormatUtils::unspecifiedValue();
@@ -974,7 +1091,8 @@ public:
 
     return ValueUtil::numberValue(millis.value());
   }
-  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override {
+  void formatValueTo(ValueSink& sink, const Context&,
+                     const StreamInfo::StreamInfo& stream_info) const override {
     const auto millis = extractMillis(stream_info);
     if (!millis) {
       // Keep the sink unmodified if no value is extracted and the caller can decide how to
@@ -1005,23 +1123,22 @@ public:
   StreamInfoUInt64FormatterProvider(FieldExtractor f) : field_extractor_(f) {}
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatTo;
-  using StreamInfoFormatterProvider::formatValue;
-  using StreamInfoFormatterProvider::formatValueTo;
-  std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
+  std::optional<std::string> format(const Context&,
+                                    const StreamInfo::StreamInfo& stream_info) const override {
     return fmt::format_int(field_extractor_(stream_info)).str();
   }
-  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override {
+  bool formatTo(std::string& sink, const Context&,
+                const StreamInfo::StreamInfo& stream_info) const override {
     const fmt::format_int formatted(field_extractor_(stream_info));
     sink.append(formatted.data(), formatted.size());
     return true;
   }
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const Context&,
+                              const StreamInfo::StreamInfo& stream_info) const override {
     return ValueUtil::numberValue(field_extractor_(stream_info));
   }
-  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override {
+  void formatValueTo(ValueSink& sink, const Context&,
+                     const StreamInfo::StreamInfo& stream_info) const override {
     // The extractor always yields a value, so the sink is always consumed.
     sink.addNumber(field_extractor_(stream_info));
   }
@@ -1063,12 +1180,8 @@ public:
       : field_extractor_(f), extraction_type_(extraction_type), mask_prefix_len_(mask_prefix_len) {}
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatTo;
-  using StreamInfoFormatterProvider::formatValue;
-  using StreamInfoFormatterProvider::formatValueTo;
-  std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
+  std::optional<std::string> format(const Context&,
+                                    const StreamInfo::StreamInfo& stream_info) const override {
     Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
     if (!address) {
       return std::nullopt;
@@ -1076,7 +1189,8 @@ public:
 
     return toString(*address);
   }
-  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override {
+  bool formatTo(std::string& sink, const Context&,
+                const StreamInfo::StreamInfo& stream_info) const override {
     Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
     if (!address) {
       return false;
@@ -1084,7 +1198,8 @@ public:
     toSink(sink, *address);
     return true;
   }
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const Context&,
+                              const StreamInfo::StreamInfo& stream_info) const override {
     Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
     if (!address) {
       return SubstitutionFormatUtils::unspecifiedValue();
@@ -1100,7 +1215,8 @@ public:
 
     return ValueUtil::stringValue(toString(*address));
   }
-  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override {
+  void formatValueTo(ValueSink& sink, const Context&,
+                     const StreamInfo::StreamInfo& stream_info) const override {
     Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
     if (!address) {
       // Keep the sink unmodified if no value is extracted and the caller can decide how to
@@ -1171,16 +1287,15 @@ private:
 // Ssl::ConnectionInfo std::string field extractor.
 class StreamInfoSslConnectionInfoFormatterProvider : public StreamInfoFormatterProvider {
 public:
+  // TODO(wbpcode): Most of attributes of SSL connection info need to create a new string.
   using FieldExtractor =
       std::function<std::optional<std::string>(const Ssl::ConnectionInfo& connection_info)>;
 
   StreamInfoSslConnectionInfoFormatterProvider(FieldExtractor f) : field_extractor_(f) {}
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
-  std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
+  std::optional<std::string> format(const Context&,
+                                    const StreamInfo::StreamInfo& stream_info) const override {
     if (stream_info.downstreamAddressProvider().sslConnection() == nullptr) {
       return std::nullopt;
     }
@@ -1193,7 +1308,8 @@ public:
     return value;
   }
 
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const Context&,
+                              const StreamInfo::StreamInfo& stream_info) const override {
     if (stream_info.downstreamAddressProvider().sslConnection() == nullptr) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
@@ -1204,6 +1320,26 @@ public:
     }
 
     return ValueUtil::optionalStringValue(value);
+  }
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override {
+    const auto value = format(context, stream_info);
+    if (!value.has_value()) {
+      return false;
+    }
+    sink.append(*value);
+    return true;
+  }
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override {
+    const auto value = formatValue(context, stream_info);
+    if (value.kind_case() == Protobuf::Value::kNullValue ||
+        value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+      // Keep the sink unmodified if no value is extracted and the caller can decide how to
+      // handle the missing value.
+      return;
+    }
+    sink.addValue(value);
   }
 
 private:
@@ -1218,10 +1354,8 @@ public:
   StreamInfoUpstreamSslConnectionInfoFormatterProvider(FieldExtractor f) : field_extractor_(f) {}
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
-  std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
+  std::optional<std::string> format(const Context&,
+                                    const StreamInfo::StreamInfo& stream_info) const override {
     if (!stream_info.upstreamInfo() ||
         stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
       return std::nullopt;
@@ -1235,7 +1369,8 @@ public:
     return value;
   }
 
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const Context&,
+                              const StreamInfo::StreamInfo& stream_info) const override {
     if (!stream_info.upstreamInfo() ||
         stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
       return SubstitutionFormatUtils::unspecifiedValue();
@@ -1247,6 +1382,28 @@ public:
     }
 
     return ValueUtil::optionalStringValue(value);
+  }
+
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override {
+    const auto value = format(context, stream_info);
+    if (!value.has_value()) {
+      return false;
+    }
+    sink.append(*value);
+    return true;
+  }
+
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override {
+    const auto value = formatValue(context, stream_info);
+    if (value.kind_case() == Protobuf::Value::kNullValue ||
+        value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+      // Keep the sink unmodified if no value is extracted and the caller can decide how to
+      // handle the missing value.
+      return;
+    }
+    sink.addValue(value);
   }
 
 private:
@@ -1926,7 +2083,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<
                                      StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.ciphersuiteString();
+                                       return std::make_optional<std::string>(
+                                           connection_info.ciphersuiteString());
                                      });
                                }}},
                              {"UPSTREAM_TLS_GROUP",
@@ -2398,7 +2556,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<
                                      StreamInfoSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.ciphersuiteString();
+                                       return std::make_optional<std::string>(
+                                           connection_info.ciphersuiteString());
                                      });
                                }}},
                              {"DOWNSTREAM_TLS_GROUP",

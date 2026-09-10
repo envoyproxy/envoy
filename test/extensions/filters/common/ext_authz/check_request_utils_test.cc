@@ -23,6 +23,9 @@ using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
+using testing::Contains;
+using testing::Key;
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -357,11 +360,11 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderAllowlist) {
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_FALSE(request_.attributes().request().http().has_header_map());
 
-  EXPECT_TRUE(request_.attributes().request().http().headers().contains("allowed"));
+  EXPECT_THAT(request_.attributes().request().http().headers(), Contains(Key("allowed")));
   EXPECT_EQ("allowed value", request_.attributes().request().http().headers().at("allowed"));
 
   // No denylist was used.
-  EXPECT_TRUE(request_.attributes().request().http().headers().contains("allowed-dupe"));
+  EXPECT_THAT(request_.attributes().request().http().headers(), Contains(Key("allowed-dupe")));
   EXPECT_EQ("one,two", request_.attributes().request().http().headers().at("allowed-dupe"));
 
   EXPECT_FALSE(request_.attributes().request().http().headers().contains("not-allowed"));

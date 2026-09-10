@@ -20,9 +20,15 @@
 #include "test/test_common/stats_utility.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 using testing::NiceMock;
 using testing::Ref;
 using testing::ReturnRef;
+
+using testing::AnyOf;
+using testing::Contains;
+using testing::HasSubstr;
+using testing::Key;
 
 namespace Envoy {
 namespace Server {
@@ -1488,7 +1494,7 @@ TEST_F(PrometheusStatsFormatterTest, ContentNegotiationTextPlainAcceptHeader) {
   EXPECT_TRUE(response_headers.getContentTypeValue().empty());
 
   std::string output = response.toString();
-  EXPECT_TRUE(output.find("# TYPE") != std::string::npos);
+  EXPECT_THAT(output, HasSubstr("# TYPE"));
 }
 
 TEST_F(PrometheusStatsFormatterTest, ContentNegotiationDefaultToText) {
@@ -1506,7 +1512,7 @@ TEST_F(PrometheusStatsFormatterTest, ContentNegotiationDefaultToText) {
 
   // Should default to text format
   std::string output = response.toString();
-  EXPECT_TRUE(output.find("# TYPE") != std::string::npos);
+  EXPECT_THAT(output, HasSubstr("# TYPE"));
 }
 
 TEST_F(PrometheusStatsFormatterTest, QueryParamOverridesAcceptHeader) {
@@ -2341,8 +2347,8 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramDenseDataAccuracy) {
         NativeHistogramDecoder::expectedBucketIndex(schema, static_cast<double>(v));
 
     // The bucket should exist
-    EXPECT_TRUE(buckets.contains(expected_idx) || buckets.contains(expected_idx - 1) ||
-                buckets.contains(expected_idx + 1))
+    EXPECT_THAT(buckets, AnyOf(Contains(Key(expected_idx)), Contains(Key(expected_idx - 1)),
+                               Contains(Key(expected_idx + 1))))
         << "Value " << v << " should be in bucket near index " << expected_idx;
   }
 

@@ -44,6 +44,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/conn_pool/pending_stream.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
@@ -53,8 +54,10 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/queue_policy/queue_policy_base.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/config_utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -82,6 +85,45 @@ defaultHappyEyeballsConfig() {
         default_config.mutable_first_address_family_count()->set_value(1);
         return default_config;
       }());
+}
+
+// Resolves the queue policy for cluster pending requests: looks up the factory, translates the
+// typed config and creates a queue policy instance once so that invalid configurations are
+// rejected at config load time rather than when the first connection pool is created. The
+// resolved factory and config are stored on the cluster info so that connection pool creation
+// does not need to repeat this work.
+absl::StatusOr<std::unique_ptr<const ClusterInfo::PendingRqQueuePolicy>>
+resolvePendingRqQueuePolicy(
+    const envoy::config::core::v3::TypedExtensionConfig& queue_policy_config,
+    Stats::Scope& stats_scope, Server::Configuration::ServerFactoryContext& server_context) {
+  using PendingStreamQueueFactory =
+      Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>;
+  PendingStreamQueueFactory* factory =
+      Config::Utility::getFactory<PendingStreamQueueFactory>(queue_policy_config);
+  if (factory == nullptr) {
+    factory =
+        Config::Utility::getFactoryByName<PendingStreamQueueFactory>(queue_policy_config.name());
+  }
+  if (factory == nullptr) {
+    return absl::InvalidArgumentError(
+        fmt::format("Didn't find a registered queue policy implementation for name: '{}'",
+                    queue_policy_config.name()));
+  }
+  const std::string stat_prefix =
+      absl::StrCat(stats_scope.symbolTable().toString(stats_scope.prefix()), ".", factory->name());
+  ProtobufTypes::MessagePtr factory_config = factory->createEmptyConfigProto();
+  RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(queue_policy_config.typed_config(),
+                                                          server_context.messageValidationVisitor(),
+                                                          *factory_config));
+  auto queue = factory->createQueuePolicy(*factory_config, stat_prefix,
+                                          server_context.messageValidationVisitor());
+  RETURN_IF_NOT_OK(queue.status());
+
+  auto policy = std::make_unique<ClusterInfo::PendingRqQueuePolicy>();
+  policy->factory_ = factory;
+  policy->config_ = std::move(factory_config);
+  policy->stat_prefix_ = stat_prefix;
+  return policy;
 }
 
 std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
@@ -248,6 +290,21 @@ buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_con
   return cluster_options;
 }
 
+// Validates that an upstream bind source address with a configured network namespace can actually
+// be entered. This is only done at config load time when the bind config opts in via
+// `validate_network_namespaces`, so that a misconfigured (e.g. non-existent) network namespace is
+// rejected here rather than causing a connection failure later.
+absl::Status validateBindNetworkNamespace(const Network::Address::InstanceConstSharedPtr& address) {
+#if defined(__linux__)
+  if (address != nullptr && address->networkNamespace().has_value()) {
+    return Network::Utility::validateNetworkNamespace(*address->networkNamespace());
+  }
+#else
+  (void)address;
+#endif
+  return absl::OkStatus();
+}
+
 void appendBindAddressNoPortOption(UpstreamLocalAddress& upstream_local_address) {
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.upstream_bind_config_fix_port_exhaustion")) {
@@ -281,6 +338,9 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
           ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address());
       RETURN_IF_NOT_OK_REF(address_or_error.status());
       upstream_local_address.address_ = address_or_error.value();
+      if (bind_config->validate_network_namespaces()) {
+        RETURN_IF_NOT_OK(validateBindNetworkNamespace(upstream_local_address.address_));
+      }
     }
     upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
 
@@ -297,6 +357,9 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
           ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
       RETURN_IF_NOT_OK_REF(address_or_error.status());
       extra_upstream_local_address.address_ = address_or_error.value();
+      if (bind_config->validate_network_namespaces()) {
+        RETURN_IF_NOT_OK(validateBindNetworkNamespace(extra_upstream_local_address.address_));
+      }
 
       extra_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
@@ -322,6 +385,9 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
           ::Envoy::Network::Address::resolveProtoSocketAddress(additional_source_address);
       RETURN_IF_NOT_OK_REF(address_or_error.status());
       additional_upstream_local_address.address_ = address_or_error.value();
+      if (bind_config->validate_network_namespaces()) {
+        RETURN_IF_NOT_OK(validateBindNetworkNamespace(additional_upstream_local_address.address_));
+      }
       additional_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
       ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
@@ -1376,6 +1442,13 @@ ClusterInfoImpl::ClusterInfoImpl(
         absl::InvalidArgumentError("Only one of max_requests_per_connection from Cluster or "
                                    "HttpProtocolOptions can be specified");
     return;
+  }
+
+  if (config.queuing_policies().has_pending_rq_policy()) {
+    auto policy_or_error = resolvePendingRqQueuePolicy(
+        config.queuing_policies().pending_rq_policy(), *stats_scope_, server_context);
+    SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
+    pending_rq_queue_policy_ = std::move(*policy_or_error);
   }
 
   if (config.has_load_balancing_policy() ||

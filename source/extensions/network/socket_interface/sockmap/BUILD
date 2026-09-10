@@ -22,6 +22,7 @@ genrule(
         "no-remote-exec",
         "skip_on_windows",
     ],
+    target_compatible_with = ["@platforms//os:linux"],
 )
 
 envoy_cc_library(
@@ -32,12 +33,13 @@ envoy_cc_library(
         "//bazel:sockmap_enabled": ["ENVOY_ENABLE_SOCKMAP=1"],
         "//conditions:default": [],
     }),
+    target_compatible_with = ["@platforms//os:linux"],
     deps = [
         "//envoy/network:address_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
     ] + select({
-        "//bazel:sockmap_enabled": ["//bazel/foreign_cc:libbpf_linux"],
+        "//bazel:sockmap_enabled": ["//bazel/deps:libbpf"],
         "//conditions:default": [],
     }),
 )
@@ -46,6 +48,7 @@ envoy_cc_library(
     name = "io_handle_lib",
     srcs = ["io_handle.cc"],
     hdrs = ["io_handle.h"],
+    target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":bpf_datapath_lib",
         "//source/common/api:os_sys_calls_lib",
@@ -53,20 +56,31 @@ envoy_cc_library(
     ],
 )
 
+# Keep the extension target itself compatible everywhere so the static entry in
+# extensions_build_config.bzl remains valid for tooling, while making it a no-op off Linux.
 envoy_cc_extension(
     name = "config",
-    srcs = ["socket_interface.cc"],
-    hdrs = ["socket_interface.h"],
-    deps = [
-        ":bpf_datapath_lib",
-        ":io_handle_lib",
-        "//envoy/common:exception_lib",
-        "//envoy/registry",
-        "//envoy/server:bootstrap_extension_config_interface",
-        "//source/common/common:fmt_lib",
-        "//source/common/network:default_socket_interface_lib",
-        "//source/common/network:socket_interface_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/extensions/network/socket_interface/sockmap/v3:pkg_cc_proto",
-    ],
+    srcs = select({
+        "//bazel:linux": ["socket_interface.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "//bazel:linux": ["socket_interface.h"],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        "//bazel:linux": [
+            ":bpf_datapath_lib",
+            ":io_handle_lib",
+            "//envoy/common:exception_lib",
+            "//envoy/registry",
+            "//envoy/server:bootstrap_extension_config_interface",
+            "//source/common/common:fmt_lib",
+            "//source/common/network:default_socket_interface_lib",
+            "//source/common/network:socket_interface_lib",
+            "//source/common/protobuf:utility_lib",
+            "@envoy_api//envoy/extensions/network/socket_interface/sockmap/v3:pkg_cc_proto",
+        ],
+        "//conditions:default": [],
+    }),
 )

@@ -16,7 +16,8 @@ class LuaProtobufConverterTest : public testing::Test {
 public:
   LuaProtobufConverterTest() : tls_(std::make_shared<NiceMock<ThreadLocal::MockInstance>>()) {
     absl::Status creation_status = absl::OkStatus();
-    state_ = std::make_unique<ThreadLocalState>("function dummy() end", *tls_, creation_status);
+    state_ = std::make_unique<ThreadLocalState>("function dummy() end", PackagePaths{}, *tls_,
+                                                creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
   }
 

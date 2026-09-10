@@ -12,22 +12,6 @@ namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 
 absl::StatusOr<Http::FilterFactoryCb>
-GrpcJsonTranscoderFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
-        proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  absl::Status creation_status = absl::OkStatus();
-  JsonTranscoderConfigSharedPtr filter_config = std::make_shared<JsonTranscoderConfig>(
-      proto_config, context.serverFactoryContext().api(), creation_status);
-  RETURN_IF_NOT_OK_REF(creation_status);
-  auto stats = std::make_shared<GrpcJsonTranscoderFilterStats>(
-      GrpcJsonTranscoderFilterStats::generateStats(stats_prefix, context.scope()));
-  return [filter_config, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<JsonTranscoderFilter>(filter_config, stats));
-  };
-}
-
-absl::StatusOr<Http::FilterFactoryCb>
 GrpcJsonTranscoderFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
@@ -37,8 +21,9 @@ GrpcJsonTranscoderFilterConfig::createHttpFilterFactoryFromProtoTyped(
   JsonTranscoderConfigSharedPtr filter_config =
       std::make_shared<JsonTranscoderConfig>(proto_config, context.api(), creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
-  auto stats = std::make_shared<GrpcJsonTranscoderFilterStats>(
-      GrpcJsonTranscoderFilterStats::generateStats(extra_context.stats_prefix, context.scope()));
+  auto stats =
+      std::make_shared<GrpcJsonTranscoderFilterStats>(GrpcJsonTranscoderFilterStats::generateStats(
+          extra_context.stats_prefix, extra_context.scopeOr(context)));
   return [filter_config, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<JsonTranscoderFilter>(filter_config, stats));
   };

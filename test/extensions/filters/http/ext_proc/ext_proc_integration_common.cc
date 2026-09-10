@@ -17,7 +17,15 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
+#include "test/test_common/struct_matchers.h"
+
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::Ge;
+using testing::Key;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -496,7 +504,7 @@ void ExtProcIntegrationTest::processRequestBodyMessage(
     // Check the flow control counter in downstream, which is triggered on the request
     // path to ext_proc server (i.e., from side stream).
     test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
-                                 testing::Ge(1));
+                                 Ge(1));
   }
 
   // Send back the response from ext_proc server.
@@ -737,7 +745,7 @@ void ExtProcIntegrationTest::testGetAndCloseStream() {
   verifyDownstreamResponse(*response, 200);
 }
 
-void ExtProcIntegrationTest::testSendDyanmicMetadata() {
+void ExtProcIntegrationTest::testSendDynamicMetadata() {
   Protobuf::Struct test_md_struct;
   (*test_md_struct.mutable_fields())["foo"].set_string_value("value from ext_proc");
 
@@ -747,15 +755,16 @@ void ExtProcIntegrationTest::testSendDyanmicMetadata() {
   processGenericMessage(
       *grpc_upstreams_[0], true, [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
         // Verify the processing request contains the untyped metadata we injected.
-        EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
+        EXPECT_THAT(req.metadata_context().filter_metadata(),
+                    Contains(Key("forwarding_ns_untyped")));
         const Protobuf::Struct& fwd_metadata =
             req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
-        EXPECT_EQ(1, fwd_metadata.fields_size());
-        EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
-        EXPECT_EQ("value from set_metadata", fwd_metadata.fields().at("foo").string_value());
+        EXPECT_THAT(fwd_metadata.fields(),
+                    UnorderedElementsAre(IsStructString("foo", "value from set_metadata")));
 
         // Verify the processing request contains the typed metadata we injected.
-        EXPECT_TRUE(req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
+        EXPECT_THAT(req.metadata_context().typed_filter_metadata(),
+                    Contains(Key("forwarding_ns_typed")));
         const Protobuf::Any& fwd_typed_metadata =
             req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
         EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
@@ -774,7 +783,7 @@ void ExtProcIntegrationTest::testSendDyanmicMetadata() {
       });
 }
 
-void ExtProcIntegrationTest::testSendTypedDyanmicMetadata() {
+void ExtProcIntegrationTest::testSendTypedDynamicMetadata() {
   envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_to_stuff;
   typed_md_to_stuff.set_metadata_namespace("typed_value from ext_proc");
 

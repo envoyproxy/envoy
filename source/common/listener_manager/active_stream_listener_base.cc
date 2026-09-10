@@ -62,6 +62,11 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
     ENVOY_CONN_LOG(debug, "closing connection from {}: no filters", *server_conn_ptr,
                    server_conn_ptr->connectionInfoProvider().remoteAddress()->asString());
     server_conn_ptr->close(Network::ConnectionCloseType::NoFlush, "no_filters");
+  } else if (drain_event_.has_value()) {
+    // The listener began draining before this connection was accepted. Notify it now (the network
+    // filter chain, and thus any drain-aware callbacks, has just been created) so connection-level
+    // drain logic applies to connections accepted during the drain window.
+    server_conn_ptr->onDrain(*drain_event_);
   }
   newActiveConnection(*filter_chain, std::move(server_conn_ptr), std::move(stream_info));
 }
@@ -153,7 +158,8 @@ ActiveConnections& OwnedActiveStreamListenerBase::getOrCreateActiveConnections(
 }
 
 void OwnedActiveStreamListenerBase::onFilterChainDrainStart(
-    const std::list<const Network::FilterChain*>& draining_filter_chains) {
+    const std::list<const Network::FilterChain*>& draining_filter_chains,
+    Network::ConnectionDrainEvent drain_event) {
   // A drain callback may synchronously close the current connection, which removes it from
   // `connections_` via removeConnection(). Capture `next` before invoking onDrain() so the
   // std::list iteration survives erasure of the current node. Pin `is_deleting_` while
@@ -169,14 +175,24 @@ void OwnedActiveStreamListenerBase::onFilterChainDrainStart(
     auto& connections = map_iter->second->connections_;
     for (auto it = connections.begin(); it != connections.end();) {
       auto next = std::next(it);
-      (*it)->connection_->onDrain();
+      (*it)->connection_->onDrain(drain_event);
       it = next;
     }
   }
   is_deleting_ = was_deleting;
 }
 
-void OwnedActiveStreamListenerBase::onListenerDrainStart() {
+void OwnedActiveStreamListenerBase::onListenerDrainStart(
+    Network::ConnectionDrainEvent drain_event) {
+  // Remember the drain so connections accepted after this point are also notified (see
+  // ActiveStreamListenerBase::newConnection). A listener can be notified more than once (a server
+  // drain escalating from InboundOnly to All re-notifies inbound listeners); the first event wins,
+  // and a later notification neither pushes the drain back nor re-notifies connections, all of
+  // which have already been notified of the first event.
+  if (drain_event_.has_value()) {
+    return;
+  }
+  drain_event_ = drain_event;
   // See onFilterChainDrainStart for why `next` is captured and `is_deleting_` is pinned.
   const bool was_deleting = is_deleting_;
   is_deleting_ = true;
@@ -184,7 +200,7 @@ void OwnedActiveStreamListenerBase::onListenerDrainStart() {
     auto& connections = entry.second->connections_;
     for (auto it = connections.begin(); it != connections.end();) {
       auto next = std::next(it);
-      (*it)->connection_->onDrain();
+      (*it)->connection_->onDrain(drain_event);
       it = next;
     }
   }
