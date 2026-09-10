@@ -91,9 +91,6 @@ on:
           FAIL:
       fail-match:
         type: string
-      import-gpg:
-        type: boolean
-        default: false
       notice-match:
         type: string
         default: |
@@ -130,6 +127,9 @@ on:
         type: string
         default:
       skip:
+        type: boolean
+        default: false
+      signing:
         type: boolean
         default: false
       source:
@@ -325,14 +325,14 @@ jobs:
         config: ${{ inputs.checkout-extra }}
         ssh-key: ${{ inputs.trusted && secrets.ssh-key-extra || '' }}
 
-    - name: Import GPG key
-      uses: envoyproxy/toolshed/actions/gpg/import@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
-      if: ${{ inputs.import-gpg }}
+    - name: Stage signing key material
+      id: signing
+      if: ${{ inputs.signing }}
+      uses: envoyproxy/toolshed/actions/gpg/write@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       with:
         key: ${{ secrets.gpg-key }}
         passphrase: ${{ secrets.gpg-key-password }}
-        passphrase-path: "${{ runner.temp }}/container/gpg-passphrase"
-        configured-passphrase-path: /build/gpg-passphrase
+        path: ${{ runner.temp }}/container/signing
 
     - run: |
         echo "e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9" > .BAZEL_FAKE_SCM_REVISION
@@ -413,7 +413,8 @@ jobs:
               || '' }}
         CI_SHA1: ${{ github.sha }}
         CI_TARGET_BRANCH: ${{ fromJSON(inputs.request).request.target-branch }}
-        MOUNT_GPG_HOME: ${{ inputs.import-gpg && 1 || '' }}
+        ENVOY_SIGNING_KEY_PATH: ${{ inputs.signing && '/build/signing/signing-key.asc' || '' }}
+        ENVOY_SIGNING_PASSPHRASE_PATH: ${{ inputs.signing && '/build/signing/passphrase' || '' }}
         ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}
         ENVOY_DOCKER_CI: ${{ inputs.docker-ci && 'true' || '' }}
         ENVOY_COMMIT: ${{ fromJSON(inputs.request).request.sha }}
