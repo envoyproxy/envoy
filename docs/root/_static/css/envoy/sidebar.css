@@ -37,7 +37,7 @@
   color: var(--envoy-ink-muted);
   display: flex;
   font-family: var(--envoy-font-mono);
-  font-size: 10px;
+  font-size: 0.625rem;
   justify-content: space-between;
   letter-spacing: 0.14em;
   padding: 20px 20px 10px;
@@ -72,7 +72,7 @@
   color: var(--envoy-ink);
   cursor: pointer;
   display: flex;
-  font-size: 13.5px;
+  font-size: 0.85rem;
   font-weight: 600;
   gap: 10px;
   list-style: none;
@@ -109,7 +109,7 @@
 .wy-menu-vertical p.caption {
   color: var(--envoy-ink-muted);
   font-family: var(--envoy-font-mono);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 500;
   letter-spacing: 0.14em;
   margin: 22px 0 8px;
@@ -147,7 +147,7 @@
   border-left: 2px solid transparent;
   color: var(--envoy-ink-body);
   display: block;
-  font-size: 13.5px;
+  font-size: 0.85rem;
   line-height: 1.45;
   padding: 5px 14px 5px 18px;
   text-decoration: none;
@@ -210,7 +210,7 @@
 .wy-menu-vertical li.toctree-l4 a,
 .wy-menu-vertical li.toctree-l5 a {
   background: transparent;
-  font-size: 13px;
+  font-size: 0.8rem;
   margin-left: -1px;
 }
 

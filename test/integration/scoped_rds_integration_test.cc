@@ -248,6 +248,17 @@ key:
   test_server_->waitForGauge("http.config_test.scoped_rds.foo-scoped-routes.version",
                              Eq(13237225503670494420UL));
 
+  // The connection manager prefix and the scoped route configuration name are both tags, so
+  // neither appears in the tag-extracted name; this holds in both stats modes.
+  const std::string& hcm_prefix = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
+  const std::string& scoped_rds_config = Config::TagNames::get().SCOPED_RDS_CONFIG;
+  const std::string& rds_route_config = Config::TagNames::get().RDS_ROUTE_CONFIG;
+  expectStatTags("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                 "http.scoped_rds.update_success",
+                 {{hcm_prefix, "config_test"}, {scoped_rds_config, "foo-scoped-routes"}});
+  expectStatTags("http.config_test.rds.foo_route1.update_success", "http.rds.update_success",
+                 {{hcm_prefix, "config_test"}, {rds_route_config, "foo_route1"}});
+
   // Add a new scope scope_route3 with a brand new RouteConfiguration foo_route2.
   const std::string scope_route3 = fmt::format(scope_tmpl, "foo_scope3", "foo_route2", "baz-route");
 

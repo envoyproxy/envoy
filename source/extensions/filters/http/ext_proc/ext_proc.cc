@@ -1404,11 +1404,8 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   // If there is no external processing configured in the encoding path,
   // and no more external processing is needed in the decoding path,
   // closing the gRPC stream if it is still open.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
-    if (encoding_state_.noExternalProcess() && decoding_state_.noMoreExternalProcess()) {
-      closeStreamMaybeGraceful();
-    }
+  if (encoding_state_.noExternalProcess() && decoding_state_.noMoreExternalProcess()) {
+    closeStreamMaybeGraceful();
   }
 
   return status;
@@ -1803,8 +1800,7 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
                                                const bool eos_seen_in_body) {
   // Bail out if the gRPC stream has already been closed. This can happen in scenarios
   // like immediate responses or rejected header mutations.
-  if (stream_ == nullptr || !Runtime::runtimeFeatureEnabled(
-                                "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
+  if (stream_ == nullptr) {
     return;
   }
 

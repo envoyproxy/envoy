@@ -32,7 +32,6 @@ jobs:
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name || matrix.target }}
     with:
-      bazel-cache: true
       bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
@@ -43,7 +42,8 @@ jobs:
         ERROR
         error:
         Error:
-        FAILED in
+        FAILED
+        FAIL:
       rbe: true
       target: ${{ matrix.target }}
       trusted: ${{ inputs.trusted }}
