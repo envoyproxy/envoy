@@ -246,7 +246,8 @@ enum class AttributeID : uint32_t {
   XdsVirtualHostMetadata,
   XdsUpstreamHostMetadata,
   XdsFilterChainName,
-  HealthCheck
+  HealthCheck,
+  UpstreamRequestedServerName
 };
 
 enum class LogLevel : uint32_t { Trace, Debug, Info, Warn, Error, Critical, Off };
