@@ -93,8 +93,8 @@ if [[ "${#FAILED[@]}" -ne "0" ]]; then
     for failed in "${FAILED[@]}"; do
         echo "${BASH_ERR_PREFIX} $failed" >&2
     done
-    if [[ $(git status --porcelain) ]]; then
-        git diff > "$DIFF_OUTPUT"
+    if [[ $(git status --porcelain -- . ":(exclude,glob)**/MODULE.bazel.lock") ]]; then
+        git diff -- . ":(exclude,glob)**/MODULE.bazel.lock" > "$DIFF_OUTPUT"
         echo >&2
         echo "Applying the following diff should fix (some) problems" >&2
         echo >&2

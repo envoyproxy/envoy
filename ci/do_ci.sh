@@ -42,6 +42,7 @@ _realpath() {
 
 ENVOY_DOCS_PATH="${ENVOY_DOCS_PATH:-./docs}"
 ENVOY_DOCS_PATH="$(_realpath "$ENVOY_DOCS_PATH")"
+LOCKFILES_DIFF_OUTPUT="${LOCKFILES_DIFF_OUTPUT:-/build/fix_lockfiles.diff}"
 readonly LOCKFILE_PATHSPEC=':(glob)**/MODULE.bazel.lock'
 readonly -a REGISTRY_BAZELRC_FILES=(
     ".bazelrc"
@@ -51,13 +52,17 @@ readonly -a REGISTRY_BAZELRC_FILES=(
 
 lockfiles_check() {
     lockfiles_generate
-    if [[ -n "$(git status --porcelain -- "$LOCKFILE_PATHSPEC")" ]]; then
-        git --no-pager diff -- "$LOCKFILE_PATHSPEC"
-        echo >&2
-        echo "Lockfiles are not in sync, please run: ci/do_ci.sh lockfiles" >&2
-        echo >&2
-        exit 1
+    if [[ -z "$(git status --porcelain -- "$LOCKFILE_PATHSPEC")" ]]; then
+        return 0
     fi
+    git --no-pager diff --stat -- "$LOCKFILE_PATHSPEC"
+    mkdir -p "$(dirname "$LOCKFILES_DIFF_OUTPUT")" 2>/dev/null || :
+    git --no-pager diff -- "$LOCKFILE_PATHSPEC" > "$LOCKFILES_DIFF_OUTPUT" 2>/dev/null || :
+    echo >&2
+    echo "FAIL: Lockfiles are not in sync, please run: ci/do_ci.sh lockfiles" >&2
+    echo "  Full diff written to ${LOCKFILES_DIFF_OUTPUT} (uploaded as a CI artifact)" >&2
+    echo >&2
+    exit 1
 }
 
 lockfiles_generate() {
@@ -79,11 +84,11 @@ registry_current_hash() {
             's#^common --registry=https://raw\.githubusercontent\.com/envoyproxy/bazel-registry/([0-9a-f]+)$#\1#p' \
             "$bazelrc")"
         if [[ -z "${hash}" ]]; then
-            echo "Failed to determine current registry hash from ${bazelrc}" >&2
+            echo "FAIL: Failed to determine current registry hash from ${bazelrc}" >&2
             return 1
         fi
         if [[ -n "${current_hash}" && "${current_hash}" != "${hash}" ]]; then
-            echo "Registry hash mismatch: ${bazelrc} has ${hash}, expected ${current_hash}" >&2
+            echo "FAIL: Registry hash mismatch: ${bazelrc} has ${hash}, expected ${current_hash}" >&2
             return 1
         fi
         current_hash="${hash}"
@@ -111,12 +116,12 @@ registry_check() {
 
     if ! git -c safe.bareRepository=all -C "${registry_dir}" \
         cat-file -e "${registry_hash}^{commit}" 2>/dev/null; then
-        echo "Registry commit ${registry_hash} not found in ${registry_repo}" >&2
+        echo "FAIL: Registry commit ${registry_hash} not found in ${registry_repo}" >&2
         return 1
     fi
     if ! git -c safe.bareRepository=all -C "${registry_dir}" \
         merge-base --is-ancestor "${registry_hash}" "${registry_branch}"; then
-        echo "Registry commit ${registry_hash} is not an ancestor of ${registry_branch}" >&2
+        echo "FAIL: Registry commit ${registry_hash} is not an ancestor of ${registry_branch}" >&2
         return 1
     fi
     echo "Registry commit ${registry_hash} is an ancestor of ${registry_branch}"
@@ -130,7 +135,7 @@ registry_check() {
         echo "WARNING: registry commit ${registry_hash} is not a tagged version (ok for ${version})" >&2
         return 0
     fi
-    echo "Registry commit ${registry_hash} is not a tagged version, required for release ${version}" >&2
+    echo "FAIL: Registry commit ${registry_hash} is not a tagged version, required for release ${version}" >&2
     return 1
 }
 
@@ -141,12 +146,12 @@ registry_bump() {
 
     old_hash="$(registry_current_hash)"
 
-    for bazelrc in "${REGISTRY_BAZELRC_FILES[@]}"; do
-        if [[ "${old_hash}" == "${registry_hash}" ]]; then
-            echo "${bazelrc}: ${old_hash} -> ${registry_hash} (unchanged)"
-            continue
-        fi
+    if [[ "${old_hash}" == "${registry_hash}" ]]; then
+        echo "registry hash unchanged: ${old_hash}"
+        return 0
+    fi
 
+    for bazelrc in "${REGISTRY_BAZELRC_FILES[@]}"; do
         sed -i -E \
             "s#^(common --registry=https://raw\\.githubusercontent\\.com/envoyproxy/bazel-registry/)[0-9a-f]+\$#\1${registry_hash}#" \
             "$bazelrc"
@@ -1074,15 +1079,16 @@ case $CI_TARGET in
             registry_hash="$(
                 git ls-remote \
                     "${ENVOY_REGISTRY_REPO:-https://github.com/envoyproxy/bazel-registry}" \
-                    refs/heads/main \
+                    "refs/heads/${ENVOY_REGISTRY_BRANCH:-main}" \
                     | cut -f1
             )"
         fi
         if [[ -z "${registry_hash}" ]]; then
-            echo "Failed to determine Envoy bazel-registry hash" >&2
+            echo "FAIL: Failed to determine Envoy bazel-registry hash" >&2
             exit 1
         fi
         registry_bump "$registry_hash"
+        registry_check
         lockfiles_generate
         ;;
 
