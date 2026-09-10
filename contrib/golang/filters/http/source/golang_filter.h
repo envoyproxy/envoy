@@ -63,7 +63,7 @@ struct httpConfigInternal;
 class SecretReader {
 public:
   SecretReader(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-               Server::Configuration::FactoryContext& context);
+               Server::Configuration::GenericFactoryContext& context);
   std::optional<const std::string> secret(const std::string& name) const;
 
 private:
@@ -78,7 +78,7 @@ class FilterConfig : public std::enable_shared_from_this<FilterConfig>,
 public:
   FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
                Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
-               Server::Configuration::FactoryContext& context);
+               Server::Configuration::GenericFactoryContext& context);
   ~FilterConfig();
 
   const std::string& soId() const { return so_id_; }

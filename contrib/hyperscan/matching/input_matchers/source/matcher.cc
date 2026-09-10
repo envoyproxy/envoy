@@ -1,5 +1,7 @@
 #include "contrib/hyperscan/matching/input_matchers/source/matcher.h"
 
+#include <format>
+
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
@@ -12,13 +14,13 @@ ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database,
                                        const hs_database_t* start_of_match_database) {
   hs_error_t err = hs_alloc_scratch(database, &scratch_);
   if (err != HS_SUCCESS) {
-    IS_ENVOY_BUG(fmt::format("unable to allocate scratch space, error code {}.", err));
+    IS_ENVOY_BUG(std::format("unable to allocate scratch space, error code {}.", err));
   }
   if (start_of_match_database) {
     err = hs_alloc_scratch(start_of_match_database, &scratch_);
     if (err != HS_SUCCESS) {
       IS_ENVOY_BUG(
-          fmt::format("unable to allocate start of match scratch space, error code {}.", err));
+          std::format("unable to allocate start of match scratch space, error code {}.", err));
     }
   }
 }
@@ -80,7 +82,7 @@ bool Matcher::match(absl::string_view value) const {
       },
       &matched);
   if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
-    IS_ENVOY_BUG(fmt::format("unable to scan, error code {}", err));
+    IS_ENVOY_BUG(std::format("unable to scan, error code {}", err));
   }
 
   return matched;
@@ -103,7 +105,7 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
       },
       &bounds);
   if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
-    IS_ENVOY_BUG(fmt::format("unable to scan, error code {}", err));
+    IS_ENVOY_BUG(std::format("unable to scan, error code {}", err));
     return std::string(value);
   }
 
@@ -151,9 +153,9 @@ void Matcher::compile(const std::vector<const char*>& expressions,
     hs_free_compile_error(compile_err);
 
     if (compile_err_expression < 0) {
-      IS_ENVOY_BUG(fmt::format("unable to compile database: {}", compile_err_message));
+      IS_ENVOY_BUG(std::format("unable to compile database: {}", compile_err_message));
     } else {
-      throw EnvoyException(fmt::format("unable to compile pattern '{}': {}",
+      throw EnvoyException(std::format("unable to compile pattern '{}': {}",
                                        expressions.at(compile_err_expression),
                                        compile_err_message));
     }

@@ -10,6 +10,7 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -217,7 +218,8 @@ private:
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralHttpFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
-    return factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_);
+    return Server::Configuration::createHttpFilterFactory(*factory, message, getStatPrefix(),
+                                                          factory_context_);
   }
 
   Server::Configuration::ServerFactoryContext& server_context_;

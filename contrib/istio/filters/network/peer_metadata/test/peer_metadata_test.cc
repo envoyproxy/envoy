@@ -81,7 +81,7 @@ private:
 // Serializes peer metadata the same way the listener-side filter stores it in
 // the registry: a google.protobuf.Struct packed into an Any.
 std::string encodePeerMetadata(absl::string_view baggage, absl::string_view identity) {
-  std::unique_ptr<Istio::Common::WorkloadMetadataObject> metadata =
+  Istio::Common::WorkloadMetadataObjectConstSharedPtr metadata =
       Istio::Common::convertBaggageToWorkloadMetadata(baggage, identity);
   Protobuf::Struct data = ::Istio::Common::convertWorkloadMetadataToStruct(*metadata);
   Protobuf::Any wrapped;
@@ -100,7 +100,7 @@ decodePeerMetadata(const std::string& serialized) {
   if (!any.UnpackTo(&data)) {
     return std::nullopt;
   }
-  std::unique_ptr<Istio::Common::WorkloadMetadataObject> metadata =
+  Istio::Common::WorkloadMetadataObjectConstSharedPtr metadata =
       Istio::Common::convertStructToWorkloadMetadata(data);
   if (!metadata) {
     return std::nullopt;
@@ -447,7 +447,7 @@ public:
       return std::nullopt;
     }
 
-    std::unique_ptr<Istio::Common::WorkloadMetadataObject> peer_info =
+    Istio::Common::WorkloadMetadataObjectConstSharedPtr peer_info =
         Istio::Common::convertStructToWorkloadMetadata(obj);
     if (!peer_info) {
       return std::nullopt;

@@ -6,6 +6,7 @@ Envoy data
   :maxdepth: 2
 
   accesslog/accesslog
+  ai/ai
   cluster/cluster
   core/core
   dns/dns

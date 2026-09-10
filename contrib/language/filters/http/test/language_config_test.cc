@@ -22,8 +22,7 @@ public:
     envoy::extensions::filters::http::language::v3alpha::Language proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
 
-    return factory_.createFilterFactoryFromProtoTyped(proto_config, "stats", factory_context_)
-        .status();
+    return factory_.createFilterFactoryFromProto(proto_config, "stats", factory_context_).status();
   }
 
 private:

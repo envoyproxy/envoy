@@ -306,6 +306,13 @@ public:
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))};
   NiceMock<Network::MockDrainDecision> drain_close_;
+  // The drain type of the listener owning the connection, served to the connection manager via
+  // `listener_info_`. DEFAULT means /healthcheck/fail drain-closes; tests that exercise the health
+  // check path flip this before calling setup().
+  envoy::config::listener::v3::Listener::DrainType drain_type_{
+      envoy::config::listener::v3::Listener::DEFAULT};
+  std::shared_ptr<NiceMock<Network::MockListenerInfo>> listener_info_{
+      std::make_shared<NiceMock<Network::MockListenerInfo>>()};
   std::unique_ptr<ConnectionManagerImpl> conn_manager_;
   std::string server_name_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{

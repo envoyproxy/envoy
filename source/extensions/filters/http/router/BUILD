@@ -24,6 +24,7 @@ envoy_cc_extension(
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
     ],
 )

@@ -1404,11 +1404,8 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   // If there is no external processing configured in the encoding path,
   // and no more external processing is needed in the decoding path,
   // closing the gRPC stream if it is still open.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
-    if (encoding_state_.noExternalProcess() && decoding_state_.noMoreExternalProcess()) {
-      closeStreamMaybeGraceful();
-    }
+  if (encoding_state_.noExternalProcess() && decoding_state_.noMoreExternalProcess()) {
+    closeStreamMaybeGraceful();
   }
 
   return status;
@@ -1441,6 +1438,9 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
   body_req->set_end_of_stream(end_stream);
   body_req->set_body(data.toString());
   encodeProtocolConfig(req);
+  if (end_stream) {
+    state.setEosSentToServerWithBody(true);
+  }
   return req;
 }
 
@@ -1800,8 +1800,7 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
                                                const bool eos_seen_in_body) {
   // Bail out if the gRPC stream has already been closed. This can happen in scenarios
   // like immediate responses or rejected header mutations.
-  if (stream_ == nullptr || !Runtime::runtimeFeatureEnabled(
-                                "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
+  if (stream_ == nullptr) {
     return;
   }
 
@@ -1959,8 +1958,9 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
         on_processing_response_->afterReceivingImmediateResponse(
             response->immediate_response(), absl::OkStatus(), decoder_callbacks_->streamInfo());
       }
+      stats_.stream_msgs_received_.inc();
       sendImmediateResponse(response->immediate_response());
-      processing_status = absl::OkStatus();
+      return;
     }
     break;
   default:
@@ -1973,6 +1973,8 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
 
   if (processing_status.ok()) {
     stats_.stream_msgs_received_.inc();
+    // Close the gRPC stream if no more external processing needed.
+    closeGrpcStreamIfLastRespReceived(*response, eos_seen_in_body);
   } else if (absl::IsFailedPrecondition(processing_status)) {
     // Processing code uses this specific error code in the case that a
     // message was received out of order.
@@ -2002,9 +2004,6 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
     stats_.stream_msgs_received_.inc();
     handleErrorResponse(processing_status);
   }
-
-  // Close the gRPC stream if no more external processing needed.
-  closeGrpcStreamIfLastRespReceived(*response, eos_seen_in_body);
 }
 
 absl::Status Filter::handleStreamingImmediateResponse(

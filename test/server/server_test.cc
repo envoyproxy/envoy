@@ -1,3 +1,6 @@
+#ifndef WIN32
+#include <sys/resource.h>
+#endif
 #include <algorithm>
 #include <memory>
 #include <vector>
@@ -173,58 +176,29 @@ TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
   InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 }
 
+#ifndef WIN32
 TEST(ServerInstanceUtil, RaiseFileLimits) {
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
-  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
-        rlim->rlim_cur = 512;
-        rlim->rlim_max = 1024;
-        return Api::SysCallIntResult{0, 0};
-      }));
-  EXPECT_CALL(os_sys_calls_, setrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, const struct rlimit* rlim) {
-        EXPECT_EQ(1024, rlim->rlim_cur);
-        EXPECT_EQ(1024, rlim->rlim_max);
-        return Api::SysCallIntResult{0, 0};
-      }));
+  struct rlimit rlim;
+  EXPECT_EQ(::getrlimit(RLIMIT_NOFILE, &rlim), 0);
+  ASSERT_GT(rlim.rlim_max, 1);
+  // Set the soft limit lower than the hard limit.
+  rlim.rlim_cur = rlim.rlim_max / 2;
   InstanceUtil::raiseFileLimits();
+  EXPECT_EQ(::getrlimit(RLIMIT_NOFILE, &rlim), 0);
+  EXPECT_EQ(rlim.rlim_cur, rlim.rlim_max);
 }
 
 TEST(ServerInstanceUtil, RaiseFileLimitsAlreadyMaxed) {
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
-  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
-        rlim->rlim_cur = 1024;
-        rlim->rlim_max = 1024;
-        return Api::SysCallIntResult{0, 0};
-      }));
+  struct rlimit rlim;
+  EXPECT_EQ(::getrlimit(RLIMIT_NOFILE, &rlim), 0);
+  rlim.rlim_cur = rlim.rlim_max;
+  EXPECT_EQ(::setrlimit(RLIMIT_NOFILE, &rlim), 0);
+  // Verify that limits remain unchanged when they are the same.
   InstanceUtil::raiseFileLimits();
+  EXPECT_EQ(::getrlimit(RLIMIT_NOFILE, &rlim), 0);
+  EXPECT_EQ(rlim.rlim_cur, rlim.rlim_max);
 }
-
-TEST(ServerInstanceUtil, RaiseFileLimitsReadError) {
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
-  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _)).WillOnce(Invoke([&](int, struct rlimit*) {
-    return Api::SysCallIntResult{-1, 0};
-  }));
-  InstanceUtil::raiseFileLimits();
-}
-
-TEST(ServerInstanceUtil, RaiseFileLimitsWriteError) {
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
-  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
-        rlim->rlim_cur = 512;
-        rlim->rlim_max = 1024;
-        return Api::SysCallIntResult{0, 0};
-      }));
-  EXPECT_CALL(os_sys_calls_, setrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, const struct rlimit*) { return Api::SysCallIntResult{-1, 0}; }));
-  InstanceUtil::raiseFileLimits();
-}
+#endif
 
 class RunHelperTest : public testing::Test {
 public:

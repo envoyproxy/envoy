@@ -4,6 +4,7 @@
 
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
+#include "envoy/formatter/substitution_formatter.h"
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
@@ -41,7 +42,7 @@ class FilterConfig {
 public:
   FilterConfig(const FilterConfigProto& config,
                Server::Configuration::ServerFactoryContext& context,
-               const std::string& stats_prefix, Stats::Scope& scope);
+               const std::string& stats_prefix, Stats::Scope& scope, absl::Status& create_status);
 
   const FilterConfigProto& config() const { return config_; }
   GcpAuthnFilterStats& stats() { return stats_; }
@@ -49,12 +50,16 @@ public:
   TokenCacheImpl* tokenCache() const {
     return token_cache_ ? &token_cache_->tls.get()->cache() : nullptr;
   }
+  const Formatter::Formatter* accountFormatter() const { return account_formatter_.get(); }
+  const Formatter::Formatter* authFormatter() const { return auth_formatter_.get(); }
 
 private:
   const FilterConfigProto config_;
   Server::Configuration::ServerFactoryContext& context_;
   GcpAuthnFilterStats stats_;
   std::shared_ptr<TokenCache> token_cache_;
+  Formatter::FormatterPtr account_formatter_;
+  Formatter::FormatterPtr auth_formatter_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -90,6 +95,7 @@ private:
   friend class GcpAuthnFilterTest;
 
   std::optional<std::string> getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster);
+  void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str);
 
   GcpAuthnFilterStats generateStats(const std::string& stats_prefix, Stats::Scope& scope) {
     return {ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))};

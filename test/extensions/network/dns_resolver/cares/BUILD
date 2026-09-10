@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -11,7 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "dns_impl_test",
     srcs = ["dns_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     # TODO(envoyproxy/windows-dev): Under winsock2 this is behaving unusually for windows, even as
     # 127.0.0.1 and ::1 are explicitly added to `c:\windows\system32\drivers\etc\hosts` ... see:
     # https://gist.github.com/wrowe/24fe5b93b58bb444bce7ecc134905395
@@ -36,6 +37,26 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "dns_impl_fuzz_test",
+    srcs = ["dns_impl_fuzz_test.cc"],
+    corpus = "dns_impl_fuzz_test_corpus",
+    # Use --wrap to allow us to intercept calls to ares_rand_bytes. This is used to
+    # use the fuzzer input in place of RNG data.
+    linkopts = ["-Wl,--wrap=ares_rand_bytes"],
+    deps = [
+        "//envoy/network:dns_resolver_interface",
+        "//source/common/api:api_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
+        "//test/extensions/network/dns_resolver/common:fake_udp_dns_server_lib",
+        "//test/fuzz:utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

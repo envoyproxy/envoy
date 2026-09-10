@@ -7,6 +7,7 @@
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -23,20 +24,9 @@ using ::envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldEx
 using ::Envoy::Http::MockStreamDecoderFilterCallbacks;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestRequestTrailerMapImpl;
+using ::testing::ElementsAre;
 using ::testing::Eq;
-
-constexpr absl::string_view expected_metadata = R"pb(
-fields {
-  key: "parent"
-  value {
-    list_value {
-      values {
-        string_value: "project-id"
-      }
-    }
-  }
-}
-)pb";
+using ::testing::UnorderedElementsAre;
 
 class FilterTestBase : public ::testing::Test {
 protected:
@@ -92,14 +82,6 @@ CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb(
   return request;
 }
 
-void checkProtoStruct(Protobuf::Struct got, absl::string_view expected_in_pbtext) {
-  Protobuf::Struct expected;
-  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(expected_in_pbtext, &expected));
-  EXPECT_TRUE(TestUtility::protoEqual(got, expected, true)) << "got:\n"
-                                                            << got.DebugString() << "expected:\n"
-                                                            << expected_in_pbtext;
-}
-
 using FilterTestExtractOk = FilterTestBase;
 TEST_F(FilterTestExtractOk, UnarySingleBuffer) {
   setUp();
@@ -112,11 +94,10 @@ TEST_F(FilterTestExtractOk, UnarySingleBuffer) {
 
   CreateApiKeyRequest request = makeCreateApiKeyRequest();
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
-        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
-        checkProtoStruct(new_dynamic_metadata, expected_metadata);
-      }));
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.grpc_field_extraction",
+                                 HasStructFields(UnorderedElementsAre(IsStructList(
+                                     "parent", ElementsAre(IsStructValueString("project-id")))))));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   // No data modification.
@@ -134,18 +115,10 @@ TEST_F(FilterTestExtractOk, EmptyFields) {
 
   CreateApiKeyRequest request = makeCreateApiKeyRequest("");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
-        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
-        checkProtoStruct(new_dynamic_metadata, R"pb(
-fields {
-  key: "parent"
-  value {
-    list_value {
-    }
-  }
-})pb");
-      }));
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_,
+              setDynamicMetadata(
+                  "envoy.filters.http.grpc_field_extraction",
+                  HasStructFields(UnorderedElementsAre(IsStructList("parent", ElementsAre())))));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   // No data modification.
@@ -174,15 +147,10 @@ TEST_F(FilterTestExtractOk, MissingFieldProducesListValue) {
     parent: "project-id"
   )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
-        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
-        const auto it = new_dynamic_metadata.fields().find("key.display_name");
-        EXPECT_TRUE(it != new_dynamic_metadata.fields().end());
-        const auto& value = it->second;
-        EXPECT_EQ(value.kind_case(), Protobuf::Value::KindCase::kListValue);
-        EXPECT_EQ(value.list_value().values_size(), 0);
-      });
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.grpc_field_extraction",
+                                 HasStructFields(UnorderedElementsAre(
+                                     IsStructList("key.display_name", ElementsAre())))));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   // No data modification.
@@ -219,31 +187,13 @@ extractions_by_method: {
       key { name: "api-key-name" }
     )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
-        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
-        checkProtoStruct(new_dynamic_metadata, R"pb(
-fields {
-  key: "normalized_parent"
-  value {
-    list_value {
-      values {
-        string_value: "project-id"
-      }
-    }
-  }
-}
-fields {
-  key: "key.name"
-  value {
-    list_value {
-      values {
-        string_value: "api-key-name"
-      }
-    }
-  }
-})pb");
-      }));
+  EXPECT_CALL(
+      mock_decoder_callbacks_.stream_info_,
+      setDynamicMetadata(
+          "envoy.filters.http.grpc_field_extraction",
+          HasStructFields(UnorderedElementsAre(
+              IsStructList("normalized_parent", ElementsAre(IsStructValueString("project-id"))),
+              IsStructList("key.name", ElementsAre(IsStructValueString("api-key-name")))))));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   // No data modification.
@@ -272,18 +222,10 @@ extractions_by_method: {
 
   CreateApiKeyRequest request = makeCreateApiKeyRequest("");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
-        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
-        checkProtoStruct(new_dynamic_metadata, R"pb(
-fields {
-  key: "normalized_parent"
-  value {
-    list_value {
-    }
-  }
-})pb");
-      }));
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.grpc_field_extraction",
+                                 HasStructFields(UnorderedElementsAre(
+                                     IsStructList("normalized_parent", ElementsAre())))));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   // No data modification.
@@ -322,11 +264,10 @@ TEST_F(FilterTestExtractOk, UnaryMultipeBuffers) {
             filter_->decodeData(middle_request_data, false));
   EXPECT_EQ(middle_request_data.length(), 0);
 
-  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
-        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
-        checkProtoStruct(new_dynamic_metadata, expected_metadata);
-      }));
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.grpc_field_extraction",
+                                 HasStructFields(UnorderedElementsAre(IsStructList(
+                                     "parent", ElementsAre(IsStructValueString("project-id")))))));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(end_request_data, true));
 
   // Inject data back and no data modification.
@@ -374,11 +315,10 @@ extractions_by_method: {
   EXPECT_EQ(request_data2->length(), 0);
   EXPECT_EQ(request_data3->length(), 0);
 
-  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
-        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
-        checkProtoStruct(new_dynamic_metadata, expected_metadata);
-      }));
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.grpc_field_extraction",
+                                 HasStructFields(UnorderedElementsAre(IsStructList(
+                                     "parent", ElementsAre(IsStructValueString("project-id")))))));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(request_data, false));
 
   // Inject data back and no data modification.
@@ -493,140 +433,24 @@ supported_types: {
 }
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
-        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
-        checkProtoStruct(new_dynamic_metadata, R"pb(fields {
-  key: "supported_types.double"
-  value {
-    list_value {
-      values {
-        string_value: "1.3"
-      }
-    }
-  }
-}
-fields {
-  key: "supported_types.fixed32"
-  value {
-    list_value {
-      values {
-        string_value: "8"
-      }
-    }
-  }
-}
-fields {
-  key: "supported_types.fixed64"
-  value {
-    list_value {
-      values {
-        string_value: "9"
-      }
-    }
-  }
-}
-fields {
-  key: "supported_types.float"
-  value {
-    list_value {
-      values {
-        string_value: "1.2"
-      }
-    }
-  }
-}
-fields {
-  key: "supported_types.int32"
-  value {
-    list_value {
-      values {
-        string_value: "4"
-      }
-    }
-  }
-}
-fields {
-  key: "supported_types.int64"
-  value {
-    list_value {
-      values {
-        string_value: "5"
-      }
-    }
-  }
-}
-fields {
-  key: "supported_types.sfixed32"
-  value {
-    list_value {
-      values {
-        string_value: "10"
-      }
-    }
-  }
-}
-fields {
-  key: "supported_types.sfixed64"
-  value {
-    list_value {
-      values {
-        string_value: "11"
-      }
-    }
-  }
-}
-fields {
-  key: "supported_types.sint32"
-  value {
-    list_value {
-      values {
-        string_value: "6"
-      }
-    }
-  }
-}
-fields {
-  key: "supported_types.sint64"
-  value {
-    list_value {
-      values {
-        string_value: "7"
-      }
-    }
-  }
-}
-fields {
-  key: "supported_types.string"
-  value {
-    list_value {
-      values {
-        string_value: "1"
-      }
-    }
-  }
-}
-fields {
-  key: "supported_types.uint32"
-  value {
-    list_value {
-      values {
-        string_value: "2"
-      }
-    }
-  }
-}
-fields {
-  key: "supported_types.uint64"
-  value {
-    list_value {
-      values {
-        string_value: "3"
-      }
-    }
-  }
-})pb");
-      }));
+  EXPECT_CALL(
+      mock_decoder_callbacks_.stream_info_,
+      setDynamicMetadata(
+          "envoy.filters.http.grpc_field_extraction",
+          HasStructFields(UnorderedElementsAre(
+              IsStructList("supported_types.double", ElementsAre(IsStructValueString("1.3"))),
+              IsStructList("supported_types.fixed32", ElementsAre(IsStructValueString("8"))),
+              IsStructList("supported_types.fixed64", ElementsAre(IsStructValueString("9"))),
+              IsStructList("supported_types.float", ElementsAre(IsStructValueString("1.2"))),
+              IsStructList("supported_types.int32", ElementsAre(IsStructValueString("4"))),
+              IsStructList("supported_types.int64", ElementsAre(IsStructValueString("5"))),
+              IsStructList("supported_types.sfixed32", ElementsAre(IsStructValueString("10"))),
+              IsStructList("supported_types.sfixed64", ElementsAre(IsStructValueString("11"))),
+              IsStructList("supported_types.sint32", ElementsAre(IsStructValueString("6"))),
+              IsStructList("supported_types.sint64", ElementsAre(IsStructValueString("7"))),
+              IsStructList("supported_types.string", ElementsAre(IsStructValueString("1"))),
+              IsStructList("supported_types.uint32", ElementsAre(IsStructValueString("2"))),
+              IsStructList("supported_types.uint64", ElementsAre(IsStructValueString("3")))))));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   // No data modification.
@@ -678,31 +502,13 @@ repeated_intermediate: {
 }
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
-        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
-        checkProtoStruct(new_dynamic_metadata, R"pb(
-fields {
-  key: "repeated_intermediate.values.list_value.values.string_value"
-  value {
-    list_value {
-      values {
-        string_value: "1"
-      }
-      values {
-        string_value: "2"
-      }
-      values {
-        string_value: "3"
-      }
-      values {
-        string_value: "4"
-      }
-    }
-  }
-}
-)pb");
-      }));
+  EXPECT_CALL(
+      mock_decoder_callbacks_.stream_info_,
+      setDynamicMetadata("envoy.filters.http.grpc_field_extraction",
+                         HasStructFields(UnorderedElementsAre(IsStructList(
+                             "repeated_intermediate.values.list_value.values.string_value",
+                             ElementsAre(IsStructValueString("1"), IsStructValueString("2"),
+                                         IsStructValueString("3"), IsStructValueString("4")))))));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   // No data modification.
@@ -828,199 +634,41 @@ repeated_supported_types: {
 
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
-        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
-        checkProtoStruct(new_dynamic_metadata, R"pb(
-fields {
-  key: "repeated_supported_types.double"
-  value {
-    list_value {
-      values {
-        string_value: "1.3"
-      }
-      values {
-        string_value: "1.313"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.fixed32"
-  value {
-    list_value {
-      values {
-        string_value: "8"
-      }
-      values {
-        string_value: "88"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.fixed64"
-  value {
-    list_value {
-      values {
-        string_value: "9"
-      }
-      values {
-        string_value: "99"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.float"
-  value {
-    list_value {
-      values {
-        string_value: "1.2"
-      }
-      values {
-        string_value: "1.212"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.int32"
-  value {
-    list_value {
-      values {
-        string_value: "4"
-      }
-      values {
-        string_value: "44"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.int64"
-  value {
-    list_value {
-      values {
-        string_value: "5"
-      }
-      values {
-        string_value: "55"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.sfixed32"
-  value {
-    list_value {
-      values {
-        string_value: "10"
-      }
-      values {
-        string_value: "1010"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.sfixed64"
-  value {
-    list_value {
-      values {
-        string_value: "11"
-      }
-      values {
-        string_value: "1111"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.sint32"
-  value {
-    list_value {
-      values {
-        string_value: "6"
-      }
-      values {
-        string_value: "66"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.sint64"
-  value {
-    list_value {
-      values {
-        string_value: "7"
-      }
-      values {
-        string_value: "77"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.string"
-  value {
-    list_value {
-      values {
-        string_value: "1"
-      }
-      values {
-        string_value: "11"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.uint32"
-  value {
-    list_value {
-      values {
-        string_value: "2"
-      }
-      values {
-        string_value: "22"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.uint64"
-  value {
-    list_value {
-      values {
-        string_value: "3"
-      }
-      values {
-        string_value: "33"
-      }
-    }
-  }
-}
-fields {
-  key: "repeated_supported_types.map"
-  value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "key1"
-            value { string_value: "value1" }
-          }
-          fields {
-            key: "key2"
-            value { string_value: "value2" }
-          }
-        }
-      }
-    }
-  }
-})pb");
-      }));
+  EXPECT_CALL(
+      mock_decoder_callbacks_.stream_info_,
+      setDynamicMetadata(
+          "envoy.filters.http.grpc_field_extraction",
+          HasStructFields(UnorderedElementsAre(
+              IsStructList("repeated_supported_types.double",
+                           ElementsAre(IsStructValueString("1.3"), IsStructValueString("1.313"))),
+              IsStructList("repeated_supported_types.fixed32",
+                           ElementsAre(IsStructValueString("8"), IsStructValueString("88"))),
+              IsStructList("repeated_supported_types.fixed64",
+                           ElementsAre(IsStructValueString("9"), IsStructValueString("99"))),
+              IsStructList("repeated_supported_types.float",
+                           ElementsAre(IsStructValueString("1.2"), IsStructValueString("1.212"))),
+              IsStructList("repeated_supported_types.int32",
+                           ElementsAre(IsStructValueString("4"), IsStructValueString("44"))),
+              IsStructList("repeated_supported_types.int64",
+                           ElementsAre(IsStructValueString("5"), IsStructValueString("55"))),
+              IsStructList("repeated_supported_types.sfixed32",
+                           ElementsAre(IsStructValueString("10"), IsStructValueString("1010"))),
+              IsStructList("repeated_supported_types.sfixed64",
+                           ElementsAre(IsStructValueString("11"), IsStructValueString("1111"))),
+              IsStructList("repeated_supported_types.sint32",
+                           ElementsAre(IsStructValueString("6"), IsStructValueString("66"))),
+              IsStructList("repeated_supported_types.sint64",
+                           ElementsAre(IsStructValueString("7"), IsStructValueString("77"))),
+              IsStructList("repeated_supported_types.string",
+                           ElementsAre(IsStructValueString("1"), IsStructValueString("11"))),
+              IsStructList("repeated_supported_types.uint32",
+                           ElementsAre(IsStructValueString("2"), IsStructValueString("22"))),
+              IsStructList("repeated_supported_types.uint64",
+                           ElementsAre(IsStructValueString("3"), IsStructValueString("33"))),
+              IsStructList(
+                  "repeated_supported_types.map",
+                  ElementsAre(IsStructValueStruct(UnorderedElementsAre(
+                      IsStructString("key1", "value1"), IsStructString("key2", "value2")))))))));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   // No data modification.

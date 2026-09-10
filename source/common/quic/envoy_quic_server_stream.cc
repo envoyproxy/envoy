@@ -20,7 +20,6 @@
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/quic/core/quic_types.h"
-#include "quiche_platform_impl/quiche_mem_slice_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -185,10 +184,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 
   ENVOY_STREAM_LOG(debug, "Received headers: {}.", *this, header_list.DebugString());
   const bool headers_only = fin_received() && highest_received_byte_offset() == NumBytesConsumed();
-  const bool end_stream =
-      fin ||
-      (headers_only && Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_signal_"
-                                                      "headers_only_to_http1_backend"));
+  const bool end_stream = fin || headers_only;
   ENVOY_STREAM_LOG(debug, "Headers_only: {}, end_stream: {}.", *this, headers_only, end_stream);
   if (end_stream) {
     end_stream_decoded_ = true;
@@ -602,9 +598,16 @@ bool EnvoyQuicServerStream::useCapsuleProtocol() {
     return false;
   }
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  Http::RequestDecoder* decoder = requestDecoderOrNull();
-  ASSERT(decoder != nullptr);
-  http_datagram_handler_->setStreamDecoder(decoder);
+  if (request_decoder_ && request_decoder_->get().has_value()) {
+    std::shared_ptr<Http::RequestDecoderHandle> handle =
+        request_decoder_->get().ptr()->getRequestDecoderHandle();
+    http_datagram_handler_->setStreamDecoderProvider([handle]() -> Http::StreamDecoder* {
+      if (handle && handle->get().has_value()) {
+        return handle->get().ptr();
+      }
+      return nullptr;
+    });
+  }
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
   return true;
 }

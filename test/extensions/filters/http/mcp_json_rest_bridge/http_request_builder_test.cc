@@ -3,6 +3,7 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -12,9 +13,13 @@ namespace McpJsonRestBridge {
 namespace {
 
 using ::envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule;
+using ::Envoy::StatusHelpers::HasStatus;
 using ::Envoy::StatusHelpers::StatusIs;
 using ::nlohmann::json;
+using ::testing::IsEmpty;
+using ::testing::Pair;
 using ::testing::StrEq;
+using ::testing::UnorderedElementsAre;
 
 TEST(HttpRequestBuilderTest, WildCardHttpRuleBodyContainsAllArgumentsNotInPath) {
   HttpRule http_rule;
@@ -40,8 +45,10 @@ body: "*"
     "theme": "Kids"
   })json");
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
   ASSERT_OK(http_request);
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789"));
   EXPECT_THAT(http_request->method, StrEq("GET"));
@@ -85,8 +92,10 @@ body: "shelf"
     "theme": "Kids"
   })json");
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
   ASSERT_OK(http_request);
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789?theme=Kids"));
   EXPECT_THAT(http_request->method, StrEq("POST"));
@@ -117,8 +126,10 @@ put: "/v1/{parent=projects/*}/shelves/{shelf.name}"
     "parent": "projects/123456789"
   })json");
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
   ASSERT_OK(http_request);
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   EXPECT_THAT(
       http_request->url,
@@ -146,8 +157,10 @@ patch: "/v1/{parent=projects/*}/shelves/{shelf.name}"
     "parent": "projects/123456789"
   })json");
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
   ASSERT_OK(http_request);
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   EXPECT_THAT(http_request->url,
               StrEq("/v1/projects/123456789/shelves/"
@@ -171,8 +184,10 @@ delete: "/v1/{parent=projects/*}"
     "parent": "projects/123456789"
   })json");
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
   ASSERT_OK(http_request);
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789?boolean=true&float=123.456&"
                                        "integer=123&null=null&string=test%20string"));
@@ -196,8 +211,10 @@ body: "*"
     "theme": "Kids"
   })json");
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
   ASSERT_OK(http_request);
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789/shelves/science-fiction"));
   EXPECT_THAT(http_request->method, StrEq("GET"));
@@ -214,24 +231,33 @@ body: "*"
 // constructed upstream path. Before the fix this returned "/v1/users/../../admin/secrets/profile".
 TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableRejectsPathTraversal) {
   json arguments = json::parse(R"json({"id": "../../admin/secrets"})json");
-  EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments, status),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "path template variable 'id' must not contain path traversal segments"));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallPathTraversalRejected);
 }
 
 // A simple variable's '/' is confined to a single segment (percent-encoded), not treated as a
 // path separator that could bypass the intended route prefix.
 TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableEncodesSlash) {
   json arguments = json::parse(R"json({"id": "a/b"})json");
-  absl::StatusOr<std::string> url = constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<std::string> url =
+      constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments, status);
   ASSERT_TRUE(url.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
   EXPECT_THAT(*url, StrEq("/v1/users/a%2Fb/profile"));
 }
 
 // A benign single-segment value still substitutes unchanged.
 TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableAllowsSingleSegment) {
   json arguments = json::parse(R"json({"id": "alice"})json");
-  absl::StatusOr<std::string> url = constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<std::string> url =
+      constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments, status);
   ASSERT_TRUE(url.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
   EXPECT_THAT(*url, StrEq("/v1/users/alice/profile"));
 }
 
@@ -239,9 +265,11 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableAllowsSingleSegment) 
 // preserved and left as the operator's explicit choice.
 TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariablePreservesSlash) {
   json arguments = json::parse(R"json({"parent": "projects/123456789"})json");
+  BridgeStatus status = BridgeStatus::Ok;
   absl::StatusOr<std::string> url =
-      constructBaseUrl("/v1/{parent=projects/*}/shelves", {"parent"}, arguments);
+      constructBaseUrl("/v1/{parent=projects/*}/shelves", {"parent"}, arguments, status);
   ASSERT_TRUE(url.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
   EXPECT_THAT(*url, StrEq("/v1/projects/123456789/shelves"));
 }
 
@@ -250,8 +278,11 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariablePreservesSlash) {
 // "/v1/../../admin/secrets/shelves".
 TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariableRejectsPathTraversal) {
   json arguments = json::parse(R"json({"name": "../../admin/secrets"})json");
-  EXPECT_THAT(constructBaseUrl("/v1/{name=projects/*}/shelves", {"name"}, arguments),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(constructBaseUrl("/v1/{name=projects/*}/shelves", {"name"}, arguments, status),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "path template variable 'name' must not contain path traversal segments"));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallPathTraversalRejected);
 }
 
 // '\' is percent-encoded to %5C rather than reaching the upstream literally, but an upstream that
@@ -259,15 +290,21 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariableRejectsPathTraversa
 // separator by the check as well.
 TEST(HttpRequestBuilderTest, ConstructBaseUrlRejectsBackslashPathTraversal) {
   json arguments = json::parse(R"json({"id": "..\\.."})json");
-  EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments, status),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "path template variable 'id' must not contain path traversal segments"));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallPathTraversalRejected);
 }
 
 // A backslash that is not a traversal segment is still allowed through, percent-encoded.
 TEST(HttpRequestBuilderTest, ConstructBaseUrlEncodesNonTraversalBackslash) {
   json arguments = json::parse(R"json({"id": "a\\b"})json");
-  absl::StatusOr<std::string> url = constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments);
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<std::string> url =
+      constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments, status);
   ASSERT_TRUE(url.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
   EXPECT_THAT(*url, StrEq("/v1/users/a%5Cb/profile"));
 }
 
@@ -281,7 +318,11 @@ get: "/v1/{parent=projects/*}"
     "string": "test string"
   })json");
 
-  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(
+      buildHttpRequest(http_rule, arguments, status),
+      HasStatus(absl::StatusCode::kInvalidArgument, "Could not find value for path: parent"));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
 }
 
 TEST(HttpRequestBuilderTest, FailToExtractBodyReturnError) {
@@ -293,7 +334,20 @@ body: "foo"
                             http_rule);
   json arguments = json::parse(R"json({})json");
 
-  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
+              HasStatus(absl::StatusCode::kInvalidArgument, "Could not find value for path: foo"));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
+}
+
+TEST(HttpRequestBuilderTest, UnsupportedHttpMethodReturnInvalidHttpRuleError) {
+  HttpRule http_rule;
+  json arguments = json::parse(R"json({})json");
+
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
+              HasStatus(absl::StatusCode::kInvalidArgument, "HttpRule is malformed"));
+  EXPECT_EQ(status, BridgeStatus::InternalToolsCallInvalidHttpRule);
 }
 
 TEST(HttpRequestBuilderTest, ConstructBaseUrlTest) {
@@ -304,19 +358,24 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlTest) {
     "projectId": "project_C"
   })json");
 
+  BridgeStatus status = BridgeStatus::Ok;
   // Single substitution.
-  EXPECT_THAT(*constructBaseUrl("/v1/{parent=projects/*}", {"parent"}, arguments),
+  EXPECT_THAT(*constructBaseUrl("/v1/{parent=projects/*}", {"parent"}, arguments, status),
               StrEq("/v1/projects/123456789"));
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   // Multiple substitutions.
   EXPECT_THAT(*constructBaseUrl(
                   "/test/v2/projects/{projectId}/datasets/{datasetId}/tables/{tableId}/insertAll",
-                  {"projectId", "datasetId", "tableId"}, arguments),
+                  {"projectId", "datasetId", "tableId"}, arguments, status),
               StrEq("/test/v2/projects/project_C/datasets/dataset_B/tables/table_A/insertAll"));
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   // Missing argument.
-  EXPECT_THAT(constructBaseUrl("/v1/{missing}", {"missing"}, arguments),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(
+      constructBaseUrl("/v1/{missing}", {"missing"}, arguments, status),
+      HasStatus(absl::StatusCode::kInvalidArgument, "Could not find value for path: missing"));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
 }
 
 // Substitution matches a whole `{name}` or `{name=pattern}` and nothing else. These cases pin the
@@ -324,15 +383,20 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlTest) {
 TEST(HttpRequestBuilderTest, ConstructBaseUrlVariableMatchingIsExact) {
   json arguments = json::parse(R"json({"id": "7"})json");
 
+  BridgeStatus status = BridgeStatus::Ok;
   // A longer name that merely starts with the variable name is left alone.
-  EXPECT_THAT(*constructBaseUrl("/v1/{identifier}/{id}", {"id"}, arguments),
+  EXPECT_THAT(*constructBaseUrl("/v1/{identifier}/{id}", {"id"}, arguments, status),
               StrEq("/v1/{identifier}/7"));
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   // An explicit pattern needs at least one character, so `{id=}` is not a variable.
-  EXPECT_THAT(*constructBaseUrl("/v1/{id=}", {"id"}, arguments), StrEq("/v1/{id=}"));
+  EXPECT_THAT(*constructBaseUrl("/v1/{id=}", {"id"}, arguments, status), StrEq("/v1/{id=}"));
+  EXPECT_EQ(status, BridgeStatus::Ok);
 
   // Every occurrence is substituted, not just the first.
-  EXPECT_THAT(*constructBaseUrl("/v1/{id}/copy/{id}", {"id"}, arguments), StrEq("/v1/7/copy/7"));
+  EXPECT_THAT(*constructBaseUrl("/v1/{id}/copy/{id}", {"id"}, arguments, status),
+              StrEq("/v1/7/copy/7"));
+  EXPECT_EQ(status, BridgeStatus::Ok);
 }
 
 TEST(HttpRequestBuilderTest, ConstructQueryParamsNestingDepthLimit) {
@@ -349,7 +413,10 @@ get: "/v1"
     current = &((*current)["a"]);
   }
 
-  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
 }
 
 TEST(HttpRequestBuilderTest, ConstructQueryParamsArrayNestingDepthLimit) {
@@ -366,7 +433,319 @@ get: "/v1"
     current = &((*current)[0]);
   }
 
-  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
+}
+
+TEST(HttpRequestBuilderTest, FailToExtractValueFromParameterBindingReturnOk) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+    get: "/v1"
+    bindings:
+    - type: HEADER
+      name: "foo"
+      argument_path: "foo_key"
+    - type: COOKIE
+      name: "bar"
+      argument_path: "bar_key"
+  )yaml",
+                            http_rule);
+  json arguments = json::parse(R"json({})json");
+
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_OK(buildHttpRequest(http_rule, arguments, status));
+  EXPECT_EQ(status, BridgeStatus::Ok);
+}
+
+TEST(HttpRequestBuilderTest, WildCardBodyAndParameterBindingPathNotFoundInEmptyObject) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+    get: "/v1/{parent=projects/*}"
+    body: "*"
+    bindings:
+    - type: HEADER
+      name: "X-Header-Key"
+      argument_path: "nested.header_key"
+  )yaml",
+                            http_rule);
+  json arguments = json::parse(R"json({
+    "parent": "projects/123456789",
+    "nested": {},
+    "theme": "Kids"
+  })json");
+
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
+  ASSERT_TRUE(http_request.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
+
+  EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789"));
+  EXPECT_THAT(http_request->method, StrEq("GET"));
+  EXPECT_EQ(http_request->body, json::parse(R"json({
+              "nested": {},
+              "theme": "Kids"
+            })json"));
+  EXPECT_THAT(http_request->headers_params, IsEmpty());
+  EXPECT_THAT(http_request->cookies_params, IsEmpty());
+}
+
+TEST(HttpRequestBuilderTest, HeaderAndCookieParamsPopulatedCorrectly) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+    get: "/v1/{parent=projects/*}/apiKeys"
+    bindings:
+    - type: HEADER
+      name: "X-Api-Key"
+      argument_path: "api_key"
+    - type: HEADER
+      name: "Authorization"
+      argument_path: "auth_token"
+    - type: COOKIE
+      name: "SESSION_ID"
+      argument_path: "session_id"
+    - type: COOKIE
+      name: "PREF"
+      argument_path: "pref"
+  )yaml",
+                            http_rule);
+
+  json arguments = json::parse(R"json({
+    "parent": "projects/123456789",
+    "api_key": "my-key",
+    "auth_token": "Bearer xyz",
+    "session_id": "sess-123",
+    "pref": "dark-mode",
+    "page_size": 10
+  })json");
+
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
+  ASSERT_TRUE(http_request.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
+
+  EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789/apiKeys?page_size=10"));
+  EXPECT_THAT(http_request->method, StrEq("GET"));
+  EXPECT_TRUE(http_request->body.is_null());
+
+  // Verify header params are populated correctly.
+  EXPECT_THAT(
+      http_request->headers_params,
+      UnorderedElementsAre(Pair("X-Api-Key", "my-key"), Pair("Authorization", "Bearer xyz")));
+
+  // Verify cookie params are populated correctly.
+  EXPECT_THAT(http_request->cookies_params,
+              UnorderedElementsAre(Pair("SESSION_ID", "sess-123"), Pair("PREF", "dark-mode")));
+}
+
+TEST(HttpRequestBuilderTest, WildCardBodyExcludesHeaderAndCookieBindings) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+    post: "/v1/{parent=projects/*}"
+    body: "*"
+    bindings:
+    - type: HEADER
+      name: "X-Api-Key"
+      argument_path: "api_key"
+    - type: COOKIE
+      name: "SESSION_ID"
+      argument_path: "session_id"
+  )yaml",
+                            http_rule);
+
+  json arguments = json::parse(R"json({
+    "parent": "projects/123456789",
+    "api_key": "my-key",
+    "session_id": "sess-123",
+    "payload": "data"
+  })json");
+
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
+  ASSERT_TRUE(http_request.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
+
+  EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789"));
+  EXPECT_THAT(http_request->method, StrEq("POST"));
+
+  // Body should NOT contain api_key, session_id, or parent (path template).
+  EXPECT_EQ(http_request->body, json::parse(R"json({"payload": "data"})json"));
+
+  // But headers and cookies should be populated.
+  EXPECT_THAT(http_request->headers_params, UnorderedElementsAre(Pair("X-Api-Key", "my-key")));
+  EXPECT_THAT(http_request->cookies_params, UnorderedElementsAre(Pair("SESSION_ID", "sess-123")));
+}
+
+TEST(HttpRequestBuilderTest, NestedArgumentPathForBindings) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+    get: "/v1/resources"
+    bindings:
+    - type: HEADER
+      name: "X-Auth-Token"
+      argument_path: "user.auth_token"
+    - type: COOKIE
+      name: "SESSION"
+      argument_path: "context.session_id"
+  )yaml",
+                            http_rule);
+
+  json arguments = json::parse(R"json({
+    "user": {
+      "auth_token": "token-abc",
+      "name": "alice"
+    },
+    "context": {
+      "session_id": "sess-xyz",
+      "locale": "en"
+    }
+  })json");
+
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
+  ASSERT_TRUE(http_request.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
+
+  // Bound nested paths should NOT appear in query params.
+  // user.name and context.locale should appear as query params.
+  EXPECT_THAT(http_request->url, StrEq("/v1/resources?context.locale=en&user.name=alice"));
+  EXPECT_THAT(http_request->method, StrEq("GET"));
+  EXPECT_TRUE(http_request->body.is_null());
+
+  EXPECT_THAT(http_request->headers_params,
+              UnorderedElementsAre(Pair("X-Auth-Token", "token-abc")));
+  EXPECT_THAT(http_request->cookies_params, UnorderedElementsAre(Pair("SESSION", "sess-xyz")));
+}
+
+TEST(HttpRequestBuilderTest, SpecificBodyFieldWithHeaderCookieBindings) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+    put: "/v1/{parent=projects/*}"
+    body: "payload"
+    bindings:
+    - type: HEADER
+      name: "X-Request-Id"
+      argument_path: "request_id"
+    - type: COOKIE
+      name: "TOKEN"
+      argument_path: "token"
+  )yaml",
+                            http_rule);
+
+  json arguments = json::parse(R"json({
+    "parent": "projects/123",
+    "payload": {"data": "value"},
+    "request_id": "req-001",
+    "token": "tok-abc",
+    "extra_query": "query_val"
+  })json");
+
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
+  ASSERT_TRUE(http_request.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
+
+  // extra_query should be a query param; request_id and token should NOT.
+  EXPECT_THAT(http_request->url, StrEq("/v1/projects/123?extra_query=query_val"));
+  EXPECT_THAT(http_request->method, StrEq("PUT"));
+  EXPECT_EQ(http_request->body, json::parse(R"json({"data": "value"})json"));
+
+  EXPECT_THAT(http_request->headers_params, UnorderedElementsAre(Pair("X-Request-Id", "req-001")));
+  EXPECT_THAT(http_request->cookies_params, UnorderedElementsAre(Pair("TOKEN", "tok-abc")));
+}
+
+TEST(HttpRequestBuilderTest, InvalidHeaderValueRejection) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+    get: "/v1"
+    bindings:
+    - type: HEADER
+      name: "X-Header-Key"
+      argument_path: "header_key"
+  )yaml",
+                            http_rule);
+
+  // CR/LF is invalid character in header values.
+  json arguments = json::parse(R"json({
+    "header_key": "invalid\r\nvalue"
+  })json");
+
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallArgumentsMalformed);
+}
+
+TEST(HttpRequestBuilderTest, InvalidCookieValueRejection) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+    get: "/v1"
+    bindings:
+    - type: COOKIE
+      name: "SESSION"
+      argument_path: "session_id"
+  )yaml",
+                            http_rule);
+
+  BridgeStatus status = BridgeStatus::Ok;
+  // CR/LF is invalid character.
+  EXPECT_THAT(buildHttpRequest(
+                  http_rule, json::parse(R"json({"session_id": "invalid\r\nvalue"})json"), status),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallArgumentsMalformed);
+
+  // Space is invalid.
+  status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid value"})json"),
+                               status),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallArgumentsMalformed);
+
+  // Comma is invalid.
+  status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid,value"})json"),
+                               status),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallArgumentsMalformed);
+
+  // Semicolon is invalid.
+  status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid;value"})json"),
+                               status),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallArgumentsMalformed);
+
+  // Backslash is invalid.
+  status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule,
+                               json::parse(R"json({"session_id": "invalid\\value"})json"), status),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallArgumentsMalformed);
+}
+
+TEST(HttpRequestBuilderTest, ValidQuotedCookieValueAllowed) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+    get: "/v1"
+    bindings:
+    - type: COOKIE
+      name: "SESSION"
+      argument_path: "session_id"
+  )yaml",
+                            http_rule);
+
+  // Enclosed in DQUOTE is valid.
+  json arguments = json::parse(R"json({
+    "session_id": "\"valid-session-id\""
+  })json");
+
+  BridgeStatus status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments, status);
+  ASSERT_TRUE(http_request.ok());
+  EXPECT_EQ(status, BridgeStatus::Ok);
+  EXPECT_THAT(http_request->cookies_params,
+              UnorderedElementsAre(Pair("SESSION", "\"valid-session-id\"")));
 }
 
 } // namespace

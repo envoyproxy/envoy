@@ -25,6 +25,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
     "passthrough" => Some(Box::new(PassthroughHttpFilterConfig {})),
+    "local_reply_response_headers" => Some(Box::new(LocalReplyResponseHeadersConfig {})),
     "header_callbacks" => Some(Box::new(HeadersHttpFilterConfig {
       headers_to_add: String::from_utf8(config.to_owned()).unwrap(),
     })),
@@ -129,13 +130,16 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       let scheduler = envoy_filter_config.new_scheduler();
 
       // Spawn a thread to simulate async work.
-      std::thread::spawn(move || {
+      let thread_handle = std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(100));
         // Schedule an event with ID 1.
         scheduler.commit(1);
       });
 
-      Some(Box::new(ConfigSchedulerConfig { shared_status }))
+      Some(Box::new(ConfigSchedulerConfig {
+        shared_status,
+        thread_handle: Some(thread_handle),
+      }))
     },
     "http_config_callout" => {
       let cluster_name = String::from_utf8(config.to_owned()).unwrap();
@@ -180,7 +184,11 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       dropped_filters: Arc::new(AtomicUsize::new(0)),
     })),
     "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig {})),
-    "log_level" => Some(Box::new(LogLevelFilterConfig {})),
+    "log_level" => Some(Box::new(LogLevelFilterConfig {
+      config_log_level: get_log_level() as u32,
+      config_info_enabled: is_log_enabled(envoy_dynamic_module_type_log_level::Info),
+      config_error_enabled: is_log_enabled(envoy_dynamic_module_type_log_level::Error),
+    })),
     _ => panic!("Unknown filter name: {name}"),
   }
 }
@@ -340,6 +348,15 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UseSelfAfterTeardownFilter {
 
 struct ConfigSchedulerConfig {
   shared_status: Arc<AtomicBool>,
+  thread_handle: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Drop for ConfigSchedulerConfig {
+  fn drop(&mut self) {
+    if let Some(thread_handle) = self.thread_handle.take() {
+      thread_handle.join().expect("Failed to join thread");
+    }
+  }
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ConfigSchedulerConfig {
@@ -477,6 +494,30 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ConfigStreamFilter {
   }
 }
 
+// Only records that its response-headers callback ran. Used to check that the
+// callback still fires when the response is a local reply the module did not
+// send, such as a `direct_response` route.
+struct LocalReplyResponseHeadersConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for LocalReplyResponseHeadersConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(LocalReplyResponseHeadersFilter {})
+  }
+}
+
+struct LocalReplyResponseHeadersFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LocalReplyResponseHeadersFilter {
+  fn on_response_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    envoy_filter.set_response_header("on-response-headers", b"called");
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+}
+
 struct PassthroughHttpFilterConfig {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for PassthroughHttpFilterConfig {
@@ -532,15 +573,27 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
   }
 }
 
-struct LogLevelFilterConfig {}
+struct LogLevelFilterConfig {
+  config_log_level: u32,
+  config_info_enabled: bool,
+  config_error_enabled: bool,
+}
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for LogLevelFilterConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(LogLevelFilter {})
+    Box::new(LogLevelFilter {
+      config_log_level: self.config_log_level,
+      config_info_enabled: self.config_info_enabled,
+      config_error_enabled: self.config_error_enabled,
+    })
   }
 }
 
-struct LogLevelFilter {}
+struct LogLevelFilter {
+  config_log_level: u32,
+  config_info_enabled: bool,
+  config_error_enabled: bool,
+}
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LogLevelFilter {
   fn on_response_headers(
@@ -548,12 +601,23 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LogLevelFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    // tests http filter handle
     let level = (get_log_level() as u32).to_string();
     envoy_filter.set_response_header("x-log-level", level.as_bytes());
     let info_enabled = is_log_enabled(envoy_dynamic_module_type_log_level::Info).to_string();
     envoy_filter.set_response_header("x-log-info-enabled", info_enabled.as_bytes());
     let error_enabled = is_log_enabled(envoy_dynamic_module_type_log_level::Error).to_string();
     envoy_filter.set_response_header("x-log-error-enabled", error_enabled.as_bytes());
+    // tests filter config handle
+    let config_level = self.config_log_level.to_string();
+    envoy_filter.set_response_header("x-config-log-level", config_level.as_bytes());
+    let config_info_enabled = self.config_info_enabled.to_string();
+    envoy_filter.set_response_header("x-config-log-info-enabled", config_info_enabled.as_bytes());
+    let config_error_enabled = self.config_error_enabled.to_string();
+    envoy_filter.set_response_header(
+      "x-config-log-error-enabled",
+      config_error_enabled.as_bytes(),
+    );
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
@@ -1316,12 +1380,22 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FakeExternalCachingFilterCo
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(FakeExternalCachingFilter {
       rx: RefCell::new(None),
+      thread_handles: RefCell::new(vec![]),
     })
   }
 }
 
 struct FakeExternalCachingFilter {
   rx: RefCell<Option<std::sync::mpsc::Receiver<String>>>,
+  thread_handles: RefCell<Vec<std::thread::JoinHandle<()>>>,
+}
+
+impl Drop for FakeExternalCachingFilter {
+  fn drop(&mut self) {
+    for thread_handle in self.thread_handles.borrow_mut().drain(..) {
+      thread_handle.join().expect("Failed to join thread");
+    }
+  }
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
@@ -1346,7 +1420,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
     // you would typically use a thread pool or an async runtime to handle
     // the asynchronous I/O or computation.
     let scheduler = envoy_filter.new_scheduler();
-    _ = std::thread::spawn(move || {
+    let thread_handle = std::thread::spawn(move || {
       // Simulate some processing to check if the cache key exists.
       let cache_hit = if cache_key == "existing" {
         // Do some processing to get the cached response body in real world.
@@ -1360,6 +1434,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
       // We use the event_id pased to the commit method to indicate if the cache key was found.
       scheduler.commit(cache_hit);
     });
+    self.thread_handles.borrow_mut().push(thread_handle);
     // Return StopIteration to indicate that we will continue the processing
     // once the scheduled event is completed.
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
@@ -1394,9 +1469,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
     let scheduler = envoy_filter.new_scheduler();
-    _ = std::thread::spawn(move || {
+    let thread_handle = std::thread::spawn(move || {
       scheduler.commit(2);
     });
+    self.thread_handles.borrow_mut().push(thread_handle);
 
     // Return StopIteration to indicate that we will continue the processing
     // once the scheduled event is completed.
@@ -1781,10 +1857,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantStreamCompleteFilter {
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // Defer the response so it is completed from inside a callback rather than inline here.
+    // commit() posts to the worker dispatcher even when called from the worker thread.
     let scheduler = envoy_filter.new_scheduler();
-    _ = std::thread::spawn(move || {
-      scheduler.commit(1);
-    });
+    scheduler.commit(1);
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 

@@ -6,12 +6,13 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::Contains;
-using testing::Key;
+using testing::Pair;
 
 namespace Envoy {
 namespace Extensions {
@@ -26,8 +27,7 @@ MATCHER_P(MapEq, rhs, "") {
   const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
-    EXPECT_THAT(obj.fields(), Contains(Key(entry.first)));
-    EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
+    EXPECT_THAT(obj.fields(), Contains(IsStructString(entry.first, entry.second)));
   }
   return true;
 }
@@ -36,8 +36,7 @@ MATCHER_P(MapEqNum, rhs, "") {
   const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
-    EXPECT_THAT(obj.fields(), Contains(Key(entry.first)));
-    EXPECT_EQ(obj.fields().at(entry.first).number_value(), entry.second);
+    EXPECT_THAT(obj.fields(), Contains(IsStructNumber(entry.first, entry.second)));
   }
   return true;
 }

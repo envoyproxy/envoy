@@ -113,7 +113,7 @@ public:
 
 private:
   std::shared_ptr<CollectorInfo> collector_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotSharedPtr tls_;
   TraceContextOption trace_context_option_;
 };
 

@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/logger.h"
 #include "envoy/thread/thread.h"
 
 #include "source/common/common/base_logger.h"
@@ -36,6 +37,7 @@ const static bool should_log = true;
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
   FUNCTION(a2a)                                                                                    \
   FUNCTION(admin)                                                                                  \
+  FUNCTION(ai_protocol_manager)                                                                    \
   FUNCTION(alternate_protocols_cache)                                                              \
   FUNCTION(aws)                                                                                    \
   FUNCTION(assert)                                                                                 \

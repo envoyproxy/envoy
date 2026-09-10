@@ -1455,6 +1455,11 @@ public:
    * for this route configuration.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * @return bool whether to ignore path parameters in path matching.
+   */
+  virtual bool ignorePathParametersInPathMatching() const PURE;
 };
 
 struct VirtualHostRoute {

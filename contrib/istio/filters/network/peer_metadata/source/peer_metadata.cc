@@ -209,7 +209,7 @@ std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
     }
   }
 
-  std::unique_ptr<::Istio::Common::WorkloadMetadataObject> metadata =
+  ::Istio::Common::WorkloadMetadataObjectConstSharedPtr metadata =
       ::Istio::Common::convertBaggageToWorkloadMetadata(baggage[0]->value().getStringView(),
                                                         identity);
 
@@ -458,7 +458,7 @@ void UpstreamFilter::populatePeerMetadataFromProto(absl::string_view serialized)
     return;
   }
 
-  std::unique_ptr<::Istio::Common::WorkloadMetadataObject> workload =
+  ::Istio::Common::WorkloadMetadataObjectConstSharedPtr workload =
       ::Istio::Common::convertStructToWorkloadMetadata(peer_metadata);
   populatePeerMetadata(*workload);
 }

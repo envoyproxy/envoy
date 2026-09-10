@@ -23,22 +23,22 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Contains;
+using testing::HasSubstr;
 using testing::Invoke;
+using testing::IsSupersetOf;
+using testing::Key;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-
-using testing::Contains;
-using testing::Key;
 using testing::UnorderedElementsAre;
-
-using testing::HasSubstr;
 
 namespace Envoy {
 namespace Extensions {
@@ -180,6 +180,23 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, MaxReconnectBackoffOverride) {
   auto custom_extension =
       std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
   EXPECT_EQ(custom_extension->maxReconnectBackoffMs(), 5000);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, MaintainIntervalDefaults) {
+  // Unset maintain_interval falls back to the historical 10s re-check.
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+      DownstreamReverseConnectionSocketInterface empty_config;
+  auto extension_with_default =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, empty_config);
+  EXPECT_EQ(extension_with_default->maintainIntervalMs(), 10000);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, MaintainIntervalOverride) {
+  auto custom_config = config_;
+  custom_config.mutable_maintain_interval()->set_seconds(5);
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  EXPECT_EQ(custom_extension->maintainIntervalMs(), 5000);
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersDefaults) {
@@ -823,16 +840,16 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogCallsLoggers) {
         // Verify metadata was populated correctly.
         const auto& metadata =
             stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
-        EXPECT_EQ(metadata.fields().at("event").string_value(), "handshake_success");
-        EXPECT_EQ(metadata.fields().at("node_id").string_value(), "node1");
-        EXPECT_EQ(metadata.fields().at("cluster_id").string_value(), "cluster1");
-        EXPECT_EQ(metadata.fields().at("tenant_id").string_value(), "tenant1");
-        EXPECT_EQ(metadata.fields().at("upstream_cluster").string_value(), "my_upstream");
-        EXPECT_EQ(metadata.fields().at("host_address").string_value(), "10.0.0.1:443");
-        EXPECT_EQ(metadata.fields().at("connection_key").string_value(), "conn-123");
-        EXPECT_EQ(metadata.fields().at("worker_id").string_value(), "worker_1");
-        EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "555");
-        EXPECT_EQ(metadata.fields().at("error").string_value(), "");
+        EXPECT_THAT(
+            metadata.fields(),
+            UnorderedElementsAre(
+                IsStructString("event", "handshake_success"), IsStructString("node_id", "node1"),
+                IsStructString("cluster_id", "cluster1"), IsStructString("tenant_id", "tenant1"),
+                IsStructString("upstream_cluster", "my_upstream"),
+                IsStructString("host_address", "10.0.0.1:443"),
+                IsStructString("connection_key", "conn-123"),
+                IsStructString("worker_id", "worker_1"), IsStructString("connection_id", "555"),
+                IsStructString("error", "")));
       }));
 
   extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "tenant1",
@@ -851,8 +868,9 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogWithError) {
       .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata =
             stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
-        EXPECT_EQ(metadata.fields().at("event").string_value(), "handshake_failure");
-        EXPECT_EQ(metadata.fields().at("error").string_value(), "connection refused");
+        EXPECT_THAT(metadata.fields(),
+                    IsSupersetOf(StructMatchers(IsStructString("event", "handshake_failure"),
+                                                IsStructString("error", "connection refused"))));
       }));
 
   extension_->emitAccessLog(time_system, "handshake_failure", "node1", "cluster1", "tenant1",
@@ -887,16 +905,17 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogConnectionClosedFullMet
       .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata =
             stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
-        EXPECT_EQ(metadata.fields().at("event").string_value(), "connection_closed");
-        EXPECT_EQ(metadata.fields().at("node_id").string_value(), "node-abc");
-        EXPECT_EQ(metadata.fields().at("cluster_id").string_value(), "cluster-xyz");
-        EXPECT_EQ(metadata.fields().at("tenant_id").string_value(), "tenant-123");
-        EXPECT_EQ(metadata.fields().at("upstream_cluster").string_value(), "us-west-cluster");
-        EXPECT_EQ(metadata.fields().at("host_address").string_value(), "192.168.1.100:8443");
-        EXPECT_EQ(metadata.fields().at("connection_key").string_value(), "conn-close-001");
-        EXPECT_EQ(metadata.fields().at("worker_id").string_value(), "worker_3");
-        EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "1001");
-        EXPECT_EQ(metadata.fields().at("error").string_value(), "");
+        EXPECT_THAT(metadata.fields(),
+                    UnorderedElementsAre(IsStructString("event", "connection_closed"),
+                                         IsStructString("node_id", "node-abc"),
+                                         IsStructString("cluster_id", "cluster-xyz"),
+                                         IsStructString("tenant_id", "tenant-123"),
+                                         IsStructString("upstream_cluster", "us-west-cluster"),
+                                         IsStructString("host_address", "192.168.1.100:8443"),
+                                         IsStructString("connection_key", "conn-close-001"),
+                                         IsStructString("worker_id", "worker_3"),
+                                         IsStructString("connection_id", "1001"),
+                                         IsStructString("error", "")));
       }));
 
   extension_->emitAccessLog(time_system, "connection_closed", "node-abc", "cluster-xyz",
@@ -914,12 +933,16 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogWithEmptyOptionalFields
       .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata =
             stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
-        EXPECT_EQ(metadata.fields().at("event").string_value(), "handshake_success");
-        EXPECT_EQ(metadata.fields().at("tenant_id").string_value(), "");
-        EXPECT_EQ(metadata.fields().at("worker_id").string_value(), "");
-        EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "");
-        EXPECT_EQ(metadata.fields().at("error").string_value(), "");
-        EXPECT_EQ(metadata.fields().size(), 10);
+        EXPECT_THAT(
+            metadata.fields(),
+            UnorderedElementsAre(IsStructString("event", "handshake_success"),
+                                 IsStructString("tenant_id", ""), IsStructString("worker_id", ""),
+                                 IsStructString("connection_id", ""), IsStructString("error", ""),
+                                 IsStructString("node_id", "node1"),
+                                 IsStructString("cluster_id", "cluster1"),
+                                 IsStructString("upstream_cluster", "my_upstream"),
+                                 IsStructString("host_address", "10.0.0.1:443"),
+                                 IsStructString("connection_key", "conn-empty")));
       }));
 
   extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "",
@@ -952,8 +975,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogErrorFieldAlwaysPresent
       .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata =
             stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
-        EXPECT_THAT(metadata.fields(), Contains(Key("error")));
-        EXPECT_EQ(metadata.fields().at("error").string_value(), "");
+        EXPECT_THAT(metadata.fields(), Contains(IsStructString("error", "")));
       }));
 
   extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "tenant1",

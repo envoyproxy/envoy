@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/common/optref.h"
 #include "envoy/formatter/http_formatter_context.h"
 #include "envoy/http/header_map.h"
@@ -14,7 +16,7 @@ namespace DynamicModules {
 using HeadersMapOptConstRef = OptRef<const Http::HeaderMap>;
 
 /**
- * Shared read-only context accessors used by Dynamic Module extensions to expose Envoy request and
+ * Shared context accessors used by Dynamic Module extensions to expose Envoy request and
  * response state across the C ABI boundary. The access logger and formatter extensions both wrap
  * these helpers in their own callbacks, so the generic attribute, header, metadata, and local reply
  * body logic lives in a single place.
@@ -77,9 +79,46 @@ public:
                                      envoy_dynamic_module_type_module_buffer filter_name,
                                      envoy_dynamic_module_type_module_buffer path, bool* result);
 
+  // Get a bytes value from filter state by key. Only objects stored as Router::StringAccessor,
+  // which is what setFilterStateBytes() creates, are readable. Returns false when the key is absent
+  // or holds a different object type. Takes a const StreamInfo because FilterState::getDataReadOnly
+  // is const, so read-only contexts can use it too.
+  static bool getFilterStateBytes(const StreamInfo::StreamInfo& stream_info,
+                                  envoy_dynamic_module_type_module_buffer key,
+                                  envoy_dynamic_module_type_envoy_buffer* result);
+
   // Get the local reply body from the formatting context. Returns false when there is no body.
   static bool getLocalReplyBody(const Formatter::Context& context,
                                 envoy_dynamic_module_type_envoy_buffer* result);
+
+  // Set a string value in dynamic metadata, merging into the named filter namespace.
+  static void setDynamicMetadataString(StreamInfo::StreamInfo& stream_info,
+                                       absl::string_view filter_name, absl::string_view key,
+                                       absl::string_view value);
+
+  // Set a number value in dynamic metadata, merging into the named filter namespace.
+  static void setDynamicMetadataNumber(StreamInfo::StreamInfo& stream_info,
+                                       absl::string_view filter_name, absl::string_view key,
+                                       double value);
+
+  // Set multiple string values in dynamic metadata, merging into the named filter namespace once.
+  // An empty array is a no-op and does not create the namespace.
+  static void
+  setDynamicMetadataStringBatch(StreamInfo::StreamInfo& stream_info, absl::string_view filter_name,
+                                const envoy_dynamic_module_type_module_key_value_pair* entries,
+                                size_t entries_size);
+
+  // Set a string value in filter state. When life_span is set, it is passed to setData.
+  static bool
+  setFilterStateBytes(StreamInfo::StreamInfo& stream_info, absl::string_view key,
+                      absl::string_view value,
+                      std::optional<StreamInfo::FilterState::LifeSpan> life_span = std::nullopt);
+
+  // Set a typed filter state object from serialized bytes using the registered ObjectFactory.
+  static bool
+  setFilterStateTyped(StreamInfo::StreamInfo& stream_info, absl::string_view key,
+                      absl::string_view value,
+                      std::optional<StreamInfo::FilterState::LifeSpan> life_span = std::nullopt);
 
   // Convert an Envoy access log type to the ABI enum. Unknown values map to NotSet so that only
   // valid enumerators ever cross the ABI boundary.

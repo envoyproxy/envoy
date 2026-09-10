@@ -13,14 +13,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 
-absl::StatusOr<Http::FilterFactoryCb> DynamoFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::dynamo::v3::Dynamo&, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
-  auto stats = std::make_shared<DynamoStats>(context.scope(), stats_prefix);
+absl::StatusOr<Http::FilterFactoryCb> DynamoFilterConfig::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::dynamo::v3::Dynamo&,
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  auto stats =
+      std::make_shared<DynamoStats>(extra_context.scopeOr(context), extra_context.stats_prefix);
   return [&context, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
-        std::make_shared<Dynamo::DynamoFilter>(context.serverFactoryContext().runtime(), stats,
-                                               context.serverFactoryContext().timeSource()));
+        std::make_shared<Dynamo::DynamoFilter>(context.runtime(), stats, context.timeSource()));
   };
 }
 

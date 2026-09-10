@@ -23,7 +23,7 @@ namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
                 Server::Configuration::ServerFactoryContext& server_context,
-                Init::Manager& init_manager) {
+                OptRef<Init::Manager> init_manager) {
   if (config.has_sds_config()) {
     return server_context.secretManager().findOrCreateGenericSecretProvider(
         config.sds_config(), config.name(), server_context, init_manager);
@@ -33,21 +33,21 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 }
 } // namespace
 
-absl::StatusOr<Http::FilterFactoryCb> FilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> FilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::sxg::v3alpha::SXG& proto_config,
-    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& server_context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   const auto& certificate = proto_config.certificate();
   const auto& private_key = proto_config.private_key();
 
-  auto& server_context = context.serverFactoryContext();
-
+  // The SDS secrets are warmed up through the init manager of the enclosing configuration, if any.
   auto secret_provider_certificate =
-      secretsProvider(certificate, server_context, context.initManager());
+      secretsProvider(certificate, server_context, extra_context.init_manager);
   if (secret_provider_certificate == nullptr) {
     return absl::InvalidArgumentError("invalid certificate secret configuration");
   }
   auto secret_provider_private_key =
-      secretsProvider(private_key, server_context, context.initManager());
+      secretsProvider(private_key, server_context, extra_context.init_manager);
   if (secret_provider_private_key == nullptr) {
     return absl::InvalidArgumentError("invalid private_key secret configuration");
   }
@@ -56,7 +56,8 @@ absl::StatusOr<Http::FilterFactoryCb> FilterFactory::createFilterFactoryFromProt
       std::move(secret_provider_certificate), std::move(secret_provider_private_key),
       server_context.threadLocal(), server_context.api());
   auto config = std::make_shared<FilterConfig>(proto_config, server_context.timeSource(),
-                                               secret_reader, stat_prefix, context.scope());
+                                               secret_reader, extra_context.stats_prefix,
+                                               extra_context.scopeOr(server_context));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     const EncoderPtr encoder = std::make_unique<EncoderImpl>(config);
     callbacks.addStreamFilter(std::make_shared<Filter>(config, encoder));

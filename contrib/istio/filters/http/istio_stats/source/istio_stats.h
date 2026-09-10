@@ -13,14 +13,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IstioStats {
 
-class IstioStatsFilterConfigFactory : public Common::ExceptionFreeFactoryBase<stats::PluginConfig> {
+class IstioStatsFilterConfigFactory : public Common::UnifiedFactoryBase<stats::PluginConfig> {
 public:
-  IstioStatsFilterConfigFactory() : ExceptionFreeFactoryBase("envoy.filters.http.istio_stats") {}
+  IstioStatsFilterConfigFactory() : UnifiedFactoryBase("envoy.filters.http.istio_stats") {}
 
 private:
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProtoTyped(const stats::PluginConfig& proto_config, const std::string&,
-                                    Server::Configuration::FactoryContext&) override;
+  createHttpFilterFactoryFromProtoTyped(const stats::PluginConfig& proto_config,
+                                        Server::Configuration::ServerFactoryContext&,
+                                        Server::Configuration::ExtraFactoryContext&) override;
 };
 
 class IstioStatsNetworkFilterConfigFactory

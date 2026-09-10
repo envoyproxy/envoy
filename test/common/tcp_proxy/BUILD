@@ -52,7 +52,7 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":tcp_proxy_test_base",
         "//envoy/common:hashable_interface",
@@ -65,7 +65,7 @@ envoy_cc_test(
     srcs = [
         "tcp_proxy_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     # MemorySanitizer's instrumentation overhead makes this large parameterized suite exceed the
     # default 300s cap, so allow 900s and shard the work to keep each shard well under the limit.
     shard_count = 5,
@@ -84,7 +84,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_test",
     srcs = ["upstream_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/tcp_proxy",

@@ -12,7 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "http_subscription_impl_test",
     srcs = ["http_subscription_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_subscription_test_harness",
     ],

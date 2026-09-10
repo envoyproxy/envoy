@@ -12,7 +12,7 @@ envoy_extension_cc_test(
     name = "simple_http_cache_test",
     srcs = ["simple_http_cache_test.cc"],
     extension_names = ["envoy.extensions.http.cache_v2.simple"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/cache_v2:cache_entry_utils_lib",
         "//source/extensions/http/cache_v2/simple_http_cache:config",

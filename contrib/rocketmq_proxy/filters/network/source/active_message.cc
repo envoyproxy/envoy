@@ -1,5 +1,7 @@
 #include "contrib/rocketmq_proxy/filters/network/source/active_message.h"
 
+#include <format>
+
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/empty_string.h"
@@ -79,7 +81,7 @@ void ActiveMessage::fillAckMessageDirective(Buffer::Instance& buffer, const std:
     int32_t queue_id = Decoder::decodeQueueId(buffer, cursor);
     int64_t queue_offset = Decoder::decodeQueueOffset(buffer, cursor);
 
-    std::string key = fmt::format("{}-{}-{}-{}", group, decoded_topic, queue_id, queue_offset);
+    std::string key = std::format("{}-{}-{}-{}", group, decoded_topic, queue_id, queue_offset);
     connection_manager_.insertAckDirective(key, directive);
     ENVOY_LOG(
         debug,

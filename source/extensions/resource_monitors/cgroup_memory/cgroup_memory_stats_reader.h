@@ -7,7 +7,9 @@
 #include "envoy/common/pure.h"
 #include "envoy/filesystem/filesystem.h"
 
-#include "cgroup_memory_paths.h"
+#include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_paths.h"
+
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,24 +31,21 @@ public:
 
   /**
    * @return Current memory usage in bytes.
-   * @throw EnvoyException if stats cannot be read.
    */
-  uint64_t getMemoryUsage() { return readMemoryStats(getMemoryUsagePath()); }
+  absl::StatusOr<uint64_t> getMemoryUsage() { return readMemoryStats(getMemoryUsagePath()); }
 
   /**
    * @return Memory limit in bytes.
    * @return UNLIMITED_MEMORY if no limit is set.
-   * @throw EnvoyException if stats cannot be read.
    */
-  uint64_t getMemoryLimit() { return readMemoryStats(getMemoryLimitPath()); }
+  absl::StatusOr<uint64_t> getMemoryLimit() { return readMemoryStats(getMemoryLimitPath()); }
 
   /**
    * Factory method to create the appropriate cgroup stats reader.
    * @param fs Filesystem instance to use for file operations.
    * @return Unique pointer to concrete CgroupMemoryStatsReader implementation.
-   * @throw EnvoyException if no supported cgroup implementation is found.
    */
-  static StatsReaderPtr create(Filesystem::Instance& fs);
+  static absl::StatusOr<StatsReaderPtr> create(Filesystem::Instance& fs);
 
 protected:
   CgroupMemoryStatsReader(Filesystem::Instance& fs) : fs_(fs) {}
@@ -55,9 +54,8 @@ protected:
    * Helper method to read and parse memory stats from cgroup files.
    * @param path Path to the memory stats file.
    * @return Memory value in bytes.
-   * @throw EnvoyException if file cannot be read or parsed.
    */
-  uint64_t readMemoryStats(const std::string& path);
+  absl::StatusOr<uint64_t> readMemoryStats(const std::string& path);
 
   /**
    * @return Path to the memory usage file.

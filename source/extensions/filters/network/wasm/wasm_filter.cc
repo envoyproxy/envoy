@@ -8,8 +8,7 @@ namespace Wasm {
 FilterConfig::FilterConfig(const envoy::extensions::filters::network::wasm::v3::Wasm& config,
                            Server::Configuration::FactoryContext& context)
     : Extensions::Common::Wasm::PluginConfig(config.config(), context.serverFactoryContext(),
-                                             context.scope(), context.initManager(),
-                                             context.direction(), false) {}
+                                             context.scope(), context.initManager(), false) {}
 
 } // namespace Wasm
 } // namespace NetworkFilters

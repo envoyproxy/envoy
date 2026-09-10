@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["reverse_connection_address.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "//envoy/common:base_includes",
         "//envoy/network:address_interface",
         "//source/common/network:address_lib",
         "//source/common/network:socket_interface_lib",

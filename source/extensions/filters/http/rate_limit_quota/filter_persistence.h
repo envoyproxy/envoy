@@ -39,11 +39,10 @@ class GlobalTlsStores : public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   // Object to hold TLS slots after the factory itself has been cleaned up.
   struct TlsStore {
-    TlsStore(Server::Configuration::FactoryContext& context, absl::string_view target_address,
+    TlsStore(Server::Configuration::ServerFactoryContext& context, absl::string_view target_address,
              absl::string_view domain)
-        : buckets_tls(context.serverFactoryContext().threadLocal()),
-          target_address_(target_address), domain_(domain),
-          main_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()) {}
+        : buckets_tls(context.threadLocal()), target_address_(target_address), domain_(domain),
+          main_dispatcher_(context.mainThreadDispatcher()) {}
 
     ~TlsStore() {
       // Clean up the index from the global map. This is not thread-safe, so
@@ -69,8 +68,8 @@ public:
   // Get an existing TLS store by index, or create one if not found.
   static absl::StatusOr<std::shared_ptr<TlsStore>>
   getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-              Server::Configuration::FactoryContext& context, absl::string_view target_address,
-              absl::string_view domain);
+              Server::Configuration::ServerFactoryContext& context,
+              absl::string_view target_address, absl::string_view domain);
 
   // Register a callback to be called when the last TLS store index is cleared.
   // This is intended primarily for test synchronization after filter deletion.

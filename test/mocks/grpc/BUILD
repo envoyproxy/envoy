@@ -12,7 +12,7 @@ envoy_cc_mock(
     name = "grpc_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/grpc:async_client_interface",
         "//envoy/grpc:async_client_manager_interface",

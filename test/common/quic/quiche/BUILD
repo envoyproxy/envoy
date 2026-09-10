@@ -10,6 +10,21 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_cc_test(
+    name = "oghttp2_session_trailers_test",
+    srcs = envoy_select_enable_http3(["oghttp2_session_trailers_test.cc"]),
+    copts = quiche_copts,
+    rbe_pool = "6gig",
+    tags = ["quiche"],
+    deps = envoy_select_enable_http3([
+        "@quiche//:http2_adapter_mock_http2_visitor",
+        "@quiche//:http2_adapter_oghttp2_adapter",
+        "@quiche//:http2_adapter_test_frame_sequence",
+        "@quiche//:http2_adapter_test_utils",
+        "@quiche//:quiche_common_platform_test",
+    ]),
+)
+
 # QUICHE test sources compiled under Envoy's real envoy_cc_test macro, which
 # injects the correct test main, PCH, sanitizer configuration, and gmock
 # strictness settings. The test sources are exposed as filegroups in
@@ -19,7 +34,7 @@ envoy_cc_test(
     name = "http2_adapter_event_forwarder_test",
     srcs = envoy_select_enable_http3(["@quiche//:http2_adapter_event_forwarder_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_adapter_event_forwarder",
@@ -33,7 +48,7 @@ envoy_cc_test(
     name = "http2_adapter_header_validator_test",
     srcs = envoy_select_enable_http3(["@quiche//:http2_adapter_header_validator_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_adapter_header_validator",
@@ -45,7 +60,7 @@ envoy_cc_test(
     name = "http2_adapter_impl_comparison_test",
     srcs = envoy_select_enable_http3(["@quiche//:http2_adapter_impl_comparison_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_adapter",
@@ -62,7 +77,7 @@ envoy_cc_test(
     name = "http2_adapter_nghttp2_adapter_test",
     srcs = envoy_select_enable_http3(["@quiche//:http2_adapter_nghttp2_adapter_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_adapter_http2_protocol",
@@ -82,7 +97,7 @@ envoy_cc_test(
     name = "http2_adapter_nghttp2_data_provider_test",
     srcs = envoy_select_enable_http3(["@quiche//:http2_adapter_nghttp2_data_provider_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_adapter_nghttp2_data_provider",
@@ -95,7 +110,7 @@ envoy_cc_test(
     name = "http2_adapter_nghttp2_session_test",
     srcs = envoy_select_enable_http3(["@quiche//:http2_adapter_nghttp2_session_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_adapter",
@@ -113,7 +128,7 @@ envoy_cc_test(
     name = "http2_adapter_oghttp2_adapter_test",
     srcs = envoy_select_enable_http3(["@quiche//:http2_adapter_oghttp2_adapter_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_adapter_http2_protocol",
@@ -132,7 +147,7 @@ envoy_cc_test(
     name = "http2_adapter_oghttp2_session_test",
     srcs = envoy_select_enable_http3(["@quiche//:http2_adapter_oghttp2_session_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_adapter_mock_http2_visitor",
@@ -147,7 +162,7 @@ envoy_cc_test(
     name = "http2_adapter_oghttp2_util_test",
     srcs = envoy_select_enable_http3(["@quiche//:http2_adapter_oghttp2_util_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_adapter_http2_protocol",
@@ -161,7 +176,7 @@ envoy_cc_test(
     name = "http2_adapter_recording_http2_visitor_test",
     srcs = envoy_select_enable_http3(["@quiche//:http2_adapter_recording_http2_visitor_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_adapter_http2_protocol",
@@ -176,7 +191,7 @@ envoy_cc_test(
     name = "http2_adapter_window_manager_test",
     srcs = envoy_select_enable_http3(["@quiche//:http2_adapter_window_manager_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_adapter_window_manager",
@@ -192,7 +207,7 @@ envoy_cc_test(
     name = "http2_platform_api_test",
     srcs = envoy_select_enable_http3(["@quiche//:http2_platform_api_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_test_tools_random",
@@ -205,7 +220,7 @@ envoy_cc_test(
     name = "quiche_balsa_balsa_frame_test",
     srcs = envoy_select_enable_http3(["@quiche//:quiche_balsa_balsa_frame_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:quiche_balsa_balsa_enums_lib",
@@ -228,7 +243,7 @@ envoy_cc_test(
     name = "quiche_balsa_balsa_headers_test",
     srcs = envoy_select_enable_http3(["@quiche//:quiche_balsa_balsa_headers_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:quiche_balsa_balsa_enums_lib",
@@ -250,7 +265,7 @@ envoy_cc_test(
     name = "quiche_balsa_header_properties_test",
     srcs = envoy_select_enable_http3(["@quiche//:quiche_balsa_header_properties_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:quiche_balsa_header_properties_lib",
@@ -262,7 +277,7 @@ envoy_cc_test(
     name = "quiche_balsa_simple_buffer_test",
     srcs = envoy_select_enable_http3(["@quiche//:quiche_balsa_simple_buffer_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:quiche_balsa_simple_buffer_lib",
@@ -276,7 +291,7 @@ envoy_cc_test(
     name = "quiche_common_test",
     srcs = envoy_select_enable_http3(["@quiche//:quiche_common_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:quiche_common_lib",
@@ -289,7 +304,7 @@ envoy_cc_test(
     name = "quiche_http_header_block_test",
     srcs = envoy_select_enable_http3(["@quiche//:quiche_http_header_block_test_srcs"]),
     copts = quiche_copts,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
         "@quiche//:http2_test_tools_test_utils_lib",

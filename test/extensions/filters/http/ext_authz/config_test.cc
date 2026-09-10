@@ -7,12 +7,16 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/grpc/async_client_manager_impl.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/extensions/filters/http/ext_authz/config.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/real_threads_test_helper.h"
 #include "test/test_common/status_utility.h"
@@ -651,6 +655,93 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationDisabled) {
   EXPECT_FALSE(typed_config.grpcService().has_value());
 }
 
+// Verify that a filter created via the HTTP client factory path supports per-route HTTP service
+// overrides.
+TEST_F(ExtAuthzFilterHttpTest, HttpClientFactoryPerRouteHttpServiceOverride) {
+  const std::string ext_authz_config_yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  failure_mode_allow: false
+  )EOF";
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_config;
+  Http::FilterFactoryCb filter_factory;
+  runOnMainBlocking([&]() {
+    TestUtility::loadFromYaml(ext_authz_config_yaml, ext_authz_config);
+    filter_factory = createFilterFactory(ext_authz_config);
+  });
+
+  // Create the filter through the real factory path.
+  Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
+  ASSERT_NE(filter, nullptr);
+
+  // Set up per-route HTTP service override pointing to a different cluster.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_proto;
+  per_route_proto.mutable_check_settings()->mutable_http_service()->mutable_server_uri()->set_uri(
+      "ext_authz_override:9000");
+  per_route_proto.mutable_check_settings()
+      ->mutable_http_service()
+      ->mutable_server_uri()
+      ->set_cluster("per_route_ext_authz_cluster");
+  per_route_proto.mutable_check_settings()
+      ->mutable_http_service()
+      ->mutable_server_uri()
+      ->mutable_timeout()
+      ->set_seconds(1);
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_proto);
+
+  // Set up mock decoder callbacks with per-route config and connection info.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Envoy::Network::MockConnection> connection;
+  auto addr = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+  connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
+  connection.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr);
+  ON_CALL(decoder_callbacks, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection}));
+
+  Router::RouteSpecificFilterConfigs per_route_configs;
+  per_route_configs.push_back(&per_route_filter_config);
+  ON_CALL(decoder_callbacks, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+
+  // If the per-route HTTP client is successfully created, it will resolve the per-route cluster
+  // "per_route_ext_authz_cluster" via the cluster manager. If the factory failed to provide
+  // server_context (the bug), createPerRouteHttpClient returns nullptr, and the filter falls back
+  // to the default client which resolves "ext_authz" instead.
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("per_route_ext_authz_cluster"))
+      .WillOnce(Return(&context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
+
+  Http::MockAsyncClientRequest async_request(
+      &context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_);
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
+              send_(_, _, _))
+      .WillOnce(Invoke([&async_request](Http::RequestMessagePtr&,
+                                        Http::AsyncClient::Callbacks& callbacks,
+                                        const Http::AsyncClient::RequestOptions&)
+                           -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        callbacks.onSuccess(async_request, std::move(response));
+        return nullptr;
+      }));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+  // If per-route override works, the request goes to "per_route_ext_authz_cluster" and returns
+  // Continue. If it falls back to the default HTTP client, getThreadLocalCluster is called with
+  // "ext_authz" instead, and the EXPECT_CALL above is unsatisfied.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+
+  std::shared_ptr<Http::StreamDecoderFilter> decoder_filter = filter;
+  decoder_filter->onDestroy();
+}
+
 class ExtAuthzFilterGrpcTest : public ExtAuthzFilterTest {
 public:
   void testFilterFactoryAndFilterWithGrpcClient(const std::string& ext_authz_config_yaml) {
@@ -735,6 +826,98 @@ TEST_F(ExtAuthzFilterGrpcTest, GoogleGrpc) {
   failure_mode_allow: false
   )EOF";
   testFilterFactoryAndFilterWithGrpcClient(ext_authz_config_yaml);
+}
+
+// Verify that a filter created via the gRPC client factory path supports per-route gRPC service
+// overrides. The factory should provide the filter with enough context to create per-route clients.
+TEST_F(ExtAuthzFilterGrpcTest, GrpcClientFactoryPerRouteGrpcServiceOverride) {
+  const std::string ext_authz_config_yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "default_ext_authz_cluster"
+  failure_mode_allow: false
+  )EOF";
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_config;
+  Http::FilterFactoryCb filter_factory;
+  runOnMainBlocking([&]() {
+    TestUtility::loadFromYaml(ext_authz_config_yaml, ext_authz_config);
+    filter_factory = createFilterFactory(ext_authz_config);
+  });
+
+  // Set up per-route gRPC service override pointing to a different cluster.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_proto;
+  per_route_proto.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_ext_authz_cluster");
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_proto);
+
+  auto mock_per_route_grpc_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
+  bool per_route_cluster_requested = false;
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
+              getOrCreateRawAsyncClientWithHashKey(_, _, true))
+      .WillRepeatedly(
+          Invoke([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                     Stats::Scope& scope,
+                     bool skip_cluster_check) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
+            // The per-route gRPC client creation should call getOrCreateRawAsyncClientWithHashKey
+            // with a config matching the per-route cluster "per_route_ext_authz_cluster".
+            if (config_with_hash_key.config().envoy_grpc().cluster_name() ==
+                "per_route_ext_authz_cluster") {
+              per_route_cluster_requested = true;
+              return mock_per_route_grpc_client;
+            }
+
+            // A client is made for the default cluster during initialization.
+            return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
+                config_with_hash_key, scope, skip_cluster_check);
+          }));
+
+  EXPECT_CALL(*mock_per_route_grpc_client, sendRaw(_, _, _, _, _, _))
+      .WillRepeatedly([](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                         Grpc::RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
+                         const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
+        envoy::service::auth::v3::CheckResponse check_response;
+        check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+        check_response.mutable_ok_response();
+
+        std::string serialized_response;
+        std::ignore = check_response.SerializeToString(&serialized_response);
+        auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
+        callbacks.onSuccessRaw(std::move(response), parent_span);
+        return nullptr;
+      });
+
+  runOnAllWorkersBlocking([&, filter_factory]() {
+    // Create the filter through the real factory path.
+    Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
+    ASSERT_NE(filter, nullptr);
+
+    // Set up mock decoder callbacks with per-route config and connection info.
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    NiceMock<Envoy::Network::MockConnection> connection;
+    auto addr = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+    connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
+    connection.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr);
+    ON_CALL(decoder_callbacks, connection())
+        .WillByDefault(Return(OptRef<const Network::Connection>{connection}));
+
+    Router::RouteSpecificFilterConfigs per_route_configs;
+    per_route_configs.push_back(&per_route_filter_config);
+    ON_CALL(decoder_callbacks, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+    filter->setDecoderFilterCallbacks(decoder_callbacks);
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+
+    std::shared_ptr<Http::StreamDecoderFilter> decoder_filter = filter;
+    decoder_filter->onDestroy();
+  });
+  EXPECT_TRUE(per_route_cluster_requested);
 }
 
 } // namespace ExtAuthz

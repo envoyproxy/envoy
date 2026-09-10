@@ -213,7 +213,10 @@ absl::Status SdsApi::validateUpdateSize(uint32_t added_resources_num,
 void SdsApi::initialize(bool warm) {
   // Don't put any code here that can throw exceptions, this has been the cause of multiple
   // hard-to-diagnose regressions.
-  subscription_->start({sds_config_name_});
+  if (!started_) {
+    started_ = true;
+    subscription_->start({sds_config_name_});
+  }
   if (!warm) {
     init_target_.ready();
   }

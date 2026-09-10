@@ -31,9 +31,9 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:logger_lib",
-        "@com_google_protobuf//:protobuf",
         "@grpc-httpjson-transcoding//src:message_reader",
         "@proto-field-extraction//:all_libs",
+        "@protobuf",
     ],
 )
 
@@ -48,6 +48,6 @@ envoy_cc_library(
     deps = [
         ":message_converter_utility_lib",
         ":stream_message_lib",
-        "@com_google_protobuf//:protobuf",
+        "@protobuf",
     ],
 )

@@ -14,6 +14,7 @@
 #include "envoy/http/header_evaluator.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
@@ -30,6 +31,7 @@
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/cidr_range.h"
+#include "source/common/network/drain_close_util.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/network/hash_policy.h"
 #include "source/common/network/utility.h"
@@ -61,6 +63,7 @@ constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_b
 #define ALL_TCP_PROXY_STATS(COUNTER, GAUGE)                                                        \
   COUNTER(downstream_cx_drain_close)                                                               \
   COUNTER(downstream_cx_no_route)                                                                  \
+  COUNTER(downstream_cx_overload_close)                                                            \
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
   COUNTER(downstream_cx_total)                                                                     \
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
@@ -270,6 +273,9 @@ public:
     proxyProtocolTlvMergePolicy() const {
       return proxy_protocol_tlv_merge_policy_;
     }
+    Server::LoadShedPoint* tcpProxyOnDataLoadShedPoint() const {
+      return tcp_proxy_on_data_loadshed_point_;
+    }
 
     // Evaluate dynamic TLV formatters and combine with static TLVs.
     Network::ProxyProtocolTLVVector
@@ -308,6 +314,7 @@ public:
     envoy::extensions::filters::network::tcp_proxy::v3::ProxyProtocolTlvMergePolicy
         proxy_protocol_tlv_merge_policy_{
             envoy::extensions::filters::network::tcp_proxy::v3::ADD_IF_ABSENT};
+    Server::LoadShedPoint* tcp_proxy_on_data_loadshed_point_{nullptr};
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -382,6 +389,12 @@ public:
   bool checkDrainClose() const { return check_drain_close_; }
   const Network::DrainDecision& drainDecision() const { return drain_decision_; }
   Network::DrainDirection drainCloseScope() const { return drain_close_scope_; }
+  Server::Configuration::ServerFactoryContext& serverFactoryContext() const {
+    return server_factory_context_;
+  }
+  Server::LoadShedPoint* tcpProxyOnDataLoadShedPoint() const {
+    return shared_config_->tcpProxyOnDataLoadShedPoint();
+  }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -429,10 +442,11 @@ private:
   uint64_t total_cluster_weight_;
   AccessLog::InstanceSharedPtrVector access_logs_;
   const uint32_t max_connect_attempts_;
-  ThreadLocal::SlotPtr upstream_drain_manager_slot_;
+  ThreadLocal::SlotSharedPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
   Random::RandomGenerator& random_generator_;
+  Server::Configuration::ServerFactoryContext& server_factory_context_;
   std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
   Regex::Engine& regex_engine_; // Static lifetime object, safe to store as a reference
   envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode upstream_connect_mode_{
@@ -668,6 +682,11 @@ protected:
     void onEvent(Network::ConnectionEvent event) override { parent_.onDownstreamEvent(event); }
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
+    void onDrain(Network::ConnectionDrainEvent drain_event) override {
+      if (!parent_.connection_drain_event_.has_value()) {
+        parent_.connection_drain_event_ = drain_event;
+      }
+    }
 
     Filter& parent_;
     bool on_high_watermark_called_{false};
@@ -702,6 +721,8 @@ protected:
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamEvent(Network::ConnectionEvent event);
   void maybeCloseDownstreamForDrainClose();
+  // Returns true if the downstream connection should now be drain-closed.
+  bool shouldDrainClose();
   void onUpstreamConnection();
   void onIdleTimeout();
   void resetIdleTimer();
@@ -725,6 +746,18 @@ protected:
   Network::ReadFilterCallbacks* read_callbacks_{};
 
   DownstreamCallbacks downstream_callbacks_;
+  // Set when the downstream connection is notified of a drain sequence via onDrain(). Carries the
+  // drain start time and strategy so the drain-close decision can be computed at the connection
+  // level (see shouldDrainClose()).
+  std::optional<Network::ConnectionDrainEvent> connection_drain_event_;
+  // The drain type of the listener owning the downstream connection, used to decide whether
+  // /healthcheck/fail should drain-close it. Read from the connection in initialize().
+  // See Network::shouldDrainClose().
+  envoy::config::listener::v3::Listener::DrainType drain_type_{
+      envoy::config::listener::v3::Listener::DEFAULT};
+  // Latched when the filter is created so it is not re-read on every read or write. See
+  // shouldDrainClose().
+  const bool use_connection_event_drain_ = false;
   Event::TimerPtr idle_timer_;
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr access_log_flush_timer_;
