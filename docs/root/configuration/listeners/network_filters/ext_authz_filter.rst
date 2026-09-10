@@ -9,7 +9,8 @@ External Authorization
 
 The external authorization network filter calls an external authorization service to check if the
 incoming request is authorized or not. If the request is deemed unauthorized by the network filter
-then the connection will be closed.
+then the connection will be closed, unless :ref:`shadow mode
+<config_network_filters_ext_authz_shadow_mode>` is enabled.
 
 .. tip::
   It is recommended that this filter is configured first in the filter chain so that requests are
@@ -103,6 +104,9 @@ The network filter outputs statistics in the *config.ext_authz.* namespace.
   cx_closed, Counter, Total connections that were closed.
   active, Gauge, Total currently active requests in transit to the authorization service.
 
+See :ref:`Shadow Mode <config_network_filters_ext_authz_shadow_mode>` for how these counters behave
+when the filter is configured not to close the connection.
+
 TLS Alert on Denial
 -------------------
 
@@ -117,6 +121,41 @@ The TLS alert is only sent when:
 * Authorization is denied either due to explicit denial or error with ``failure_mode_allow`` set to ``false``.
 
 For non-TLS connections, the connection is closed without sending an alert.
+
+.. _config_network_filters_ext_authz_shadow_mode:
+
+Shadow Mode
+-----------
+
+When :ref:`shadow_mode <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.shadow_mode>`
+is set to ``true``, the filter still calls the authorization service but never closes the connection.
+The decision is written to the connection's :ref:`FilterState
+<arch_overview_data_sharing_between_filters>` as a :ref:`ShadowDecision
+<envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ShadowDecision>` object under
+``envoy.filters.network.ext_authz.<stat_prefix>.shadow``, so a subsequent filter can read it and
+decide whether to enforce it. This allows a new authorization service to run alongside the
+enforcing one and have its decisions compared before it is trusted to reject traffic.
+
+.. attention::
+
+  Shadow mode disables enforcement in this filter. Traffic is allowed whatever the authorization
+  service returns, so a subsequent filter has to read the decision and close the connection for a
+  denial to take effect.
+
+The ``denied`` and ``error`` counters are incremented as usual, while ``cx_closed`` is not, since
+no connection is closed. ``failure_mode_allowed`` is not incremented either, because traffic is
+allowed by shadow mode rather than by ``failure_mode_allow``. No TLS alert is sent, whatever
+:ref:`send_tls_alert_on_denial
+<envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.send_tls_alert_on_denial>` is
+set to.
+
+The decision is available in access logs, either as JSON or field by field. The examples below
+assume a ``stat_prefix`` of ``ext_authz``.
+
+.. code-block:: none
+
+  %FILTER_STATE(envoy.filters.network.ext_authz.ext_authz.shadow:PLAIN)%
+  %FILTER_STATE(envoy.filters.network.ext_authz.ext_authz.shadow:FIELD:check_result)%
 
 .. _config_network_filters_ext_authz_tcp_proxy:
 

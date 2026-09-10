@@ -37,7 +37,7 @@ public:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  void initializeTest(bool send_tls_alert_on_denial, bool with_tls) {
+  void initializeTest(bool send_tls_alert_on_denial, bool with_tls, bool shadow_mode = false) {
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -46,7 +46,7 @@ public:
       ConfigHelper::setHttp2(*ext_authz_cluster);
     });
 
-    config_helper_.addConfigModifier([this, send_tls_alert_on_denial, with_tls](
+    config_helper_.addConfigModifier([this, send_tls_alert_on_denial, with_tls, shadow_mode](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       auto* filter_chain = listener->mutable_filter_chains(0);
@@ -56,6 +56,7 @@ public:
       setGrpcService(*ext_authz_config.mutable_grpc_service(), "ext_authz",
                      fake_upstreams_.back()->localAddress());
       ext_authz_config.set_send_tls_alert_on_denial(send_tls_alert_on_denial);
+      ext_authz_config.set_shadow_mode(shadow_mode);
 
       // Save the existing tcp_proxy filter config.
       auto tcp_proxy_filter = filter_chain->filters(0);
@@ -145,6 +146,16 @@ public:
     ext_authz_request_->finishGrpcStream(Grpc::Status::WellKnownGrpcStatus::Ok);
   }
 
+  void cleanupExtAuthzConnection() {
+    if (fake_ext_authz_connection_ != nullptr) {
+      AssertionResult result = fake_ext_authz_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_ext_authz_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      fake_ext_authz_connection_ = nullptr;
+    }
+  }
+
   std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_;
   Network::UpstreamTransportSocketFactoryPtr context_;
   ConnectionStatusCallbacks connect_callbacks_;
@@ -216,14 +227,7 @@ BORINGSSL_TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertEnabled) {
 
   ssl_client_->close(Network::ConnectionCloseType::NoFlush);
 
-  // Clean up the ext_authz gRPC connection.
-  if (fake_ext_authz_connection_ != nullptr) {
-    AssertionResult result = fake_ext_authz_connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = fake_ext_authz_connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    fake_ext_authz_connection_ = nullptr;
-  }
+  cleanupExtAuthzConnection();
 }
 
 // Test that when ext_authz denies with TLS and send_tls_alert_on_denial is false,
@@ -276,14 +280,7 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertDisabled) {
 
   ssl_client_->close(Network::ConnectionCloseType::NoFlush);
 
-  // Clean up the ext_authz gRPC connection.
-  if (fake_ext_authz_connection_ != nullptr) {
-    AssertionResult result = fake_ext_authz_connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = fake_ext_authz_connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    fake_ext_authz_connection_ = nullptr;
-  }
+  cleanupExtAuthzConnection();
 }
 
 // Test that when ext_authz allows the connection, it proceeds to tcp_proxy.
@@ -328,14 +325,7 @@ TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnection) {
 
   EXPECT_EQ("world", payload_reader_->data());
 
-  // Clean up the ext_authz gRPC connection.
-  if (fake_ext_authz_connection_ != nullptr) {
-    AssertionResult result = fake_ext_authz_connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = fake_ext_authz_connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    fake_ext_authz_connection_ = nullptr;
-  }
+  cleanupExtAuthzConnection();
 }
 
 // Test that denial works without TLS. No alert sent, but connection still closes.
@@ -362,14 +352,105 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithoutTls) {
   // Close the client connection to clean up the test.
   tcp_client->close();
 
-  // Clean up the ext_authz gRPC connection.
-  if (fake_ext_authz_connection_ != nullptr) {
-    AssertionResult result = fake_ext_authz_connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = fake_ext_authz_connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    fake_ext_authz_connection_ = nullptr;
-  }
+  cleanupExtAuthzConnection();
+}
+
+// Test that in shadow mode a denial does not close the connection. The data reaches the upstream
+// and the decision is readable from filter state.
+TEST_P(ExtAuthzNetworkIntegrationTest, ShadowModeDenialDoesNotCloseConnection) {
+  useListenerAccessLog(
+      "%FILTER_STATE(envoy.filters.network.ext_authz.ext_authz.shadow:PLAIN)% "
+      "field=%FILTER_STATE(envoy.filters.network.ext_authz.ext_authz.shadow:FIELD:check_result)%");
+  initializeTest(false /* send_tls_alert_on_denial */, false /* with_tls */,
+                 true /* shadow_mode */);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("some_data", false, false));
+
+  AssertionResult result = waitForExtAuthzConnection();
+  RELEASE_ASSERT(result, result.message());
+  result = waitForExtAuthzRequest();
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+
+  test_server_->waitForCounter("ext_authz.ext_authz.denied", Ge(1));
+
+  // The connection stays open, so the buffered data is released to the tcp_proxy filter and
+  // reaches the upstream.
+  FakeRawConnectionPtr fake_upstream_connection;
+  result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection->waitForData(9);
+  RELEASE_ASSERT(result, result.message());
+
+  EXPECT_EQ(0, test_server_->counter("ext_authz.ext_authz.cx_closed")->value());
+  EXPECT_EQ(0, test_server_->counter("ext_authz.ext_authz.ok")->value());
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->close();
+  cleanupExtAuthzConnection();
+  test_server_.reset();
+
+  const std::string log = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(log, HasSubstr("\"check_result\":\"DENIED\""));
+  EXPECT_THAT(log, HasSubstr("\"status_code\":403"));
+  EXPECT_THAT(log, HasSubstr("field=DENIED"));
+}
+
+// Test that in shadow mode no TLS alert is sent on a denial and the TLS connection remains usable.
+TEST_P(ExtAuthzNetworkIntegrationTest, ShadowModeDenialSendsNoTlsAlert) {
+  initializeTest(true /* send_tls_alert_on_denial */, true /* with_tls */, true /* shadow_mode */);
+
+  setupSslConnection();
+  ASSERT_TRUE(connect_callbacks_.connected());
+
+  Buffer::OwnedImpl data("some_data");
+  ssl_client_->write(data, false);
+
+  AssertionResult result = waitForExtAuthzConnection();
+  RELEASE_ASSERT(result, result.message());
+  result = waitForExtAuthzRequest();
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+
+  test_server_->waitForCounter("ext_authz.ext_authz.denied", Ge(1));
+
+  // The connection survives the denial and still proxies in both directions.
+  FakeRawConnectionPtr fake_upstream_connection;
+  result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection->waitForData(9);
+  RELEASE_ASSERT(result, result.message());
+
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  payload_reader_->setDataToWaitFor("world");
+  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ("world", payload_reader_->data());
+  EXPECT_FALSE(connect_callbacks_.closed());
+
+  EXPECT_EQ(0, test_server_->counter("ext_authz.ext_authz.cx_closed")->value());
+
+  // No access_denied alert was sent, so the client saw no TLS error. Access the failure reason on
+  // the dispatcher thread to avoid data races.
+  std::string failure_reason;
+  dispatcher_->post([this, &failure_reason]() {
+    failure_reason = std::string(ssl_client_->transportFailureReason());
+  });
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(failure_reason, "") << "Expected no transport failure reason in shadow mode, got: "
+                                << failure_reason;
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+  cleanupExtAuthzConnection();
 }
 
 } // namespace

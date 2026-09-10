@@ -24,8 +24,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization filter calls out to an external service over the
 // gRPC Authorization API defined by
 // :ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
-// A failed check will cause this filter to close the TCP connection.
-// [#next-free-field: 12]
+// A failed check will cause this filter to close the TCP connection, unless ``shadow_mode`` is
+// enabled.
+// [#next-free-field: 13]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.ext_authz.v2.ExtAuthz";
@@ -100,4 +101,40 @@ message ExtAuthz {
   // the protobuf message definition in order to perform safe parsing.
   //
   repeated string typed_metadata_context_namespaces = 11;
+
+  // When set to ``true``, the filter operates in shadow mode. In shadow mode the filter still
+  // calls the external authorization service, but never closes the connection. Instead of closing
+  // on a denied or error response, the filter writes the authorization decision into the
+  // connection's :ref:`FilterState <arch_overview_data_sharing_between_filters>` as a
+  // :ref:`ShadowDecision
+  // <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ShadowDecision>` object so that a
+  // subsequent filter can read and optionally enforce it.
+  //
+  // The FilterState key is ``envoy.filters.network.ext_authz.<stat_prefix>.shadow``, so filters
+  // with distinct ``stat_prefix`` values do not overwrite each other.
+  //
+  // Defaults to ``false``.
+  bool shadow_mode = 12;
+}
+
+// Serialized form of the shadow-mode authorization decision written to FilterState when
+// :ref:`shadow_mode
+// <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.shadow_mode>` is enabled.
+// Consumed by a subsequent filter that decides whether to enforce the decision.
+message ShadowDecision {
+  // Possible authorization decisions.
+  enum CheckResult {
+    UNSPECIFIED = 0;
+    OK = 1;
+    DENIED = 2;
+    ERROR = 3;
+  }
+
+  // The decision the authorization service returned.
+  CheckResult check_result = 1;
+
+  // Status code the authorization service returned on a denied response. Unset when the service
+  // returned none, and always unset for ``OK``, since this filter authorizes TCP connections and
+  // sends no response of its own.
+  uint32 status_code = 2 [(validate.rules).uint32 = {lte: 599 gte: 100 ignore_empty: true}];
 }

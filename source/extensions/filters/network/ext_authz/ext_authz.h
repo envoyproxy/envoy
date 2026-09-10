@@ -45,6 +45,44 @@ struct InstanceStats {
 };
 
 /**
+ * Shadow-mode authorization decision carried in FilterState when ``shadow_mode`` is enabled.
+ * A subsequent filter reads this object and decides whether to enforce the decision.
+ */
+class ShadowDecisionObject : public StreamInfo::FilterState::Object {
+public:
+  using ShadowDecisionProto = envoy::extensions::filters::network::ext_authz::v3::ShadowDecision;
+
+  ShadowDecisionObject(ShadowDecisionProto::CheckResult check_result, uint32_t status_code)
+      : check_result_(check_result), status_code_(status_code) {}
+
+  ShadowDecisionProto::CheckResult checkResult() const { return check_result_; }
+  uint32_t statusCode() const { return status_code_; }
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override;
+
+  std::optional<std::string> serializeAsString() const override;
+
+  // Exposes the decision as individual fields so access log formatters and CEL expressions can
+  // read them without serializing the whole message to JSON.
+  bool hasFieldSupport() const override { return true; }
+  StreamInfo::FilterState::Object::FieldType getField(absl::string_view field_name) const override {
+    if (field_name == "check_result") {
+      return absl::string_view(ShadowDecisionProto::CheckResult_Name(check_result_));
+    }
+    if (field_name == "status_code" && status_code_ != 0) {
+      return int64_t(status_code_);
+    }
+    return {};
+  }
+
+private:
+  void populateProto(ShadowDecisionProto& msg) const;
+
+  const ShadowDecisionProto::CheckResult check_result_;
+  const uint32_t status_code_;
+};
+
+/**
  * Global configuration for ExtAuthz filter.
  */
 class Config {
@@ -58,6 +96,8 @@ public:
         include_peer_certificate_(config.include_peer_certificate()),
         include_tls_session_(config.include_tls_session()),
         send_tls_alert_on_denial_(config.send_tls_alert_on_denial()),
+        shadow_mode_(config.shadow_mode()),
+        shadow_filter_state_key_(generateShadowFilterStateKey(config.stat_prefix())),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
                 ? std::optional<Matchers::MetadataMatcher>(
@@ -82,6 +122,8 @@ public:
   bool includePeerCertificate() const { return include_peer_certificate_; }
   bool includeTLSSession() const { return include_tls_session_; }
   bool sendTlsAlertOnDenial() const { return send_tls_alert_on_denial_; }
+  bool shadowMode() const { return shadow_mode_; }
+  const std::string& shadowFilterStateKey() const { return shadow_filter_state_key_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
   bool filterEnabledMetadata(const envoy::config::core::v3::Metadata& metadata) const {
     return filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
@@ -95,12 +137,15 @@ public:
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
+  static std::string generateShadowFilterStateKey(const std::string& stat_prefix);
   const InstanceStats stats_;
   bool failure_mode_allow_;
   LabelsMap destination_labels_;
   const bool include_peer_certificate_;
   const bool include_tls_session_;
   const bool send_tls_alert_on_denial_;
+  const bool shadow_mode_;
+  const std::string shadow_filter_state_key_;
   const std::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
   const std::vector<std::string> metadata_context_namespaces_;
   const std::vector<std::string> typed_metadata_context_namespaces_;
@@ -112,7 +157,8 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
  * ExtAuthz filter instance. This filter will call the Authorization service with the given
  * configuration parameters. If the authorization service returns an error or a deny the
  * connection will be closed without any further filters being called. Otherwise all buffered
- * data will be released to further filters.
+ * data will be released to further filters. In shadow mode the connection is never closed and
+ * the decision is recorded in FilterState instead.
  */
 class Filter : public Network::ReadFilter,
                public Network::ConnectionCallbacks,
@@ -150,6 +196,10 @@ private:
   // then the filter chain should stop. Otherwise the filter chain can continue to the next filter.
   enum class FilterReturn { Stop, Continue };
   void callCheck();
+  // Releases the buffered data to the rest of the filter chain.
+  void continueFilterChain();
+  // Records the authorization decision in FilterState for a subsequent filter to enforce.
+  void setShadowFilterState(const Filters::Common::ExtAuthz::Response& response);
 
   bool filterEnabled(const envoy::config::core::v3::Metadata& metadata) {
     return config_->filterEnabledMetadata(metadata);
