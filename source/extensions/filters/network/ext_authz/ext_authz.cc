@@ -24,16 +24,16 @@ namespace ExtAuthz {
 namespace {
 
 using MetadataProto = ::envoy::config::core::v3::Metadata;
-using ShadowDecisionProto = ::envoy::extensions::filters::network::ext_authz::ShadowDecision;
+using ExtAuthzDecisionProto = ::envoy::extensions::filters::network::ext_authz::ExtAuthzDecision;
 
-ShadowDecisionProto::CheckResult toCheckResult(Filters::Common::ExtAuthz::CheckStatus status) {
+ExtAuthzDecisionProto::CheckResult toCheckResult(Filters::Common::ExtAuthz::CheckStatus status) {
   switch (status) {
   case Filters::Common::ExtAuthz::CheckStatus::OK:
-    return ShadowDecisionProto::OK;
+    return ExtAuthzDecisionProto::OK;
   case Filters::Common::ExtAuthz::CheckStatus::Error:
-    return ShadowDecisionProto::ERROR;
+    return ExtAuthzDecisionProto::ERROR;
   case Filters::Common::ExtAuthz::CheckStatus::Denied:
-    return ShadowDecisionProto::DENIED;
+    return ExtAuthzDecisionProto::DENIED;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
@@ -67,19 +67,19 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
                                   POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-void ShadowDecisionObject::populateProto(ShadowDecisionProto& msg) const {
+void ExtAuthzDecisionObject::populateProto(ExtAuthzDecisionProto& msg) const {
   msg.set_check_result(check_result_);
   msg.set_status_code(status_code_);
 }
 
-ProtobufTypes::MessagePtr ShadowDecisionObject::serializeAsProto() const {
-  auto msg = std::make_unique<ShadowDecisionProto>();
+ProtobufTypes::MessagePtr ExtAuthzDecisionObject::serializeAsProto() const {
+  auto msg = std::make_unique<ExtAuthzDecisionProto>();
   populateProto(*msg);
   return msg;
 }
 
-std::optional<std::string> ShadowDecisionObject::serializeAsString() const {
-  ShadowDecisionProto msg;
+std::optional<std::string> ExtAuthzDecisionObject::serializeAsString() const {
+  ExtAuthzDecisionProto msg;
   populateProto(msg);
   return MessageUtil::getJsonStringFromMessageOrError(msg);
 }
@@ -228,8 +228,8 @@ void Filter::continueFilterChain() {
 void Filter::setShadowFilterState(const Filters::Common::ExtAuthz::Response& response) {
   filter_callbacks_->connection().streamInfo().filterState()->setData(
       NetworkFilterNames::get().ExtAuthorization,
-      std::make_shared<ShadowDecisionObject>(toCheckResult(response.status),
-                                             static_cast<uint32_t>(response.status_code)),
+      std::make_shared<ExtAuthzDecisionObject>(toCheckResult(response.status),
+                                               static_cast<uint32_t>(response.status_code)),
       StreamInfo::FilterState::LifeSpan::Connection);
 }
 

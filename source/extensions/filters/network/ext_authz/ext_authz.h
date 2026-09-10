@@ -18,7 +18,7 @@
 #include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
-#include "source/extensions/filters/network/ext_authz/shadow_decision.pb.h"
+#include "source/extensions/filters/network/ext_authz/ext_authz_decision.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -46,17 +46,17 @@ struct InstanceStats {
 };
 
 /**
- * Shadow-mode authorization decision carried in FilterState when ``shadow_mode`` is enabled.
+ * Authorization decision carried in FilterState when ``shadow_mode`` is enabled.
  * A subsequent filter reads this object and decides whether to enforce the decision.
  */
-class ShadowDecisionObject : public StreamInfo::FilterState::Object {
+class ExtAuthzDecisionObject : public StreamInfo::FilterState::Object {
 public:
-  using ShadowDecisionProto = envoy::extensions::filters::network::ext_authz::ShadowDecision;
+  using ExtAuthzDecisionProto = envoy::extensions::filters::network::ext_authz::ExtAuthzDecision;
 
-  ShadowDecisionObject(ShadowDecisionProto::CheckResult check_result, uint32_t status_code)
+  ExtAuthzDecisionObject(ExtAuthzDecisionProto::CheckResult check_result, uint32_t status_code)
       : check_result_(check_result), status_code_(status_code) {}
 
-  ShadowDecisionProto::CheckResult checkResult() const { return check_result_; }
+  ExtAuthzDecisionProto::CheckResult checkResult() const { return check_result_; }
   uint32_t statusCode() const { return status_code_; }
 
   ProtobufTypes::MessagePtr serializeAsProto() const override;
@@ -68,7 +68,7 @@ public:
   bool hasFieldSupport() const override { return true; }
   StreamInfo::FilterState::Object::FieldType getField(absl::string_view field_name) const override {
     if (field_name == "check_result") {
-      return absl::string_view(ShadowDecisionProto::CheckResult_Name(check_result_));
+      return absl::string_view(ExtAuthzDecisionProto::CheckResult_Name(check_result_));
     }
     if (field_name == "status_code" && status_code_ != 0) {
       return int64_t(status_code_);
@@ -77,9 +77,9 @@ public:
   }
 
 private:
-  void populateProto(ShadowDecisionProto& msg) const;
+  void populateProto(ExtAuthzDecisionProto& msg) const;
 
-  const ShadowDecisionProto::CheckResult check_result_;
+  const ExtAuthzDecisionProto::CheckResult check_result_;
   const uint32_t status_code_;
 };
 

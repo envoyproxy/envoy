@@ -4,7 +4,7 @@ package envoy.extensions.filters.network.ext_authz;
 
 // Authorization decision recorded in FilterState when shadow mode is enabled. A subsequent filter
 // reads this object and decides whether to enforce the decision.
-message ShadowDecision {
+message ExtAuthzDecision {
   // Possible authorization decisions.
   enum CheckResult {
     UNSPECIFIED = 0;

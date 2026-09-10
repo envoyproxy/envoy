@@ -14,8 +14,8 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_proto_library(
-    name = "shadow_decision",
-    srcs = ["shadow_decision.proto"],
+    name = "ext_authz_decision",
+    srcs = ["ext_authz_decision.proto"],
 )
 
 envoy_cc_library(
@@ -23,7 +23,7 @@ envoy_cc_library(
     srcs = ["ext_authz.cc"],
     hdrs = ["ext_authz.h"],
     deps = [
-        ":shadow_decision_cc_proto",
+        ":ext_authz_decision_cc_proto",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//envoy/runtime:runtime_interface",

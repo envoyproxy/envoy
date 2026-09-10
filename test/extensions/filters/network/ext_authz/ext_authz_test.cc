@@ -38,7 +38,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
 
-using ShadowDecisionProto = ShadowDecisionObject::ShadowDecisionProto;
+using ExtAuthzDecisionProto = ExtAuthzDecisionObject::ExtAuthzDecisionProto;
 
 class ExtAuthzFilterTest : public testing::Test {
 public:
@@ -175,9 +175,9 @@ stat_prefix: name
     EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setResponseCodeDetails(_)).Times(0);
   }
 
-  const ShadowDecisionObject* shadowDecision() {
+  const ExtAuthzDecisionObject* extAuthzDecision() {
     return filter_callbacks_.connection_.stream_info_.filterState()
-        ->getDataReadOnly<ShadowDecisionObject>(NetworkFilterNames::get().ExtAuthorization);
+        ->getDataReadOnly<ExtAuthzDecisionObject>(NetworkFilterNames::get().ExtAuthorization);
   }
 
   const std::string metadata_yaml_string_ = R"EOF(
@@ -840,7 +840,7 @@ TEST_F(ExtAuthzFilterTest, ShadowModeFilterStateKeyIsFilterName) {
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
 
   EXPECT_NE(nullptr, filter_callbacks_.connection_.stream_info_.filterState()
-                         ->getDataReadOnly<ShadowDecisionObject>(
+                         ->getDataReadOnly<ExtAuthzDecisionObject>(
                              NetworkFilterNames::get().ExtAuthorization));
 }
 
@@ -859,9 +859,9 @@ TEST_F(ExtAuthzFilterTest, ShadowModeDeniedDoesNotCloseConnection) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
-  const ShadowDecisionObject* decision = shadowDecision();
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
   ASSERT_NE(nullptr, decision);
-  EXPECT_EQ(ShadowDecisionProto::DENIED, decision->checkResult());
+  EXPECT_EQ(ExtAuthzDecisionProto::DENIED, decision->checkResult());
   EXPECT_EQ(403U, decision->statusCode());
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.denied").value());
@@ -883,9 +883,9 @@ TEST_F(ExtAuthzFilterTest, ShadowModeErrorDoesNotCloseConnection) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
-  const ShadowDecisionObject* decision = shadowDecision();
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
   ASSERT_NE(nullptr, decision);
-  EXPECT_EQ(ShadowDecisionProto::ERROR, decision->checkResult());
+  EXPECT_EQ(ExtAuthzDecisionProto::ERROR, decision->checkResult());
   // The authorization service returned no status code, so none is recorded.
   EXPECT_EQ(0U, decision->statusCode());
 
@@ -910,9 +910,9 @@ TEST_F(ExtAuthzFilterTest, ShadowModeOkRecordsDecision) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
-  const ShadowDecisionObject* decision = shadowDecision();
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
   ASSERT_NE(nullptr, decision);
-  EXPECT_EQ(ShadowDecisionProto::OK, decision->checkResult());
+  EXPECT_EQ(ExtAuthzDecisionProto::OK, decision->checkResult());
   // The filter authorizes TCP connections and sends no response of its own, so no status code is
   // recorded for OK.
   EXPECT_EQ(0U, decision->statusCode());
@@ -941,9 +941,9 @@ stat_prefix: name
 
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
 
-  const ShadowDecisionObject* decision = shadowDecision();
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
   ASSERT_NE(nullptr, decision);
-  EXPECT_EQ(ShadowDecisionProto::ERROR, decision->checkResult());
+  EXPECT_EQ(ExtAuthzDecisionProto::ERROR, decision->checkResult());
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
@@ -969,7 +969,7 @@ stat_prefix: name
 
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
 
-  ASSERT_NE(nullptr, shadowDecision());
+  ASSERT_NE(nullptr, extAuthzDecision());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
@@ -995,9 +995,9 @@ TEST_F(ExtAuthzFilterTest, ShadowModeImmediateDenied) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
-  const ShadowDecisionObject* decision = shadowDecision();
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
   ASSERT_NE(nullptr, decision);
-  EXPECT_EQ(ShadowDecisionProto::DENIED, decision->checkResult());
+  EXPECT_EQ(ExtAuthzDecisionProto::DENIED, decision->checkResult());
 
   EXPECT_CALL(*client_, cancel()).Times(0);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -1041,7 +1041,7 @@ filter_enabled_metadata:
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
-  EXPECT_EQ(nullptr, shadowDecision());
+  EXPECT_EQ(nullptr, extAuthzDecision());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.disabled").value());
 }
 
@@ -1062,7 +1062,7 @@ TEST_F(ExtAuthzFilterTest, ShadowModeUnsetPreservesEnforcement) {
 
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
 
-  EXPECT_EQ(nullptr, shadowDecision());
+  EXPECT_EQ(nullptr, extAuthzDecision());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
@@ -1078,14 +1078,14 @@ TEST_F(ExtAuthzFilterTest, ShadowModeDecisionSerialization) {
   response->status_code = Http::Code::Unauthorized;
   request_callbacks_->onComplete(std::move(response));
 
-  const ShadowDecisionObject* decision = shadowDecision();
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
   ASSERT_NE(nullptr, decision);
 
   const auto json = decision->serializeAsString();
   ASSERT_TRUE(json.has_value());
-  ShadowDecisionProto from_json;
+  ExtAuthzDecisionProto from_json;
   TestUtility::loadFromJson(json.value(), from_json);
-  EXPECT_EQ(ShadowDecisionProto::DENIED, from_json.check_result());
+  EXPECT_EQ(ExtAuthzDecisionProto::DENIED, from_json.check_result());
   EXPECT_EQ(401U, from_json.status_code());
 
   const ProtobufTypes::MessagePtr proto = decision->serializeAsProto();
@@ -1108,14 +1108,14 @@ TEST_F(ExtAuthzFilterTest, ShadowModeOkSerializationOmitsStatusCode) {
 
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
 
-  const ShadowDecisionObject* decision = shadowDecision();
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
   ASSERT_NE(nullptr, decision);
 
   const auto json = decision->serializeAsString();
   ASSERT_TRUE(json.has_value());
-  ShadowDecisionProto from_json;
+  ExtAuthzDecisionProto from_json;
   TestUtility::loadFromJson(json.value(), from_json);
-  EXPECT_EQ(ShadowDecisionProto::OK, from_json.check_result());
+  EXPECT_EQ(ExtAuthzDecisionProto::OK, from_json.check_result());
   EXPECT_EQ(0U, from_json.status_code());
 
   EXPECT_EQ("OK", absl::get<absl::string_view>(decision->getField("check_result")));
