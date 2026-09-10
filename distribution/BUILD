@@ -144,15 +144,29 @@ pgp_public_key(
     }),
 )
 
-# Bundle the (unsigned) per-arch debs into a single debs.tar.gz. This is an
-# ordinary, cacheable/remotable action - signing happens separately below, via
-# the toolshed `pgp_*` rules.
+SIGNED_CHANGES = envoy_signed_changes(
+    name = "signed_changes",
+    arch_packages = {
+        "arm64": ":arm64-packages",
+        "x64": ":x64-packages",
+    },
+    release_version = release_version_for(VERSION),
+    version = VERSION,
+)
+
+_SIGNED_CHANGES_COPY_CMD = "\n    ".join([
+    'cp $(location %s) "$$tmpdir/%s"' % (label, dest)
+    for label, dest in SIGNED_CHANGES
+])
+
+# Bundle the per-arch debs into a single flat debs.tar.gz, replacing unsigned
+# multi-distro `.changes` with signed per-distro `.changes`.
 genrule(
     name = "multi_arch_debs",
     srcs = [
         ":arm64-packages",
         ":x64-packages",
-    ],
+    ] + [label for label, _dest in SIGNED_CHANGES],
     outs = ["debs.tar.gz"],
     cmd = """
     tmpdir=$$(mktemp -d)
@@ -163,15 +177,18 @@ genrule(
         NEEDS_PATH=1
     fi
     if [[ -n $$NEEDS_PATH ]]; then
-        echo "You must set //distribution:x64-packages and //distribution:arm64-packages to build multiarch debs" >&2
+        echo "FAIL: You must set //distribution:x64-packages and //distribution:arm64-packages to build multiarch debs" >&2
         exit 1
     fi
     tar xf $(location :x64-packages) -C "$$tmpdir"
     tar xf $(location :arm64-packages) -C "$$tmpdir"
     mv "$${tmpdir}/deb/"* "$${tmpdir}"
     rm -rf "$${tmpdir}/deb/"
+    rm -f "$${tmpdir}"/*.changes
+    %s
     tar czf $@ -C "$${tmpdir}" .
-    """,
+    """ % _SIGNED_CHANGES_COPY_CMD,
+    tags = ["manual"],
 )
 
 # Extract and rename the release binaries out of the per-arch release
@@ -196,7 +213,7 @@ genrule(
         NEEDS_PATH=1
     fi
     if [[ -n $$NEEDS_PATH ]]; then
-        echo "You must set //distribution:x64-release and //distribution:arm64-release for building release binaries" >&2
+        echo "FAIL: You must set //distribution:x64-release and //distribution:arm64-release for building release binaries" >&2
         exit 1
     fi
     ZSTD=$(location @zstd//:zstd_cli)
@@ -228,32 +245,19 @@ pgp_sign_checksums(
     tags = ["manual"],
 )
 
-SIGNED_CHANGES = envoy_signed_changes(
-    name = "signed_changes",
-    arch_packages = {
-        "arm64": ":arm64-packages",
-        "x64": ":x64-packages",
-    },
-    release_version = release_version_for(VERSION),
-)
-
-_SIGNED_CHANGES_COPY_CMD = "\n    ".join([
-    'mkdir -p "$$tmpdir/$$(dirname %s)" && cp $(location %s) "$$tmpdir/%s"' % (dest, label, dest)
-    for label, dest in SIGNED_CHANGES
-])
-
-# Final release bundle. This only assembles already-signed/plain artifacts -
-# it never touches key material, so (unlike the pgp targets above) it is an
-# ordinary, cacheable/remotable action.
+# Final release bundle layout contract (matches prior `envoy.gpg.sign` output):
+# - `signing.key` at archive root.
+# - `bin/` contains `debs.tar.gz`, 4 release binaries, and `checksums.txt.asc`.
+# Publisher uploads `bin/*` non-recursively, and distro verification reads
+# `bin/debs.tar.gz` plus `signing.key`.
 genrule(
     name = "signed",
     srcs = [
         ":multi_arch_debs",
         ":release_binaries",
         ":signed_checksums",
-        ":signed_checksums_checksums",
         ":signing_key_file",
-    ] + [label for label, _dest in SIGNED_CHANGES],
+    ],
     outs = ["release.signed.tar.zst"],
     cmd = """
     tmpdir=$$(mktemp -d)
@@ -262,13 +266,11 @@ genrule(
     for f in $(locations :release_binaries); do
         cp "$$f" "$$tmpdir/bin/"
     done
-    cp $(location :signed_checksums) "$$tmpdir/checksums.txt.asc"
-    cp $(location :signed_checksums_checksums) "$$tmpdir/checksums.txt"
+    cp $(location :signed_checksums) "$$tmpdir/bin/checksums.txt.asc"
     cp $(location :signing_key_file) "$$tmpdir/signing.key"
-    %s
     ZSTD=$(location @zstd//:zstd_cli)
     tar -C "$$tmpdir" -cf - . | "$$ZSTD" -T0 -o $@ -
-    """ % _SIGNED_CHANGES_COPY_CMD,
+    """,
     tags = ["manual"],
     tools = ["@zstd//:zstd_cli"],
 )

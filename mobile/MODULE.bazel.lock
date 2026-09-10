@@ -3127,7 +3127,7 @@
           "@@envoy+//Cargo.toml": "c9efddb99563255164b111971f35618643cbd15948caa9a29199cc3fabb2b7fe",
           "@@sq+//Cargo.lock": "895825c3c5231254147ce308ba39579e74691b1ed559d9f8db59cb16febda46d",
           "@@sq+//Cargo.toml": "c8ae9714158e67aec183942e36cf5d14ad1868fdb6472b50fbec9dbf8f9bdb43",
-          "@@wasmtime+//Cargo.lock": "fe41703e177e8da68355f6bdc22054daf6b6b2c6b32effe1fc1ce8c9c705e52d"
+          "@@wasmtime+//Cargo.lock": "23dc066229af684ccd62f89b98775c49beb79d3add7f4f70bd3b8dd9e01037be"
         },
         "recordedDirentsInputs": {},
         "envVariables": {

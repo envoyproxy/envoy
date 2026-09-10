@@ -1196,7 +1196,7 @@ case $CI_TARGET in
         echo "Signing binary packages..."
         setup_clang_toolchain
         if [[ -z "${ENVOY_SIGNING_KEY_PATH}" || -z "${ENVOY_SIGNING_PASSPHRASE_PATH}" ]]; then
-            echo "ENVOY_SIGNING_KEY_PATH and ENVOY_SIGNING_PASSPHRASE_PATH must be set" >&2
+            echo "FAIL: ENVOY_SIGNING_KEY_PATH and ENVOY_SIGNING_PASSPHRASE_PATH must be set" >&2
             exit 1
         fi
         KEY_SHA256="$(sha256sum "${ENVOY_SIGNING_KEY_PATH}" | cut -d' ' -f1)"

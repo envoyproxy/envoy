@@ -14,6 +14,12 @@ load("@envoy_toolshed//pgp:defs.bzl", "changes_from_tarball", "pgp_sign_changes_
 # and `distribution/distros.yaml`.
 DISTROS = ["bookworm", "trixie", "focal", "jammy", "noble"]
 
+# Bazel arch -> Debian arch (as used in `pkg_deb` output filenames).
+DEB_ARCH = {
+    "arm64": "arm64",
+    "x64": "amd64",
+}
+
 def _package_names(release_version):
     return [
         "envoy",
@@ -22,37 +28,42 @@ def _package_names(release_version):
         "envoy-contrib-%s" % release_version,
     ]
 
-def envoy_signed_changes(name, arch_packages, release_version, distros = DISTROS):
+def envoy_signed_changes(name, arch_packages, version, release_version, distros = DISTROS):
     """Extract, split-per-distro, and clearsign the bundled `.changes` files.
+
+    Output basenames reproduce what `envoy.gpg.sign`/debsign emitted into
+    `bin/debs.tar.gz`.
 
     Args:
         name: Prefix for generated targets.
         arch_packages: dict of arch name -> label of the `packages.<arch>.tar.gz`
             tarball (containing a `deb/` prefix with the `.deb`/`.changes` files).
+        version: Full package version from `pkg_deb`.
         release_version: The `<major>.<minor>` release version used to name the
             minor-version package/`.changes` files.
         distros: Debian/Ubuntu codenames to split each `.changes` file into.
 
     Returns:
-        A list of `(label, bundle_path)` tuples for the signed `.changes` files,
-        for use when assembling the final release bundle.
+        A list of `(label, basename)` tuples for the signed `.changes` files.
     """
     names = _package_names(release_version)
     signed = []
     for arch, packages in arch_packages.items():
+        deb_arch = DEB_ARCH[arch]
         for pkg in names:
+            changes_basename = "%s_%s_%s" % (pkg, version, deb_arch)
             extract_name = "%s-%s-%s-extract" % (name, arch, pkg)
             changes_from_tarball(
                 name = extract_name,
                 tarball = packages,
                 package = pkg,
                 prefix = "deb",
-                out = "%s/%s/%s.changes" % (name, arch, pkg),
+                out = "%s/%s/%s.changes" % (name, arch, changes_basename),
             )
             for label, distro in pgp_sign_changes_split(
                 name = "%s-%s-%s" % (name, arch, pkg),
                 changes = ":%s" % extract_name,
                 distros = distros,
             ):
-                signed.append((label, "changes/%s/%s.%s.changes" % (arch, pkg, distro)))
+                signed.append((label, "%s.%s.changes" % (changes_basename, distro)))
     return signed
