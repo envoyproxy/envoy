@@ -10,21 +10,14 @@ namespace StreamInfo {
 
 absl::string_view FilterState::indexToName(FilterStateIndex index) {
   const size_t idx = static_cast<size_t>(index);
-  if (idx >= static_cast<size_t>(FilterStateIndex::MaxIndex)) {
+  if (idx >= FilterStateIndexCount) {
     return "";
   }
-  static constexpr std::array<absl::string_view, static_cast<size_t>(FilterStateIndex::MaxIndex)>
-      names = {
-          "envoy.filters.network.http_connection_manager.local_reply_owner",
-          "envoy.network.upstream_server_name",
-          "envoy.network.upstream_socket_options",
-          "envoy.network.upstream_subject_alt_names",
-          "envoy.network.network_namespace",
-          "envoy.router.original_connect_port",
-#ifdef ENVOY_ENABLE_EXECUTION_CONTEXT
-          "envoy.network.connection_execution_context",
-#endif
-      };
+  static constexpr std::array<absl::string_view, FilterStateIndexCount> names = {
+#define GENERATE_NAMES(enum_val, string_val) string_val,
+      FOR_EACH_FILTER_STATE_INDEX(GENERATE_NAMES)
+#undef GENERATE_NAMES
+  };
   return names[idx];
 }
 
@@ -32,7 +25,7 @@ std::optional<FilterStateIndex> FilterState::nameToIndex(absl::string_view name)
   static const auto map = []() {
     CompiledStringMap<uint32_t> m;
     std::vector<CompiledStringMap<uint32_t>::KV> contents;
-    for (uint32_t i = 0; i < static_cast<uint32_t>(FilterStateIndex::MaxIndex); ++i) {
+    for (uint32_t i = 0; i < FilterStateIndexCount; ++i) {
       const FilterStateIndex idx = static_cast<FilterStateIndex>(i);
       contents.push_back({indexToName(idx), i + 1});
     }
@@ -184,7 +177,7 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
       break;
     }
   }
-  for (size_t i = 0; i < static_cast<size_t>(FilterStateIndex::MaxIndex); ++i) {
+  for (size_t i = 0; i < FilterStateIndexCount; ++i) {
     const auto& object = indexed_data_storage_[i];
     if (object != nullptr) {
       const FilterStateIndex index = static_cast<FilterStateIndex>(i);
@@ -213,7 +206,7 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, std::shared_ptr<Obj
                                      FilterState::LifeSpan life_span,
                                      StreamSharingMayImpactPooling stream_sharing) {
   const size_t idx = static_cast<size_t>(index);
-  if (idx >= static_cast<size_t>(FilterStateIndex::MaxIndex)) {
+  if (idx >= FilterStateIndexCount) {
     return;
   }
   if (life_span > life_span_) {
@@ -248,7 +241,7 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, std::shared_ptr<Obj
 const FilterState::Object*
 FilterStateImpl::getIndexedDataReadOnlyGeneric(FilterStateIndex index) const {
   const size_t idx = static_cast<size_t>(index);
-  if (idx >= static_cast<size_t>(FilterStateIndex::MaxIndex)) {
+  if (idx >= FilterStateIndexCount) {
     return nullptr;
   }
   const auto& obj = indexed_data_storage_[idx];
@@ -268,7 +261,7 @@ FilterState::Object* FilterStateImpl::getIndexedDataMutableGeneric(FilterStateIn
 std::shared_ptr<FilterState::Object>
 FilterStateImpl::getIndexedDataSharedMutableGeneric(FilterStateIndex index) {
   const size_t idx = static_cast<size_t>(index);
-  if (idx >= static_cast<size_t>(FilterStateIndex::MaxIndex)) {
+  if (idx >= FilterStateIndexCount) {
     return nullptr;
   }
   const auto& obj = indexed_data_storage_[idx];
@@ -283,7 +276,7 @@ FilterStateImpl::getIndexedDataSharedMutableGeneric(FilterStateIndex index) {
 
 bool FilterStateImpl::hasIndexedData(FilterStateIndex index) const {
   const size_t idx = static_cast<size_t>(index);
-  if (idx >= static_cast<size_t>(FilterStateIndex::MaxIndex)) {
+  if (idx >= FilterStateIndexCount) {
     return false;
   }
   return indexed_data_storage_[idx] != nullptr || (parent_ && parent_->hasIndexedData(index));

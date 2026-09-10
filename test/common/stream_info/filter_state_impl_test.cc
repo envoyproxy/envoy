@@ -541,17 +541,19 @@ TEST_F(FilterStateImplTest, IndexedFilterStateLazyAllocation) {
 }
 
 TEST_F(FilterStateImplTest, IndexedFilterStateUtilities) {
+  const FilterStateIndex invalid_index = static_cast<FilterStateIndex>(FilterStateIndexCount);
+
   // Verify invalid index handling (out of bounds)
-  EXPECT_FALSE(filterState().hasIndexedData(FilterStateIndex::MaxIndex));
-  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnlyGeneric(FilterStateIndex::MaxIndex));
-  EXPECT_EQ(nullptr, filterState().getIndexedDataSharedMutableGeneric(FilterStateIndex::MaxIndex));
+  EXPECT_FALSE(filterState().hasIndexedData(invalid_index));
+  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnlyGeneric(invalid_index));
+  EXPECT_EQ(nullptr, filterState().getIndexedDataSharedMutableGeneric(invalid_index));
 
   // setIndexedData with invalid index should return immediately with no-op
-  filterState().setIndexedData(FilterStateIndex::MaxIndex, std::make_shared<SimpleType>(500),
+  filterState().setIndexedData(invalid_index, std::make_shared<SimpleType>(500),
                                FilterState::LifeSpan::FilterChain);
 
   // indexToName boundary checks
-  EXPECT_EQ("", FilterState::indexToName(FilterStateIndex::MaxIndex));
+  EXPECT_EQ("", FilterState::indexToName(invalid_index));
   EXPECT_EQ("", FilterState::indexToName(static_cast<FilterStateIndex>(99)));
 
   // nameToIndex direct checks for invalid keys

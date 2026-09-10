@@ -71,8 +71,7 @@ private:
   const FilterState::LifeSpan life_span_;
   absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>> data_storage_;
   uint32_t indexed_count_{0};
-  std::array<std::unique_ptr<IndexedFilterObject>, static_cast<size_t>(FilterStateIndex::MaxIndex)>
-      indexed_data_storage_{};
+  std::array<std::unique_ptr<IndexedFilterObject>, FilterStateIndexCount> indexed_data_storage_{};
 };
 
 } // namespace StreamInfo
