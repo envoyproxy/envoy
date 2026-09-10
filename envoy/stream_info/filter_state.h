@@ -49,22 +49,13 @@ enum class StreamSharingMayImpactPooling {
 enum class FilterStateIndex : uint32_t {
   LocalReplyOwner,
   UpstreamServerName,
-  TransportSocketOptions,
-  ConnectionExecutionContext,
-  OriginalConnectPort,
-  CacheFilterLoggingInfo,
-  ExtAuthzLoggingInfo,
-  OverrideHost,
-  NetworkNamespace,
+  UpstreamSocketOptions,
   UpstreamSubjectAltNames,
-  TransportSocketOriginalDstAddress,
-  TunnelResponseHeadersOrTrailers,
-  TcpProxyCluster,
-  TcpProxyPerConnectionIdleTimeoutMs,
-  UpstreamDynamicHost,
-  UpstreamDynamicPort,
-  HttpGrpcStats,
-  NetworkGeoip,
+  NetworkNamespace,
+  OriginalConnectPort,
+#ifdef ENVOY_ENABLE_EXECUTION_CONTEXT
+  ConnectionExecutionContext,
+#endif
   MaxIndex
 };
 

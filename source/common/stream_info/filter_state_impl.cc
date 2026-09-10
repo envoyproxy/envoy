@@ -14,24 +14,17 @@ absl::string_view FilterState::indexToName(FilterStateIndex index) {
     return "";
   }
   static constexpr std::array<absl::string_view, static_cast<size_t>(FilterStateIndex::MaxIndex)>
-      names = {"envoy.filters.network.http_connection_manager.local_reply_owner",
-               "envoy.network.upstream_server_name",
-               "envoy.network.transport_socket_options",
-               "envoy.network.connection_execution_context",
-               "envoy.router.original_connect_port",
-               "io.envoyproxy.extensions.filters.http.cache.CacheFilterLoggingInfo",
-               "envoy.filters.http.ext_authz",
-               "envoy.extensions.load_balancing_policies.override_host.filter_state",
-               "envoy.network.network_namespace",
-               "envoy.network.upstream_subject_alt_names",
-               "envoy.network.transport_socket.original_dst_address",
-               "envoy.http.tunnel_response_headers_or_trailers",
-               "envoy.tcp_proxy.cluster",
-               "envoy.tcp_proxy.per_connection_idle_timeout_ms",
-               "envoy.upstream.dynamic_host",
-               "envoy.upstream.dynamic_port",
-               "envoy.filters.http.grpc_stats",
-               "envoy.geoip"};
+      names = {
+          "envoy.filters.network.http_connection_manager.local_reply_owner",
+          "envoy.network.upstream_server_name",
+          "envoy.network.upstream_socket_options",
+          "envoy.network.upstream_subject_alt_names",
+          "envoy.network.network_namespace",
+          "envoy.router.original_connect_port",
+#ifdef ENVOY_ENABLE_EXECUTION_CONTEXT
+          "envoy.network.connection_execution_context",
+#endif
+      };
   return names[idx];
 }
 
