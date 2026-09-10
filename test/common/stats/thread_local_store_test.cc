@@ -1,3 +1,4 @@
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -2596,6 +2597,7 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
 
 class HistogramThreadTest : public ThreadLocalRealThreadsMixin, public testing::Test {
 protected:
+  using Bucket = ParentHistogram::Bucket;
   static constexpr uint32_t NumThreads = 10;
 
   HistogramThreadTest() : ThreadLocalRealThreadsMixin(NumThreads) {}
@@ -2641,6 +2643,40 @@ TEST_F(HistogramThreadTest, MakeHistogramsAndRecordValues) {
   ParentHistogramSharedPtr hist = histograms[0];
   EXPECT_THAT(hist->bucketSummary(),
               HasSubstr(absl::StrCat(" B25(0,0) B50(", NumThreads, ",", NumThreads, ") ")));
+}
+
+TEST_F(HistogramThreadTest, MergeWithMostlyEmptyTlsHistograms) {
+  std::atomic<uint32_t> recorded{0};
+  foreachThread([this, &recorded]() {
+    Histogram& histogram = scope_.histogramFromString("my_hist", Histogram::Unit::Unspecified);
+    if (recorded.fetch_add(1) == 0) {
+      histogram.recordValue(42);
+    }
+  });
+
+  mergeHistograms();
+
+  auto histograms = store_->histograms();
+  ASSERT_EQ(1, histograms.size());
+  EXPECT_THAT(histograms[0]->bucketSummary(), HasSubstr(" B50(1,1) "));
+}
+
+TEST_F(HistogramThreadTest, MergeDisjointBucketsAcrossTlsHistograms) {
+  std::atomic<uint32_t> thread_index{0};
+  foreachThread([this, &thread_index]() {
+    Histogram& histogram = scope_.histogramFromString("my_hist", Histogram::Unit::Unspecified);
+    const uint32_t index = thread_index.fetch_add(1);
+    if (index < 2) {
+      histogram.recordValue(index == 0 ? 42 : 100);
+    }
+  });
+
+  mergeHistograms();
+
+  auto histograms = store_->histograms();
+  ASSERT_EQ(1, histograms.size());
+  EXPECT_THAT(histograms[0]->detailedIntervalBuckets(),
+              UnorderedElementsAre(Bucket{42, 1, 1}, Bucket{100, 10, 1}));
 }
 
 TEST_F(HistogramThreadTest, ScopeOverlap) {
