@@ -1,5 +1,6 @@
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -314,6 +315,21 @@ uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
     ASSERT(client_map_.empty());
     ASSERT(host_set_member_update_cb_handle_ == nullptr);
     return 0;
+  }
+
+  // Only the Redis cluster load balancer interprets the shard index in
+  // RedisSpecifyShardContextImpl and returns nullptr past the last shard. A generic load balancer
+  // ignores the index and keeps returning hosts, so walking the slot space would call chooseHost()
+  // MaxSlot times on every cluster-scope command just to rediscover the configured hosts.
+  if (!is_redis_cluster_) {
+    absl::flat_hash_set<Upstream::HostConstSharedPtr> unique_hosts;
+    for (const auto& host_set : cluster_->prioritySet().hostSetsPerPriority()) {
+      for (const auto& host : host_set->healthyHosts()) {
+        unique_hosts.insert(host);
+      }
+    }
+    return static_cast<uint16_t>(
+        std::min<size_t>(unique_hosts.size(), Envoy::Extensions::Clusters::Redis::MaxSlot));
   }
 
   Common::Redis::RespValue request;
