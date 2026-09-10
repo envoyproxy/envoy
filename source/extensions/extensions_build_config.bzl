@@ -80,6 +80,7 @@ EXTENSIONS = {
     "envoy.health_checkers.dynamic_modules":            "//source/extensions/health_checkers/dynamic_modules:config",
     "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
     "envoy.health_checkers.thrift":                     "//source/extensions/health_checkers/thrift:config",
+    "envoy.health_checkers.udp":                        "//source/extensions/health_checkers/udp:health_checker_lib",
     "envoy.health_checkers.tcp":                        "//source/extensions/health_checkers/tcp:health_checker_lib",
     "envoy.health_checkers.http":                       "//source/extensions/health_checkers/http:health_checker_lib",
     "envoy.health_checkers.grpc":                       "//source/extensions/health_checkers/grpc:health_checker_lib",
