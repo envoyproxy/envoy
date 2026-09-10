@@ -843,50 +843,19 @@ TEST_P(EdsTest, ActiveClusterGetsUpdated) {
 // Verifies that multiple deferred clusters added in a batch and removed before inline inflation
 // are safely cleaned up without inflating or corrupting thread-local cluster tables.
 TEST_P(StaticClusterTest, BatchAddAndPreInflationRemoval) {
-  const std::string bootstrap_yaml = R"EOF(
-    static_resources:
-    )EOF";
-
-  auto bootstrap = parseBootstrapFromV3YamlEnableDeferredCluster(bootstrap_yaml);
+  auto bootstrap = parseBootstrapFromV3YamlEnableDeferredCluster("static_resources:\n");
   create(bootstrap);
 
-  const std::string static_cluster_yaml_1 = R"EOF(
-    name: cluster_1
-    connect_timeout: 0.250s
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: cluster_1
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 11001
-  )EOF";
-
-  const std::string static_cluster_yaml_2 = R"EOF(
-    name: cluster_2
-    connect_timeout: 0.250s
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: cluster_2
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 11002
-  )EOF";
+  auto c1 = defaultStaticCluster("cluster_1");
+  setClusterType(c1, getStaticClusterType());
+  auto c2 = defaultStaticCluster("cluster_2");
+  setClusterType(c2, getStaticClusterType());
 
   // Start a batch and add two deferred clusters.
   {
     auto batch = cluster_manager_->createSourceBatch();
-    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
-        parseClusterFromV3Yaml(static_cluster_yaml_1, getStaticClusterType()), "1"));
-    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
-        parseClusterFromV3Yaml(static_cluster_yaml_2, getStaticClusterType()), "1"));
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(c1, "1"));
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(c2, "1"));
 
     // Remove cluster_2 within the same batch before it was ever inflated or looked up.
     EXPECT_TRUE(cluster_manager_->removeCluster("cluster_2"));
@@ -983,46 +952,16 @@ TEST_P(EdsTest, BatchMultipleDeferredUpdatesAndInlineInflation) {
 // Verifies that removing a deferred cluster before it has ever been inflated removes it from
 // both active and deferred cluster maps without leaving orphaned state.
 TEST_P(StaticClusterTest, BatchDeferredClusterRemovalBeforeInflation) {
-  const std::string bootstrap_yaml = R"EOF(
-    static_resources:
-      clusters:
-      - name: bootstrap_cluster
-        connect_timeout: 0.250s
-        lb_policy: ROUND_ROBIN
-        load_assignment:
-          cluster_name: bootstrap_cluster
-          endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: 127.0.0.1
-                    port_value: 60000
-    )EOF";
-
-  auto bootstrap = parseBootstrapFromV3YamlEnableDeferredCluster(bootstrap_yaml);
+  auto bootstrap = parseBootstrapFromV3YamlEnableDeferredCluster("static_resources:\n");
   create(bootstrap);
 
-  const std::string cluster_to_remove_yaml = R"EOF(
-    name: deferred_to_remove
-    connect_timeout: 0.250s
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: deferred_to_remove
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 11020
-  )EOF";
+  auto cluster_to_remove = defaultStaticCluster("deferred_to_remove");
+  setClusterType(cluster_to_remove, getStaticClusterType());
 
   // Add deferred cluster in a batch
   {
     auto batch = cluster_manager_->createSourceBatch();
-    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
-        parseClusterFromV3Yaml(cluster_to_remove_yaml, getStaticClusterType()), "v1"));
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster_to_remove, "v1"));
   }
 
   EXPECT_TRUE(cluster_manager_->hasCluster("deferred_to_remove"));
