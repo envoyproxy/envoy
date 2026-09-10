@@ -215,18 +215,6 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
       clear_route_cache_(!proto_config_.disable_clear_route_cache()) {}
 
 absl::Status McpJsonRestBridgeFilterConfig::initialize() {
-  if (proto_config_.server_info().has_max_supported_protocol_version()) {
-    const std::string& max_version =
-        proto_config_.server_info().max_supported_protocol_version().value();
-    if (max_version != McpConstants::MCP_VERSION_2025_11_25 &&
-        max_version != McpConstants::MCP_VERSION_2026_07_28) {
-      return absl::InvalidArgumentError(
-          fmt::format("Invalid max_supported_protocol_version: '{}'.", max_version));
-    }
-  }
-  enable_stateless_protocol_ =
-      (max_supported_protocol_version_ >= McpConstants::MCP_VERSION_2026_07_28);
-
   const auto& tool_config = proto_config_.tool_config();
   std::string host = tool_config.default_server_info().host();
   std::string path = tool_config.default_server_info().path();

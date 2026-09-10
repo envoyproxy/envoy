@@ -139,12 +139,6 @@ TEST(McpJsonRestBridgeFilterConfigTest, InvalidMaxSupportedProtocolVersion) {
     EXPECT_THROW_WITH_REGEX(
         factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
         Envoy::ProtoValidationException, "Proto constraint validation failed");
-
-    // Filter-level validation also rejects it if bypassed directly to create().
-    EXPECT_THAT(McpJsonRestBridgeFilterConfig::create(proto_config),
-                HasStatus(absl::StatusCode::kInvalidArgument,
-                          HasSubstr(fmt::format("Invalid max_supported_protocol_version: '{}'.",
-                                                version))));
   }
 }
 
@@ -156,7 +150,8 @@ TEST(McpJsonRestBridgeFilterConfigTest, MaxSupportedProtocolVersionBehavior) {
         McpJsonRestBridgeFilterConfig::create(proto_config);
     ASSERT_OK(config);
     EXPECT_EQ((*config)->maxSupportedProtocolVersion(), "2025-11-25");
-    EXPECT_FALSE((*config)->enableStatelessProtocol());
+    EXPECT_TRUE((*config)->supportsProtocolVersion("2025-11-25"));
+    EXPECT_FALSE((*config)->supportsProtocolVersion("2026-07-28"));
   }
 
   // Version 2025-11-25 is effective
@@ -171,7 +166,8 @@ TEST(McpJsonRestBridgeFilterConfigTest, MaxSupportedProtocolVersionBehavior) {
         McpJsonRestBridgeFilterConfig::create(proto_config);
     ASSERT_OK(config);
     EXPECT_EQ((*config)->maxSupportedProtocolVersion(), "2025-11-25");
-    EXPECT_FALSE((*config)->enableStatelessProtocol());
+    EXPECT_TRUE((*config)->supportsProtocolVersion("2025-11-25"));
+    EXPECT_FALSE((*config)->supportsProtocolVersion("2026-07-28"));
   }
 
   // Version 2026-07-28 is effective
@@ -186,7 +182,8 @@ TEST(McpJsonRestBridgeFilterConfigTest, MaxSupportedProtocolVersionBehavior) {
         McpJsonRestBridgeFilterConfig::create(proto_config);
     ASSERT_OK(config);
     EXPECT_EQ((*config)->maxSupportedProtocolVersion(), "2026-07-28");
-    EXPECT_TRUE((*config)->enableStatelessProtocol());
+    EXPECT_TRUE((*config)->supportsProtocolVersion("2025-11-25"));
+    EXPECT_TRUE((*config)->supportsProtocolVersion("2026-07-28"));
   }
 }
 

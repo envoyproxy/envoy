@@ -59,7 +59,9 @@ public:
 
   const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }
   const std::string& maxSupportedProtocolVersion() const { return max_supported_protocol_version_; }
-  bool enableStatelessProtocol() const { return enable_stateless_protocol_; }
+  bool supportsProtocolVersion(absl::string_view version) const {
+    return max_supported_protocol_version_ >= version;
+  }
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
@@ -122,7 +124,6 @@ private:
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
   std::string fallback_protocol_version_;
   std::string max_supported_protocol_version_;
-  bool enable_stateless_protocol_ = false;
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
   bool clear_route_cache_;

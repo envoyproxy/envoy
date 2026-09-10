@@ -158,13 +158,10 @@ message TraceContextExtractionOptions {
 // Configuration for the server metadata.
 message ServerInfo {
   // The maximum MCP protocol version supported by this MCP endpoint.
-  // All versions before and including this version will be supported.
   //
-  // - If provided: The extension enforces version negotiation according to the MCP specification:
-  //   https://modelcontextprotocol.io/specification/2026-07-28/basic/lifecycle#version-negotiation
-  //   This field is only effective when set to ``2026-07-28`` or later versions. Setting it to a version
-  //   prior to ``2025-11-25`` has no effect because the filter unconditionally supports all features
-  //   up to ``2025-11-25`` with no mechanism to disable them.
+  // - If provided: Supported values are ``2025-11-25`` and ``2026-07-28``. Versions prior
+  //   to ``2025-11-25`` are rejected because the filter unconditionally supports features
+  //   up to ``2025-11-25`` and does not support downgrading below that baseline.
   // - If not provided: Defaults to ``2025-11-25``.
   //
   // Example value: "2026-07-28"
