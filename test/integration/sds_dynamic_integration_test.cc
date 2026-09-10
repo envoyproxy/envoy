@@ -684,6 +684,9 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, CertificateTlsParams) {
   // Without a certificate override, the context-level AES128 restriction must be restored.
   EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256"))
                    ->value());
+  // The unchanged AES256 count proves that the restored context baseline excludes AES256.
+  EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384"))
+                   ->value());
   // Both SDS resources must be accepted: one adding the override and one removing it.
   EXPECT_EQ(2, test_server_->counter("sds.server_cert_rsa.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
