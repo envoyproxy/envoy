@@ -84,7 +84,7 @@ class Upstream:
     # "fast instance" immediately.
     def __init__(self, fast_version=False):
         self.port = UPSTREAM_FAST_PORT if fast_version else UPSTREAM_SLOW_PORT
-        self.release = asyncio.Event()
+        self.allow_write_completion = asyncio.Event()
         self.app = web.Application()
         self.app.add_routes([
             web.get("/", self.fast_response) if fast_version else web.get("/", self.slow_response),
@@ -116,7 +116,7 @@ class Upstream:
         await response.prepare(request)
         await response.write(b"start\n")
         try:
-            await asyncio.wait_for(self.release.wait(), timeout=60)
+            await asyncio.wait_for(self.allow_write_completion.wait(), timeout=60)
         except asyncio.TimeoutError:
             log.warning("timed out waiting to release slow upstream response")
         await response.write(b"end\n")
@@ -557,7 +557,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
     async def _assert_slow_requests_complete_on_old_instance(
             self, slow_responses: list[LineGenerator]) -> None:
         log.info("releasing original slow request")
-        self.slow_upstream.release.set()
+        self.slow_upstream.allow_write_completion.set()
         for response in slow_responses:
             self.assertEqual(await response.line(), b"end\n")
         for response in slow_responses:
@@ -584,7 +584,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_connection_handoffs(self) -> None:
         async with contextlib.AsyncExitStack() as stack:
-            stack.callback(self.slow_upstream.release.set)
+            stack.callback(self.slow_upstream.allow_write_completion.set)
             await self._test_connection_handoffs(stack)
 
     async def _test_connection_handoffs(self, stack: contextlib.AsyncExitStack) -> None:
