@@ -709,6 +709,19 @@ public:
   virtual void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
+   * Decode headers directly to subsequent filters in the filter chain. This method is used in
+   * cases in which a filter needs to inject or continue decoded headers to subsequent filters
+   * asynchronously, indicating end_stream at an appropriate time.
+   *
+   * This method should only be called outside of callback context. I.e., do not call this method
+   * from within a filter's decodeHeaders() call.
+   *
+   * @param headers RequestHeaderMap supplies the headers to be injected.
+   * @param end_stream boolean supplies whether this is a header-only request.
+   */
+  virtual void injectDecodedHeadersToFilterChain(RequestHeaderMap& headers, bool end_stream) PURE;
+
+  /**
    * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
    * If called in any other context, an assertion will be triggered.
    *
@@ -1148,6 +1161,21 @@ public:
    * @param end_stream boolean supplies whether this is the last data frame, and no trailers behind.
    */
   virtual void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
+   * Encode headers directly to subsequent filters in the filter chain. This method is used in
+   * cases in which a filter needs to inject or continue encoded headers to subsequent filters
+   * asynchronously, indicating end_stream at an appropriate time.
+   *
+   * This method should only be called outside of callback context. I.e., do not call this method
+   * from within a filter's encodeHeaders() call.
+   *
+   * @param headers ResponseHeaderMapPtr supplies the headers to be injected (if non-null, replaces
+   * existing response headers).
+   * @param end_stream boolean supplies whether this is a header-only response.
+   */
+  virtual void injectEncodedHeadersToFilterChain(ResponseHeaderMapPtr&& headers,
+                                                 bool end_stream) PURE;
 
   /**
    * Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
