@@ -1,10 +1,10 @@
 /**
  * Permalinks: every addressable definition gets one, and clicking one copies it.
  *
- * Sphinx puts a `#` anchor on headings only. protodoc emits each field and
- * enum value as a definition list carrying the symbol's target, so those are
- * addressable too but have nothing to grab; here they get the same anchor a
- * heading has.
+ * Sphinx puts a permalink anchor on headings only. protodoc emits each field
+ * and enum value as a definition list carrying the symbol's target, so those
+ * are addressable too but have nothing to grab; here they get the same anchor
+ * a heading has.
  *
  * Clicking any anchor then copies its absolute URL. The click still jumps to
  * the target as before, so nothing that worked stops working and the address
@@ -39,6 +39,10 @@ function flash(link, status) {
 }
 
 function copyOnClick(content) {
+  content.querySelectorAll('a.headerlink').forEach((link) => {
+    link.title = 'Copy link';
+  });
+
   const status = document.createElement('div');
   status.className = 'envoy-visually-hidden';
   status.setAttribute('role', 'status');

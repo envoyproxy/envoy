@@ -82,9 +82,9 @@
   .envoy-content-main .rst-content h4 > a.headerlink,
   .envoy-content-main .rst-content h5 > a.headerlink,
   .envoy-content-main .rst-content h6 > a.headerlink {
-    left: auto;
-    margin-left: 0.4em;
+    margin: 0 0 0 0.2em;
     position: relative;
+    right: auto;
     top: auto;
   }
 }

@@ -90,9 +90,9 @@
 .envoy-content-main .rst-content .envoy-proto-symbol > h3 > a.headerlink,
 .envoy-content-main .rst-content .envoy-proto-symbol > h4 > a.headerlink,
 .envoy-content-main .rst-content .envoy-proto-symbol > h5 > a.headerlink {
-  left: auto;
-  margin-left: 0.5em;
+  margin: 0 0 0 0.2em;
   position: relative;
+  right: auto;
   top: auto;
 }
 
