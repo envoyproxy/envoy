@@ -16,6 +16,7 @@ envoy_cc_extension(
         "reverse_tunnel_acceptor_extension.h",
         "reverse_tunnel_lifecycle_info.h",
         "reverse_tunnel_upstream_lifecycle.h",
+        "upstream_socket_manager.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -35,7 +36,7 @@ envoy_cc_extension(
         "//source/common/config:utility_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/stats:timespan_lib",
-        "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_includes",
         "//source/extensions/bootstrap/reverse_tunnel/common:rping_interceptor_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
     ],
@@ -58,11 +59,13 @@ envoy_cc_extension(
         "//source/common/common:logger_lib",
         "//source/common/formatter:stream_info_formatter_extension_lib",
         "//source/common/network:default_socket_interface_lib",
+        "//source/common/network:socket_interface_lib",
         "//source/common/network:socket_lib",
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:uint64_accessor_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
         "//source/server:generic_factory_context_lib",
     ],
     alwayslink = 1,
@@ -71,7 +74,6 @@ envoy_cc_extension(
 envoy_cc_extension(
     name = "upstream_socket_manager_lib",
     srcs = ["upstream_socket_manager.cc"],
-    hdrs = ["upstream_socket_manager.h"],
     visibility = ["//visibility:public"],
     deps = [
         "reverse_tunnel_acceptor_includes",

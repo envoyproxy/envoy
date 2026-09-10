@@ -10,8 +10,6 @@ import "envoy/config/core/v3/socket_cmsg_headers.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -76,8 +74,7 @@ message QuicProtocolOptions {
   // The current QUICHE implementation will advertise only one of the preferred IPv4 and IPv6 addresses based on the address family the client initially connects with.
   // If not specified, Envoy will not advertise any server's preferred address.
   // [#extension-category: envoy.quic.server_preferred_address]
-  core.v3.TypedExtensionConfig server_preferred_address_config = 9
-      [(xds.annotations.v3.field_status).work_in_progress = true];
+  core.v3.TypedExtensionConfig server_preferred_address_config = 9;
 
   // Configure the server to send transport parameter `disable_active_migration <https://www.rfc-editor.org/rfc/rfc9000#section-18.2-4.30.1>`_.
   // Defaults to false (do not send this transport parameter).

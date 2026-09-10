@@ -4715,6 +4715,130 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_async_host_selection_
 ) {
 }
 
+/// Records what the resolve-and-record wrappers did so a test can assert them. Resolution reports
+/// `MetricNotFound` for id 0 so the failure arm is reachable, and otherwise hands back a handle
+/// derived from the id.
+pub(crate) static MOCK_CLUSTER_METRIC_OPS: std::sync::Mutex<Vec<(String, usize, u64)>> =
+  std::sync::Mutex::new(Vec::new());
+
+fn record_cluster_metric_op(op: &str, handle: *mut std::ffi::c_void, value: u64) {
+  MOCK_CLUSTER_METRIC_OPS
+    .lock()
+    .unwrap()
+    .push((op.to_owned(), handle as usize, value));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_resolve_counter_vec(
+  _config: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  counter_ptr: *mut abi::envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  if id == 0 {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  unsafe { *counter_ptr = (0x1000 + id) as _ };
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec(
+  _config: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  gauge_ptr: *mut abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  if id == 0 {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  unsafe { *gauge_ptr = (0x2000 + id) as _ };
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec(
+  _config: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  histogram_ptr: *mut abi::envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  if id == 0 {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  unsafe { *histogram_ptr = (0x3000 + id) as _ };
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_counter_add(
+  counter: abi::envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("counter_add", counter, value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_gauge_set(
+  gauge: abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("gauge_set", gauge, value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_gauge_add(
+  gauge: abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("gauge_add", gauge, value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_gauge_sub(
+  gauge: abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("gauge_sub", gauge, value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_histogram_record(
+  histogram: abi::envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("histogram_record", histogram, value);
+}
+
+// Records the batched entries so a test can assert the wrapper flattened them in order.
+pub(crate) static MOCK_CLUSTER_LB_CONTEXT_METADATA_BATCH: std::sync::Mutex<Vec<(String, String)>> =
+  std::sync::Mutex::new(Vec::new());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _ns: abi::envoy_dynamic_module_type_module_buffer,
+  entries: *const abi::envoy_dynamic_module_type_module_key_value_pair,
+  entries_size: usize,
+) -> bool {
+  let mut recorded = MOCK_CLUSTER_LB_CONTEXT_METADATA_BATCH.lock().unwrap();
+  recorded.clear();
+  for i in 0..entries_size {
+    let entry = unsafe { &*entries.add(i) };
+    let key = unsafe { std::slice::from_raw_parts(entry.key_ptr as *const u8, entry.key_length) };
+    let value =
+      unsafe { std::slice::from_raw_parts(entry.value_ptr as *const u8, entry.value_length) };
+    recorded.push((
+      String::from_utf8_lossy(key).into_owned(),
+      String::from_utf8_lossy(value).into_owned(),
+    ));
+  }
+  true
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
   _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
@@ -4730,6 +4854,49 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
   _index: usize,
 ) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
   std::ptr::null_mut()
+}
+
+/// Maps each priority to a scenario so the SDK wrapper's size-then-fill handshake is exercised end
+/// to end.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  priority: u32,
+  hosts_out: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  hosts_capacity: usize,
+  hosts_size_out: *mut usize,
+) -> bool {
+  const HOSTS: [usize; 2] = [0xAB, 0xCD];
+  match priority {
+    // Two healthy hosts, filled once the buffer is large enough.
+    0 => {
+      unsafe { *hosts_size_out = HOSTS.len() };
+      if hosts_capacity < HOSTS.len() {
+        return false;
+      }
+      for (i, addr) in HOSTS.iter().enumerate() {
+        unsafe {
+          *hosts_out.add(i) = *addr as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr
+        };
+      }
+      true
+    },
+    // Existing but empty partition. A zero buffer already holds it.
+    1 => {
+      unsafe { *hosts_size_out = 0 };
+      true
+    },
+    // A partition that never fits, so the fill call keeps failing.
+    2 => {
+      unsafe { *hosts_size_out = HOSTS.len() };
+      false
+    },
+    // No such priority level.
+    _ => {
+      unsafe { *hosts_size_out = 0 };
+      false
+    },
+  }
 }
 
 #[no_mangle]
@@ -9736,6 +9903,18 @@ fn test_cluster_specifier_context_reads_request_state() {
   assert!(ctx.get_cluster_host_count("prod", 0).is_none());
   assert!(ctx.route_name().is_none());
   STUB_SPECIFIER_STATE_PRESENT.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_attribute_id_ordering() {
+  assert_eq!(
+    67,
+    abi::envoy_dynamic_module_type_attribute_id::HealthCheck as u32
+  );
+  assert_eq!(
+    68,
+    abi::envoy_dynamic_module_type_attribute_id::UpstreamRequestedServerName as u32
+  );
 }
 
 #[test]

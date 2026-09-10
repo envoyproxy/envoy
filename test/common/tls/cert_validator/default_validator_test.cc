@@ -1163,6 +1163,168 @@ TEST(DefaultCertValidatorTest, SharesCrlAcrossContexts) {
   EXPECT_EQ(getCrlCache(context.singletonManager())->size(), 2);
 }
 
+// The trusted CA cache returns one shared parsed representation for identical
+// content, so a trust bundle referenced from many contexts is materialized in
+// memory only once.
+TEST(CaCertCacheTest, SharesIdenticalCaContent) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  absl::StatusOr<CaCertListSharedPtr> first = cache->getOrCreate(ca_cert, "ca_cert.pem");
+  ASSERT_OK(first);
+  absl::StatusOr<CaCertListSharedPtr> second = cache->getOrCreate(ca_cert, "ca_cert.pem");
+  ASSERT_OK(second);
+
+  // Both lookups return the same CaCertList and the same parsed X509.
+  EXPECT_EQ(first->get(), second->get());
+  ASSERT_FALSE((*first)->certs.empty());
+  EXPECT_EQ((*first)->certs[0].get(), (*second)->certs[0].get());
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Distinct CA content is cached separately.
+TEST(CaCertCacheTest, SeparatesDistinctCaContent) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+  const std::string fake_ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/fake_ca_cert.pem"));
+
+  absl::StatusOr<CaCertListSharedPtr> first = cache->getOrCreate(ca_cert, "ca_cert.pem");
+  ASSERT_OK(first);
+  absl::StatusOr<CaCertListSharedPtr> second = cache->getOrCreate(fake_ca_cert, "fake_ca_cert.pem");
+  ASSERT_OK(second);
+
+  EXPECT_NE(first->get(), second->get());
+  EXPECT_EQ(cache->size(), 2);
+}
+
+// A trust bundle carrying several certificates is parsed into one entry holding
+// all of them.
+TEST(CaCertCacheTest, KeepsEveryCertificateInABundle) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string bundle = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem"));
+
+  absl::StatusOr<CaCertListSharedPtr> entry = cache->getOrCreate(bundle, "ca_certificates.pem");
+  ASSERT_OK(entry);
+  EXPECT_GT((*entry)->certs.size(), 1);
+}
+
+// A CA blob is allowed to carry CRLs alongside the certificates; both are kept
+// on the shared entry.
+TEST(CaCertCacheTest, KeepsCrlsCarriedInTheCaBlob) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string ca_cert_with_crl =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_crl.pem"));
+
+  absl::StatusOr<CaCertListSharedPtr> entry =
+      cache->getOrCreate(ca_cert_with_crl, "ca_cert_with_crl.pem");
+  ASSERT_OK(entry);
+  EXPECT_FALSE((*entry)->certs.empty());
+  EXPECT_FALSE((*entry)->crls.empty());
+}
+
+// An entry is released once the last reference to it is dropped, so the cache
+// does not grow without bound as certificates are rotated via xDS.
+TEST(CaCertCacheTest, ReleasesUnreferencedEntries) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  {
+    absl::StatusOr<CaCertListSharedPtr> entry = cache->getOrCreate(ca_cert, "ca_cert.pem");
+    ASSERT_OK(entry);
+    EXPECT_EQ(cache->size(), 1);
+  }
+  // The only reference is gone, so the entry is released.
+  EXPECT_EQ(cache->size(), 0);
+
+  // Re-adding the same content succeeds and repopulates the cache.
+  absl::StatusOr<CaCertListSharedPtr> reloaded = cache->getOrCreate(ca_cert, "ca_cert.pem");
+  ASSERT_OK(reloaded);
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Content that carries no usable certificate returns an error and is not cached.
+TEST(CaCertCacheTest, ReturnsErrorForInvalidCaCert) {
+  auto cache = std::make_shared<CaCertCache>();
+  // Valid PEM envelope but garbage base64 inside, so nothing parses out of it.
+  const std::string invalid = "-----BEGIN CERTIFICATE-----\n"
+                              "not valid base64 content!!!\n"
+                              "-----END CERTIFICATE-----\n";
+
+  absl::StatusOr<CaCertListSharedPtr> result = cache->getOrCreate(invalid, "invalid_ca_cert.pem");
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr(
+                          "Failed to load trusted CA certificates from invalid_ca_cert.pem")));
+  EXPECT_EQ(cache->size(), 0);
+}
+
+// A returned CaCertList keeps the cache alive, so a caller only needs to hold
+// the CaCertList (this is what lets the validator store a single shared_ptr).
+TEST(CaCertCacheTest, CaCertListKeepsCacheAlive) {
+  std::weak_ptr<CaCertCache> weak_cache;
+  CaCertListSharedPtr ca_cert_list;
+  {
+    auto cache = std::make_shared<CaCertCache>();
+    weak_cache = cache;
+    const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+        TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+    absl::StatusOr<CaCertListSharedPtr> result = cache->getOrCreate(ca_cert, "ca_cert.pem");
+    ASSERT_OK(result);
+    ca_cert_list = std::move(*result);
+  }
+  // The local cache reference is gone, but the CaCertList still holds it alive.
+  EXPECT_FALSE(weak_cache.expired());
+  EXPECT_EQ(ca_cert_list->cache.get(), weak_cache.lock().get());
+
+  // Dropping the CaCertList releases the cache.
+  ca_cert_list.reset();
+  EXPECT_TRUE(weak_cache.expired());
+}
+
+// Two validators created from the same factory context share a single parsed
+// trust bundle, which is the behavior that prevents a separate copy of the CA
+// certificates per TLS context.
+TEST(DefaultCertValidatorTest, SharesCaCertsAcrossContexts) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config1 = makeSuppressConfig(ca_cert, false);
+  auto config2 = makeSuppressConfig(ca_cert, false);
+  DefaultCertValidator validator1(config1.get(), stats, context);
+  DefaultCertValidator validator2(config2.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx1(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL_CTX> ssl_ctx2(SSL_CTX_new(TLS_method()));
+  std::vector<SSL_CTX*> contexts1 = {ssl_ctx1.get()};
+  std::vector<SSL_CTX*> contexts2 = {ssl_ctx2.get()};
+  ASSERT_OK(validator1.initializeSslContexts(contexts1, false, *store.rootScope()));
+  ASSERT_OK(validator2.initializeSslContexts(contexts2, false, *store.rootScope()));
+
+  // Both validators reference the same parsed CA certificates, cached exactly
+  // once, and each still reports the CA it was configured with.
+  EXPECT_EQ(getCaCertCache(context.singletonManager())->size(), 1);
+  EXPECT_NE(validator1.getCaCertInformation(), nullptr);
+  EXPECT_NE(validator2.getCaCertInformation(), nullptr);
+
+  // A validator using different CA content adds a second cache entry.
+  const std::string other_ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/fake_ca_cert.pem"));
+  auto config3 = makeSuppressConfig(other_ca_cert, false);
+  DefaultCertValidator validator3(config3.get(), stats, context);
+  bssl::UniquePtr<SSL_CTX> ssl_ctx3(SSL_CTX_new(TLS_method()));
+  std::vector<SSL_CTX*> contexts3 = {ssl_ctx3.get()};
+  ASSERT_OK(validator3.initializeSslContexts(contexts3, false, *store.rootScope()));
+  EXPECT_EQ(getCaCertCache(context.singletonManager())->size(), 2);
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

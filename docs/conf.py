@@ -395,6 +395,12 @@ html_js_files = [
 # This is the file name suffix for HTML files (e.g. ".xhtml").
 #html_file_suffix = None
 
+# `.html` by default so builds render straight from disk or an object store
+# (PR previews, local dev). envoy-website builds with
+# `--@envoy-docs//:pretty_links`, which exports an empty suffix, and serves
+# `/foo` from `foo.html` itself.
+html_link_suffix = os.environ.get("ENVOY_DOCS_LINK_SUFFIX", ".html")
+
 # Language to be used for generating the HTML full-text search index.
 # Sphinx supports the following languages:
 #   'da', 'de', 'en', 'es', 'fi', 'fr', 'hu', 'it', 'ja'

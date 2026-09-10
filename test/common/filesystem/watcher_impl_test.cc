@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <fstream>
+#include <thread>
 
 #include "envoy/common/exception.h"
 
@@ -262,7 +263,9 @@ TEST_F(WatcherImplTest, MultipleCallbacksWithErrors) {
   Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
 
   TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
-  std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+  }
 
   int callback_count = 0;
   ASSERT_OK(watcher->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
@@ -280,12 +283,19 @@ TEST_F(WatcherImplTest, MultipleCallbacksWithErrors) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Trigger first modification. The first callback returns error, but watcher continues.
-  file << "text1" << std::flush;
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"), std::ios::app);
+    file << "text1";
+  }
+  std::this_thread::sleep_for(std::chrono::milliseconds(100)); // NO_CHECK_FORMAT(real_time)
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
+  std::this_thread::sleep_for(std::chrono::milliseconds(100)); // NO_CHECK_FORMAT(real_time)
   // Trigger second modification. It should still work.
-  file << "text2" << std::flush;
-  file.close();
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"), std::ios::app);
+    file << "text2";
+  }
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(2, callback_count);

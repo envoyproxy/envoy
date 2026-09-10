@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

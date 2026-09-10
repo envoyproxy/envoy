@@ -417,7 +417,7 @@ public:
               std::make_shared<TestRdsRouteConfigSubscription>(
                   std::move(config_update), std::move(resource_decoder), rds.config_source(),
                   rds.route_config_name(), manager_identifier, server_factory_context_,
-                  "test_listener.trds.", "TRDS", provider_manager_, creation_status);
+                  "test_listener.", "TRDS", provider_manager_, creation_status);
           RETURN_IF_NOT_OK(creation_status);
           auto provider = std::make_shared<TestRouteConfigProviderImpl>(std::move(subscription),
                                                                         server_factory_context_);
