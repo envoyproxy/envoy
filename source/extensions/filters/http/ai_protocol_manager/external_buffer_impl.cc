@@ -18,7 +18,8 @@ InMemoryExternalBuffer::~InMemoryExternalBuffer() {
   *alive_ = false;
 }
 
-void InMemoryExternalBuffer::write(Buffer::InstancePtr data, WriteCallback cb) {
+void InMemoryExternalBuffer::write(Buffer::InstancePtr data, bool /*end_stream*/,
+                                   WriteCallback cb) {
   // The bytes only become visible to length() / read() once the (asynchronous)
   // completion callback below runs, modelling a write that is not durable until
   // acknowledged.
