@@ -56,11 +56,11 @@ lockfiles_check() {
         return 0
     fi
     git --no-pager diff --stat -- "$LOCKFILE_PATHSPEC"
-    mkdir -p "$(dirname "$LOCKFILES_DIFF_OUTPUT")" 2>/dev/null || :
-    git --no-pager diff -- "$LOCKFILE_PATHSPEC" > "$LOCKFILES_DIFF_OUTPUT" 2>/dev/null || :
     echo >&2
     echo "FAIL: Lockfiles are not in sync, please run: ci/do_ci.sh lockfiles" >&2
-    echo "  Full diff written to ${LOCKFILES_DIFF_OUTPUT} (uploaded as a CI artifact)" >&2
+    if { git --no-pager diff -- "$LOCKFILE_PATHSPEC" > "$LOCKFILES_DIFF_OUTPUT"; } 2>/dev/null; then
+        echo "  Full diff written to ${LOCKFILES_DIFF_OUTPUT}" >&2
+    fi
     echo >&2
     exit 1
 }
@@ -1087,8 +1087,13 @@ case $CI_TARGET in
             echo "FAIL: Failed to determine Envoy bazel-registry hash" >&2
             exit 1
         fi
+        old_registry_hash="$(registry_current_hash)"
         registry_bump "$registry_hash"
-        registry_check
+        if ! registry_check; then
+            echo "FAIL: registry hash ${registry_hash} rejected, restoring ${old_registry_hash}" >&2
+            registry_bump "$old_registry_hash"
+            exit 1
+        fi
         lockfiles_generate
         ;;
 
