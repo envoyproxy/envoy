@@ -59,9 +59,6 @@ public:
 
   const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }
   const std::string& maxSupportedProtocolVersion() const { return max_supported_protocol_version_; }
-  bool supportsProtocolVersion(absl::string_view version) const {
-    return max_supported_protocol_version_ >= version;
-  }
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }

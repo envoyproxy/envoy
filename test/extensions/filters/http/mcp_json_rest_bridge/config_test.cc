@@ -150,8 +150,6 @@ TEST(McpJsonRestBridgeFilterConfigTest, MaxSupportedProtocolVersionBehavior) {
         McpJsonRestBridgeFilterConfig::create(proto_config);
     ASSERT_OK(config);
     EXPECT_EQ((*config)->maxSupportedProtocolVersion(), "2025-11-25");
-    EXPECT_TRUE((*config)->supportsProtocolVersion("2025-11-25"));
-    EXPECT_FALSE((*config)->supportsProtocolVersion("2026-07-28"));
   }
 
   // Version 2025-11-25 is effective
@@ -166,8 +164,6 @@ TEST(McpJsonRestBridgeFilterConfigTest, MaxSupportedProtocolVersionBehavior) {
         McpJsonRestBridgeFilterConfig::create(proto_config);
     ASSERT_OK(config);
     EXPECT_EQ((*config)->maxSupportedProtocolVersion(), "2025-11-25");
-    EXPECT_TRUE((*config)->supportsProtocolVersion("2025-11-25"));
-    EXPECT_FALSE((*config)->supportsProtocolVersion("2026-07-28"));
   }
 
   // Version 2026-07-28 is effective
@@ -182,8 +178,6 @@ TEST(McpJsonRestBridgeFilterConfigTest, MaxSupportedProtocolVersionBehavior) {
         McpJsonRestBridgeFilterConfig::create(proto_config);
     ASSERT_OK(config);
     EXPECT_EQ((*config)->maxSupportedProtocolVersion(), "2026-07-28");
-    EXPECT_TRUE((*config)->supportsProtocolVersion("2025-11-25"));
-    EXPECT_TRUE((*config)->supportsProtocolVersion("2026-07-28"));
   }
 }
 
