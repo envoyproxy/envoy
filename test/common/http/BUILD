@@ -63,6 +63,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "codec_helper_test",
+    srcs = ["codec_helper_test.cc"],
+    deps = [
+        "//source/common/http:codec_helper_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "codec_client_test",
     srcs = ["codec_client_test.cc"],
     rbe_pool = "linux_x64_small",
