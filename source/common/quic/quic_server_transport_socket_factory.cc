@@ -49,7 +49,7 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
     }
   }
 
-  // QUIC does not re-validate the client certificate on session resumption: a resumed connection
+  // QUIC does not re-validate the client certificate on session resumption. A resumed connection
   // reuses the verdict of the original handshake until the ticket expires. Resumption and early
   // data therefore default to off on filter chains that require a client certificate. Operators
   // can still opt into resumption explicitly.

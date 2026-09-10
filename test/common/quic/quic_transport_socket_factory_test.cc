@@ -339,6 +339,49 @@ downstream_tls_context:
       static_cast<QuicServerTransportSocketFactory&>(*factory_default).requiresClientCertificate());
 }
 
+// `clientCertificateValidationConfigured()` reflects whether a validation context is configured,
+// independent of `require_client_certificate`.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientCertificateValidationConfigured) {
+  auto build = [&](const std::string& yaml) {
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+    return THROW_OR_RETURN_VALUE(
+        config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+        Network::DownstreamTransportSocketFactoryPtr);
+  };
+
+  // Validation context without `require_client_certificate`.
+  auto factory_optional = build(TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF"));
+  EXPECT_TRUE(static_cast<QuicServerTransportSocketFactory&>(*factory_optional)
+                  .clientCertificateValidationConfigured());
+  EXPECT_FALSE(static_cast<QuicServerTransportSocketFactory&>(*factory_optional)
+                   .requiresClientCertificate());
+
+  // No validation context configured.
+  auto factory_none = build(TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF"));
+  EXPECT_FALSE(static_cast<QuicServerTransportSocketFactory&>(*factory_none)
+                   .clientCertificateValidationConfigured());
+}
+
 // `require_client_certificate: true` without `validation_context.trusted_ca`
 // is rejected because the `SSL_CTX` would remain `SSL_VERIFY_NONE` and accept
 // any client certificate chain.

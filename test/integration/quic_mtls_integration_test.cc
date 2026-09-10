@@ -47,7 +47,9 @@ public:
       server_cert_config->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/" + server_key));
 
-      if (require_client_cert) {
+      // Add a validation context whenever a CA is provided, independent of `require_client_cert`,
+      // so a listener without the requirement exercises optional mTLS.
+      if (!client_ca_cert.empty()) {
         tls_context->mutable_common_tls_context()
             ->mutable_validation_context()
             ->mutable_trusted_ca()
@@ -221,6 +223,63 @@ TEST_P(QuicMtlsIntegrationTest, ServerWithoutClientCertRequirement) {
 
   verifyClientSideServerCertInfo();
   codec_client_->close();
+}
+
+// Optional mTLS validates and forwards a client certificate that the client presents, and the
+// server marks the peer certificate validated.
+TEST_P(QuicMtlsIntegrationTest, OptionalClientCertPresentedIsValidated) {
+  useAccessLog("%CEL(connection.peer_certificate_valid)%");
+  setupServerWithClientCertValidation("cacert.pem", "servercert.pem", "serverkey.pem",
+                                      /*require_client_cert=*/false);
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  verifyServerSideClientCertInfo("Test Frontend Team");
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("true"));
+
+  codec_client_->close();
+}
+
+// Optional mTLS accepts a client that presents no certificate. No XFCC header is emitted and the
+// server does not mark the peer certificate validated.
+TEST_P(QuicMtlsIntegrationTest, OptionalClientCertAbsentAccepted) {
+  useAccessLog("%CEL(connection.peer_certificate_valid)%");
+  setupServerWithClientCertValidation("cacert.pem", "servercert.pem", "serverkey.pem",
+                                      /*require_client_cert=*/false);
+  ssl_client_option_.no_cert_ = true;
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  auto xfcc_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("x-forwarded-client-cert"));
+  EXPECT_TRUE(xfcc_headers.empty());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("false"));
+
+  codec_client_->close();
+}
+
+// Optional mTLS rejects a client that presents a certificate that does not chain to the trust
+// anchor. Only the absence of a certificate is tolerated.
+TEST_P(QuicMtlsIntegrationTest, OptionalClientCertUntrustedRejected) {
+  setupServerWithClientCertValidation("upstreamcacert.pem", "servercert.pem", "serverkey.pem",
+                                      /*require_client_cert=*/false);
+  initialize();
+  expectConnectionFailure("");
 }
 
 // XFCC carries the client certificate subject and the URL-encoded leaf cert.
