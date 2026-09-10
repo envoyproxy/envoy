@@ -6,7 +6,7 @@
 
 #include "source/common/coroutine/status_macros.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/ai/request_info/request_info_extractor.h"
+#include "source/extensions/filters/ai/request_info/extractor.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_conversion.h"
 
 #include "nlohmann/json.hpp"

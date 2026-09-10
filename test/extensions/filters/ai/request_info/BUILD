@@ -12,12 +12,12 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "request_info_extractor_test",
-    srcs = ["request_info_extractor_test.cc"],
+    name = "extractor_test",
+    srcs = ["extractor_test.cc"],
     extension_names = ["envoy.filters.ai.request_info"],
     rbe_pool = "linux_x64_small",
     deps = [
-        "//source/extensions/filters/ai/request_info:request_info_extractor_lib",
+        "//source/extensions/filters/ai/request_info:extractor_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_readers_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//source/extensions/filters/http/ai_protocol_manager:token_usage_lib",
@@ -34,7 +34,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/ai/request_info:filter_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_factory_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
         "//source/extensions/filters/http/ai_protocol_manager:buffer_manager_lib",
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_manager_lib",
@@ -57,7 +57,7 @@ envoy_extension_cc_test(
         "//envoy/registry",
         "//source/extensions/filters/ai/request_info:config",
         "//source/extensions/filters/ai/request_info:filter_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_factory_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

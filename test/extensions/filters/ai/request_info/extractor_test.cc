@@ -1,6 +1,6 @@
 #include <string>
 
-#include "source/extensions/filters/ai/request_info/request_info_extractor.h"
+#include "source/extensions/filters/ai/request_info/extractor.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 

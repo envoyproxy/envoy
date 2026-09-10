@@ -3,7 +3,7 @@
 
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_factory.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/config.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 

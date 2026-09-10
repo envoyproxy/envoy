@@ -246,7 +246,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
-        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_factory_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
         "//source/extensions/filters/http/ai_protocol_manager:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",

@@ -90,7 +90,7 @@ envoy_cc_library(
     srcs = ["json_readers.cc"],
     hdrs = ["json_readers.h"],
     deps = [
-        "//source/common/singleton:const_singleton",
+        "@abseil-cpp//absl/strings",
         "@nlohmann_json//:json",
     ],
 )
@@ -208,7 +208,14 @@ envoy_cc_library(
     hdrs = ["ai_filter.h"],
     deps = [
         ":ai_request_lib",
+        ":token_usage_lib",
+        "//envoy/common:pure_lib",
+        "//envoy/config:typed_config_interface",
         "//envoy/http:codes_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/coroutine:task_lib",
         "@abseil-cpp//absl/functional:any_invocable",
@@ -246,27 +253,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "ai_filter_factory_lib",
-    hdrs = ["ai_filter_factory.h"],
-    deps = [
-        ":ai_filter_lib",
-        ":token_usage_lib",
-        "//envoy/common:pure_lib",
-        "//envoy/config:typed_config_interface",
-        "//envoy/http:header_map_interface",
-        "//envoy/server:factory_context_interface",
-        "//envoy/stats:stats_interface",
-        "//envoy/stream_info:stream_info_interface",
-        "@abseil-cpp//absl/status:statusor",
-    ],
-)
-
-envoy_cc_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
-        ":ai_filter_factory_lib",
+        ":ai_filter_lib",
         ":api_protocol_conversion_lib",
         ":buffer_manager_lib",
         ":external_buffer_interface",

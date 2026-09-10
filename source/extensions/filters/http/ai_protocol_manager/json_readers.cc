@@ -10,7 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-std::optional<uint64_t> readCount(const nlohmann::json& json, const std::string& key,
+std::optional<uint64_t> readCount(const nlohmann::json& json, absl::string_view key,
                                   bool& malformed, NullPolicy null_policy) {
   const auto it = json.find(key);
   if (it == json.end()) {
@@ -54,12 +54,12 @@ std::optional<uint64_t> readCount(const nlohmann::json& json, const std::string&
   return std::nullopt;
 }
 
-std::optional<std::string> readString(const nlohmann::json& json, const std::string& key) {
+std::optional<std::string> readString(const nlohmann::json& json, absl::string_view key) {
   bool ignored = false;
   return readString(json, key, ignored);
 }
 
-std::optional<std::string> readString(const nlohmann::json& json, const std::string& key,
+std::optional<std::string> readString(const nlohmann::json& json, absl::string_view key,
                                       bool& malformed) {
   const auto it = json.find(key);
   if (it == json.end() || it->is_null()) {
@@ -78,7 +78,7 @@ std::optional<std::string> readString(const nlohmann::json& json, const std::str
   return value.empty() ? std::nullopt : std::optional<std::string>(value);
 }
 
-std::optional<bool> readBool(const nlohmann::json& json, const std::string& key, bool& malformed) {
+std::optional<bool> readBool(const nlohmann::json& json, absl::string_view key, bool& malformed) {
   const auto it = json.find(key);
   if (it == json.end() || it->is_null()) {
     return std::nullopt;
@@ -90,7 +90,7 @@ std::optional<bool> readBool(const nlohmann::json& json, const std::string& key,
   return it->get<bool>();
 }
 
-std::optional<uint32_t> readArrayLength(const nlohmann::json& json, const std::string& key,
+std::optional<uint32_t> readArrayLength(const nlohmann::json& json, absl::string_view key,
                                         bool& malformed) {
   const auto it = json.find(key);
   if (it == json.end() || it->is_null()) {
@@ -103,7 +103,7 @@ std::optional<uint32_t> readArrayLength(const nlohmann::json& json, const std::s
   return static_cast<uint32_t>(it->size());
 }
 
-const nlohmann::json* readObject(const nlohmann::json& json, const std::string& key,
+const nlohmann::json* readObject(const nlohmann::json& json, absl::string_view key,
                                  bool& malformed, NullPolicy null_policy) {
   const auto it = json.find(key);
   if (it == json.end()) {

@@ -3,7 +3,7 @@
 
 #include "source/extensions/filters/ai/request_info/config.h"
 #include "source/extensions/filters/ai/request_info/filter.h"
-#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_factory.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"

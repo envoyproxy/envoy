@@ -171,8 +171,12 @@ absl::StatusOr<std::shared_ptr<const FilterConfig>> FilterConfig::create(
           fmt::format("ai_protocol_manager: unknown AI filter '{}' with type URL '{}'",
                       entry.name(), Config::Utility::getFactoryType(entry.typed_config())));
     }
-    const ProtobufTypes::MessagePtr config = Config::Utility::translateAnyToFactoryConfig(
-        entry.typed_config(), context.messageValidationVisitor(), *factory);
+    const ProtobufTypes::MessagePtr config = factory->createEmptyConfigProto();
+    if (absl::Status status = Config::Utility::translateOpaqueConfig(
+            entry.typed_config(), context.messageValidationVisitor(), *config);
+        !status.ok()) {
+      return status;
+    }
     absl::StatusOr<AiFilterFactoryCb> cb = factory->createAiFilterFactory(*config, context, scope);
     if (!cb.ok()) {
       return cb.status();
@@ -424,12 +428,12 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
 
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
-    ai_filter_context_ = std::make_unique<AiFilterContext>(AiFilterContext{
-        decoder_callbacks_->streamInfo(), *request_headers_, route_request_protocol_});
+    const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
+                                  route_request_protocol_};
     std::vector<AiFilterPtr> filters;
     filters.reserve(config_->aiFilterFactories().size());
     for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
-      if (AiFilterPtr filter = factory(*ai_filter_context_); filter != nullptr) {
+      if (AiFilterPtr filter = factory(context); filter != nullptr) {
         filters.push_back(std::move(filter));
       }
     }

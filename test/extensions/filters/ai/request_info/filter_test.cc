@@ -8,7 +8,7 @@
 
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/ai/request_info/filter.h"
-#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_factory.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"

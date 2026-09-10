@@ -9,7 +9,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
-#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_factory.h"
 
 #include "nlohmann/json_fwd.hpp"
 
@@ -59,7 +58,7 @@ private:
   void publish(const nlohmann::json& json);
 
   RequestInfoFilterConfigSharedPtr config_;
-  const HttpFilters::AiProtocolManager::AiFilterContext& context_;
+  const HttpFilters::AiProtocolManager::AiFilterContext context_;
 };
 
 } // namespace RequestInfo

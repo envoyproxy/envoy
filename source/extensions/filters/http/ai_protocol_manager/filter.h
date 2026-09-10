@@ -11,7 +11,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_factory.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_conversion.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
@@ -237,8 +237,6 @@ private:
   // Request headers for this stream. Held by pointer during decode path.
   Http::RequestHeaderMap* request_headers_{nullptr};
 
-  // Declared ahead of the manager so it outlives the AI filters the manager owns.
-  std::unique_ptr<AiFilterContext> ai_filter_context_;
   // FilterManager orchestrating the AI filter chain.
   std::unique_ptr<FilterManager> filter_manager_;
 

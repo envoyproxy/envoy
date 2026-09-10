@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/ai/request_info/v3/request_info.pb.h"
 #include "envoy/extensions/filters/ai/request_info/v3/request_info.pb.validate.h"
 
-#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_factory.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 
 namespace Envoy {
 namespace Extensions {
