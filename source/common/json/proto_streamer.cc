@@ -20,19 +20,10 @@ using Field = Protobuf::FieldDescriptor;
   (index.has_value() ? reflection.GetRepeated##Type(message, &field, *index)                       \
                      : reflection.Get##Type(message, &field))
 
-// Whether ProtoJSON gives `message` a special representation rather than an object of its fields,
-// which is every `well_known_type()` other than Any. Any is excluded, this streamer expands it into
-// a frame.
-//
-// TODO(filipcacky): Struct, Value and ListValue should be streamed, see json_utility.cc
+// Whether ProtoJSON gives `message` a special representation rather than an object of its fields.
 bool hasSpecialRepresentation(const Protobuf::Message& message) {
-  switch (message.GetDescriptor()->well_known_type()) {
-  case Protobuf::Descriptor::WELLKNOWNTYPE_UNSPECIFIED:
-  case Protobuf::Descriptor::WELLKNOWNTYPE_ANY:
-    return false;
-  default:
-    return true;
-  }
+  return message.GetDescriptor()->well_known_type() !=
+         Protobuf::Descriptor::WELLKNOWNTYPE_UNSPECIFIED;
 }
 
 // Whether `field` holds a Value with no kind.
@@ -109,42 +100,7 @@ absl::string_view mapKeyToString(const Protobuf::Message& entry, const Field& fi
 MessageStreamer::MessageStreamer(const Protobuf::Message& message, BufferStreamer::Level& level,
                                  Options options)
     : options_(options) {
-  const std::string name =
-      options_.emit_type_url_
-          ? TypeUtil::descriptorFullNameToTypeUrl(message.GetDescriptor()->full_name())
-          : "";
-  emitNamedMessage(message, level, name, false);
-}
-
-void MessageStreamer::emitNamedMessage(const Protobuf::Message& message,
-                                       BufferStreamer::Level& level, absl::string_view type_url,
-                                       bool is_sensitive, ProtobufTypes::MessagePtr owned) {
-  // ProtoJSON pairs a special representation with its `@type` under `value`.
-  if (!type_url.empty() && hasSpecialRepresentation(message)) {
-    BufferStreamer::MapPtr map = level.addMap();
-    map->addKey("@type");
-    map->addString(type_url);
-    map->addKey("value");
-    emitSpecialRepresentation(message, *map, is_sensitive);
-    return;
-  }
-
-  Frame& frame = [&]() -> Frame& {
-    // A TypedStruct has to be reified before it can be redacted, see redactOpaque in
-    // source/common/protobuf/utility.cc. The copy comes back redacted, so nothing below it is.
-    if (options_.redact_sensitive_fields_ && MessageUtil::isTypedStruct(*message.GetDescriptor())) {
-      return pushOwnedFrame(redactedCopy(message, is_sensitive), level, false);
-    } else if (owned == nullptr) {
-      return pushFrame(message, level, is_sensitive);
-    } else {
-      return pushOwnedFrame(std::move(owned), level, is_sensitive);
-    }
-  }();
-
-  if (!type_url.empty()) {
-    frame.map_->addKey("@type");
-    frame.map_->addString(type_url);
-  }
+  emitMessage(message, level, false);
 }
 
 MessageStreamer::~MessageStreamer() {
@@ -320,15 +276,22 @@ void MessageStreamer::emitValue(const Protobuf::Message& message, const Field& f
   }
 }
 
+ProtobufTypes::MessagePtr MessageStreamer::reifiedTypedStruct(const Protobuf::Message& message,
+                                                              bool is_sensitive) {
+  if (!options_.redact_sensitive_fields_ || !MessageUtil::isTypedStruct(*message.GetDescriptor())) {
+    return nullptr;
+  }
+  return redactedCopy(message, is_sensitive);
+}
+
 void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStreamer::Level& level,
                                   bool is_sensitive) {
   const Protobuf::Descriptor& descriptor = *message.GetDescriptor();
   switch (descriptor.well_known_type()) {
   case Protobuf::Descriptor::WELLKNOWNTYPE_UNSPECIFIED:
-    // A TypedStruct has to be reified before it can be redacted, see redactOpaque in
-    // source/common/protobuf/utility.cc. The copy comes back redacted, so nothing below it is.
-    if (options_.redact_sensitive_fields_ && MessageUtil::isTypedStruct(descriptor)) {
-      pushOwnedFrame(redactedCopy(message, is_sensitive), level, false);
+    if (ProtobufTypes::MessagePtr reified = reifiedTypedStruct(message, is_sensitive);
+        reified != nullptr) {
+      pushOwnedFrame(std::move(reified), level, false);
       return;
     }
     pushFrame(message, level, is_sensitive);
@@ -374,6 +337,7 @@ void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStream
     emitSpecialRepresentation(message, level, is_sensitive);
     return;
   default:
+    // TODO(filipcacky): Struct, Value and ListValue should be streamed, see json_utility.cc
     emitSpecialRepresentation(message, level, is_sensitive);
     return;
   }
@@ -403,9 +367,19 @@ void MessageStreamer::emitAny(const Protobuf::Message& message, BufferStreamer::
   }
   // A payload that only parses in part still prints the part that did.
   std::ignore = packed->ParsePartialFromString(any->value());
-
   const Protobuf::Message& payload = *packed;
-  emitNamedMessage(payload, level, any->type_url(), is_sensitive, std::move(packed));
+
+  ProtobufTypes::MessagePtr reified = reifiedTypedStruct(payload, is_sensitive);
+  Frame& frame = reified == nullptr ? pushOwnedFrame(std::move(packed), level, is_sensitive)
+                                    : pushOwnedFrame(std::move(reified), level, false);
+  frame.map_->addKey("@type");
+  frame.map_->addString(any->type_url());
+
+  if (hasSpecialRepresentation(frame.message_)) {
+    frame.fields_.clear();
+    frame.map_->addKey("value");
+    emitMessage(frame.message_, *frame.map_, is_sensitive);
+  }
 }
 
 void MessageStreamer::emitSpecialRepresentation(const Protobuf::Message& message,
@@ -424,17 +398,13 @@ void MessageStreamer::emitSpecialRepresentation(const Protobuf::Message& message
 MessageStreamer::Frame& MessageStreamer::pushFrame(const Protobuf::Message& message,
                                                    BufferStreamer::Level& level,
                                                    bool ancestor_is_sensitive) {
-  Frame& frame = stack_.emplace(message, level.addMap());
-  frame.ancestor_is_sensitive_ = ancestor_is_sensitive;
-  return frame;
+  return stack_.emplace(message, level.addMap(), ancestor_is_sensitive);
 }
 
 MessageStreamer::Frame& MessageStreamer::pushOwnedFrame(ProtobufTypes::MessagePtr message,
                                                         BufferStreamer::Level& level,
                                                         bool ancestor_is_sensitive) {
-  Frame& frame = pushFrame(*message, level, ancestor_is_sensitive);
-  frame.owned_ = std::move(message);
-  return frame;
+  return stack_.emplace(std::move(message), level.addMap(), ancestor_is_sensitive);
 }
 
 #undef REFLECTION_GET

@@ -16,9 +16,6 @@ namespace Json {
 class MessageStreamer {
 public:
   struct Options {
-    // Whether to emit a leading @type naming the message.
-    bool emit_type_url_ = false;
-
     // Whether the keys are the proto field names or the lowerCamelCase ProtoJSON defaults to.
     // https://protobuf.dev/programming-guides/json/#field-names
     bool preserve_proto_field_names_ = false;
@@ -50,9 +47,15 @@ public:
 
 private:
   struct Frame {
-    Frame(const Protobuf::Message& message, BufferStreamer::MapPtr map)
-        : message_(message), map_(std::move(map)) {
+    Frame(const Protobuf::Message& message, BufferStreamer::MapPtr map, bool ancestor_is_sensitive)
+        : message_(message), map_(std::move(map)), ancestor_is_sensitive_(ancestor_is_sensitive) {
       message_.GetReflection()->ListFields(message, &fields_);
+    }
+
+    Frame(ProtobufTypes::MessagePtr owned, BufferStreamer::MapPtr map, bool ancestor_is_sensitive)
+        : message_(*owned), map_(std::move(map)), owned_(std::move(owned)),
+          ancestor_is_sensitive_(ancestor_is_sensitive) {
+      message_.GetReflection()->ListFields(message_, &fields_);
     }
 
     const Protobuf::Message& message_;
@@ -86,14 +89,6 @@ private:
   // frame onto `stack_`.
   void emitNextField(Frame& frame);
 
-  // Emits `message` in `level` under `@type` if `type_url` is not empty.
-  // A message with a special representation goes under `value`, anything else creates a new frame,
-  // which takes `owned` over when the streamer is the one holding the message.
-  // https://protobuf.dev/programming-guides/json/#any
-  void emitNamedMessage(const Protobuf::Message& message, BufferStreamer::Level& level,
-                        absl::string_view type_url, bool is_sensitive,
-                        ProtobufTypes::MessagePtr owned = nullptr);
-
   // Pushes a frame emitting `message` as an object opened in `level`.
   Frame& pushFrame(const Protobuf::Message& message, BufferStreamer::Level& level,
                    bool ancestor_is_sensitive);
@@ -115,6 +110,11 @@ private:
   // Emits entry `index` of the map `field` as a key and a value in `entries`.
   void emitMapEntry(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
                     int index, BufferStreamer::Map& entries, bool is_sensitive);
+
+  // A TypedStruct has to be reified before it can be redacted, see redactOpaque in
+  // source/common/protobuf/utility.cc. Returns the redacted copy to walk in place of `message`, so
+  // nothing below it is sensitive, or null when `message` is walked as it stands.
+  ProtobufTypes::MessagePtr reifiedTypedStruct(const Protobuf::Message& message, bool is_sensitive);
 
   // Emits the value of a message-typed field, which is either a special representation or a new
   // frame.
