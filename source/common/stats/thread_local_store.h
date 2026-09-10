@@ -67,7 +67,10 @@ public:
                            std::optional<uint32_t> bins);
   ~ThreadLocalHistogramImpl() override;
 
-  void merge(histogram_t* target);
+  // Returns the inactive materialized histogram. A null result means that the inactive histogram is
+  // empty or represented by its inline bucket.
+  histogram_t* histogramForMerge();
+  bool mergeInlineHistogramForMerge(histogram_t* target);
 
   /**
    * Called in the beginning of merge process. Swaps the histogram used for collection so that we do

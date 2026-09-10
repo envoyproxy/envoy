@@ -1164,16 +1164,12 @@ void ThreadLocalHistogramImpl::recordValue(uint64_t value) {
   used_ = true;
 }
 
-void ThreadLocalHistogramImpl::merge(histogram_t* target) {
-  TlsHistogramState& state = histograms_[otherHistogramIndex()];
-  if (!state.mergeInlineInto(target)) {
-    histogram_t* source = state.histogram();
-    if (source != nullptr) {
-      const histogram_t* const_sources[] = {source};
-      hist_accumulate(target, const_sources, 1);
-      state.clear();
-    }
-  }
+histogram_t* ThreadLocalHistogramImpl::histogramForMerge() {
+  return histograms_[otherHistogramIndex()].histogram();
+}
+
+bool ThreadLocalHistogramImpl::mergeInlineHistogramForMerge(histogram_t* target) {
+  return histograms_[otherHistogramIndex()].mergeInlineInto(target);
 }
 
 ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
@@ -1279,13 +1275,46 @@ void ParentHistogramImpl::merge() {
     // then release the lock before we do the actual merge. However it is not a big deal
     // because the tls_histogram merge is not that expensive as it is a single histogram
     // merge and adding TLS histograms is rare.
+
+    // Accumulating each source rebuilds the result. Send only sources with content during
+    // the current interval.
+    absl::InlinedVector<histogram_t*, 32> sources;
+    absl::InlinedVector<const histogram_t*, 32> const_sources;
+    bool has_interval_data = false;
     for (const TlsHistogramSharedPtr& tls_histogram : tls_histograms_) {
-      tls_histogram->merge(interval_histogram_);
+      if (tls_histogram->mergeInlineHistogramForMerge(interval_histogram_)) {
+        has_interval_data = true;
+        continue;
+      }
+
+      histogram_t* source = tls_histogram->histogramForMerge();
+      if (source != nullptr) {
+        sources.push_back(source);
+        const_sources.push_back(source);
+      }
     }
-    // Since TLS merge is done, we can release the lock here.
+
+    if (!sources.empty()) {
+      has_interval_data = true;
+      ASSERT(sources.size() <= std::numeric_limits<int>::max());
+      hist_accumulate(interval_histogram_, const_sources.data(),
+                      static_cast<int>(const_sources.size()));
+    }
+
+    // Clear all used, even if hist_accumulate failed, so that next interval is clean.
+    for (histogram_t* source : sources) {
+      hist_clear(source);
+    }
+
+    // TLS merge is done, we can release the lock here.
     lock.release();
-    hist_accumulate(cumulative_histogram_, &interval_histogram_, 1);
-    cumulative_statistics_.refresh(cumulative_histogram_);
+
+    if (has_interval_data) {
+      hist_accumulate(cumulative_histogram_, &interval_histogram_, 1);
+      cumulative_statistics_.refresh(cumulative_histogram_);
+    }
+
+    // Even if the interval had no data, the hist_clear needs to be reflected
     interval_statistics_.refresh(interval_histogram_);
     merged_ = true;
   }
