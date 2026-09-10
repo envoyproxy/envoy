@@ -455,7 +455,7 @@ function build_openssl_presubmit() {
         case "$file" in
             # Global/build config: blast radius isn't a per-file query, so defer
             # to the crypto-surface seed below.
-            .bazelrc|.bazelversion|WORKSPACE|WORKSPACE.bazel|MODULE.bazel|MODULE.bazel.lock|bazel/*)
+            .bazelrc|.bazelversion|MODULE.bazel|MODULE.bazel.lock|bazel/*)
                 global_config_changed=true
                 ;;
             # Whole package. A root-level file would yield the invalid pattern
