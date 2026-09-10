@@ -25,7 +25,7 @@
     display: inline-flex;
   }
 
-  /* below this the label competes with the version menu; the icon is enough */
+  /* below this the icon is enough */
   .envoy-search-button {
     flex: none;
     justify-content: center;
@@ -35,10 +35,6 @@
 
   .envoy-search-button > span,
   .envoy-search-button kbd {
-    display: none;
-  }
-
-  .envoy-action-label {
     display: none;
   }
 
@@ -98,12 +94,6 @@
   .envoy-doc-topbar {
     gap: 10px;
     padding: 0 14px;
-  }
-
-  .envoy-version-menu,
-  .envoy-doc-logo::after,
-  .envoy-doc-wordmark {
-    display: none;
   }
 
   .envoy-content-main .rst-content h1 {
