@@ -102,39 +102,12 @@ message ExtAuthz {
   //
   repeated string typed_metadata_context_namespaces = 11;
 
-  // When set to ``true``, the filter operates in shadow mode. In shadow mode the filter still
-  // calls the external authorization service, but never closes the connection. Instead of closing
-  // on a denied or error response, the filter writes the authorization decision into the
-  // connection's :ref:`FilterState <arch_overview_data_sharing_between_filters>` as a
-  // :ref:`ShadowDecision
-  // <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ShadowDecision>` object so that a
-  // subsequent filter can read and optionally enforce it.
-  //
-  // The FilterState key is ``envoy.filters.network.ext_authz.<stat_prefix>.shadow``, so filters
-  // with distinct ``stat_prefix`` values do not overwrite each other.
+  // When set to ``true``, the filter operates in shadow mode. The filter still calls the external
+  // authorization service but never closes the connection. The authorization decision is instead
+  // recorded in the connection's :ref:`FilterState <arch_overview_data_sharing_between_filters>`
+  // under the key ``envoy.filters.network.ext_authz`` so that a subsequent filter can read and
+  // optionally enforce it.
   //
   // Defaults to ``false``.
   bool shadow_mode = 12;
-}
-
-// Serialized form of the shadow-mode authorization decision written to FilterState when
-// :ref:`shadow_mode
-// <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.shadow_mode>` is enabled.
-// Consumed by a subsequent filter that decides whether to enforce the decision.
-message ShadowDecision {
-  // Possible authorization decisions.
-  enum CheckResult {
-    UNSPECIFIED = 0;
-    OK = 1;
-    DENIED = 2;
-    ERROR = 3;
-  }
-
-  // The decision the authorization service returned.
-  CheckResult check_result = 1;
-
-  // Status code the authorization service returned on a denied response. Unset when the service
-  // returned none, and always unset for ``OK``, since this filter authorizes TCP connections and
-  // sends no response of its own.
-  uint32 status_code = 2 [(validate.rules).uint32 = {lte: 599 gte: 100 ignore_empty: true}];
 }

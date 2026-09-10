@@ -18,6 +18,7 @@
 #include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/extensions/filters/network/ext_authz/shadow_decision.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,7 +51,7 @@ struct InstanceStats {
  */
 class ShadowDecisionObject : public StreamInfo::FilterState::Object {
 public:
-  using ShadowDecisionProto = envoy::extensions::filters::network::ext_authz::v3::ShadowDecision;
+  using ShadowDecisionProto = envoy::extensions::filters::network::ext_authz::ShadowDecision;
 
   ShadowDecisionObject(ShadowDecisionProto::CheckResult check_result, uint32_t status_code)
       : check_result_(check_result), status_code_(status_code) {}
@@ -97,7 +98,6 @@ public:
         include_tls_session_(config.include_tls_session()),
         send_tls_alert_on_denial_(config.send_tls_alert_on_denial()),
         shadow_mode_(config.shadow_mode()),
-        shadow_filter_state_key_(generateShadowFilterStateKey(config.stat_prefix())),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
                 ? std::optional<Matchers::MetadataMatcher>(
@@ -123,7 +123,6 @@ public:
   bool includeTLSSession() const { return include_tls_session_; }
   bool sendTlsAlertOnDenial() const { return send_tls_alert_on_denial_; }
   bool shadowMode() const { return shadow_mode_; }
-  const std::string& shadowFilterStateKey() const { return shadow_filter_state_key_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
   bool filterEnabledMetadata(const envoy::config::core::v3::Metadata& metadata) const {
     return filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
@@ -137,7 +136,6 @@ public:
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
-  static std::string generateShadowFilterStateKey(const std::string& stat_prefix);
   const InstanceStats stats_;
   bool failure_mode_allow_;
   LabelsMap destination_labels_;
@@ -145,7 +143,6 @@ private:
   const bool include_tls_session_;
   const bool send_tls_alert_on_denial_;
   const bool shadow_mode_;
-  const std::string shadow_filter_state_key_;
   const std::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
   const std::vector<std::string> metadata_context_namespaces_;
   const std::vector<std::string> typed_metadata_context_namespaces_;

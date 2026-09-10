@@ -3,6 +3,7 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -12,11 +13,17 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
+envoy_proto_library(
+    name = "shadow_decision",
+    srcs = ["shadow_decision.proto"],
+)
+
 envoy_cc_library(
     name = "ext_authz",
     srcs = ["ext_authz.cc"],
     hdrs = ["ext_authz.h"],
     deps = [
+        ":shadow_decision_cc_proto",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//envoy/runtime:runtime_interface",

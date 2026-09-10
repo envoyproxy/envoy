@@ -24,7 +24,7 @@ namespace ExtAuthz {
 namespace {
 
 using MetadataProto = ::envoy::config::core::v3::Metadata;
-using ShadowDecisionProto = ::envoy::extensions::filters::network::ext_authz::v3::ShadowDecision;
+using ShadowDecisionProto = ::envoy::extensions::filters::network::ext_authz::ShadowDecision;
 
 ShadowDecisionProto::CheckResult toCheckResult(Filters::Common::ExtAuthz::CheckStatus status) {
   switch (status) {
@@ -65,10 +65,6 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
   const std::string final_prefix = fmt::format("ext_authz.{}.", name);
   return {ALL_TCP_EXT_AUTHZ_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                   POOL_GAUGE_PREFIX(scope, final_prefix))};
-}
-
-std::string Config::generateShadowFilterStateKey(const std::string& stat_prefix) {
-  return fmt::format("{}.{}.shadow", NetworkFilterNames::get().ExtAuthorization, stat_prefix);
 }
 
 void ShadowDecisionObject::populateProto(ShadowDecisionProto& msg) const {
@@ -231,7 +227,7 @@ void Filter::continueFilterChain() {
 
 void Filter::setShadowFilterState(const Filters::Common::ExtAuthz::Response& response) {
   filter_callbacks_->connection().streamInfo().filterState()->setData(
-      config_->shadowFilterStateKey(),
+      NetworkFilterNames::get().ExtAuthorization,
       std::make_shared<ShadowDecisionObject>(toCheckResult(response.status),
                                              static_cast<uint32_t>(response.status_code)),
       StreamInfo::FilterState::LifeSpan::Connection);

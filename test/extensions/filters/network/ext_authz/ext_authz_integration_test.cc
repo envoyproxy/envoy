@@ -358,9 +358,8 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithoutTls) {
 // Test that in shadow mode a denial does not close the connection. The data reaches the upstream
 // and the decision is readable from filter state.
 TEST_P(ExtAuthzNetworkIntegrationTest, ShadowModeDenialDoesNotCloseConnection) {
-  useListenerAccessLog(
-      "%FILTER_STATE(envoy.filters.network.ext_authz.ext_authz.shadow:PLAIN)% "
-      "field=%FILTER_STATE(envoy.filters.network.ext_authz.ext_authz.shadow:FIELD:check_result)%");
+  useListenerAccessLog("%FILTER_STATE(envoy.filters.network.ext_authz:PLAIN)% "
+                       "field=%FILTER_STATE(envoy.filters.network.ext_authz:FIELD:check_result)%");
   initializeTest(false /* send_tls_alert_on_denial */, false /* with_tls */,
                  true /* shadow_mode */);
 

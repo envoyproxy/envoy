@@ -177,7 +177,7 @@ stat_prefix: name
 
   const ShadowDecisionObject* shadowDecision() {
     return filter_callbacks_.connection_.stream_info_.filterState()
-        ->getDataReadOnly<ShadowDecisionObject>(config_->shadowFilterStateKey());
+        ->getDataReadOnly<ShadowDecisionObject>(NetworkFilterNames::get().ExtAuthorization);
   }
 
   const std::string metadata_yaml_string_ = R"EOF(
@@ -828,11 +828,20 @@ TEST_F(ExtAuthzFilterTest, NoMetadataContextNamespaces) {
 // Shadow mode tests. With shadow_mode enabled the filter never closes the connection. It records
 // the authorization decision in FilterState and releases the buffered data to the filter chain.
 
-// Verifies that the FilterState key is scoped by stat_prefix so that two ext_authz filters in the
-// same filter chain do not overwrite each other's decision.
-TEST_F(ExtAuthzFilterTest, ShadowModeFilterStateKeyScopedByStatPrefix) {
+// Verifies that the decision is stored under the filter's canonical name, independent of
+// stat_prefix, so the key does not vary per filter instance.
+TEST_F(ExtAuthzFilterTest, ShadowModeFilterStateKeyIsFilterName) {
   initialize(shadow_yaml_string_);
-  EXPECT_EQ("envoy.filters.network.ext_authz.name.shadow", config_->shadowFilterStateKey());
+
+  expectCheckStarted();
+  expectConnectionNotClosed();
+  EXPECT_CALL(filter_callbacks_, continueReading());
+
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
+
+  EXPECT_NE(nullptr, filter_callbacks_.connection_.stream_info_.filterState()
+                         ->getDataReadOnly<ShadowDecisionObject>(
+                             NetworkFilterNames::get().ExtAuthorization));
 }
 
 // Verifies that a denied response records the decision and leaves the connection open.
