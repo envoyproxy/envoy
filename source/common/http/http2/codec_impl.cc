@@ -2455,8 +2455,6 @@ ServerConnectionImpl::ServerConnectionImpl(
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_request_headers_kb,
                      max_request_headers_count, runtime),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
-      http2_discard_host_header_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_discard_host_header")),
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
       should_send_go_away_and_close_on_dispatch_(overload_manager.getLoadShedPoint(
@@ -2515,26 +2513,24 @@ Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
 }
 
 int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
-  if (http2_discard_host_header_) {
-    StreamImpl* stream = getStreamUnchecked(stream_id);
-    if (stream && name == static_cast<absl::string_view>(Http::Headers::get().HostLegacy)) {
-      // Check if there is already the :authority header
-      const auto result = stream->headers().get(Http::Headers::get().Host);
-      if (!result.empty()) {
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.http2_track_size_of_dropped_host_header")) {
-          // Discard the host header value but track its size for enforcing received header map
-          // limits.
-          stream->discarded_host_header_size_ += name.size() + value.size();
-          stream->discarded_host_header_count_++;
-          stream->bytes_meter_->addDecompressedHeaderBytesReceived(name.size() + value.size());
-          return checkHeaderLimits(*stream);
-        } else {
-          return 0;
-        }
+  StreamImpl* stream = getStreamUnchecked(stream_id);
+  if (stream && name == static_cast<absl::string_view>(Http::Headers::get().HostLegacy)) {
+    // Check if there is already the :authority header
+    const auto result = stream->headers().get(Http::Headers::get().Host);
+    if (!result.empty()) {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.http2_track_size_of_dropped_host_header")) {
+        // Discard the host header value but track its size for enforcing received header map
+        // limits.
+        stream->discarded_host_header_size_ += name.size() + value.size();
+        stream->discarded_host_header_count_++;
+        stream->bytes_meter_->addDecompressedHeaderBytesReceived(name.size() + value.size());
+        return checkHeaderLimits(*stream);
+      } else {
+        return 0;
       }
-      // Otherwise use host value as :authority
     }
+    // Otherwise use host value as :authority
   }
   return saveHeader(stream_id, std::move(name), std::move(value));
 }
