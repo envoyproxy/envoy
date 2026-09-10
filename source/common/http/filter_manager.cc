@@ -1759,10 +1759,9 @@ void FilterManager::callHighWatermarkCallbacks() {
 }
 
 void FilterManager::callLowWatermarkCallbacks() {
-  ENVOY_BUG(high_watermark_count_ > 0,
-            "HTTP filter manager low watermark callback without a preceding high watermark "
-            "callback");
   if (high_watermark_count_ == 0) {
+    IS_ENVOY_BUG("HTTP filter manager low watermark callback without a preceding high watermark "
+                 "callback");
     return;
   }
   --high_watermark_count_;
