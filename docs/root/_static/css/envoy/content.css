@@ -120,30 +120,81 @@
   margin: 28px 0 8px;
 }
 
-/* the anchor hangs in the margin, so linking a heading never reflows the line */
+/* --- permalinks ----------------------------------------------------------
+
+   A link icon sized to its line and never below 13px, so it reads as a link
+   at a glance; conf.py blanks the theme's Font Awesome glyph so this is the
+   only mark. The anchor spans its line, which makes the hit target the line
+   rather than the icon, and is a positioned box so the copied bubble has
+   something to sit on. */
+
 .envoy-content-main .rst-content a.headerlink {
-  color: var(--envoy-rule-strong);
-  font-size: 0.7em;
-  font-weight: 400;
-  left: -1.35em;
+  color: var(--envoy-ink-muted);
+  display: inline-block;
+  font-size: inherit;
+  line-height: inherit;
+  margin-left: 0.2em;
   opacity: 0;
-  position: absolute;
+  padding: 0 0.3em;
+  position: relative;
   text-decoration: none;
-  top: 0.28em;
   visibility: visible;
 }
 
 .envoy-content-main .rst-content a.headerlink::after {
-  content: "#";
+  background: currentColor;
+  content: "";
+  display: inline-block;
+  height: clamp(13px, 0.75em, 18px);
+  mask: url("../../img/link.svg") center / contain no-repeat;
+  vertical-align: middle;
+  width: clamp(13px, 0.75em, 18px);
 }
 
-.envoy-content-main .rst-content :hover > a.headerlink,
-.envoy-content-main .rst-content a.headerlink:focus-visible {
+/* in a heading it hangs in the margin, so linking one never reflows the line */
+.envoy-content-main .rst-content h1 > a.headerlink,
+.envoy-content-main .rst-content h2 > a.headerlink,
+.envoy-content-main .rst-content h3 > a.headerlink,
+.envoy-content-main .rst-content h4 > a.headerlink,
+.envoy-content-main .rst-content h5 > a.headerlink,
+.envoy-content-main .rst-content h6 > a.headerlink {
+  margin: 0 0.2em 0 0;
+  position: absolute;
+  right: 100%;
+  top: 0;
+}
+
+/* a definition's anchor stays faintly in view: fields are what gets shared,
+   and a page holds dozens to discover it from */
+.envoy-content-main .rst-content dl > dt > a.headerlink {
+  color: var(--envoy-rule-strong);
   opacity: 1;
 }
 
+.envoy-content-main .rst-content :hover > a.headerlink,
+.envoy-content-main .rst-content a.headerlink:focus-visible,
+.envoy-content-main .rst-content a.headerlink.envoy-copied {
+  color: var(--envoy-ink-muted);
+  opacity: 1;
+}
+
+/* the accent marks interaction everywhere else, and this is a link */
 .envoy-content-main .rst-content a.headerlink:hover {
-  color: var(--envoy-ink);
+  color: var(--envoy-accent);
+}
+
+/* permalinks.js holds the class for a moment after the link is copied */
+.envoy-content-main .rst-content a.headerlink.envoy-copied::before {
+  background: var(--envoy-ink);
+  border-radius: 4px;
+  bottom: calc(50% + 11px);
+  color: var(--envoy-ground);
+  content: "Copied";
+  font: 500 11px/1 var(--envoy-font-sans);
+  left: 0;
+  padding: 4px 7px;
+  pointer-events: none;
+  position: absolute;
 }
 
 /* --- text ---------------------------------------------------------------- */
