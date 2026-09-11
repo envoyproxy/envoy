@@ -368,6 +368,8 @@ envoy_cc_library(
         "//source/common/common:statusor_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/json:proto_streamer_lib",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",

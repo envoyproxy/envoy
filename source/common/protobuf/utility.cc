@@ -593,8 +593,8 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
     const auto* field_descriptor = descriptor->field(i);
 
     // Redact if this field or any of its ancestors have the `sensitive` option set.
-    const bool sensitive = ancestor_is_sensitive ||
-                           field_descriptor->options().GetExtension(udpa::annotations::sensitive);
+    const bool sensitive =
+        ancestor_is_sensitive || MessageUtil::isSensitiveField(*field_descriptor);
 
     if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
       // Recursive case: traverse message fields.
@@ -650,6 +650,14 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
 
 void MessageUtil::redact(Protobuf::Message& message) {
   ::Envoy::redact(&message, /* ancestor_is_sensitive = */ false);
+}
+
+void MessageUtil::redactAll(Protobuf::Message& message) {
+  ::Envoy::redact(&message, /* ancestor_is_sensitive = */ true);
+}
+
+bool MessageUtil::isSensitiveField(const Protobuf::FieldDescriptor& field) {
+  return field.options().GetExtension(udpa::annotations::sensitive);
 }
 
 std::string MessageUtil::toTextProto(const Protobuf::Message& message) {
