@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_dyn_module_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -65,14 +66,18 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "udp_dynamic_modules_integration_test",
-    srcs = ["udp_dynamic_modules_integration_test.cc"],
+envoy_cc_dyn_module_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
-        "//test/extensions/dynamic_modules/test_data/c:udp_stop_iteration",
+        "//test/extensions/dynamic_modules/test_data/go:udp_listener_integration_test",
     ],
+    env = {"GODEBUG": "cgocheck=0"},
+    rbe_pool = "linux_x64_small",
     deps = [
+        "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/udp/dynamic_modules:config",
         "//source/extensions/filters/udp/udp_proxy:config",
         "//test/extensions/dynamic_modules:util",
