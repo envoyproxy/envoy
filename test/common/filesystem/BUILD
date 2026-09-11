@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "filesystem_impl_test",
     srcs = ["filesystem_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/filesystem:filesystem_lib",
         "//test/test_common:environment_lib",
@@ -22,7 +22,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "directory_test",
     srcs = ["directory_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/filesystem:directory_lib",
         "//test/test_common:environment_lib",
@@ -33,7 +33,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "watcher_impl_test",
     srcs = ["watcher_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:exception_lib",
         "//source/common/common:assert_lib",

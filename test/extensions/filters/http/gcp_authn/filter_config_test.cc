@@ -65,6 +65,106 @@ TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithNewProto) {
   cb(filter_callback);
 }
 
+TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithTokenMetadataKey) {
+  std::string filter_config_yaml = R"EOF(
+    retry_policy:
+      retry_back_off:
+        base_interval: 0.1s
+        max_interval: 32s
+      num_retries: 5
+    cluster: test_cluster
+    timeout:
+        seconds: 5
+    token_metadata_key: token_key
+  )EOF";
+  GcpAuthnFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  GcpAuthnFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithAudience) {
+  std::string filter_config_yaml = R"EOF(
+    retry_policy:
+      retry_back_off:
+        base_interval: 0.1s
+        max_interval: 32s
+      num_retries: 5
+    cluster: test_cluster
+    timeout:
+        seconds: 5
+    audience:
+      url: http://config_audience
+  )EOF";
+  GcpAuthnFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  GcpAuthnFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithIamAccessToken) {
+  std::string filter_config_yaml = R"EOF(
+    retry_policy:
+      retry_back_off:
+        base_interval: 0.1s
+        max_interval: 32s
+      num_retries: 5
+    cluster: test_cluster
+    timeout:
+        seconds: 5
+    audience:
+      iam_access_token:
+        account: "sa@proj.iam.gserviceaccount.com"
+        authorization: "Bearer token"
+  )EOF";
+  GcpAuthnFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  GcpAuthnFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithInvalidIamAccessTokenFormatter) {
+  std::string filter_config_yaml = R"EOF(
+    retry_policy:
+      retry_back_off:
+        base_interval: 0.1s
+        max_interval: 32s
+      num_retries: 5
+    cluster: test_cluster
+    timeout:
+        seconds: 5
+    audience:
+      iam_access_token:
+        account: "%INVALID_FORMATTER("
+        authorization: "Bearer token"
+  )EOF";
+  GcpAuthnFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  GcpAuthnFilterFactory factory;
+  auto result = factory.createFilterFactoryFromProto(filter_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+}
+
 } // namespace
 } // namespace GcpAuthn
 } // namespace HttpFilters

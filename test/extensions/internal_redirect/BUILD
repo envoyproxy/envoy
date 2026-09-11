@@ -14,7 +14,7 @@ envoy_cc_test(
     srcs = [
         "redirect_extension_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/set_filter_state:config",

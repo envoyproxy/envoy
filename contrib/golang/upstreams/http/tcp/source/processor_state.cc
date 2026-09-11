@@ -1,5 +1,7 @@
 #include "processor_state.h"
 
+#include <format>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/protobuf/utility.h"
 
@@ -78,7 +80,7 @@ void EncodingProcessorState::handleHeaderGolangStatus(HttpTcpBridgeStatus status
     break;
 
   default:
-    PANIC(fmt::format("golang http-tcp bridge handleHeaderGolangStatus unexpected go_tatus: {}",
+    PANIC(std::format("golang http-tcp bridge handleHeaderGolangStatus unexpected go_tatus: {}",
                       int(status)));
   }
 
@@ -109,7 +111,7 @@ void EncodingProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus st
     }
 
     RELEASE_ASSERT(isBufferDataEmpty(),
-                   fmt::format("golang http-tcp bridge handleDataGolangStatus unexpected "
+                   std::format("golang http-tcp bridge handleDataGolangStatus unexpected "
                                "HttpTcpBridgeContinue while data_buffer_ is not empty: {}",
                                int(status)));
     setFilterState(FilterState::WaitingData);
@@ -120,7 +122,7 @@ void EncodingProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus st
 
     if (end_stream) {
       // we will catch this unexpected behaviour from users in Golang side, this should not happens.
-      PANIC(fmt::format("golang http-tcp bridge handleDataGolangStatus unexpected go_tatus when "
+      PANIC(std::format("golang http-tcp bridge handleDataGolangStatus unexpected go_tatus when "
                         "end_stream is true: {}",
                         int(status)));
     }
@@ -134,7 +136,7 @@ void EncodingProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus st
     break;
 
   default:
-    PANIC(fmt::format("golang http-tcp bridge handleDataGolangStatus unexpected go_tatus: {}",
+    PANIC(std::format("golang http-tcp bridge handleDataGolangStatus unexpected go_tatus: {}",
                       int(status)));
   }
 

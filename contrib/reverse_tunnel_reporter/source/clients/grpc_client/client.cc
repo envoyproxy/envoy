@@ -1,5 +1,7 @@
 #include "contrib/reverse_tunnel_reporter/source/clients/grpc_client/client.h"
 
+#include <format>
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -116,7 +118,7 @@ void GrpcClient::onReceiveMessage(Grpc::ResponsePtr<StreamTunnelsResp>&& message
   // A server cannot ACK a nonce we never sent. If this fires the server has a bug.
   ASSERT(
       resp_nonce <= nonce_current_,
-      fmt::format("server acked nonce {} but we only sent up to {}", resp_nonce, nonce_current_));
+      std::format("server acked nonce {} but we only sent up to {}", resp_nonce, nonce_current_));
 
   // Valid ACK: must be newer than the last acked watermark and within what we've sent.
   if (resp_nonce > nonce_acked_ && resp_nonce <= nonce_current_) {

@@ -111,7 +111,7 @@ private:
     absl::flat_hash_map<std::size_t, HttpAccessLoggerImpl::SharedPtr> access_loggers_;
   };
 
-  ThreadLocal::SlotPtr tls_slot_;
+  ThreadLocal::SlotSharedPtr tls_slot_;
   Server::Configuration::ServerFactoryContext& server_context_;
 
   // Cache of headers applicators, keyed by HttpService config hash. Protected by
@@ -148,7 +148,7 @@ private:
   // Common::ImplBase
   void emitLog(const Formatter::Context& context, const StreamInfo::StreamInfo& info) override;
 
-  const ThreadLocal::SlotPtr tls_slot_;
+  const ThreadLocal::SlotSharedPtr tls_slot_;
   const HttpAccessLoggerCacheSharedPtr access_logger_cache_;
   const envoy::config::core::v3::HttpService http_service_;
   std::unique_ptr<OpenTelemetryFormatter> body_formatter_;

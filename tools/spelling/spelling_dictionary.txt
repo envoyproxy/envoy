@@ -3,6 +3,7 @@
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
 
+AI
 Allshard
 FCS
 FLUSHALL
@@ -12,6 +13,7 @@ RANDOMKEY
 SLOWLOG
 addend
 addrlen
+connectionless
 defragmentation
 evictable
 flushdb
@@ -79,6 +81,7 @@ DFP
 Dynatrace
 DOM
 DONTFRAG
+dotdot
 Gasd
 GiB
 IPTOS
@@ -200,6 +203,7 @@ ECDH
 ECDHE
 ECDS
 ECDSA
+sigalgs
 ECONNREFUSED
 ECONNRESET
 EDESTRUCTION
@@ -221,6 +225,7 @@ EVP
 EWOULDBLOCK
 EXPECTs
 EXPR
+FAPI
 FAQ
 FASTOPEN
 FB
@@ -385,6 +390,7 @@ NOCHECKRESP
 NODATA
 NODELAY
 NODELETE
+NOERROR
 NOLINT
 NOLINTBEGIN
 NOLINTEND
@@ -609,6 +615,7 @@ XN
 XNOR
 XSS
 YAML
+YYYY
 ZXID
 absl
 accesslog
@@ -726,6 +733,7 @@ canonicalization
 canonicalize
 canonicalized
 canonicalizer
+canonicalizes
 canonicalizing
 cardinality
 casted
@@ -902,6 +910,7 @@ extrahelp
 faceplant
 facto
 failover
+faketime
 fallbacks
 fanout
 fastbuild
@@ -1243,6 +1252,7 @@ pfctl
 pipelined
 pipelining
 pkey
+pkix
 plaintext
 pluggable
 pointee
@@ -1457,6 +1467,7 @@ sim
 sinked
 sint
 sizeof
+skippable
 smatch
 snapshotted
 sockaddr
@@ -1808,3 +1819,10 @@ acq
 interleavings
 millis
 msgs
+CRYSTALS
+encapsulation
+Kyber
+MLKEM
+PQC
+quantum
+X25519MLKEM768

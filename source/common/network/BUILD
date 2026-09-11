@@ -191,6 +191,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "drain_close_util_lib",
+    srcs = ["drain_close_util.cc"],
+    hdrs = ["drain_close_util.h"],
+    deps = [
+        "//envoy/network:connection_interface",
+        "//envoy/network:drain_decision_interface",
+        "//envoy/network:listener_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/common:assert_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "hash_policy_lib",
     srcs = ["hash_policy.cc"],
     hdrs = ["hash_policy.h"],

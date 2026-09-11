@@ -26,7 +26,7 @@ public:
   ~InMemoryExternalBuffer() override;
 
   // ExternalBuffer
-  void write(Buffer::InstancePtr data, WriteCallback cb) override;
+  void write(Buffer::InstancePtr data, bool end_stream, WriteCallback cb) override;
   void read(uint64_t offset, uint64_t length, ReadCallback cb) override;
   uint64_t length() const override { return data_.length(); }
 

@@ -1,5 +1,6 @@
 #include "contrib/golang/filters/http/source/config.h"
 
+#include <format>
 #include <string>
 
 #include "envoy/registry/registry.h"
@@ -29,7 +30,7 @@ absl::StatusOr<Http::FilterFactoryCb> GolangFilterConfig::createHttpFilterFactor
   auto dso_lib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::load(
       proto_config.library_id(), proto_config.library_path(), proto_config.plugin_name());
   if (dso_lib == nullptr) {
-    return absl::InvalidArgumentError(fmt::format("golang_filter: load library failed: {} {}",
+    return absl::InvalidArgumentError(std::format("golang_filter: load library failed: {} {}",
                                                   proto_config.library_id(),
                                                   proto_config.library_path()));
   }
@@ -37,7 +38,7 @@ absl::StatusOr<Http::FilterFactoryCb> GolangFilterConfig::createHttpFilterFactor
   Server::GenericFactoryContextImpl generic_context(
       context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
-      proto_config, dso_lib, fmt::format("{}golang.", extra_context.stats_prefix), generic_context);
+      proto_config, dso_lib, std::format("{}golang.", extra_context.stats_prefix), generic_context);
   RETURN_IF_NOT_OK(config->newGoPluginConfig());
   return [config, dso_lib](Http::FilterChainFactoryCallbacks& callbacks) {
     const std::string& worker_name = callbacks.dispatcher().name();

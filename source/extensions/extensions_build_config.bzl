@@ -129,6 +129,7 @@ EXTENSIONS = {
     #
     "envoy.matching.inputs.cel_data_input":             "//source/extensions/matching/http/cel_input:cel_input_lib",
     "envoy.matching.inputs.dynamic_module_data_input":  "//source/extensions/matching/http/dynamic_modules:data_input_lib",
+    "envoy.matching.inputs.dynamic_module_string_data_input":  "//source/extensions/matching/http/dynamic_modules:string_data_input_lib",
 
     #
     # Dynamic Metadata Matching Input
@@ -615,6 +616,7 @@ EXTENSIONS = {
     #
     # HTTP Early Header Mutation
     #
+    "envoy.http.early_header_mutation.dynamic_modules": "//source/extensions/http/early_header_mutation/dynamic_modules:config",
     "envoy.http.early_header_mutation.header_mutation": "//source/extensions/http/early_header_mutation/header_mutation:config",
 
     #

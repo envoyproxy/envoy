@@ -5,10 +5,12 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -19,7 +21,7 @@ namespace ZooKeeperProxy {
 bool protoMapEq(const Protobuf::Struct& obj, const std::map<std::string, std::string>& rhs) {
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
-    EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
+    EXPECT_THAT(obj.fields(), Contains(IsStructString(entry.first, entry.second)));
   }
   return true;
 }

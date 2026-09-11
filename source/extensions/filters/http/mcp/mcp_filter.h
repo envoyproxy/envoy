@@ -29,7 +29,8 @@ namespace Mcp {
   COUNTER(requests_rejected)                                                                       \
   COUNTER(invalid_json)                                                                            \
   COUNTER(body_too_large)                                                                          \
-  COUNTER(duplicate_keys_rejected)
+  COUNTER(duplicate_keys_rejected)                                                                 \
+  COUNTER(header_mismatch)
 
 /**
  * Struct definition for MCP filter stats. @see stats_macros.h
@@ -68,6 +69,9 @@ public:
 
   bool rejectDuplicateKeys() const { return parser_config_.rejectDuplicateKeys(); }
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
+  envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attributeSource() const {
+    return attribute_source_;
+  }
   const ParserConfig& parserConfig() const { return parser_config_; }
   bool shouldStoreToDynamicMetadata() const {
     return request_storage_mode_ ==
@@ -95,6 +99,7 @@ private:
       propagate_baggage_;
   const uint32_t max_request_body_size_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
+  const envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attribute_source_;
   const std::string metadata_namespace_;
   ParserConfig parser_config_;
   McpFilterStats stats_;
@@ -175,8 +180,13 @@ private:
   const McpOverrideConfig* routeOverride() const;
 
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
+  bool needsBody() const;
+  bool hasCompleteHeaderAttributes() const;
+  bool headerAttributesMatch() const;
+  bool verifyHeaderAttributes() const;
   Http::FilterDataStatus completeParsing();
   void setDynamicMetadataStatus(Protobuf::Struct metadata);
+  void populateMetadataFromHeaders();
 
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
@@ -187,6 +197,9 @@ private:
   std::unique_ptr<JsonPathParser> parser_;
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
+  bool skip_body_parsing_{false};
+  std::string header_method_;
+  std::string header_name_;
   Filters::Common::Mcp::Status status_{Filters::Common::Mcp::Status::Ok};
 };
 

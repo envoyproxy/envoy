@@ -812,16 +812,14 @@ bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const
                                                  random_value);
 }
 
-absl::string_view
-RouteEntryImplBase::sanitizePathBeforePathMatching(const absl::string_view path) const {
-  absl::string_view ret = path;
+std::string RouteEntryImplBase::sanitizePathBeforePathMatching(const absl::string_view path) const {
   if (vhost_->globalRouteConfig().ignorePathParametersInPathMatching()) {
-    auto pos = ret.find_first_of(';');
-    if (pos != absl::string_view::npos) {
-      ret.remove_suffix(ret.length() - pos);
+    std::optional<std::string> modified_path = RouteMatchContext::stripPathParams(path);
+    if (modified_path.has_value()) {
+      return *modified_path;
     }
   }
-  return ret;
+  return std::string(path);
 }
 
 bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& stream_info) const {
@@ -2243,6 +2241,19 @@ const envoy::config::core::v3::Metadata& NullConfigImpl::metadata() const {
 }
 const Envoy::Config::TypedMetadata& NullConfigImpl::typedMetadata() const {
   return DefaultRouteMetadataPack::get().typed_metadata_;
+}
+
+std::optional<std::string> RouteMatchContext::stripPathParams(absl::string_view path) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.strip_path_parameters_per_segment")) {
+    return Http::PathUtil::removePathParameters(path);
+  }
+
+  const auto pos = path.find(';');
+  if (pos == absl::string_view::npos) {
+    return std::nullopt;
+  }
+  return std::string(path.substr(0, pos));
 }
 
 Matcher::ActionConstSharedPtr

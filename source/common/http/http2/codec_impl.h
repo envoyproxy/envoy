@@ -444,6 +444,8 @@ protected:
     std::optional<StreamResetReason> reset_reason_;
     HeaderString cookies_;
     uint32_t cookie_count_;
+    uint64_t discarded_host_header_size_{0};
+    uint32_t discarded_host_header_count_{0};
     bool local_end_stream_sent_ : 1 = false;
     bool remote_end_stream_ : 1 = false;
     bool remote_rst_ : 1 = false;
@@ -660,6 +662,7 @@ protected:
   StreamImpl* getStreamUnchecked(int32_t stream_id);
   int saveHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value);
   void recordHistogramsForStream(StreamImpl& stream);
+  int checkHeaderLimits(StreamImpl& stream);
 
   /**
    * Copies any frames pending internally by nghttp2 into outbound buffer.
@@ -745,11 +748,6 @@ protected:
   // Latched value of the `http2_include_cookies_in_limits` runtime feature, read once per
   // connection instead of on every header field in saveHeader().
   const bool http2_include_cookies_in_limits_ = false;
-#ifndef ENVOY_ENABLE_UHV
-  // Latched value of the `validate_upstream_headers` runtime feature, consulted per encoded
-  // request instead of performing a runtime lookup there.
-  const bool validate_upstream_headers_ = false;
-#endif
 
   // Status for any errors encountered by the nghttp2 callbacks.
   // nghttp2 library uses single return code to indicate callback failure and

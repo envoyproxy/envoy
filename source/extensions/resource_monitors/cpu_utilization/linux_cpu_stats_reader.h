@@ -62,9 +62,9 @@ public:
    * @param fs Filesystem instance to use for file operations.
    * @param time_source TimeSource for measuring elapsed time.
    * @return Unique pointer to concrete LinuxContainerCpuStatsReader implementation.
-   * @throw EnvoyException if no supported cgroup implementation is found.
    */
-  static ContainerStatsReaderPtr create(Filesystem::Instance& fs, TimeSource& time_source);
+  static absl::StatusOr<ContainerStatsReaderPtr> create(Filesystem::Instance& fs,
+                                                        TimeSource& time_source);
 
 protected:
   LinuxContainerCpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)

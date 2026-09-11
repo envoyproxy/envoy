@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/common/logger.h"
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
@@ -16,10 +17,16 @@
 
 #include "xds/type/matcher/v3/matcher.pb.h"
 
+using testing::Contains;
+using testing::IsSupersetOf;
 using testing::NiceMock;
+using testing::Pair;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
+
+#include "test/test_common/struct_matchers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,7 +37,7 @@ class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
 public:
   static void SetUpTestSuite() {
     // Set debug log level to ensure coverage of debug log statements
-    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+    Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
   }
 
   RoleBasedAccessControlNetworkFilterTest() = default;
@@ -216,12 +223,12 @@ on_no_match:
   }
 
   void checkAccessLogMetadata(bool expected) {
-    auto filter_meta = stream_info_.dynamicMetadata().filter_metadata().at(
-        Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
-    EXPECT_EQ(expected,
-              filter_meta.fields()
-                  .at(Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey)
-                  .bool_value());
+    EXPECT_THAT(
+        stream_info_.dynamicMetadata().filter_metadata(),
+        Contains(Pair(Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace,
+                      HasStructFields(Contains(IsStructBool(
+                          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey,
+                          expected))))));
   }
 
   void setMetadata() {
@@ -358,13 +365,12 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
             config_->stats().shadow_allowed_.name());
   EXPECT_EQ("tcp.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
-  auto filter_meta =
-      stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
-  EXPECT_EQ(
-      "bar",
-      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
+  EXPECT_THAT(
+      stream_info_.dynamicMetadata().filter_metadata(),
+      Contains(Pair(NetworkFilterNames::get().Rbac,
+                    HasStructFields(UnorderedElementsAre(
+                        IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"),
+                        IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"))))));
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, DelayDenied) {
@@ -493,13 +499,12 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherDenied) {
             config_->stats().shadow_allowed_.name());
   EXPECT_EQ("tcp.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
-  auto filter_meta =
-      stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
-  EXPECT_EQ(
-      "bar",
-      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
+  EXPECT_THAT(
+      stream_info_.dynamicMetadata().filter_metadata(),
+      Contains(Pair(NetworkFilterNames::get().Rbac,
+                    HasStructFields(UnorderedElementsAre(
+                        IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"),
+                        IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"))))));
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherNetworkNamespaceAllowed) {
@@ -709,7 +714,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, DebugLogLevel) {
   setRequestedServerName("www.cncf.io");
 
   // Force debug level on
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
 
   // Mock SSL setup
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();

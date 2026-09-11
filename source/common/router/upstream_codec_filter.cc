@@ -91,6 +91,8 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   } else if (callbacks_->upstreamCallbacks()->pausedForWebsocketUpgrade()) {
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  } else if (callbacks_->upstreamCallbacks()->pausedForGenericUpgrade()) {
+    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -159,6 +161,17 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
     filter_.callbacks_->continueDecoding();
   }
 
+  if (filter_.callbacks_->upstreamCallbacks()->pausedForGenericUpgrade()) {
+    const uint64_t status = Http::Utility::getResponseStatus(*headers);
+    const auto protocol = filter_.callbacks_->upstreamCallbacks()->upstreamStreamInfo().protocol();
+    if (status == static_cast<uint64_t>(Http::Code::SwitchingProtocols) ||
+        (protocol.has_value() && protocol.value() != Envoy::Http::Protocol::Http11 &&
+         Http::CodeUtility::is2xx(status))) {
+      filter_.callbacks_->upstreamCallbacks()->setPausedForGenericUpgrade(false);
+      filter_.callbacks_->continueDecoding();
+    }
+  }
+
   if (filter_.callbacks_->upstreamCallbacks()->pausedForWebsocketUpgrade()) {
     const uint64_t status = Http::Utility::getResponseStatus(*headers);
     const auto protocol = filter_.callbacks_->upstreamCallbacks()->upstreamStreamInfo().protocol();
@@ -171,9 +184,7 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
       // Disable per-try timeouts since the websocket upgrade completed successfully
       filter_.callbacks_->upstreamCallbacks()->disablePerTryTimeoutForWebsocketUpgrade();
       filter_.callbacks_->continueDecoding();
-    } else if (Runtime::runtimeFeatureEnabled(
-                   "envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain") &&
-               status >= 400) {
+    } else if (status >= 400) {
       maybeEndDecode(end_stream);
       const bool has_upgrade_header = (headers->Upgrade() != nullptr);
       const bool has_connection_upgrade =

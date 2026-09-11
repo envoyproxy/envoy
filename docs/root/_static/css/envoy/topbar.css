@@ -1,0 +1,129 @@
+/* Topbar — search trigger and docs-local actions.
+
+   envoyproxy.io injects the site banner above this bar, including the logo,
+   global nav and version switching; this bar keeps only docs-specific controls. */
+
+.envoy-doc-topbar {
+  align-items: center;
+  background: var(--envoy-ground);
+  border-bottom: 1px solid var(--envoy-rule);
+  display: flex;
+  gap: 16px;
+  height: var(--envoy-topbar-height);
+  left: 0;
+  padding: 0 22px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 1000;
+}
+
+/* --- search trigger ------------------------------------------------------ */
+
+.envoy-search-button {
+  align-items: center;
+  background: var(--envoy-ground);
+  border: 1px solid var(--envoy-rule-strong);
+  border-radius: 5px;
+  color: var(--envoy-ink-muted);
+  cursor: pointer;
+  display: flex;
+  flex: 0 1 320px;
+  font-size: 0.8rem;
+  gap: 9px;
+  height: 32px;
+  min-width: 0;
+  padding: 0 8px 0 10px;
+  text-align: left;
+}
+
+.envoy-search-button > svg {
+  flex: none;
+}
+
+.envoy-search-button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.envoy-search-button:hover {
+  border-color: var(--envoy-ink);
+  color: var(--envoy-ink-body);
+}
+
+.envoy-search-button kbd {
+  background: transparent;
+  border: 1px solid var(--envoy-rule);
+  border-radius: 3px;
+  color: var(--envoy-ink-muted);
+  font-family: var(--envoy-font-mono);
+  flex: none;
+  font-size: 0.65rem;
+  margin-left: auto;
+  padding: 1px 5px;
+}
+
+/* --- actions ------------------------------------------------------------- */
+
+.envoy-doc-actions {
+  align-items: center;
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.envoy-doc-actions a,
+.envoy-doc-actions button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: var(--envoy-ink-body);
+  cursor: pointer;
+  display: inline-flex;
+  gap: 7px;
+  height: 32px;
+  justify-content: center;
+  min-width: 32px;
+  padding: 0 8px;
+  text-decoration: none;
+}
+
+.envoy-doc-actions a:hover,
+.envoy-doc-actions button:hover {
+  background: var(--envoy-surface-2);
+  color: var(--envoy-ink);
+}
+
+.envoy-theme-icon-light,
+html[data-envoy-theme="dark"] .envoy-theme-icon-dark {
+  display: none;
+}
+
+html[data-envoy-theme="dark"] .envoy-theme-icon-light {
+  display: inline;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-envoy-theme="light"]) .envoy-theme-icon-dark {
+    display: none;
+  }
+
+  html:not([data-envoy-theme="light"]) .envoy-theme-icon-light {
+    display: inline;
+  }
+}
+
+.envoy-doc-actions .envoy-nav-toggle {
+  display: none;
+}
+
+.envoy-nav-backdrop {
+  background: var(--envoy-scrim);
+  border: 0;
+  inset: 0;
+  position: fixed;
+  z-index: 190;
+}
