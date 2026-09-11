@@ -9,8 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// One of the three per-value ApiProtocol maps; the proto <-> internal pair
-// lives in api_protocol_conversion.h. Kept as separate exhaustive switches so
+// One of three ApiProtocol maps (see api_protocol_conversion.h), kept as exhaustive switches so
 // a new enum value fails the build at each.
 absl::string_view apiProtocolName(ApiProtocol protocol) {
   switch (protocol) {
@@ -52,8 +51,6 @@ void TokenUsage::merge(const TokenUsage& update) {
 }
 
 void TokenUsage::finalize(const ApiProtocolAdapter& adapter) {
-  // Canonicalization rules are per dialect: the adapter must be the
-  // accumulator's own (finalizeUsage() in api_protocol_adapter.h wires this).
   ASSERT(adapter.protocol() == api_protocol);
   // The summations below must not run twice.
   ASSERT(!finalized_);
@@ -61,15 +58,10 @@ void TokenUsage::finalize(const ApiProtocolAdapter& adapter) {
     return;
   }
   finalized_ = true;
-  // Canonicalize the accumulated native counts per dialect (see the header
-  // for why this must not run per event).
+  // Once, after the last merge: canonicalizing per event would regress cumulative counts.
   adapter.canonicalizeUsage(*this, canonicalization_overflow_);
 
-  // The provider-reported total (riding total_tokens during accumulation)
-  // moves to its own field, always preserved. total_tokens is exclusively the
-  // canonical sum, present only when both components are known and the sum
-  // round-trips exactly through the double-backed metadata field -- so its
-  // meaning never depends on what else was reported.
+  // total_tokens is only ever the canonical sum; the provider's value is kept separately.
   provider_total_tokens = total_tokens;
   total_tokens.reset();
   if (input_tokens.has_value() && output_tokens.has_value()) {
@@ -77,8 +69,7 @@ void TokenUsage::finalize(const ApiProtocolAdapter& adapter) {
     if (sum <= MaxSafeCount) {
       total_tokens = sum;
     } else {
-      // Not exactly representable in the double-backed Struct projection:
-      // publish no canonical total and flag the record.
+      // Not exactly representable in the double-backed Struct projection.
       canonicalization_overflow_ = true;
     }
   }

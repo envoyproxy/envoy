@@ -14,8 +14,6 @@
 namespace Envoy {
 namespace {
 
-// The manager publishes the record before releasing headers, so an ext_proc filter
-// after it sees the typed record in its request-headers metadata_context.
 class RequestInfoIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                    public HttpIntegrationTest {
 public:
@@ -155,7 +153,6 @@ TEST_P(RequestInfoIntegrationTest, PublishesRecordBeforeReleasingHeaders) {
   EXPECT_EQ(captured_.max_output_tokens().value(), 64);
   EXPECT_EQ(captured_.message_count().value(), 1);
   EXPECT_EQ(captured_.tool_count().value(), 1);
-  EXPECT_EQ(captured_.extraction_status(), envoy::data::ai::v3::RequestInfo::COMPLETE);
   EXPECT_EQ(counterValue("ai_protocol_manager.request_info.published"), 1);
   EXPECT_EQ(counterValue("ai_protocol_manager.request_info.partial"), 0);
 }

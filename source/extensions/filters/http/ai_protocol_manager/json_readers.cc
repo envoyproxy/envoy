@@ -20,9 +20,7 @@ std::optional<uint64_t> readCount(const nlohmann::json& json, absl::string_view 
   if (value.is_null() && null_policy == NullPolicy::AllowNullAsAbsent) {
     return std::nullopt;
   }
-  // JsonWithExtBufParser stores any literal that fits int64 as a *signed*
-  // integer (is_number_unsigned() is true only above INT64_MAX), so probe the
-  // signed representation first.
+  // JsonWithExtBufParser stores a literal as unsigned only above INT64_MAX.
   if (value.is_number_integer()) {
     if (value.is_number_unsigned()) {
       const uint64_t count = value.get<uint64_t>();
@@ -41,8 +39,7 @@ std::optional<uint64_t> readCount(const nlohmann::json& json, absl::string_view 
   }
   if (value.is_number_float()) {
     const double as_double = value.get<double>();
-    // Range-check before the float-to-integer cast: converting an
-    // out-of-range double to uint64_t is undefined behavior.
+    // Range-check before the cast: an out-of-range double-to-uint64_t conversion is undefined.
     if (!std::isfinite(as_double) || as_double < 0 ||
         as_double > static_cast<double>(MaxSafeCount) || std::trunc(as_double) != as_double) {
       malformed = true;
@@ -50,7 +47,7 @@ std::optional<uint64_t> readCount(const nlohmann::json& json, absl::string_view 
     }
     return static_cast<uint64_t>(as_double);
   }
-  malformed = true; // Present with a non-numeric value (string, bool, null, container).
+  malformed = true;
   return std::nullopt;
 }
 
@@ -103,8 +100,8 @@ std::optional<uint32_t> readArrayLength(const nlohmann::json& json, absl::string
   return static_cast<uint32_t>(it->size());
 }
 
-const nlohmann::json* readObject(const nlohmann::json& json, absl::string_view key,
-                                 bool& malformed, NullPolicy null_policy) {
+const nlohmann::json* readObject(const nlohmann::json& json, absl::string_view key, bool& malformed,
+                                 NullPolicy null_policy) {
   const auto it = json.find(key);
   if (it == json.end()) {
     return nullptr;

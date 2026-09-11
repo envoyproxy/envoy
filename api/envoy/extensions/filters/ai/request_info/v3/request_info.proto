@@ -18,16 +18,10 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // <config_http_filters_ai_protocol_manager_ai_filters>`.
 // [#extension: envoy.filters.ai.request_info]
 
-// An :ref:`AI filter
-// <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.filters>`
-// that publishes :ref:`envoy.data.ai.v3.RequestInfo
-// <envoy_v3_api_msg_data.ai.v3.RequestInfo>` as typed dynamic metadata. On a
-// declared endpoint with a body, the record is written before the request
-// headers continue, so every later HTTP filter (for example :ref:`ext_proc
-// <config_http_filters_ext_proc>`) sees it from its first request-headers
-// callback. The filter never modifies or rejects the request.
+// Publishes :ref:`RequestInfo <envoy_v3_api_msg_data.ai.v3.RequestInfo>` as typed
+// dynamic metadata. On a declared endpoint with a body, it is written before the
+// request headers continue, so later HTTP filters see it from their first callback.
 message RequestInfo {
-  // Namespace for the emitted typed dynamic metadata.
-  // Defaults to ``envoy.ai.request_info``.
+  // Metadata namespace. Defaults to ``envoy.ai.request_info``.
   string metadata_namespace = 1;
 }

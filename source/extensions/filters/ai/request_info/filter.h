@@ -28,14 +28,15 @@ struct RequestInfoFilterStats {
 
 class RequestInfoFilterConfig {
 public:
-  RequestInfoFilterConfig(const envoy::extensions::filters::ai::request_info::v3::RequestInfo& proto,
-                          Stats::Scope& scope);
+  RequestInfoFilterConfig(
+      const envoy::extensions::filters::ai::request_info::v3::RequestInfo& proto,
+      Stats::Scope& scope);
 
   const std::string& metadataNamespace() const { return metadata_namespace_; }
-  RequestInfoFilterStats& stats() const { return stats_; }
+  const RequestInfoFilterStats& stats() const { return stats_; }
 
 private:
-  mutable RequestInfoFilterStats stats_;
+  const RequestInfoFilterStats stats_;
   const std::string metadata_namespace_;
 };
 using RequestInfoFilterConfigSharedPtr = std::shared_ptr<const RequestInfoFilterConfig>;

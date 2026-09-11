@@ -33,16 +33,16 @@ namespace AiProtocolManager {
 using PerRouteProto =
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute;
 
-// Filter-level configuration shared by every stream on the chain, downstream and
-// upstream installations alike.
+class FilterConfig;
+using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
+
 class FilterConfig {
 public:
   FilterConfig(
       const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-      Stats::Scope& scope, AiFilterFactories ai_filter_factories = {});
+      Stats::Scope& scope, AiFilterFactories&& ai_filter_factories = {});
 
-  // Resolves request_handling.filters against the envoy.filters.ai registry.
-  static absl::StatusOr<std::shared_ptr<const FilterConfig>>
+  static absl::StatusOr<FilterConfigSharedPtr>
   create(const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
          Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
 
@@ -60,8 +60,7 @@ public:
   AiProtocolManagerStats& stats() const { return stats_; }
 
 private:
-  // Counters are thread-safe to increment; mutable so a shared const config
-  // serves them.
+  // Mutable so the shared const config can increment its thread-safe counters.
   mutable AiProtocolManagerStats stats_;
   const bool request_handling_enabled_ = false;
   const bool parse_unconfigured_routes_ = false;
@@ -75,13 +74,8 @@ private:
   const uint32_t max_parsed_sse_events_ = 0;
   const AiFilterFactories ai_filter_factories_;
 };
-using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
 
-// Per-route configuration. Its presence declares the route an AI endpoint.
-// The request and response wire APIs are declared separately (protocol
-// translation can make them differ); either may be Unspecified when the
-// route left it undeclared. A declared request API with a registered payload
-// schema (schema/schema_registry.h) is validated strictly.
+// Request and response wire APIs are separate; protocol translation can make them differ.
 class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
   explicit RouteConfig(const PerRouteProto& proto)
@@ -89,14 +83,11 @@ public:
         request_protocol_(protocolFromProto(proto.request().api_protocol())),
         response_protocol_(protocolFromProto(proto.response().api_protocol())) {}
 
-  // Whether the route hands its request payload to the filter to hold and
-  // validate.
+  // Whether the filter holds and validates this route's request payload.
   bool hasRequest() const { return has_request_; }
   ApiProtocol requestProtocol() const { return request_protocol_; }
   ApiProtocol responseProtocol() const { return response_protocol_; }
 
-  // The wire API for response extraction on this route: the declared response
-  // API, falling back to the declared request API.
   ApiProtocol effectiveResponseProtocol() const {
     return response_protocol_ != ApiProtocol::Unspecified ? response_protocol_ : request_protocol_;
   }
@@ -107,64 +98,11 @@ private:
   const ApiProtocol response_protocol_ = ApiProtocol::Unspecified;
 };
 
-// AI Protocol Manager HTTP filter (alpha).
-//
-// The filter manages AI endpoint traffic: it holds a request payload and
-// parses it against the wire API the endpoint declares -- which is what lets
-// routing, admission and policy act on a payload the proxy understands rather
-// than on opaque bytes.
-//
-// As the body arrives the filter offloads it into an ExternalBuffer -- keeping
-// a large payload out of the connection manager's buffers -- and parses and
-// validates the JSON in a streaming fashion alongside. The chain is held
-// meanwhile: decodeHeaders() stops iteration when a body follows, and the
-// headers stay pinned here while decodeData() keeps offloading. Only once the
-// payload is validated does the filter replay the buffered body back into the
-// chain; the first injectDecodedDataToFilterChain() call releases the held
-// headers ahead of it, so subsequent filters see the headers immediately
-// followed by the payload. An invalid payload is rejected rather than
-// forwarded.
-//
-// None of that happens for a stream the filter has no reason to inspect:
-// decodeHeaders() returns Continue and the offload path is never entered.
-//
-// The offload/replay pipeline and its bidirectional flow control live in the
-// path-agnostic BufferManager (buffer_manager.h); the filter is a thin delegator
-// that constructs one BufferManager per direction with the matching
-// FilterChainBridge (filter_chain_bridge.h). Today only the decode (request) path
-// is wired; the encode path will construct a second BufferManager with the
-// encoder bridge.
-//
-// Parsing runs alongside the offload: every body frame is fed to a
-// JsonWithExtBufParser before it reaches the BufferManager, so the two see the
-// identical byte stream from the first body byte -- which is what makes the
-// parser's recorded offsets valid buffer offsets (json_with_ext_buf_parser.h).
-// Feeding first also fails a malformed payload the moment the bad byte arrives,
-// not after the whole upload.
-//
-// A route carrying a per-route request declaration is a declared AI endpoint,
-// and its payload is the filter's to manage: parsed strictly, with a malformed
-// one rejected so Envoy and the backend cannot read the same body differently.
-// A route without one is parsed only if the filter opted into
-// parse_unconfigured_routes -- offered for compatibility with chains that want
-// a parsed body on ordinary routes, never a reason to fail a request -- and is
-// otherwise untouched. That opt-in covers routes that never asked for it, so it
-// takes only a request it can hold to end of stream without stalling it, which
-// rules out gRPC and Connect streaming, upgrades, and CONNECT. A declared
-// endpoint carries no such gate.
-//
-// A declared wire API with a registered payload schema is validated at end of
-// payload (schema/schema_registry.h), then the configured AI filters run over the
-// parsed document (filter_manager.h); normalization comes later.
-//
-// Encode (response) path: observe-only token-usage extraction. When
-// response_handling.token_usage is configured, 2xx SSE/JSON responses on
-// configured routes (or on all routes with include_unconfigured_routes) are
-// teed into a ResponseHandler; at end of stream the normalized usage is
-// published as dynamic metadata on the downstream StreamInfo, from downstream
-// and upstream installations alike. The filter never stops iteration or
-// mutates the response; extraction works on bounded side state, synchronously
-// on the encode callbacks, and no handler failure can affect the stream.
+// AI Protocol Manager HTTP filter (alpha). Holds a request, offloads its body to an
+// ExternalBuffer while parsing it, then replays it once validated and run through the AI
+// filters. The encode path never stops iteration or mutates the response; it only publishes
+// token usage as dynamic metadata.
+// Each frame reaches the parser before the BufferManager, so parser offsets are buffer offsets.
 class AiProtocolManagerFilter : public Http::PassThroughFilter,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -187,60 +125,44 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
 private:
-  // Feeds one body frame to the parser in place. Returns false only if the
-  // payload was rejected, in which case the caller must not offload or replay
-  // it; a best-effort parse that fails abandons parsing and returns true.
+  // Returns false only if the payload was rejected, so the caller must drop the frame;
+  // a failed best-effort parse abandons parsing and returns true.
   bool feedParser(const Buffer::Instance& data, bool end_stream);
 
-  // Terminates the stream with a 400 for a payload that failed to parse.
   void rejectInvalidPayload(const absl::Status& status);
 
-  // Whether the route handed its request payload to the filter, which is also
-  // what makes a parse failure fatal.
+  // A parse failure is fatal only on an AI endpoint, so Envoy and the upstream cannot read one
+  // body differently.
   bool isAiEndpoint() const { return route_has_request_; }
 
-  // The inline-string threshold for this stream: the route's payload schema
-  // when it pins one, otherwise the filter's configured default.
   uint32_t inlineStringThresholdBytes() const;
 
-  // Publish the accumulated token usage as dynamic metadata and account stats.
   // Called exactly once, at response end of stream (data or trailers).
   void finalizeResponseHandling();
 
-  // Finalizes the decode path when the full request body (and optional trailers) has been received.
-  // Sets endStream on decode_manager_ and executes the AI filter chain or replays the body.
   void finalizeDecode(bool has_trailers);
 
   ExternalBufferFactory& buffer_factory_;
   FilterConfigSharedPtr config_;
 
-  // Non-null exactly when decodeHeaders() decided to inspect this stream, so it
-  // doubles as the engaged flag. Outlives request_parser_, which is released as
-  // soon as parsing is done with.
+  // Non-null exactly when decodeHeaders() chose to inspect this stream; outlives request_parser_.
   BufferManagerPtr decode_manager_;
 
-  // Copied out of the route configuration rather than held by pointer: the route
-  // can be re-resolved mid-stream, which would leave a cached pointer dangling,
-  // and these are two scalars.
+  // Copied, not held by pointer: a mid-stream route re-resolve would leave it dangling.
   bool route_has_request_{false};
   ApiProtocol route_request_protocol_{ApiProtocol::Unspecified};
 
-  // The parsed payload, handed to the FilterManager once fully received.
   JsonWithExtBuf request_json_;
-  // Cleared once parsing is done with, whether it completed, was abandoned, or
-  // failed the request.
+  // Reset once parsing completes, is abandoned, or fails the request.
   std::unique_ptr<JsonWithExtBufParser> request_parser_;
 
   // Once set, later frames on the dying stream are dropped, not offloaded.
   bool payload_rejected_{false};
 
-  // Request headers for this stream. Held by pointer during decode path.
   Http::RequestHeaderMap* request_headers_{nullptr};
 
-  // FilterManager orchestrating the AI filter chain.
   std::unique_ptr<FilterManager> filter_manager_;
 
-  // Encode-path (response token-usage) state.
   ResponseHandlerPtr response_handler_;
   bool response_finalized_{false};
 };

@@ -29,11 +29,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // The filter manages AI endpoint traffic on both directions of a stream. On
 // the request path it holds a declared AI endpoint's payload and parses it,
 // which is what lets routing, admission and policy act on a payload the proxy
-// understands rather than on opaque bytes, and runs the configured
-// :ref:`AI filters
-// <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.filters>`
-// over the parsed payload. On the response path it can extract normalized LLM
-// token usage into dynamic metadata.
+// understands rather than on opaque bytes. On the response path it can
+// extract normalized LLM token usage into dynamic metadata.
 //
 // Request and response processing are independently enabled by the presence
 // of ``request_handling`` and ``response_handling``. Which routes are AI
@@ -75,9 +72,8 @@ message RequestHandling {
   // Request-path parsing limits. Defaults apply when unset.
   RequestParsingLimits limits = 2;
 
-  // AI filters, run in order over the parsed payload of a declared AI endpoint
-  // before it continues down the HTTP filter chain. Routes without a per-route
-  // request declaration run none, even under ``parse_unconfigured_routes``.
+  // AI filters run in order over a declared AI endpoint's parsed payload before
+  // it continues down the HTTP filter chain.
   // [#extension-category: envoy.filters.ai]
   repeated config.core.v3.TypedExtensionConfig filters = 3;
 }

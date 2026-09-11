@@ -35,8 +35,6 @@ namespace {
 class AiProtocolManagerFilterTest : public testing::Test {
 public:
   AiProtocolManagerFilterTest() {
-    // Capture the upstream watermark callbacks the filter registers so tests can
-    // simulate upstream back-pressure.
     ON_CALL(callbacks_, addUpstreamWatermarkCallbacks(testing::_))
         .WillByDefault(
             Invoke([this](Http::UpstreamWatermarkCallbacks& cb) { watermark_cb_ = &cb; }));
@@ -44,8 +42,7 @@ public:
         .WillByDefault(
             Invoke([this](Http::UpstreamWatermarkCallbacks&) { watermark_cb_ = nullptr; }));
     createFilter();
-    // The in-memory buffer delivers completions via dispatcher.post(). Capture
-    // those callbacks so the test can run the event loop deterministically.
+    // The in-memory buffer completes via dispatcher.post(); drain() runs them.
     ON_CALL(callbacks_.dispatcher_, post(testing::_))
         .WillByDefault(Invoke([this](Event::PostCb cb) { posted_.push_back(std::move(cb)); }));
     ON_CALL(callbacks_, injectDecodedDataToFilterChain(testing::_, testing::_))
@@ -53,16 +50,11 @@ public:
           injected_.add(data);
           injected_end_stream_ = end_stream;
           ++inject_calls_;
-          // Simulate upstream back-pressure arising mid-replay: when configured,
-          // raise the watermark right after the Nth injected chunk.
           if (watermark_cb_ != nullptr && inject_calls_ == raise_watermark_at_inject_) {
             watermark_cb_->onAboveWriteBufferHighWatermark();
           }
         }));
-    // Capture continueDecoding() so trailer-terminated streams can assert the
-    // held trailers are released after the replayed body.
     ON_CALL(callbacks_, continueDecoding()).WillByDefault(Invoke([this]() { ++continue_calls_; }));
-    // Capture local replies so rejection tests can assert code and details.
     ON_CALL(callbacks_, sendLocalReply(testing::_, testing::_, testing::_, testing::_, testing::_))
         .WillByDefault(Invoke([this](Http::Code code, absl::string_view,
                                      std::function<void(Http::ResponseHeaderMap&)>,
@@ -77,8 +69,7 @@ public:
   // Run at trace so debug/trace-log argument expressions execute too.
   LogLevelSetter log_level_setter_{spdlog::level::trace};
 
-  // A test wanting a different filter-level config calls this again first. A
-  // zero threshold leaves the field unset, so the default applies.
+  // A zero threshold leaves the field unset, so the default applies.
   void createFilter(bool parse_unconfigured_routes = false,
                     uint32_t inline_string_threshold_bytes = 0) {
     if (filter_ != nullptr) {
@@ -110,19 +101,14 @@ public:
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
-  // decodeHeaders() for a stream the filter is expected to engage on. Engaging
-  // builds the BufferManager, which claims a SchedulableCallback, so the mock is
-  // created here and only here -- a pass-through stream must not create one, or
-  // its expectation goes unsatisfied.
+  // Engaging claims a SchedulableCallback, so only engaging streams may create the mock.
   Http::FilterHeadersStatus decodeHeadersEngaging() {
     replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
     request_headers_ = requestHeaders();
     return filter_->decodeHeaders(request_headers_, /*end_stream=*/false);
   }
 
-  // Engages the filter where the payload is not what the test is about:
-  // parse_unconfigured_routes offloads and replays whether or not the body
-  // parses.
+  // parse_unconfigured_routes offloads and replays whether or not the body parses.
   void engageIgnoringPayload() {
     createFilter(/*parse_unconfigured_routes=*/true);
     ASSERT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -137,8 +123,6 @@ public:
     return filter_->decodeHeaders(headers, /*end_stream=*/false);
   }
 
-  // Attaches a per-route config declaring the route an AI endpoint with a
-  // request payload for the filter to hold.
   void setRouteConfig() {
     PerRouteProto proto;
     proto.mutable_request()->set_api_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
@@ -147,9 +131,7 @@ public:
         .WillByDefault(testing::Return(route_config_.get()));
   }
 
-  // A valid chat-completions payload whose `model` sits between the default
-  // 1KiB inline-string threshold and 4KiB, so which side of the threshold it
-  // lands on is the configured value's doing.
+  // `model` sits between the default 1KiB inline-string threshold and 4KiB.
   static std::string oversizedModelPayload() {
     return R"({"model":")" + std::string(2000, 'm') +
            R"(","messages":[{"role":"user","content":"hi"}]})";
@@ -161,13 +143,9 @@ public:
         {":method", "POST"}, {":path", "/chat/completions"}, {"content-type", "application/json"}};
   }
 
-  // The manager the filter owns requires onDestroy() before destruction (see
-  // buffer_manager.h); Envoy guarantees that in production, so drive it here to
-  // detach decode_manager_ before ~filter_ frees it. Idempotent, so tests that
-  // already called onDestroy() are fine.
+  // The manager requires onDestroy() before destruction (see buffer_manager.h); idempotent.
   void TearDown() override { filter_->onDestroy(); }
 
-  // Run all posted callbacks, including ones enqueued while draining.
   void drain() {
     while (!posted_.empty()) {
       Event::PostCb cb = std::move(posted_.front());
@@ -187,8 +165,7 @@ public:
   FilterConfigSharedPtr config_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::UpstreamWatermarkCallbacks* watermark_cb_{};
-  // Owned by the manager the filter builds; present so createSchedulableCallback()
-  // returns a usable callback during construction.
+  // Owned by the manager the filter builds; must exist before that manager is constructed.
   NiceMock<Event::MockSchedulableCallback>* replay_cb_{nullptr};
   std::unique_ptr<RouteConfig> route_config_;
   std::unique_ptr<AiProtocolManagerFilter> filter_;
@@ -204,22 +181,17 @@ public:
   std::string local_reply_details_;
 };
 
-// With a payload to inspect, iteration pauses so the rest of the chain does not
-// see the headers until it is offloaded.
 TEST_F(AiProtocolManagerFilterTest, HoldsHeadersWhenBodyFollows) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 }
 
-// A headers-only request has no payload to inspect, so the headers flow
-// immediately; holding them would deadlock since no body drives the release.
+// Holding the headers would deadlock: no body arrives to drive the release.
 TEST_F(AiProtocolManagerFilterTest, PassesHeadersOnlyRequest) {
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/healthz"}};
   EXPECT_EQ(filter_->decodeHeaders(headers, true), Http::FilterHeadersStatus::Continue);
 }
 
-// Headers held during decodeHeaders() are released when replay begins: the body
-// is offloaded while iteration is paused, then injected back to the chain.
 TEST_F(AiProtocolManagerFilterTest, ReleasesHeldHeadersOnReplay) {
   engageIgnoringPayload();
 
@@ -232,8 +204,6 @@ TEST_F(AiProtocolManagerFilterTest, ReleasesHeldHeadersOnReplay) {
   EXPECT_EQ(injected_.toString(), "{\"messages\":[\"hi\"]}");
 }
 
-// The body is offloaded chunk-by-chunk and replayed verbatim once end_stream is
-// seen, with end_stream propagated on the final injected frame.
 TEST_F(AiProtocolManagerFilterTest, OffloadsAndReplaysBody) {
   engageIgnoringPayload();
   Buffer::OwnedImpl chunk1("{\"messages\":");
@@ -241,7 +211,7 @@ TEST_F(AiProtocolManagerFilterTest, OffloadsAndReplaysBody) {
   Buffer::OwnedImpl chunk2("[\"hi\"]}");
   EXPECT_EQ(filter_->decodeData(chunk2, true), Http::FilterDataStatus::StopIterationNoBuffer);
 
-  // Nothing has been replayed yet: writes and replay are all asynchronous.
+  // Writes and replay are asynchronous.
   EXPECT_EQ(inject_calls_, 0);
 
   drain();
@@ -251,7 +221,6 @@ TEST_F(AiProtocolManagerFilterTest, OffloadsAndReplaysBody) {
   EXPECT_EQ(injected_.toString(), "{\"messages\":[\"hi\"]}");
 }
 
-// A body that arrives in a single end_stream frame is still round-tripped.
 TEST_F(AiProtocolManagerFilterTest, SingleFrameBody) {
   engageIgnoringPayload();
   Buffer::OwnedImpl body("{}");
@@ -262,9 +231,7 @@ TEST_F(AiProtocolManagerFilterTest, SingleFrameBody) {
   EXPECT_EQ(injected_.toString(), "{}");
 }
 
-// An empty terminal frame produces an empty end_stream marker downstream. It
-// issues no write, so replay is scheduled (not started reentrantly from
-// decodeData) and runs on the next event-loop iteration.
+// An empty frame issues no write, so replay is scheduled rather than run reentrantly.
 TEST_F(AiProtocolManagerFilterTest, EmptyBody) {
   engageIgnoringPayload();
   Buffer::OwnedImpl empty;
@@ -279,8 +246,6 @@ TEST_F(AiProtocolManagerFilterTest, EmptyBody) {
   EXPECT_EQ(injected_.length(), 0);
 }
 
-// A payload larger than the replay chunk size is streamed back in multiple
-// bounded frames and reassembles to the original bytes.
 TEST_F(AiProtocolManagerFilterTest, LargePayloadReplayedInChunks) {
   engageIgnoringPayload();
   const std::string big(200 * 1024, 'x'); // > ReadChunkSize (64KiB)
@@ -294,7 +259,6 @@ TEST_F(AiProtocolManagerFilterTest, LargePayloadReplayedInChunks) {
   EXPECT_EQ(injected_.toString(), big);
 }
 
-// Destroying the filter mid-flight cancels pending callbacks; no replay occurs.
 TEST_F(AiProtocolManagerFilterTest, DestroyBeforeReplay) {
   engageIgnoringPayload();
   Buffer::OwnedImpl body("payload");
@@ -305,34 +269,25 @@ TEST_F(AiProtocolManagerFilterTest, DestroyBeforeReplay) {
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// The filter registers for upstream watermark callbacks so it can observe
-// upstream back-pressure during replay.
 TEST_F(AiProtocolManagerFilterTest, RegistersUpstreamWatermarkCallbacks) {
   engageIgnoringPayload();
   EXPECT_NE(watermark_cb_, nullptr);
 }
 
-// When the downstream chain (toward upstream) is backed up before replay starts,
-// no data is injected until the back-pressure is released.
 TEST_F(AiProtocolManagerFilterTest, ReplayPausesUnderUpstreamBackPressure) {
   engageIgnoringPayload();
   const std::string big(200 * 1024, 'x'); // > ReadChunkSize, multiple chunks.
   Buffer::OwnedImpl body(big);
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
 
-  // Upstream signals back-pressure before replay begins.
   ASSERT_NE(watermark_cb_, nullptr);
   watermark_cb_->onAboveWriteBufferHighWatermark();
 
-  // Draining completes the write and starts replay, but replay is paused: no
-  // chunk is read or injected while the high watermark is held.
   drain();
   EXPECT_EQ(inject_calls_, 0);
   EXPECT_FALSE(injected_end_stream_);
 
-  // Releasing back-pressure schedules the resume off the watermark callback stack
-  // (deferred so we never read/inject reentrantly from within it); firing the
-  // continuation runs replay to completion.
+  // Resume is deferred off the watermark callback stack to avoid reentrant read/inject.
   watermark_cb_->onBelowWriteBufferLowWatermark();
   ASSERT_TRUE(replay_cb_->enabled());
   replay_cb_->invokeCallback();
@@ -342,27 +297,18 @@ TEST_F(AiProtocolManagerFilterTest, ReplayPausesUnderUpstreamBackPressure) {
   EXPECT_EQ(injected_.toString(), big);
 }
 
-// Back-pressure arising mid-replay (the upstream fills as we inject) halts the
-// synchronous read loop, and replay resumes when it clears.
 TEST_F(AiProtocolManagerFilterTest, ReplayResumesMidStream) {
   engageIgnoringPayload();
   const std::string big(200 * 1024, 'x'); // 4 chunks of 64KiB + remainder.
-  // Upstream backs up right after the first replayed chunk; the loop must then
-  // stop until it is released.
   raise_watermark_at_inject_ = 1;
   Buffer::OwnedImpl body(big);
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
 
-  // Append completes, replay injects one chunk, then pauses on the watermark
-  // raised during that inject.
   drain();
   EXPECT_EQ(inject_calls_, 1);
   EXPECT_FALSE(injected_end_stream_);
   EXPECT_LT(injected_.length(), big.size());
 
-  // Release back-pressure; the resume is scheduled off the watermark callback
-  // stack (deferred to avoid reentrant read/inject) and the continuation runs
-  // replay to completion.
   ASSERT_NE(watermark_cb_, nullptr);
   watermark_cb_->onBelowWriteBufferLowWatermark();
   ASSERT_TRUE(replay_cb_->enabled());
@@ -371,8 +317,7 @@ TEST_F(AiProtocolManagerFilterTest, ReplayResumesMidStream) {
   EXPECT_EQ(injected_.toString(), big);
 }
 
-// High watermark callbacks can nest (stream + connection); replay resumes only
-// after a matching number of low-watermark callbacks.
+// High watermark callbacks can nest (stream + connection).
 TEST_F(AiProtocolManagerFilterTest, NestedWatermarksRequireBalancedRelease) {
   engageIgnoringPayload();
   const std::string big(200 * 1024, 'x');
@@ -385,14 +330,11 @@ TEST_F(AiProtocolManagerFilterTest, NestedWatermarksRequireBalancedRelease) {
   drain();
   EXPECT_EQ(inject_calls_, 0);
 
-  // One release is not enough to resume.
   watermark_cb_->onBelowWriteBufferLowWatermark();
   drain();
   EXPECT_EQ(inject_calls_, 0);
   EXPECT_FALSE(injected_end_stream_);
 
-  // Balanced release schedules the resume off the watermark callback stack; the
-  // continuation runs replay to completion.
   watermark_cb_->onBelowWriteBufferLowWatermark();
   ASSERT_TRUE(replay_cb_->enabled());
   replay_cb_->invokeCallback();
@@ -401,10 +343,7 @@ TEST_F(AiProtocolManagerFilterTest, NestedWatermarksRequireBalancedRelease) {
   EXPECT_EQ(injected_.toString(), big);
 }
 
-// A request whose body is terminated by trailers (last data frame has
-// end_stream=false; the trailers carry END_STREAM) is not stuck: the body is
-// replayed (final frame end_stream=false) and the held trailers are released
-// via continueDecoding() once the body has been injected.
+// Held trailers are released only after the replayed body.
 TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedStream) {
   engageIgnoringPayload();
   Buffer::OwnedImpl body("{\"messages\":[\"hi\"]}");
@@ -423,8 +362,6 @@ TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedStream) {
   EXPECT_EQ(continue_calls_, 1);
 }
 
-// A trailer-only request (headers + trailers, no body) has nothing to offload, so
-// the trailers flow immediately (Continue) and nothing is injected or held.
 TEST_F(AiProtocolManagerFilterTest, TrailersWithoutBody) {
   engageIgnoringPayload();
 
@@ -436,16 +373,8 @@ TEST_F(AiProtocolManagerFilterTest, TrailersWithoutBody) {
   EXPECT_EQ(continue_calls_, 0);
 }
 
-// ---------------------------------------------------------------------------
-// Encode-path (response handling) tests. The encode path is independent of the
-// decode-path offload machinery: no decoder callbacks are needed.
-
 class AiProtocolManagerFilterResponseTest : public testing::Test {
 public:
-  // Build a filter whose config enables token-usage extraction on every route
-  // (optionally from yaml overriding the TokenUsageExtraction fields). Route
-  // scoping itself is exercised by the RouteScoping tests below, which build
-  // their config through setupWithProto().
   void setup(const std::string& token_usage_yaml = "{}") {
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
     TestUtility::loadFromYaml(
@@ -456,7 +385,6 @@ public:
     setupWithProto(proto_config);
   }
 
-  // Attaches a per-route config on the encode path.
   void setEncodeRouteConfig(const PerRouteProto& proto) {
     route_config_ = std::make_unique<RouteConfig>(proto);
     ON_CALL(encoder_callbacks_, mostSpecificPerFilterConfig())
@@ -470,8 +398,7 @@ public:
     typed_metadata_writes_.clear();
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope());
     filter_ = std::make_unique<AiProtocolManagerFilter>(factory_, config_);
-    // A stream filter receives both callback sets in production; encode-path
-    // code may rely on the decoder callbacks (e.g. the buffer memory account).
+    // Encode-path code may use the decoder callbacks (e.g. the buffer memory account).
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     ON_CALL(encoder_callbacks_.stream_info_, setDynamicMetadata(testing::_, testing::_))
@@ -492,14 +419,12 @@ public:
     }
   }
 
-  // Send a 200 response header with the given content type.
   void sendHeaders(absl::string_view content_type, absl::string_view status = "200") {
     Http::TestResponseHeaderMapImpl headers{{":status", std::string(status)},
                                             {"content-type", std::string(content_type)}};
     EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
   }
 
-  // Send one response body frame; asserts pass-through leaves the bytes intact.
   void sendData(absl::string_view body, bool end_stream) {
     Buffer::OwnedImpl data(body);
     EXPECT_EQ(filter_->encodeData(data, end_stream), Http::FilterDataStatus::Continue);
@@ -511,7 +436,6 @@ public:
     return counter != nullptr ? counter->value() : 0;
   }
 
-  // The authoritative typed record.
   std::optional<envoy::data::ai::v3::TokenUsage>
   singleTypedWrite(const std::string& expected_namespace) {
     if (typed_metadata_writes_.size() != 1 ||
@@ -539,8 +463,6 @@ public:
   std::vector<std::pair<std::string, Protobuf::Any>> typed_metadata_writes_;
 };
 
-// An SSE response is teed, usage extracted, and published at end of stream
-// under the default namespace, while every frame passes through untouched.
 TEST_F(AiProtocolManagerFilterResponseTest, SseUsagePublishedAtEndOfStream) {
   setup();
   sendHeaders("text/event-stream");
@@ -569,10 +491,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, SseUsagePublishedAtEndOfStream) {
   EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::COMPLETE);
 }
 
-// A degraded stream -- some usage extracted, then an event over the cap --
-// still publishes at clean end of stream, but flags the counts as partial so
-// a consumer can tell the emitted values may be stale (e.g. an earlier
-// cumulative snapshot) rather than final.
+// After a skipped event the counts may be a stale cumulative snapshot, hence PARTIAL.
 TEST_F(AiProtocolManagerFilterResponseTest, PartialUsageReportsExtractionStatus) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
   auto* token_usage = proto_config.mutable_response_handling()->mutable_token_usage();
@@ -580,7 +499,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, PartialUsageReportsExtractionStatus)
   token_usage->mutable_limits()->mutable_max_sse_event_size()->set_value(256);
   setupWithProto(proto_config);
   sendHeaders("text/event-stream");
-  // An early cumulative Gemini snapshot extracts normally.
   sendData("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"a\"}]}}],"
            "\"usageMetadata\":{\"promptTokenCount\":6,\"candidatesTokenCount\":16,"
            "\"totalTokenCount\":22}}\n\n",
@@ -598,10 +516,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, PartialUsageReportsExtractionStatus)
   EXPECT_EQ(counterValue("sse_event_too_large"), 1);
 }
 
-// A JSON response whose content-length already exceeds the inspection cap is
-// abandoned up front -- nothing is buffered or parsed -- and publishes the
-// same status-only FAILED record the incrementally-discovered case does,
-// carrying the configured wire API rather than UNSPECIFIED.
+// Rejected from content-length alone, so the FAILED record carries the configured API.
 TEST_F(AiProtocolManagerFilterResponseTest, ContentLengthOverCapFailsExtraction) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
   auto* token_usage = proto_config.mutable_response_handling()->mutable_token_usage();
@@ -612,19 +527,17 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentLengthOverCapFailsExtraction)
   Http::TestResponseHeaderMapImpl headers{
       {":status", "200"}, {"content-type", "application/json"}, {"content-length", "100"}};
   EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
-  sendData(std::string(100, 'x'), true); // Passes through untouched, uninspected.
+  sendData(std::string(100, 'x'), true);
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
   EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
   EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   EXPECT_EQ(counterValue("response_body_too_large"), 1);
-  EXPECT_EQ(counterValue("response_parse_error"), 0); // Never buffered or parsed.
+  EXPECT_EQ(counterValue("response_parse_error"), 0);
   EXPECT_EQ(counterValue("token_usage_failed"), 1);
 }
 
-// An empty JSON body delivered as a terminal DATA frame counts missing,
-// exactly like the same nothing delivered as a headers-only response: the
-// outcome does not depend on HTTP framing.
+// Same outcome as a headers-only response: stats do not depend on framing.
 TEST_F(AiProtocolManagerFilterResponseTest, EmptyJsonBodyCountsMissing) {
   setup();
   sendHeaders("application/json");
@@ -635,9 +548,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, EmptyJsonBodyCountsMissing) {
   EXPECT_EQ(counterValue("response_parse_error"), 0);
 }
 
-// An Anthropic in-band `error` event after usage has accumulated: the
-// terminal usage update never arrives, so the record publishes as PARTIAL,
-// never COMPLETE.
+// After an in-band `error` event the terminal usage update never arrives.
 TEST_F(AiProtocolManagerFilterResponseTest, AnthropicStreamErrorMarksPartial) {
   setup();
   sendHeaders("text/event-stream");
@@ -656,16 +567,11 @@ TEST_F(AiProtocolManagerFilterResponseTest, AnthropicStreamErrorMarksPartial) {
   EXPECT_EQ(counterValue("token_usage_partial"), 1);
 }
 
-// Complete extraction failure still publishes a status-only record: per-stream
-// consumers must be able to distinguish "Envoy failed to extract" from "the
-// provider supplied no usage" (which publishes nothing). The failing event
-// here is an OpenAI Responses terminal event above the production 1MiB
-// default cap -- a normal operational failure mode for long generations, not
-// only an adversarial one.
+// Consumers must tell "Envoy failed to extract" apart from "no usage" (publishes nothing).
 TEST_F(AiProtocolManagerFilterResponseTest, ExtractionFailurePublishesStatusOnlyRecord) {
   setup(); // Default caps.
   sendHeaders("text/event-stream");
-  // Detection locks from a small skipped-nothing chunk first.
+  // Locks protocol detection before the oversized event.
   sendData("data: {\"object\":\"chat.completion.chunk\",\"model\":\"gpt-4o\","
            "\"choices\":[{\"delta\":{\"content\":\"hi\"}}],\"usage\":null}\n\n",
            false);
@@ -686,11 +592,10 @@ TEST_F(AiProtocolManagerFilterResponseTest, ExtractionFailurePublishesStatusOnly
   EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
   EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
   EXPECT_EQ(typed->model(), "gpt-4o");
-  EXPECT_FALSE(typed->has_total_tokens()); // No counts recovered.
+  EXPECT_FALSE(typed->has_total_tokens());
   EXPECT_FALSE(typed->has_input_tokens());
 }
 
-// A clean stream that simply carries no usage still publishes nothing.
 TEST_F(AiProtocolManagerFilterResponseTest, AbsentUsagePublishesNothing) {
   setup();
   sendHeaders("text/event-stream");
@@ -702,9 +607,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, AbsentUsagePublishesNothing) {
   EXPECT_EQ(counterValue("token_usage_partial"), 0);
 }
 
-// An eligible response ending at the headers counts as missing, exactly like
-// one ending in an empty terminal DATA frame: stats do not depend on codec
-// framing of an empty body.
 TEST_F(AiProtocolManagerFilterResponseTest, EligibleHeadersOnlyResponseCountsMissing) {
   setup();
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"content-type", "application/json"}};
@@ -713,8 +615,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, EligibleHeadersOnlyResponseCountsMis
   EXPECT_TRUE(typed_metadata_writes_.empty());
 }
 
-// A syntactically valid final document whose known count fields are unusable
-// must not leave the earlier snapshot published as complete.
+// Unusable count fields must not leave the earlier snapshot published as COMPLETE.
 TEST_F(AiProtocolManagerFilterResponseTest, MalformedPresentUsageFieldMarksPartial) {
   setup();
   sendHeaders("text/event-stream");
@@ -733,12 +634,9 @@ TEST_F(AiProtocolManagerFilterResponseTest, MalformedPresentUsageFieldMarksParti
   EXPECT_EQ(counterValue("token_usage_partial"), 1);
 }
 
-// With the filter installed in both chains (allowed by the API), the first
-// publication owns the namespace: a second write would leave consumers with
-// an ambiguous record.
+// With the filter in both chains, the first publication owns the namespace.
 TEST_F(AiProtocolManagerFilterResponseTest, DuplicatePublicationSkipped) {
   setup();
-  // Simulate the upstream installation having already published.
   envoy::data::ai::v3::TokenUsage prior;
   prior.set_model("model-a");
   prior.mutable_total_tokens()->set_value(100);
@@ -752,13 +650,12 @@ TEST_F(AiProtocolManagerFilterResponseTest, DuplicatePublicationSkipped) {
            "\"completion_tokens\":4,\"total_tokens\":7}}",
            true);
 
-  EXPECT_TRUE(typed_metadata_writes_.empty()); // No second write.
+  EXPECT_TRUE(typed_metadata_writes_.empty());
   EXPECT_EQ(counterValue("token_usage_duplicate"), 1);
   EXPECT_EQ(counterValue("token_usage_found"), 0);
 }
 
-// The provider-reported total is surfaced separately when it disagrees with
-// the canonical input + output sum; total_tokens stays internally consistent.
+// total_tokens is always input + output; the provider's own figure is kept separately.
 TEST_F(AiProtocolManagerFilterResponseTest, InconsistentProviderTotalSurfaced) {
   setup();
   sendHeaders("application/json");
@@ -774,8 +671,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, InconsistentProviderTotalSurfaced) {
   EXPECT_EQ(counterValue("token_usage_total_mismatch"), 1);
 }
 
-// Anthropic named-event stream: input from message_start, cumulative output
-// from the last message_delta, total computed at finalize.
+// Input comes from message_start, cumulative output from the last message_delta.
 TEST_F(AiProtocolManagerFilterResponseTest, SseAnthropicComputedTotal) {
   setup();
   sendHeaders("text/event-stream; charset=utf-8");
@@ -797,7 +693,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, SseAnthropicComputedTotal) {
   EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
 }
 
-// A JSON body (Gemini generateContent) is parsed at end of stream.
 TEST_F(AiProtocolManagerFilterResponseTest, JsonBodyGemini) {
   setup();
   sendHeaders("application/json; charset=utf-8");
@@ -819,10 +714,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, JsonBodyGemini) {
   EXPECT_EQ(typed->model(), "gemini-2.5-flash");
 }
 
-// Reviewer merge-gate case: an ordinary long OpenAI Responses generation
-// embeds the complete response object in its terminal lifecycle event. Under
-// the default configuration a ~64KiB response.completed event must still
-// yield usage (the old 16KiB default silently dropped it).
+// response.completed embeds the whole response object, so long generations exceed 64KiB.
 TEST_F(AiProtocolManagerFilterResponseTest, LargeOpenAiResponsesTerminalEventDefaultConfig) {
   setup();
   sendHeaders("text/event-stream");
@@ -849,7 +741,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, LargeOpenAiResponsesTerminalEventDef
   EXPECT_EQ(counterValue("token_usage_found"), 1);
 }
 
-// A stream ending in trailers (no end_stream data frame) finalizes there.
 TEST_F(AiProtocolManagerFilterResponseTest, TrailersFinalize) {
   setup();
   sendHeaders("text/event-stream");
@@ -861,8 +752,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, TrailersFinalize) {
   EXPECT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
 }
 
-// A JSON response whose body ends via trailers (no end_stream data frame) is
-// still parsed: end-of-stream reaches the handler through encodeTrailers().
 TEST_F(AiProtocolManagerFilterResponseTest, JsonResponseEndingInTrailers) {
   setup();
   sendHeaders("application/json");
@@ -878,8 +767,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, JsonResponseEndingInTrailers) {
   EXPECT_EQ(counterValue("token_usage_found"), 1);
 }
 
-// End-of-stream arriving as an empty terminal data frame (a common Envoy
-// framing) still finalizes the handler.
 TEST_F(AiProtocolManagerFilterResponseTest, EmptyTerminalDataFrameFinalizes) {
   setup();
   sendHeaders("application/json");
@@ -891,8 +778,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, EmptyTerminalDataFrameFinalizes) {
   EXPECT_EQ(typed->total_tokens().value(), 7);
 }
 
-// A stream that resets before end-of-stream publishes nothing: no metadata,
-// no found/missing accounting.
 TEST_F(AiProtocolManagerFilterResponseTest, ResetDoesNotPublish) {
   setup();
   sendHeaders("text/event-stream");
@@ -906,8 +791,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, ResetDoesNotPublish) {
   EXPECT_EQ(counterValue("token_usage_missing"), 0);
 }
 
-// Streams that legitimately carry no usage produce the missing stat and no
-// metadata.
 TEST_F(AiProtocolManagerFilterResponseTest, UsageAbsentCountsMissing) {
   setup();
   sendHeaders("text/event-stream");
@@ -919,8 +802,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, UsageAbsentCountsMissing) {
   EXPECT_EQ(counterValue("token_usage_found"), 0);
 }
 
-// A configured fallback wire API pins extraction for shapes auto-detection
-// cannot place.
+// The body carries no shape marker, so auto-detection alone cannot place it.
 TEST_F(AiProtocolManagerFilterResponseTest, DefaultApiProtocolConfig) {
   setup("{default_api_protocol: ANTHROPIC_MESSAGES}");
   sendHeaders("application/json");
@@ -930,15 +812,12 @@ TEST_F(AiProtocolManagerFilterResponseTest, DefaultApiProtocolConfig) {
   EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
 }
 
-// Token usage is scoped to declared routes by default: with
-// include_unconfigured_routes unset, an unconfigured route is not inspected
-// at all, and a route carrying any per-route config is.
+// Any per-route config, even an empty one, scopes a route in.
 TEST_F(AiProtocolManagerFilterResponseTest, RouteScopingDefaultsToConfiguredRoutes) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
   proto_config.mutable_response_handling()->mutable_token_usage();
   setupWithProto(proto_config);
 
-  // No per-route config: inert -- no metadata and no missing accounting.
   sendHeaders("application/json");
   sendData("{\"object\":\"chat.completion\",\"usage\":{\"prompt_tokens\":3,"
            "\"completion_tokens\":4,\"total_tokens\":7}}",
@@ -947,8 +826,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, RouteScopingDefaultsToConfiguredRout
   EXPECT_EQ(counterValue("token_usage_found"), 0);
   EXPECT_EQ(counterValue("token_usage_missing"), 0);
 
-  // The same response on a declared route is inspected (an empty per-route
-  // config is enough to scope the route in).
   setupWithProto(proto_config);
   setEncodeRouteConfig(PerRouteProto());
   sendHeaders("application/json");
@@ -959,14 +836,11 @@ TEST_F(AiProtocolManagerFilterResponseTest, RouteScopingDefaultsToConfiguredRout
   EXPECT_EQ(counterValue("token_usage_found"), 1);
 }
 
-// The per-route response API outranks the per-route request API, which
-// outranks the configured fallback.
+// Route response API > route request API > default_api_protocol.
 TEST_F(AiProtocolManagerFilterResponseTest, PerRouteProtocolPrecedence) {
-  // The ambiguous body below carries Anthropic-style usage keys with no
-  // detectable shape marker, so whichever protocol seeds extraction wins.
+  // No shape marker, so whichever protocol seeds extraction wins.
   const std::string ambiguous = "{\"usage\":{\"input_tokens\":5,\"output_tokens\":7}}";
 
-  // route response (ANTHROPIC_MESSAGES) > route request (OPENAI_CHAT_COMPLETIONS).
   setup("{default_api_protocol: GEMINI_GENERATE_CONTENT}");
   PerRouteProto per_route;
   per_route.mutable_request()->set_api_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
@@ -980,7 +854,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, PerRouteProtocolPrecedence) {
     EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   }
 
-  // route request > default_api_protocol.
   setup("{default_api_protocol: GEMINI_GENERATE_CONTENT}");
   PerRouteProto request_only;
   request_only.mutable_request()->set_api_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
@@ -994,7 +867,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, PerRouteProtocolPrecedence) {
   }
 }
 
-// A configured namespace overrides the default.
 TEST_F(AiProtocolManagerFilterResponseTest, CustomMetadataNamespace) {
   setup("{metadata_namespace: custom.ns}");
   sendHeaders("application/json");
@@ -1002,8 +874,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, CustomMetadataNamespace) {
   EXPECT_TRUE(singleTypedWrite("custom.ns").has_value());
 }
 
-// Non-2xx responses, unsupported content types, and headers-only responses are
-// never inspected: no handler, no metadata, no stats.
 TEST_F(AiProtocolManagerFilterResponseTest, UninspectedResponses) {
   setup();
   sendHeaders("text/event-stream", "502");
@@ -1022,9 +892,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, UninspectedResponses) {
   EXPECT_TRUE(typed_metadata_writes_.empty());
 }
 
-// Compressed responses cannot be inspected: any non-identity content-encoding
-// skips extraction with a dedicated stat (the body must be decompressed before
-// this filter to enable extraction).
+// Extraction needs the body decompressed before this filter on the encode path.
 TEST_F(AiProtocolManagerFilterResponseTest, CompressedResponseSkipped) {
   setup();
   Http::TestResponseHeaderMapImpl headers{
@@ -1040,12 +908,8 @@ TEST_F(AiProtocolManagerFilterResponseTest, CompressedResponseSkipped) {
   EXPECT_EQ(counterValue("token_usage_missing"), 0);
 }
 
-// Content-Encoding is list-valued and repeatable: a non-identity coding
-// anywhere disqualifies the response; identity-only variants (with optional
-// whitespace) do not; and an encoding on a never-eligible content type counts
-// nothing.
+// Content-Encoding is list-valued and repeatable.
 TEST_F(AiProtocolManagerFilterResponseTest, ContentEncodingMatrix) {
-  // Duplicate header entries: identity then gzip.
   setup();
   {
     Http::TestResponseHeaderMapImpl headers{{":status", "200"},
@@ -1057,7 +921,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentEncodingMatrix) {
     EXPECT_TRUE(typed_metadata_writes_.empty());
     EXPECT_EQ(counterValue("unsupported_content_encoding"), 1);
   }
-  // Comma-separated codings in one entry.
   setup();
   {
     Http::TestResponseHeaderMapImpl headers{{":status", "200"},
@@ -1069,7 +932,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentEncodingMatrix) {
     // The fixture's stats store persists across setup() calls: cumulative.
     EXPECT_EQ(counterValue("unsupported_content_encoding"), 2);
   }
-  // Identity-only, repeated and with optional whitespace: extraction proceeds.
   setup();
   {
     Http::TestResponseHeaderMapImpl headers{{":status", "200"},
@@ -1092,7 +954,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentEncodingMatrix) {
     EXPECT_TRUE(typed_metadata_writes_.empty());
     EXPECT_EQ(counterValue("unsupported_content_encoding"), 3);
   }
-  // Compressed but never-eligible content type: no handler and no stat.
   setup();
   {
     Http::TestResponseHeaderMapImpl headers{
@@ -1104,8 +965,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentEncodingMatrix) {
   }
 }
 
-// Cache-read and cache-write input breakdowns publish as the nested
-// input_token_details message and its Struct mirror.
 TEST_F(AiProtocolManagerFilterResponseTest, InputTokenDetailsPublished) {
   setup();
   sendHeaders("application/json");
@@ -1121,7 +980,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, InputTokenDetailsPublished) {
   EXPECT_FALSE(typed->input_token_details().has_tool_use_tokens());
 }
 
-// Tool-use prompt tokens publish in the input breakdown too.
 TEST_F(AiProtocolManagerFilterResponseTest, ToolUseInputDetailPublished) {
   setup();
   sendHeaders("application/json");
@@ -1136,9 +994,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ToolUseInputDetailPublished) {
   EXPECT_EQ(typed->input_tokens().value(), 11);
 }
 
-// A JSON body over the cap whose content-length is absent is only caught in
-// onData: extraction fails with no protocol ever locked, and the status-only
-// record publishes an unspecified protocol.
+// Without content-length the cap trips in onData, before any protocol has locked.
 TEST_F(AiProtocolManagerFilterResponseTest, OversizedBodyWithoutContentLengthFailsUnspecified) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
   auto* token_usage = proto_config.mutable_response_handling()->mutable_token_usage();
@@ -1158,8 +1014,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, OversizedBodyWithoutContentLengthFai
   EXPECT_EQ(counterValue("token_usage_failed"), 1);
 }
 
-// Without a token_usage config the encode path is fully inert -- whether
-// response_handling itself is absent or empty.
 TEST_F(AiProtocolManagerFilterResponseTest, DisabledWithoutConfig) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager empty_response;
   empty_response.mutable_response_handling(); // No token_usage inside.
@@ -1182,8 +1036,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, DisabledWithoutConfig) {
   EXPECT_EQ(counterValue("token_usage_missing"), 0);
 }
 
-// A declared endpoint's payload is parsed as it is offloaded and still replayed
-// downstream byte for byte: parsing observes the payload, it does not rewrite it.
 TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVerbatim) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1219,18 +1071,16 @@ public:
                                        LocalReplier) override {
     ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
     seen_.push_back({context_.request_protocol,
-                     std::string(context_.request_headers.getPathValue()),
-                     &context_.stream_info});
+                     std::string(context_.request_headers.getPathValue()), &context_.stream_info});
     request->request_index().json()["model"] = "rewritten";
     co_return co_await std::move(propagate_request)(std::move(request));
   }
 
 private:
-  const AiFilterContext& context_;
+  const AiFilterContext context_;
   std::vector<Seen>& seen_;
 };
 
-// Built once per stream from that stream's context, and run before replay.
 TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverDeclaredPayload) {
   std::vector<ContextRecordingAiFilter::Seen> seen;
   int built = 0;
@@ -1275,7 +1125,6 @@ TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
   EXPECT_TRUE(injected_end_stream_);
 }
 
-// A factory may return nullptr to sit out a stream.
 TEST_F(AiProtocolManagerFilterTest, NullAiFilterIsSkipped) {
   createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterPtr { return nullptr; }});
   setRouteConfig();
@@ -1291,8 +1140,6 @@ TEST_F(AiProtocolManagerFilterTest, NullAiFilterIsSkipped) {
   EXPECT_TRUE(injected_end_stream_);
 }
 
-// Content-Length header is set to the recalculated length when the filter manager serializes the
-// payload.
 TEST_F(AiProtocolManagerFilterTest, SetsContentLengthOnReplay) {
   setRouteConfig();
   replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
@@ -1314,7 +1161,6 @@ TEST_F(AiProtocolManagerFilterTest, SetsContentLengthOnReplay) {
   EXPECT_EQ(request_headers_.getContentLengthValue(), absl::StrCat(injected_.length()));
 }
 
-// Content-Length header is not added if it was not previously present on request headers.
 TEST_F(AiProtocolManagerFilterTest, DoesNotSetContentLengthOnReplayWhenAbsent) {
   setRouteConfig();
   replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
@@ -1333,9 +1179,7 @@ TEST_F(AiProtocolManagerFilterTest, DoesNotSetContentLengthOnReplayWhenAbsent) {
   EXPECT_EQ(request_headers_.ContentLength(), nullptr);
 }
 
-// A payload whose `model` is larger than the inline-string threshold: the
-// parser offloads the value, and the schema declares `model` non-offloadable,
-// so the default 1KiB threshold rejects it.
+// The schema declares `model` non-offloadable, so an offloaded value fails validation.
 TEST_F(AiProtocolManagerFilterTest, ModelOverInlineStringThresholdIsRejected) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1350,8 +1194,6 @@ TEST_F(AiProtocolManagerFilterTest, ModelOverInlineStringThresholdIsRejected) {
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// The same payload is accepted once the configured threshold is raised above
-// the value: the configured threshold, not the default, reaches the parser.
 TEST_F(AiProtocolManagerFilterTest, RaisedInlineStringThresholdKeepsLargeValuesInline) {
   createFilter(/*parse_unconfigured_routes=*/false, /*inline_string_threshold_bytes=*/4096);
   setRouteConfig();
@@ -1363,13 +1205,11 @@ TEST_F(AiProtocolManagerFilterTest, RaisedInlineStringThresholdKeepsLargeValuesI
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  // The DOM stores object members in a std::map, so re-serialization does not
-  // preserve key order; compare the parsed JSON rather than the raw bytes.
+  // The DOM's std::map members reorder keys on re-serialization, so compare parsed JSON.
   EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
   EXPECT_TRUE(injected_end_stream_);
 }
 
-// Malformed JSON is answered with a 400 and never reaches the upstream.
 TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJson) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1382,8 +1222,7 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJson) {
   EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
   EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
   EXPECT_EQ(inject_calls_, 0);
-  // A body that is not JSON at all is a parse error, not a schema failure: the
-  // two 400s are counted apart because they mean different things to operate on.
+  // Parse errors and schema failures mean different things to operators, so count apart.
   EXPECT_EQ(counterValue("request_parse_error"), 1);
   EXPECT_EQ(counterValue("request_schema_invalid"), 0);
   EXPECT_EQ(counterValue("request_parsed"), 0);
@@ -1403,7 +1242,6 @@ TEST_F(AiProtocolManagerFilterTest, RejectsDuplicateKeys) {
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// Incomplete rather than malformed; caught when the terminal frame closes.
 TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJson) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1417,10 +1255,7 @@ TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJson) {
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// A stream whose framing promised a body but delivered none -- a chunked request
-// with only the terminating chunk, or an empty terminal DATA frame -- carries no
-// payload to validate, so it passes through just like a request that ended on
-// its headers. A GET reaches the filter this way.
+// No payload to validate, same as a request ending on its headers; a GET arrives this way.
 TEST_F(AiProtocolManagerFilterTest, EmptyBodyOnDeclaredEndpointIsPassedThrough) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1434,13 +1269,11 @@ TEST_F(AiProtocolManagerFilterTest, EmptyBodyOnDeclaredEndpointIsPassedThrough) 
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(injected_.length(), 0);
-  // No payload arrived, so there is no document and nothing to count parsed.
   EXPECT_EQ(counterValue("request_parsed"), 0);
   EXPECT_EQ(counterValue("request_parse_error"), 0);
 }
 
-// Only a stream with no body at all is exempt. Once bytes have arrived they are
-// a payload, and an empty terminal frame closes it rather than excusing it.
+// Once bytes have arrived, an empty terminal frame closes the payload rather than excusing it.
 TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJsonEndedByEmptyTerminalFrame) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1456,8 +1289,7 @@ TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJsonEndedByEmptyTerminalFram
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// Parsing before offloading means a bad byte early in a large upload fails the
-// request immediately, and the rest of the client's data is dropped.
+// Parsing precedes offloading, so an early bad byte fails the request before the upload ends.
 TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJsonMidUpload) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1466,7 +1298,6 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJsonMidUpload) {
   EXPECT_EQ(filter_->decodeData(bad_chunk, false), Http::FilterDataStatus::StopIterationNoBuffer);
   EXPECT_EQ(local_reply_calls_, 1);
 
-  // What was in flight is discarded, and nothing is replayed.
   Buffer::OwnedImpl trailing_chunk(std::string(64 * 1024, 'x'));
   EXPECT_EQ(filter_->decodeData(trailing_chunk, true),
             Http::FilterDataStatus::StopIterationNoBuffer);
@@ -1476,8 +1307,6 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJsonMidUpload) {
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// A payload that is valid JSON syntax but fails schema validation is answered
-// with a 400 and never reaches the upstream.
 TEST_F(AiProtocolManagerFilterTest, RejectsPayloadFailingSchemaValidation) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1491,13 +1320,11 @@ TEST_F(AiProtocolManagerFilterTest, RejectsPayloadFailingSchemaValidation) {
   EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
   EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
   EXPECT_EQ(inject_calls_, 0);
-  // Well-formed JSON that the declared API rejects: schema drift, not garbage.
   EXPECT_EQ(counterValue("request_schema_invalid"), 1);
   EXPECT_EQ(counterValue("request_parse_error"), 0);
   EXPECT_EQ(counterValue("request_parsed"), 0);
 }
 
-// Unknown fields are permitted and pass through untouched.
 TEST_F(AiProtocolManagerFilterTest, PassesThroughUnknownFields) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1513,8 +1340,6 @@ TEST_F(AiProtocolManagerFilterTest, PassesThroughUnknownFields) {
   EXPECT_TRUE(injected_end_stream_);
 }
 
-// A body ending on an empty terminal frame still gets its document closed, so a
-// complete payload split that way is not mistaken for a truncated one.
 TEST_F(AiProtocolManagerFilterTest, ChunkedBodyWithEmptyTerminalFrame) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1551,7 +1376,6 @@ TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedJsonIsParsed) {
   EXPECT_EQ(continue_calls_, 1);
 }
 
-// The same path catches a truncated body that would otherwise be forwarded.
 TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJsonTerminatedByTrailers) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1568,8 +1392,6 @@ TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJsonTerminatedByTrailers) {
   EXPECT_EQ(continue_calls_, 0);
 }
 
-// An undeclared route gives the filter nothing to look at: headers are not held,
-// the body is not offloaded, nothing is replayed.
 TEST_F(AiProtocolManagerFilterTest, PassesThroughUndeclaredRoute) {
   Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
@@ -1578,16 +1400,13 @@ TEST_F(AiProtocolManagerFilterTest, PassesThroughUndeclaredRoute) {
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::Continue);
   drain();
 
-  // Left in the chain's own buffer rather than round-tripped.
   EXPECT_EQ(body.toString(), R"({"model":"gpt-4"})");
   EXPECT_EQ(inject_calls_, 0);
   EXPECT_EQ(local_reply_calls_, 0);
-  // A stream the filter never engages on touches none of the request counters.
   EXPECT_EQ(counterValue("request_parsed"), 0);
   EXPECT_EQ(counterValue("request_passthrough"), 0);
 }
 
-// Nor does it subscribe to watermarks or claim any replay machinery.
 TEST_F(AiProtocolManagerFilterTest, PassThroughStreamCostsNothing) {
   Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
@@ -1596,7 +1415,6 @@ TEST_F(AiProtocolManagerFilterTest, PassThroughStreamCostsNothing) {
   EXPECT_EQ(replay_cb_, nullptr);
 }
 
-// Trailers on a pass-through stream flow like everything else.
 TEST_F(AiProtocolManagerFilterTest, PassesThroughTrailersOnUndeclaredRoute) {
   Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
@@ -1611,7 +1429,6 @@ TEST_F(AiProtocolManagerFilterTest, PassesThroughTrailersOnUndeclaredRoute) {
   EXPECT_EQ(continue_calls_, 0);
 }
 
-// A malformed payload there is forwarded untouched -- nothing is looking at it.
 TEST_F(AiProtocolManagerFilterTest, PassesThroughMalformedPayloadOnUndeclaredRoute) {
   Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
@@ -1624,8 +1441,6 @@ TEST_F(AiProtocolManagerFilterTest, PassesThroughMalformedPayloadOnUndeclaredRou
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// Best-effort parsing runs on an undeclared route and leaves a valid payload
-// untouched.
 TEST_F(AiProtocolManagerFilterTest, BestEffortParsingAcceptsValidPayload) {
   createFilter(/*parse_unconfigured_routes=*/true);
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1636,14 +1451,11 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingAcceptsValidPayload) {
 
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4"})");
-  // An unconfigured route has no schema to check, but the document is still
-  // there for later filters, so it counts as parsed.
+  // No schema to check, but the document exists for later filters, so it counts as parsed.
   EXPECT_EQ(counterValue("request_parsed"), 1);
   EXPECT_EQ(counterValue("request_passthrough"), 0);
 }
 
-// Best effort means exactly that: a payload that does not parse is forwarded
-// unchanged rather than rejected.
 TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsMalformedPayload) {
   createFilter(/*parse_unconfigured_routes=*/true);
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1655,13 +1467,11 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsMalformedPayload) {
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(injected_.toString(), R"({"model" "gpt-4"})");
   EXPECT_TRUE(injected_end_stream_);
-  // Forwarded, not failed -- so it is counted apart from the rejecting paths.
   EXPECT_EQ(counterValue("request_passthrough"), 1);
   EXPECT_EQ(counterValue("request_parse_error"), 0);
   EXPECT_EQ(counterValue("request_parsed"), 0);
 }
 
-// A payload abandoned mid-upload is still offloaded and replayed in full.
 TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsRestOfAbandonedPayload) {
   createFilter(/*parse_unconfigured_routes=*/true);
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1676,7 +1486,6 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsRestOfAbandonedPayl
   EXPECT_EQ(injected_.toString(), R"({"model" "gpt-4","stream":true})");
 }
 
-// Best effort also tolerates an empty body, where a declared endpoint rejects it.
 TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsEmptyBody) {
   createFilter(/*parse_unconfigured_routes=*/true);
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1692,8 +1501,7 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsEmptyBody) {
   EXPECT_EQ(injected_.length(), 0);
 }
 
-// The one shape best effort can hold: the whole request arrives before a response
-// is wanted, so pinning the headers cannot stall it.
+// A JSON request arrives whole before a response is wanted, so holding headers cannot stall.
 TEST_F(AiProtocolManagerFilterTest, BestEffortEngagesOnJsonContentType) {
   EXPECT_EQ(decodeHeadersUnconfigured(
                 Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1713,7 +1521,6 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortEngagesOnJsonContentTypeWithParame
             Http::FilterHeadersStatus::StopIteration);
 }
 
-// A "+json" structured suffix names a JSON payload just as "application/json" does.
 TEST_F(AiProtocolManagerFilterTest, BestEffortEngagesOnJsonStructuredSuffix) {
   EXPECT_EQ(decodeHeadersUnconfigured(
                 Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1723,8 +1530,7 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortEngagesOnJsonStructuredSuffix) {
             Http::FilterHeadersStatus::StopIteration);
 }
 
-// The stall this gate exists for. The content type carries a JSON suffix, so
-// only the protocol check catches it.
+// The stall the gate exists for; the +json suffix leaves only the protocol check to catch it.
 TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsGrpcRequest) {
   EXPECT_EQ(decodeHeadersUnconfigured(
                 Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1734,8 +1540,7 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsGrpcRequest) {
             Http::FilterHeadersStatus::Continue);
 }
 
-// Connect's streaming framing carries a JSON suffix too. (Unary Connect sends
-// plain "application/json" and stays eligible.)
+// Unary Connect sends plain application/json and stays eligible; streaming does not.
 TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsConnectStreamingRequest) {
   EXPECT_EQ(decodeHeadersUnconfigured(
                 Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1757,7 +1562,6 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsUpgrade) {
             Http::FilterHeadersStatus::Continue);
 }
 
-// So is a CONNECT tunnel, extended or not.
 TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsConnect) {
   EXPECT_EQ(decodeHeadersUnconfigured(
                 Http::TestRequestHeaderMapImpl{
@@ -1766,7 +1570,6 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsConnect) {
             Http::FilterHeadersStatus::Continue);
 }
 
-// A body the parser could make nothing of is not worth holding the headers for.
 TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsNonJsonContentType) {
   EXPECT_EQ(decodeHeadersUnconfigured(
                 Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1776,7 +1579,6 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsNonJsonContentType) {
             Http::FilterHeadersStatus::Continue);
 }
 
-// An absent content type says nothing about the payload, so best effort declines it.
 TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsMissingContentType) {
   EXPECT_EQ(decodeHeadersUnconfigured(
                 Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/upload"}},
@@ -1784,8 +1586,6 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsMissingContentType) {
             Http::FilterHeadersStatus::Continue);
 }
 
-// The gate belongs to best effort alone; a declared endpoint is managed whatever
-// the content type says.
 TEST_F(AiProtocolManagerFilterTest, DeclaredEndpointIgnoresGate) {
   setRouteConfig();
   replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
@@ -1795,9 +1595,6 @@ TEST_F(AiProtocolManagerFilterTest, DeclaredEndpointIgnoresGate) {
             Http::FilterHeadersStatus::StopIteration);
 }
 
-// A declared endpoint is strict regardless of the filter-level
-// parse_unconfigured_routes setting: the request declaration is what says
-// this payload has to be well formed.
 TEST_F(AiProtocolManagerFilterTest, RouteConfigIsStrictEvenWithBestEffortConfigured) {
   createFilter(/*parse_unconfigured_routes=*/true);
   setRouteConfig();
@@ -1812,8 +1609,6 @@ TEST_F(AiProtocolManagerFilterTest, RouteConfigIsStrictEvenWithBestEffortConfigu
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// A declared endpoint's valid payload is parsed, validated against the
-// declared API's schema, and forwarded unchanged.
 TEST_F(AiProtocolManagerFilterTest, PassThroughEndpointIsParsedAndForwarded) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1843,7 +1638,6 @@ TEST_F(AiProtocolManagerFilterTest, SetsFilterStateObjectOnParsedPayload) {
   EXPECT_EQ(fs->index().json()["model"], "gpt-4");
 }
 
-// A payload with valid JSON syntax but violating the route's schema is rejected with 400.
 TEST_F(AiProtocolManagerFilterTest, SchemaValidationRejectsInvalidPayload) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1858,16 +1652,13 @@ TEST_F(AiProtocolManagerFilterTest, SchemaValidationRejectsInvalidPayload) {
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// Trailers arriving after a stream was rejected are dropped with StopIteration.
 TEST_F(AiProtocolManagerFilterTest, TrailersDroppedAfterPayloadRejection) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
-  // Send malformed payload chunk that fails the stream.
   Buffer::OwnedImpl bad_chunk(R"({"model" "gpt-4"})");
   EXPECT_EQ(filter_->decodeData(bad_chunk, false), Http::FilterDataStatus::StopIterationNoBuffer);
 
-  // Send trailers on the dying stream.
   Http::TestRequestTrailerMapImpl trailers;
   EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
 }

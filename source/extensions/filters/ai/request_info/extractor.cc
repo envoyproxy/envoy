@@ -32,7 +32,6 @@ std::optional<uint64_t> readLimit(const nlohmann::json& json, absl::string_view 
   return readCount(json, key, malformed, NullPolicy::AllowNullAsAbsent);
 }
 
-// Top-level `model` and `stream`, which every known API shares.
 void readCommon(const nlohmann::json& json, RequestAttributes& attrs) {
   if (auto model = readString(json, "model", attrs.malformed); model.has_value()) {
     attrs.model = std::move(model).value();
@@ -70,8 +69,7 @@ void readAnthropicMessages(const nlohmann::json& json, RequestAttributes& attrs)
   attrs.tool_count = readArrayLength(json, "tools", attrs.malformed);
 }
 
-// `/{version}/models/{model}:generateContent` or `:streamGenerateContent`;
-// Vertex nests the same final segment. Anything else leaves both unset.
+// `.../models/{model}:generateContent` or `:streamGenerateContent`, which Vertex nests too.
 void readGeminiTarget(absl::string_view path, RequestAttributes& attrs) {
   path = path.substr(0, path.find('?'));
   const size_t last_slash = path.rfind('/');
@@ -107,11 +105,10 @@ void readGeminiGenerateContent(const nlohmann::json& json, absl::string_view pat
                                RequestAttributes& attrs) {
   readGeminiTarget(path, attrs);
   // Gemini's proto3 JSON accepts snake_case field names alongside camelCase.
-  const nlohmann::json* config = readObject(json, "generationConfig", attrs.malformed,
-                                            NullPolicy::AllowNullAsAbsent);
+  const nlohmann::json* config =
+      readObject(json, "generationConfig", attrs.malformed, NullPolicy::AllowNullAsAbsent);
   if (config == nullptr) {
-    config = readObject(json, "generation_config", attrs.malformed,
-                        NullPolicy::AllowNullAsAbsent);
+    config = readObject(json, "generation_config", attrs.malformed, NullPolicy::AllowNullAsAbsent);
   }
   if (config != nullptr) {
     attrs.max_output_tokens = readLimit(*config, "maxOutputTokens", attrs.malformed);

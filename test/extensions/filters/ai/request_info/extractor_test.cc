@@ -31,9 +31,8 @@ RequestAttributes extract(ApiProtocol protocol, const std::string& json,
 }
 
 TEST(RequestInfoExtractorTest, OpenAiChatCompletions) {
-  const RequestAttributes attrs = extract(
-      ApiProtocol::OpenAiChatCompletions,
-      R"({"model":"gpt-4o","stream":true,"max_tokens":128,
+  const RequestAttributes attrs = extract(ApiProtocol::OpenAiChatCompletions,
+                                          R"({"model":"gpt-4o","stream":true,"max_tokens":128,
           "messages":[{"role":"user","content":"hi"},{"role":"assistant","content":"yo"}],
           "tools":[{"type":"function","function":{"name":"f"}}]})");
   EXPECT_EQ(attrs.api_protocol, ApiProtocol::OpenAiChatCompletions);
@@ -55,13 +54,12 @@ TEST(RequestInfoExtractorTest, OpenAiChatCompletionsPrefersMaxCompletionTokens) 
 }
 
 TEST(RequestInfoExtractorTest, OpenAiResponses) {
-  const RequestAttributes attrs = extract(
-      ApiProtocol::OpenAiResponses,
-      R"({"model":"gpt-5","stream":false,"max_output_tokens":50,
+  const RequestAttributes attrs = extract(ApiProtocol::OpenAiResponses,
+                                          R"({"model":"gpt-5","stream":false,"max_output_tokens":50,
           "input":[{"role":"user","content":"a"},{"role":"user","content":"b"},
                    {"role":"user","content":"c"}],
           "tools":[{"type":"web_search"},{"type":"function","name":"f"}]})",
-      "/v1/responses");
+                                          "/v1/responses");
   EXPECT_EQ(attrs.api_protocol, ApiProtocol::OpenAiResponses);
   EXPECT_EQ(attrs.model, "gpt-5");
   EXPECT_EQ(attrs.stream, false);
@@ -88,12 +86,12 @@ TEST(RequestInfoExtractorTest, OpenAiResponsesOffloadedStringInputIsOneMessage) 
 }
 
 TEST(RequestInfoExtractorTest, AnthropicMessages) {
-  const RequestAttributes attrs = extract(
-      ApiProtocol::AnthropicMessages,
-      R"({"model":"claude-opus-5","max_tokens":1024,"stream":true,"system":"be nice",
+  const RequestAttributes attrs =
+      extract(ApiProtocol::AnthropicMessages,
+              R"({"model":"claude-opus-5","max_tokens":1024,"stream":true,"system":"be nice",
           "messages":[{"role":"user","content":"hi"}],
           "tools":[{"name":"t","input_schema":{"type":"object"}}]})",
-      "/v1/messages");
+              "/v1/messages");
   EXPECT_EQ(attrs.api_protocol, ApiProtocol::AnthropicMessages);
   EXPECT_EQ(attrs.model, "claude-opus-5");
   EXPECT_EQ(attrs.stream, true);
@@ -104,13 +102,13 @@ TEST(RequestInfoExtractorTest, AnthropicMessages) {
 }
 
 TEST(RequestInfoExtractorTest, GeminiReadsTargetAndGenerationConfig) {
-  const RequestAttributes attrs = extract(
-      ApiProtocol::GeminiGenerateContent,
-      R"({"contents":[{"role":"user","parts":[{"text":"hi"}]},
+  const RequestAttributes attrs =
+      extract(ApiProtocol::GeminiGenerateContent,
+              R"({"contents":[{"role":"user","parts":[{"text":"hi"}]},
                       {"role":"model","parts":[{"text":"yo"}]}],
           "generationConfig":{"maxOutputTokens":64},
           "tools":[{"functionDeclarations":[]}]})",
-      "/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse");
+              "/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse");
   EXPECT_EQ(attrs.api_protocol, ApiProtocol::GeminiGenerateContent);
   EXPECT_EQ(attrs.model, "gemini-2.5-pro");
   EXPECT_EQ(attrs.stream, true);
@@ -121,10 +119,11 @@ TEST(RequestInfoExtractorTest, GeminiReadsTargetAndGenerationConfig) {
 }
 
 TEST(RequestInfoExtractorTest, GeminiAcceptsSnakeCaseAndVertexTarget) {
-  const RequestAttributes attrs = extract(
-      ApiProtocol::GeminiGenerateContent,
-      R"({"contents":[],"generation_config":{"max_output_tokens":32}})",
-      "/v1/projects/p/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent");
+  const RequestAttributes attrs =
+      extract(ApiProtocol::GeminiGenerateContent,
+              R"({"contents":[],"generation_config":{"max_output_tokens":32}})",
+              "/v1/projects/p/locations/us-central1/publishers/google/models/"
+              "gemini-2.5-flash:generateContent");
   EXPECT_EQ(attrs.model, "gemini-2.5-flash");
   EXPECT_EQ(attrs.stream, false);
   EXPECT_EQ(attrs.max_output_tokens, 32u);
@@ -132,7 +131,6 @@ TEST(RequestInfoExtractorTest, GeminiAcceptsSnakeCaseAndVertexTarget) {
   EXPECT_FALSE(attrs.malformed);
 }
 
-// Another operation, a bare model, or an empty model is not a generate target.
 TEST(RequestInfoExtractorTest, GeminiIgnoresUnrecognizedTarget) {
   for (const absl::string_view path :
        {"/v1beta/models/gemini-2.5-pro:countTokens", "/v1beta/gemini-2.5-pro:generateContent",
@@ -145,18 +143,17 @@ TEST(RequestInfoExtractorTest, GeminiIgnoresUnrecognizedTarget) {
 }
 
 TEST(RequestInfoExtractorTest, GeminiOversizedPathModelFlagsAndKeepsStream) {
-  const RequestAttributes attrs =
-      extract(ApiProtocol::GeminiGenerateContent, "{}",
-              "/v1beta/models/" + std::string(MaxStringValueSize + 1, 'm') + ":streamGenerateContent");
+  const RequestAttributes attrs = extract(
+      ApiProtocol::GeminiGenerateContent, "{}",
+      "/v1beta/models/" + std::string(MaxStringValueSize + 1, 'm') + ":streamGenerateContent");
   EXPECT_TRUE(attrs.model.empty());
   EXPECT_EQ(attrs.stream, true);
   EXPECT_TRUE(attrs.malformed);
 }
 
 TEST(RequestInfoExtractorTest, UnspecifiedReadsSharedAttributesOnly) {
-  const RequestAttributes attrs = extract(
-      ApiProtocol::Unspecified,
-      R"({"model":"m","stream":false,"max_tokens":5,
+  const RequestAttributes attrs = extract(ApiProtocol::Unspecified,
+                                          R"({"model":"m","stream":false,"max_tokens":5,
           "messages":[{"role":"user","content":"hi"}],"tools":[]})");
   EXPECT_EQ(attrs.api_protocol, ApiProtocol::Unspecified);
   EXPECT_EQ(attrs.model, "m");
@@ -183,9 +180,9 @@ TEST(RequestInfoExtractorTest, AbsentAttributesStayAbsent) {
 }
 
 TEST(RequestInfoExtractorTest, NullAttributesReadAsAbsent) {
-  const RequestAttributes attrs = extract(
-      ApiProtocol::OpenAiChatCompletions,
-      R"({"model":"gpt-4o","stream":null,"max_tokens":null,"max_completion_tokens":null,
+  const RequestAttributes attrs =
+      extract(ApiProtocol::OpenAiChatCompletions,
+              R"({"model":"gpt-4o","stream":null,"max_tokens":null,"max_completion_tokens":null,
           "tools":null,"messages":[]})");
   EXPECT_EQ(attrs.model, "gpt-4o");
   EXPECT_FALSE(attrs.stream.has_value());
@@ -196,9 +193,9 @@ TEST(RequestInfoExtractorTest, NullAttributesReadAsAbsent) {
 }
 
 TEST(RequestInfoExtractorTest, UnusableAttributesReadAsAbsentAndFlag) {
-  const RequestAttributes attrs = extract(
-      ApiProtocol::OpenAiChatCompletions,
-      R"({"model":42,"stream":"yes","max_tokens":-1,"messages":"nope","tools":{}})");
+  const RequestAttributes attrs =
+      extract(ApiProtocol::OpenAiChatCompletions,
+              R"({"model":42,"stream":"yes","max_tokens":-1,"messages":"nope","tools":{}})");
   EXPECT_TRUE(attrs.model.empty());
   EXPECT_FALSE(attrs.stream.has_value());
   EXPECT_FALSE(attrs.max_output_tokens.has_value());
@@ -208,17 +205,16 @@ TEST(RequestInfoExtractorTest, UnusableAttributesReadAsAbsentAndFlag) {
 }
 
 TEST(RequestInfoExtractorTest, OneUnusableAttributeKeepsTheRest) {
-  const RequestAttributes attrs = extract(
-      ApiProtocol::AnthropicMessages,
-      R"({"model":"claude-opus-5","max_tokens":"lots","messages":[{"role":"user","content":"hi"}]})",
-      "/v1/messages");
+  const RequestAttributes attrs =
+      extract(ApiProtocol::AnthropicMessages,
+              R"({"model":"claude-opus-5","max_tokens":"lots","messages":[{"role":"user"}]})",
+              "/v1/messages");
   EXPECT_EQ(attrs.model, "claude-opus-5");
   EXPECT_FALSE(attrs.max_output_tokens.has_value());
   EXPECT_EQ(attrs.message_count, 1u);
   EXPECT_TRUE(attrs.malformed);
 }
 
-// A model offloaded to the external buffer is not readable from the index.
 TEST(RequestInfoExtractorTest, OffloadedModelReadsAsAbsentAndFlags) {
   nlohmann::json json = parse(R"({"messages":[]})");
   json["model"] = JsonWithExtBuf::makeExternalRef(JsonWithExtBuf::ExternalRef{10, 20});

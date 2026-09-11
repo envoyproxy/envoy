@@ -29,9 +29,7 @@ constexpr absl::string_view DefaultMetadataNamespace{"envoy.ai.request_info"};
 envoy::data::ai::v3::RequestInfo toProto(const RequestAttributes& attrs) {
   envoy::data::ai::v3::RequestInfo typed;
   typed.set_api_protocol(HttpFilters::AiProtocolManager::protocolToProto(attrs.api_protocol));
-  if (!attrs.model.empty()) {
-    typed.set_model(attrs.model);
-  }
+  typed.set_model(attrs.model);
   if (attrs.stream.has_value()) {
     typed.mutable_stream()->set_value(attrs.stream.value());
   }
@@ -44,8 +42,6 @@ envoy::data::ai::v3::RequestInfo toProto(const RequestAttributes& attrs) {
   if (attrs.tool_count.has_value()) {
     typed.mutable_tool_count()->set_value(attrs.tool_count.value());
   }
-  typed.set_extraction_status(attrs.malformed ? envoy::data::ai::v3::RequestInfo::PARTIAL
-                                              : envoy::data::ai::v3::RequestInfo::COMPLETE);
   return typed;
 }
 
@@ -80,8 +76,8 @@ void RequestInfoFilter::publish(const nlohmann::json& json) {
     return;
   }
 
-  const RequestAttributes attrs = extractRequestAttributes(
-      context_.request_protocol, json, context_.request_headers.getPathValue());
+  const RequestAttributes attrs = extractRequestAttributes(context_.request_protocol, json,
+                                                           context_.request_headers.getPathValue());
   Protobuf::Any typed_any;
   MessageUtil::packFrom(typed_any, toProto(attrs));
   stream_info.setDynamicTypedMetadata(config_->metadataNamespace(), typed_any);
@@ -90,8 +86,7 @@ void RequestInfoFilter::publish(const nlohmann::json& json) {
   if (attrs.malformed) {
     config_->stats().partial_.inc();
   }
-  ENVOY_LOG(trace, "request_info: {} record published to namespace {}",
-            attrs.malformed ? "partial" : "complete", config_->metadataNamespace());
+  ENVOY_LOG(trace, "request_info: published to namespace {}", config_->metadataNamespace());
 }
 
 } // namespace RequestInfo

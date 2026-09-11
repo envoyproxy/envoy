@@ -40,7 +40,6 @@ using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 
 constexpr absl::string_view DefaultNamespace = "envoy.ai.request_info";
 
-// Runs the filter in a real FilterManager chain over a real StreamInfo.
 class RequestInfoFilterTest : public testing::Test {
 public:
   RequestInfoFilterTest()
@@ -57,19 +56,18 @@ public:
     return std::make_shared<const RequestInfoFilterConfig>(proto, *stats_store_.rootScope());
   }
 
-  // Runs one request through the chain and returns the replayed body.
+  // Returns the replayed body.
   std::string run(const std::string& payload, ApiProtocol protocol,
                   absl::string_view path = "/v1/chat/completions",
                   RequestInfoFilterConfigSharedPtr config = nullptr) {
     request_headers_ =
         Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", std::string(path)}};
-    context_ = std::make_unique<AiFilterContext>(
-        AiFilterContext{stream_info_, request_headers_, protocol});
     JsonWithExtBuf doc;
     doc.setJson(nlohmann::json::parse(payload));
     std::vector<AiFilterPtr> filters;
     filters.push_back(std::make_unique<RequestInfoFilter>(
-        config != nullptr ? std::move(config) : makeConfig(), *context_));
+        config != nullptr ? std::move(config) : makeConfig(),
+        AiFilterContext{stream_info_, request_headers_, protocol}));
     FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
                           stream_info_);
 
@@ -113,7 +111,6 @@ public:
   StreamInfo::StreamInfoImpl stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   Http::TestRequestHeaderMapImpl request_headers_;
-  std::unique_ptr<AiFilterContext> context_;
 };
 
 TEST_F(RequestInfoFilterTest, PublishesTypedRecordAndForwardsPayloadUnchanged) {
@@ -132,7 +129,6 @@ TEST_F(RequestInfoFilterTest, PublishesTypedRecordAndForwardsPayloadUnchanged) {
   EXPECT_EQ(record->max_output_tokens().value(), 64);
   EXPECT_EQ(record->message_count().value(), 1);
   EXPECT_EQ(record->tool_count().value(), 1);
-  EXPECT_EQ(record->extraction_status(), envoy::data::ai::v3::RequestInfo::COMPLETE);
   // Only typed metadata is published: no untyped mirror.
   EXPECT_TRUE(stream_info_.dynamicMetadata().filter_metadata().empty());
   EXPECT_EQ(counterValue("published"), 1);
@@ -150,7 +146,6 @@ TEST_F(RequestInfoFilterTest, AbsentAttributesAreLeftUnset) {
   EXPECT_FALSE(record->has_max_output_tokens());
   EXPECT_EQ(record->message_count().value(), 0);
   EXPECT_FALSE(record->has_tool_count());
-  EXPECT_EQ(record->extraction_status(), envoy::data::ai::v3::RequestInfo::COMPLETE);
 }
 
 TEST_F(RequestInfoFilterTest, FlagsPartialWhenAnAttributeIsUnusable) {
@@ -159,7 +154,6 @@ TEST_F(RequestInfoFilterTest, FlagsPartialWhenAnAttributeIsUnusable) {
   ASSERT_TRUE(record.has_value());
   EXPECT_TRUE(record->model().empty());
   EXPECT_TRUE(record->stream().value());
-  EXPECT_EQ(record->extraction_status(), envoy::data::ai::v3::RequestInfo::PARTIAL);
   EXPECT_EQ(counterValue("published"), 1);
   EXPECT_EQ(counterValue("partial"), 1);
 }
@@ -175,7 +169,6 @@ TEST_F(RequestInfoFilterTest, ReadsGeminiTargetFromRequestPath) {
   EXPECT_TRUE(record->stream().value());
   EXPECT_EQ(record->max_output_tokens().value(), 32);
   EXPECT_EQ(record->message_count().value(), 1);
-  EXPECT_EQ(record->extraction_status(), envoy::data::ai::v3::RequestInfo::COMPLETE);
 }
 
 TEST_F(RequestInfoFilterTest, UnspecifiedProtocolPublishesSharedAttributesOnly) {
@@ -188,7 +181,6 @@ TEST_F(RequestInfoFilterTest, UnspecifiedProtocolPublishesSharedAttributesOnly) 
   EXPECT_FALSE(record->stream().value());
   EXPECT_FALSE(record->has_max_output_tokens());
   EXPECT_FALSE(record->has_message_count());
-  EXPECT_EQ(record->extraction_status(), envoy::data::ai::v3::RequestInfo::COMPLETE);
 }
 
 TEST_F(RequestInfoFilterTest, PublishesUnderConfiguredNamespace) {
@@ -199,7 +191,6 @@ TEST_F(RequestInfoFilterTest, PublishesUnderConfiguredNamespace) {
   EXPECT_EQ(published("custom.ns")->model(), "m");
 }
 
-// Two manager installations on one stream: the existing record wins.
 TEST_F(RequestInfoFilterTest, FirstWriterOwnsTheNamespace) {
   envoy::data::ai::v3::RequestInfo existing;
   existing.set_model("first");

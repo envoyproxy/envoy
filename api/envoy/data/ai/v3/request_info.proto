@@ -19,56 +19,26 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: AI request info]
 
-// Request attributes extracted from an AI request payload by the
-// :ref:`request info AI filter
-// <envoy_v3_api_msg_extensions.filters.ai.request_info.v3.RequestInfo>` of the
-// :ref:`AI Protocol Manager filter <config_http_filters_ai_protocol_manager>`
-// and published as typed dynamic metadata. It is the request-side counterpart
-// of :ref:`TokenUsage <envoy_v3_api_msg_data.ai.v3.TokenUsage>`. All values
-// are client-declared and unverified. Every attribute is optional; one that is
-// present but unusable (wrong type, out of range, or a string over 256 bytes)
-// reads as absent and marks the record ``PARTIAL``.
-// [#next-free-field: 8]
+// Request attributes published as typed dynamic metadata by the :ref:`request info AI
+// filter <envoy_v3_api_msg_extensions.filters.ai.request_info.v3.RequestInfo>`. Values are
+// client-declared and unverified; a present but unusable value reads as absent.
+// [#next-free-field: 7]
 message RequestInfo {
-  enum ExtractionStatus {
-    EXTRACTION_STATUS_UNSPECIFIED = 0;
-
-    // Every known attribute present in the payload was usable.
-    COMPLETE = 1;
-
-    // At least one known attribute was present but unusable; the attributes
-    // that are present remain reliable.
-    PARTIAL = 2;
-  }
-
-  // The route's declared wire API. ``API_PROTOCOL_UNSPECIFIED`` means the
-  // route declared an AI endpoint without naming its API; only the shared
-  // top-level ``model`` and ``stream`` are read then.
+  // The route's declared wire API. When unspecified, only ``model`` and ``stream`` are read.
   type.ai.v3.ApiProtocol api_protocol = 1;
 
-  // The payload's top-level ``model``, or, for Gemini, the model segment of
-  // the request path. Empty when absent.
+  // The requested model; for Gemini, taken from the request path.
   string model = 2;
 
-  // The payload's ``stream`` flag, or, for Gemini, whether the request path's
-  // operation is ``streamGenerateContent``. Absent when the request did not say.
+  // Whether a streamed response was requested; for Gemini, taken from the request path.
   google.protobuf.BoolValue stream = 3;
 
-  // The output token cap the request declares: ``max_completion_tokens`` (or
-  // ``max_tokens``) for OpenAI Chat Completions, ``max_output_tokens`` for
-  // OpenAI Responses, ``max_tokens`` for Anthropic Messages, and
-  // ``generationConfig.maxOutputTokens`` (camelCase or snake_case) for Gemini.
-  // Absent when not declared.
+  // The requested output token cap.
   google.protobuf.UInt64Value max_output_tokens = 4;
 
-  // Number of direct elements in the conversation array: ``messages`` for
-  // OpenAI Chat Completions and Anthropic Messages, ``input`` for OpenAI
-  // Responses (a string ``input`` counts as one), ``contents`` for Gemini.
+  // Number of messages in the conversation.
   google.protobuf.UInt32Value message_count = 5;
 
-  // Number of direct elements in the ``tools`` array.
+  // Number of tools declared.
   google.protobuf.UInt32Value tool_count = 6;
-
-  // Quality of the extracted record.
-  ExtractionStatus extraction_status = 7;
 }

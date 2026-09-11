@@ -16,8 +16,7 @@ AiProtocolManagerFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
         proto_config,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  // One factory is shared by every stream on the chain. The in-memory
-  // implementation is stateless, so a single shared instance is safe.
+  // Stateless, so one instance is shared by every stream on the chain.
   auto buffer_factory = std::make_shared<InMemoryExternalBufferFactory>();
   absl::StatusOr<FilterConfigSharedPtr> config =
       FilterConfig::create(proto_config, context, extra_context.scopeOr(context));

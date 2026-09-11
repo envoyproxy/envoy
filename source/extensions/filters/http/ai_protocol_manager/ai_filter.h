@@ -29,7 +29,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// Callable awaitable that delivers the `AiRequest` to a filter. Callable on r-value only.
+// Delivers the `AiRequest` to a filter; callable once.
 class AiRequestReceiver {
 public:
   using Impl = absl::AnyInvocable<Coroutine::Task<absl::StatusOr<AiRequestPtr>>() &&>;
@@ -52,15 +52,13 @@ private:
   Impl impl_;
 };
 
-// Callable awaitable that forwards the `AiRequest` to the next filter in the chain. Callable on
-// r-value only.
+// Forwards the `AiRequest` to the next filter in the chain; callable once.
 class AiRequestPropagator {
 public:
   using Impl = absl::AnyInvocable<Coroutine::Task<absl::Status>(AiRequestPtr) &&>;
 
   explicit AiRequestPropagator(Impl impl) : impl_(std::move(impl)) {}
 
-  // Forwards the request index without requesting field streaming.
   Coroutine::Task<absl::Status> operator()(AiRequestPtr req) && {
     if (!valid()) {
       IS_ENVOY_BUG("AiRequestPropagator invoked on an invalid or already moved instance");
@@ -71,8 +69,7 @@ public:
     co_return co_await std::move(impl)(std::move(req));
   }
 
-  // TODO(penguingao): Add overload accepting FieldStreamInterest when field streaming is
-  // introduced.
+  // TODO(penguingao): Add an overload accepting FieldStreamInterest for field streaming.
 
   bool valid() const { return impl_ != nullptr; }
 
@@ -80,16 +77,14 @@ private:
   Impl impl_;
 };
 
-// Callable callback to send an immediate HTTP local reply and abort processing.
+// Sends an immediate local reply and aborts processing.
 using LocalReplier = absl::AnyInvocable<void(Http::Code code, std::string details) &&>;
 
-// Abstract interface implemented by AI filter instances.
 class AiFilter {
 public:
   virtual ~AiFilter() = default;
 
   // Invoked when an AI request arrives.
-  // Returns absl::OkStatus() on normal completion, or an error status on failure.
   virtual Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
                                                AiRequestPropagator propagate_request,
                                                LocalReplier reply_locally) = 0;
@@ -97,7 +92,7 @@ public:
 
 using AiFilterPtr = std::unique_ptr<AiFilter>;
 
-// Per-stream inputs for an AI filter. Copyable; the references outlive the stream's filters.
+// A filter must copy this rather than keep the reference; its referents outlive the filters.
 struct AiFilterContext {
   StreamInfo::StreamInfo& stream_info;
   const Http::RequestHeaderMap& request_headers;
@@ -109,12 +104,12 @@ struct AiFilterContext {
 using AiFilterFactoryCb = std::function<AiFilterPtr(const AiFilterContext& context)>;
 using AiFilterFactories = std::vector<AiFilterFactoryCb>;
 
-// Extension point behind RequestHandling.filters (category "envoy.filters.ai").
+// Extension point behind RequestHandling.filters.
 class AiFilterConfigFactory : public Config::TypedFactory {
 public:
   ~AiFilterConfigFactory() override = default;
 
-  // `scope` is the AI Protocol Manager's stats scope.
+  // `scope` is the scope the AI Protocol Manager was created with, without its prefix.
   virtual absl::StatusOr<AiFilterFactoryCb>
   createAiFilterFactory(const Protobuf::Message& config,
                         Server::Configuration::ServerFactoryContext& context,

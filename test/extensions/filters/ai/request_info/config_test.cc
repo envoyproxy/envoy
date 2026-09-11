@@ -30,8 +30,8 @@ TEST(RequestInfoConfigTest, IsRegistered) {
       Registry::FactoryRegistry<AiFilterConfigFactory>::getFactory("envoy.filters.ai.request_info");
   ASSERT_NE(factory, nullptr);
   EXPECT_EQ(factory->category(), "envoy.filters.ai");
-  EXPECT_THAT(factory, testing::WhenDynamicCastTo<RequestInfoFilterConfigFactory*>(
-                           testing::NotNull()));
+  EXPECT_THAT(factory,
+              testing::WhenDynamicCastTo<RequestInfoFilterConfigFactory*>(testing::NotNull()));
 }
 
 TEST(RequestInfoConfigTest, CreatesFilterFromEmptyConfig) {

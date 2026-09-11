@@ -269,6 +269,7 @@ envoy_cc_library(
         ":schema_lib",
         ":serializer_lib",
         ":stats_lib",
+        "//envoy/common:exception_lib",
         "//envoy/http:codes_interface",
         "//envoy/router:router_interface",
         "//envoy/server:factory_context_interface",

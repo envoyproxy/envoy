@@ -14,8 +14,6 @@ namespace Extensions {
 namespace AiFilters {
 namespace RequestInfo {
 
-// What a request asks for. `malformed` marks a known attribute that was present
-// but unusable and therefore reads as absent.
 struct RequestAttributes {
   HttpFilters::AiProtocolManager::ApiProtocol api_protocol{
       HttpFilters::AiProtocolManager::ApiProtocol::Unspecified};
@@ -24,11 +22,11 @@ struct RequestAttributes {
   std::optional<uint64_t> max_output_tokens;
   std::optional<uint32_t> message_count;
   std::optional<uint32_t> tool_count;
+  // Set when a present attribute was unusable and so reads as absent.
   bool malformed{false};
 };
 
-// Reads `json` as a `protocol` request. `path` is the request :path, which is
-// where Gemini names the model and the streaming operation.
+// `path` is the request :path, where Gemini names the model and the streaming operation.
 RequestAttributes extractRequestAttributes(HttpFilters::AiProtocolManager::ApiProtocol protocol,
                                            const nlohmann::json& json, absl::string_view path);
 

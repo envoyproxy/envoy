@@ -24,7 +24,6 @@ TEST(ReadStringTest, ReadsUsableValues) {
   EXPECT_FALSE(malformed);
 }
 
-// Absent, null and empty are all "the request did not say", not a defect.
 TEST(ReadStringTest, BenignlyAbsentValuesDoNotFlag) {
   for (const std::string json : {"{}", R"({"k":null})", R"({"k":""})"}) {
     bool malformed = false;
@@ -46,7 +45,6 @@ TEST(ReadStringTest, UnusableValuesReadAsAbsentAndFlag) {
   EXPECT_TRUE(malformed);
 }
 
-// An offloaded string is a binary node, so it is not readable from the index.
 TEST(ReadStringTest, ExternalReferenceReadsAsAbsentAndFlags) {
   nlohmann::json json = parse("{}");
   json["k"] = JsonWithExtBuf::makeExternalRef(JsonWithExtBuf::ExternalRef{10, 20});
@@ -55,8 +53,6 @@ TEST(ReadStringTest, ExternalReferenceReadsAsAbsentAndFlags) {
   EXPECT_TRUE(malformed);
 }
 
-// The overload reads the same value; only the diagnostic differs, which is what
-// keeps a response-path shape probe from flagging an unrelated document.
 TEST(ReadStringTest, OverloadWithoutFlagReadsIdenticalValues) {
   EXPECT_EQ(readString(parse(R"({"k":"v"})"), "k"), "v");
   for (const std::string json : {"{}", R"({"k":null})", R"({"k":""})", R"({"k":42})"}) {
@@ -88,12 +84,10 @@ TEST(ReadArrayLengthTest, CountsElementsWithoutValidatingThem) {
   EXPECT_TRUE(malformed);
 }
 
-// Null is a documented "unset" on the request path and a defect on the response
-// path, so the caller picks.
 TEST(ReadCountTest, NullPolicyDecidesWhetherNullIsMalformed) {
   bool malformed = false;
-  EXPECT_FALSE(readCount(parse(R"({"k":null})"), "k", malformed, NullPolicy::AllowNullAsAbsent)
-                   .has_value());
+  EXPECT_FALSE(
+      readCount(parse(R"({"k":null})"), "k", malformed, NullPolicy::AllowNullAsAbsent).has_value());
   EXPECT_FALSE(malformed);
 
   EXPECT_FALSE(readCount(parse(R"({"k":null})"), "k", malformed).has_value());
