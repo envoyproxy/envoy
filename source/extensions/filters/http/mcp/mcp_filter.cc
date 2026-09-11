@@ -352,7 +352,7 @@ bool McpFilter::needsBody() const {
   // Mcp-Method and Mcp-Name header semantics are only defined for the
   // new protocol. Legacy requests fall back to body parsing even when
   // attribute_source is HEADERS.
-  if (!shouldUseNewSpecSemantics()) {
+  if (!use_new_spec_semantics_) {
     return true;
   }
 
@@ -431,13 +431,15 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
     }
   }
 
-  if (protocol_version_headers.empty() && shouldUseNewSpecSemantics()) {
+  use_new_spec_semantics_ = shouldUseNewSpecSemantics();
+
+  if (protocol_version_headers.empty() && use_new_spec_semantics_) {
     config_->stats().header_mismatch_.inc();
     sendHeaderMismatchReply("Missing required MCP-Protocol-Version header");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  if (shouldUseNewSpecSemantics()) {
+  if (use_new_spec_semantics_) {
     if (isValidMcpDeleteRequest(headers)) {
       sendMethodNotAllowedReply(
           absl::StrCat("MCP DELETE is not supported for protocol version ",
@@ -468,7 +470,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
   if (isValidMcpPostRequest(headers)) {
     is_json_post_request_ = true;
     ENVOY_LOG(debug, "valid MCP Post request");
-    if (shouldUseNewSpecSemantics() ||
+    if (use_new_spec_semantics_ ||
         config_->attributeSource() != envoy::extensions::filters::http::mcp::v3::Mcp::BODY) {
       const auto method_headers = headers.get(kMcpMethod);
       if (!method_headers.empty()) {
@@ -479,7 +481,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
       if (!name_headers.empty()) {
         const absl::string_view name_value = name_headers[0]->value().getStringView();
 
-        if (shouldUseNewSpecSemantics()) {
+        if (use_new_spec_semantics_) {
           const auto decoded_name = decodeMcpHeaderValue(name_value);
           if (!decoded_name.has_value()) {
             config_->stats().header_mismatch_.inc();
@@ -494,7 +496,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
       }
     }
 
-    if (shouldUseNewSpecSemantics()) {
+    if (use_new_spec_semantics_) {
       if (header_method_.empty()) {
         config_->stats().header_mismatch_.inc();
         sendHeaderMismatchReply("Missing required Mcp-Method header");
@@ -784,7 +786,7 @@ bool McpFilter::headerAttributesMatch() const {
 }
 
 bool McpFilter::verifyHeaderAttributes() const {
-  if (!shouldUseNewSpecSemantics()) {
+  if (!use_new_spec_semantics_) {
     return true;
   }
 
@@ -792,7 +794,7 @@ bool McpFilter::verifyHeaderAttributes() const {
 }
 
 McpFilter::ProtocolVersionValidationResult McpFilter::validateProtocolVersion() const {
-  if (!shouldUseNewSpecSemantics()) {
+  if (!use_new_spec_semantics_) {
     return ProtocolVersionValidationResult::Ok;
   }
 
