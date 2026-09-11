@@ -1876,10 +1876,17 @@ void ConnectionImpl::onProtocolConstraintViolation() {
 }
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
-  // Notify the streams based on least recently encoding to the connection.
-  // NOLINTNEXTLINE(modernize-loop-convert)
+  // Snapshot the streams in least-recently-encoded order before invoking callbacks. A callback may
+  // encode on its stream and reorder active_streams_, invalidating the traversal. Stream deletion
+  // is deferred, so the pointers remain valid for the duration of this synchronous callback fanout.
+  std::vector<StreamImpl*> streams;
+  streams.reserve(active_streams_.size());
   for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
-    (*it)->runLowWatermarkCallbacks();
+    streams.push_back(it->get());
+  }
+
+  for (StreamImpl* stream : streams) {
+    stream->runLowWatermarkCallbacks();
   }
 }
 
