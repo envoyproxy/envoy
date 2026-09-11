@@ -146,9 +146,7 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, Upstream::HostS
   const uint32_t bit = 1u << checker_index;
 
   auto state_it = host_states_.find(host.get());
-  if (state_it == host_states_.end()) {
-    return;
-  }
+  ASSERT(state_it != host_states_.end());
   auto& state = state_it->second;
 
   const bool was_aggregate_failed = state.fail_bits != 0;

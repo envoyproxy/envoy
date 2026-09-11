@@ -339,7 +339,8 @@ public:
   }
   void start() override {}
 
-  void reportResult(const Upstream::HostSharedPtr& host, bool failed, bool degraded) {
+  void reportResult(const Upstream::HostSharedPtr& host, bool failed, bool degraded,
+                    bool pending = false) {
     if (failed) {
       flag_callbacks_.set(*host, Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
     } else {
@@ -350,7 +351,11 @@ public:
     } else {
       flag_callbacks_.clear(*host, Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC);
     }
-    flag_callbacks_.clear(*host, Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
+    if (pending) {
+      flag_callbacks_.set(*host, Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
+    } else {
+      flag_callbacks_.clear(*host, Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
+    }
 
     auto state = failed ? Upstream::HealthState::Unhealthy : Upstream::HealthState::Healthy;
     for (const auto& cb : callbacks_) {
@@ -498,6 +503,73 @@ TEST_F(MultiHealthCheckerDegradedTest, FailedAndDegradedCoexist) {
   checker_b->reportResult(host, false, false);
   EXPECT_FALSE(host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_FALSE(host->healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
+}
+
+// When the host starts with PENDING and only one sub-checker clears it,
+// the aggregate remains pending and callbacks are suppressed.
+TEST_F(MultiHealthCheckerDegradedTest, PendingToStillPendingNoCallback) {
+  setup();
+  auto host = Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  host->healthFlagSet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {host};
+  health_checker_->start();
+
+  ASSERT_EQ(2u, fake_factory_.instances_.size());
+  auto* checker_a = fake_factory_.instances_[0];
+  auto* checker_b = fake_factory_.instances_[1];
+
+  int callback_count = 0;
+  health_checker_->addHostCheckCompleteCb([&](const Upstream::HostSharedPtr&,
+                                              Upstream::HealthTransition,
+                                              Upstream::HealthState) { callback_count++; });
+
+  // Only checker_a reports success. checker_b is still pending.
+  checker_a->reportResult(host, false, false);
+
+  // Aggregate is still pending (checker_b hasn't reported), so no callback fires.
+  EXPECT_EQ(0, callback_count);
+  EXPECT_TRUE(host->healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC));
+
+  // Now checker_b reports, clearing the last pending bit.
+  checker_b->reportResult(host, false, false);
+  EXPECT_EQ(1, callback_count);
+  EXPECT_FALSE(host->healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC));
+}
+
+// A sub-checker reporting with PENDING still set keeps the pending bit for that checker.
+TEST_F(MultiHealthCheckerDegradedTest, CheckerReportsWithPendingSet) {
+  setup();
+  auto host = Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  host->healthFlagSet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {host};
+  health_checker_->start();
+
+  auto* checker_a = fake_factory_.instances_[0];
+  auto* checker_b = fake_factory_.instances_[1];
+
+  int callback_count = 0;
+  health_checker_->addHostCheckCompleteCb([&](const Upstream::HostSharedPtr&,
+                                              Upstream::HealthTransition,
+                                              Upstream::HealthState) { callback_count++; });
+
+  // checker_a reports but keeps its own pending flag set.
+  checker_a->reportResult(host, false, false, true);
+  EXPECT_EQ(0, callback_count);
+  EXPECT_TRUE(host->healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC));
+
+  // checker_b also reports with pending still set.
+  checker_b->reportResult(host, false, false, true);
+  EXPECT_EQ(0, callback_count);
+  EXPECT_TRUE(host->healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC));
+
+  // Now both clear pending.
+  checker_a->reportResult(host, false, false);
+  EXPECT_EQ(0, callback_count);
+  EXPECT_TRUE(host->healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC));
+
+  checker_b->reportResult(host, false, false);
+  EXPECT_EQ(1, callback_count);
+  EXPECT_FALSE(host->healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC));
 }
 
 } // namespace
