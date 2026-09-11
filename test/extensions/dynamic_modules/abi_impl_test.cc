@@ -124,6 +124,135 @@ TEST(CommonAbiImplTest, GetLogLevelReflectsConfiguredLevel) {
   logger.set_level(original_level);
 }
 
+// Sink delegate that records the spdlog source location of the last dynamic modules log record so
+// tests can assert the module-supplied location flows through to spdlog.
+class SourceLocationCapturingSink : public Logger::SinkDelegate {
+public:
+  explicit SourceLocationCapturingSink(Logger::DelegatingLogSinkSharedPtr log_sink)
+      : Logger::SinkDelegate(log_sink) {
+    setDelegate();
+  }
+  ~SourceLocationCapturingSink() override { restoreDelegate(); }
+
+  void log(absl::string_view msg, const spdlog::details::log_msg& log_msg) override {
+    previousDelegate()->log(msg, log_msg);
+    const absl::string_view logger_name(log_msg.logger_name.data(), log_msg.logger_name.size());
+    if (logger_name != "dynamic_modules") {
+      return;
+    }
+    captured_ = true;
+    filename_ = log_msg.source.filename == nullptr ? "" : std::string(log_msg.source.filename);
+    line_ = log_msg.source.line;
+    level_ = log_msg.level;
+    formatted_ = std::string(msg);
+  }
+  void flush() override { previousDelegate()->flush(); }
+
+  bool captured_{false};
+  std::string filename_;
+  int line_{0};
+  spdlog::level::level_enum level_{spdlog::level::off};
+  std::string formatted_;
+};
+
+// Verifies that the module-supplied source file and line are forwarded to spdlog for every level.
+TEST(CommonAbiImplTest, LogUsesModuleSuppliedSourceLocation) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "module log message";
+  const std::string file = "my_module.rs";
+  const std::pair<envoy_dynamic_module_type_log_level, spdlog::level::level_enum> cases[] = {
+      {envoy_dynamic_module_type_log_level_Trace, spdlog::level::trace},
+      {envoy_dynamic_module_type_log_level_Debug, spdlog::level::debug},
+      {envoy_dynamic_module_type_log_level_Info, spdlog::level::info},
+      {envoy_dynamic_module_type_log_level_Warn, spdlog::level::warn},
+      {envoy_dynamic_module_type_log_level_Error, spdlog::level::err},
+      {envoy_dynamic_module_type_log_level_Critical, spdlog::level::critical},
+  };
+  uint32_t line = 10;
+  for (const auto& [abi_level, spdlog_level] : cases) {
+    sink.captured_ = false;
+    envoy_dynamic_module_callback_log(abi_level, {message.data(), message.size()},
+                                      {file.data(), file.size()}, line);
+    EXPECT_TRUE(sink.captured_);
+    EXPECT_EQ(file, sink.filename_);
+    EXPECT_EQ(static_cast<int>(line), sink.line_);
+    EXPECT_EQ(spdlog_level, sink.level_);
+    EXPECT_NE(std::string::npos, sink.formatted_.find(message));
+    ++line;
+  }
+
+  logger.set_level(original_level);
+}
+
+// Verifies that a missing source file is handled without crashing and yields an empty spdlog
+// filename.
+TEST(CommonAbiImplTest, LogHandlesEmptySourceFile) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "no source file";
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info,
+                                    {message.data(), message.size()}, {nullptr, 0}, 0);
+  EXPECT_TRUE(sink.captured_);
+  EXPECT_EQ("", sink.filename_);
+
+  logger.set_level(original_level);
+}
+
+// Verifies that Off and out-of-range levels are dropped without reaching spdlog.
+TEST(CommonAbiImplTest, LogIgnoresOffAndOutOfRangeLevels) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "ignored";
+  const std::string file = "my_module.rs";
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Off,
+                                    {message.data(), message.size()}, {file.data(), file.size()},
+                                    1);
+  EXPECT_FALSE(sink.captured_);
+  // A value further outside the enum range would be undefined behavior to load, so use one past
+  // Off.
+  const auto out_of_range =
+      static_cast<envoy_dynamic_module_type_log_level>(envoy_dynamic_module_type_log_level_Off + 1);
+  envoy_dynamic_module_callback_log(out_of_range, {message.data(), message.size()},
+                                    {file.data(), file.size()}, 1);
+  EXPECT_FALSE(sink.captured_);
+
+  logger.set_level(original_level);
+}
+
+// Verifies that a message below the configured level is dropped while an enabled one is emitted
+// with the module-supplied location.
+TEST(CommonAbiImplTest, LogRespectsConfiguredLevel) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::err);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "level gated";
+  const std::string file = "my_module.rs";
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info,
+                                    {message.data(), message.size()}, {file.data(), file.size()},
+                                    1);
+  EXPECT_FALSE(sink.captured_);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Error,
+                                    {message.data(), message.size()}, {file.data(), file.size()},
+                                    42);
+  EXPECT_TRUE(sink.captured_);
+  EXPECT_EQ(file, sink.filename_);
+  EXPECT_EQ(42, sink.line_);
+
+  logger.set_level(original_level);
+}
+
 // =============================================================================
 // Function Registry Tests
 // =============================================================================

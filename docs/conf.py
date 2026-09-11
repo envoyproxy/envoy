@@ -98,11 +98,18 @@ def dockerhub_envoy_role(
     return [pnode], []
 
 
+def _blank_permalink_icon(app):
+    # sphinx_rtd_theme overwrites this with a Font Awesome glyph when it loads,
+    # after conf.py has run; the stylesheet draws the `#` itself.
+    app.config.html_permalinks_icon = ''
+
+
 def setup(app):
     app.add_config_value('release_level', '', 'env')
     app.add_config_value('substitutions', [], 'html')
     app.add_directive('substitution-code-block', SubstitutionCodeBlock)
     app.add_role('dockerhub_envoy', dockerhub_envoy_role)
+    app.connect('builder-inited', _blank_permalink_icon)
 
 
 missing_config = (
@@ -309,16 +316,6 @@ html_favicon = 'favicon.ico'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
-
-# A published copy of the docs knows its own version, but not what has been
-# released since it was built, so the version list cannot be baked in here.
-# Whoever assembles the site can inject it by overriding `envoy_versions` with
-# a list of {'name': ..., 'url': ...}; until then the menu degrades to a single
-# link to the version index.
-html_context = {
-    'envoy_versions': [],
-    'envoy_versions_url': '/docs/',
-}
 
 # envoy.css carries the design tokens and must load first; the component
 # modules below are listed separately so each is a parallel <link> rather than

@@ -38,6 +38,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
 
+using ExtAuthzDecisionProto = ExtAuthzDecisionObject::ExtAuthzDecisionProto;
+
 class ExtAuthzFilterTest : public testing::Test {
 public:
   void initialize(std::string yaml) {
@@ -148,6 +150,36 @@ grpc_service:
 failure_mode_allow: true
 stat_prefix: name
   )EOF";
+  // Drives the filter up to the point where the authorization service has been called and
+  // request_callbacks_ is armed, without completing the call.
+  void expectCheckStarted() {
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(addr_);
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(addr_);
+    EXPECT_CALL(*client_, check(_, _, _, _))
+        .WillOnce(
+            WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+              request_callbacks_ = &callbacks;
+            })));
+
+    EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+    Buffer::OwnedImpl data("hello");
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  }
+
+  void expectConnectionNotClosed() {
+    EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
+    EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+    EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setResponseFlag(_)).Times(0);
+    EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setResponseCodeDetails(_)).Times(0);
+  }
+
+  const ExtAuthzDecisionObject* extAuthzDecision() {
+    return filter_callbacks_.connection_.stream_info_.filterState()
+        ->getDataReadOnly<ExtAuthzDecisionObject>(NetworkFilterNames::get().ExtAuthorization);
+  }
+
   const std::string metadata_yaml_string_ = R"EOF(
 grpc_service:
   envoy_grpc:
@@ -161,6 +193,14 @@ filter_enabled_metadata:
   value:
     string_match:
       exact: "check"
+  )EOF";
+  const std::string shadow_yaml_string_ = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: ext_authz_server
+
+shadow_mode: true
+stat_prefix: name
   )EOF";
 };
 
@@ -783,6 +823,303 @@ TEST_F(ExtAuthzFilterTest, NoMetadataContextNamespaces) {
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
+}
+
+// Shadow mode tests. With shadow_mode enabled the filter never closes the connection. It records
+// the authorization decision in FilterState and releases the buffered data to the filter chain.
+
+// Verifies that the decision is stored under the filter's canonical name, independent of
+// stat_prefix, so the key does not vary per filter instance.
+TEST_F(ExtAuthzFilterTest, ShadowModeFilterStateKeyIsFilterName) {
+  initialize(shadow_yaml_string_);
+
+  expectCheckStarted();
+  expectConnectionNotClosed();
+  EXPECT_CALL(filter_callbacks_, continueReading());
+
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
+
+  EXPECT_NE(nullptr, filter_callbacks_.connection_.stream_info_.filterState()
+                         ->getDataReadOnly<ExtAuthzDecisionObject>(
+                             NetworkFilterNames::get().ExtAuthorization));
+}
+
+// Verifies that a denied response records the decision and leaves the connection open.
+TEST_F(ExtAuthzFilterTest, ShadowModeDeniedDoesNotCloseConnection) {
+  initialize(shadow_yaml_string_);
+
+  expectCheckStarted();
+  expectConnectionNotClosed();
+  EXPECT_CALL(filter_callbacks_, continueReading());
+
+  auto response = makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied);
+  response->status_code = Http::Code::Forbidden;
+  request_callbacks_->onComplete(std::move(response));
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
+  ASSERT_NE(nullptr, decision);
+  EXPECT_EQ(ExtAuthzDecisionProto::DENIED, decision->checkResult());
+  EXPECT_EQ(403U, decision->statusCode());
+
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+}
+
+// Verifies that an error response is recorded and allowed through even though failure_mode_allow
+// is not set.
+TEST_F(ExtAuthzFilterTest, ShadowModeErrorDoesNotCloseConnection) {
+  initialize(shadow_yaml_string_);
+
+  expectCheckStarted();
+  expectConnectionNotClosed();
+  EXPECT_CALL(filter_callbacks_, continueReading());
+
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
+  ASSERT_NE(nullptr, decision);
+  EXPECT_EQ(ExtAuthzDecisionProto::ERROR, decision->checkResult());
+  // The authorization service returned no status code, so none is recorded.
+  EXPECT_EQ(0U, decision->statusCode());
+
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+}
+
+// Verifies that an OK response records the decision and still emits dynamic metadata.
+TEST_F(ExtAuthzFilterTest, ShadowModeOkRecordsDecision) {
+  initialize(shadow_yaml_string_);
+
+  expectCheckStarted();
+  expectConnectionNotClosed();
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _));
+  EXPECT_CALL(filter_callbacks_, continueReading());
+
+  auto response = makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK);
+  (*response->dynamic_metadata.mutable_fields())["foo"] = ValueUtil::stringValue("bar");
+  request_callbacks_->onComplete(std::move(response));
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
+  ASSERT_NE(nullptr, decision);
+  EXPECT_EQ(ExtAuthzDecisionProto::OK, decision->checkResult());
+  // The filter authorizes TCP connections and sends no response of its own, so no status code is
+  // recorded for OK.
+  EXPECT_EQ(0U, decision->statusCode());
+
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
+// Verifies that shadow mode takes precedence over failure_mode_allow, so the fail-open counter
+// stays untouched.
+TEST_F(ExtAuthzFilterTest, ShadowModeErrorWithFailureModeAllow) {
+  const std::string yaml = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: ext_authz_server
+
+failure_mode_allow: true
+shadow_mode: true
+stat_prefix: name
+  )EOF";
+  initialize(yaml);
+
+  expectCheckStarted();
+  expectConnectionNotClosed();
+  EXPECT_CALL(filter_callbacks_, continueReading());
+
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
+
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
+  ASSERT_NE(nullptr, decision);
+  EXPECT_EQ(ExtAuthzDecisionProto::ERROR, decision->checkResult());
+
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
+// Verifies that no TLS alert is sent on a denial in shadow mode, since the connection stays open.
+TEST_F(ExtAuthzFilterTest, ShadowModeDeniedSendsNoTlsAlert) {
+  const std::string yaml = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: ext_authz_server
+
+send_tls_alert_on_denial: true
+shadow_mode: true
+stat_prefix: name
+  )EOF";
+  initialize(yaml);
+
+  expectCheckStarted();
+  expectConnectionNotClosed();
+  EXPECT_CALL(filter_callbacks_, continueReading());
+
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
+
+  ASSERT_NE(nullptr, extAuthzDecision());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
+// Verifies that an on stack denied response records the decision without calling continueReading,
+// and that the filter chain resumes on the next onData().
+TEST_F(ExtAuthzFilterTest, ShadowModeImmediateDenied) {
+  initialize(shadow_yaml_string_);
+
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
+  expectConnectionNotClosed();
+  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
+          })));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
+  ASSERT_NE(nullptr, decision);
+  EXPECT_EQ(ExtAuthzDecisionProto::DENIED, decision->checkResult());
+
+  EXPECT_CALL(*client_, cancel()).Times(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
+// Verifies that a filter disabled by metadata records no decision, since no check was made.
+TEST_F(ExtAuthzFilterTest, ShadowModeDisabledFilterRecordsNoDecision) {
+  const std::string yaml = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: ext_authz_server
+
+shadow_mode: true
+stat_prefix: name
+filter_enabled_metadata:
+  filter: "abc.xyz"
+  path:
+  - key: "k1"
+  value:
+    string_match:
+      exact: "check"
+  )EOF";
+  initialize(yaml);
+
+  const std::string metadata_yaml = R"EOF(
+  filter_metadata:
+    abc.xyz:
+      k1: skip
+  )EOF";
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
+  ON_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(metadata));
+
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  EXPECT_EQ(nullptr, extAuthzDecision());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.disabled").value());
+}
+
+// Verifies that with shadow_mode unset the filter closes the connection as before and records no
+// decision.
+TEST_F(ExtAuthzFilterTest, ShadowModeUnsetPreservesEnforcement) {
+  initialize(default_yaml_string_);
+
+  expectCheckStarted();
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
+  EXPECT_CALL(
+      filter_callbacks_.connection_.stream_info_,
+      setResponseCodeDetails(Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied));
+  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
+
+  EXPECT_EQ(nullptr, extAuthzDecision());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
+// Verifies the FilterState serializations that access log formatters and CEL expressions read.
+TEST_F(ExtAuthzFilterTest, ShadowModeDecisionSerialization) {
+  initialize(shadow_yaml_string_);
+
+  expectCheckStarted();
+  expectConnectionNotClosed();
+  EXPECT_CALL(filter_callbacks_, continueReading());
+
+  auto response = makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied);
+  response->status_code = Http::Code::Unauthorized;
+  request_callbacks_->onComplete(std::move(response));
+
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
+  ASSERT_NE(nullptr, decision);
+
+  const auto json = decision->serializeAsString();
+  ASSERT_TRUE(json.has_value());
+  ExtAuthzDecisionProto from_json;
+  TestUtility::loadFromJson(json.value(), from_json);
+  EXPECT_EQ(ExtAuthzDecisionProto::DENIED, from_json.check_result());
+  EXPECT_EQ(401U, from_json.status_code());
+
+  const ProtobufTypes::MessagePtr proto = decision->serializeAsProto();
+  ASSERT_NE(nullptr, proto);
+  EXPECT_TRUE(TestUtility::protoEqual(from_json, *proto));
+
+  EXPECT_TRUE(decision->hasFieldSupport());
+  EXPECT_EQ("DENIED", absl::get<absl::string_view>(decision->getField("check_result")));
+  EXPECT_EQ(401, absl::get<int64_t>(decision->getField("status_code")));
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(decision->getField("unknown")));
+}
+
+// Verifies that an OK decision exposes no status code through either serialization.
+TEST_F(ExtAuthzFilterTest, ShadowModeOkSerializationOmitsStatusCode) {
+  initialize(shadow_yaml_string_);
+
+  expectCheckStarted();
+  expectConnectionNotClosed();
+  EXPECT_CALL(filter_callbacks_, continueReading());
+
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
+
+  const ExtAuthzDecisionObject* decision = extAuthzDecision();
+  ASSERT_NE(nullptr, decision);
+
+  const auto json = decision->serializeAsString();
+  ASSERT_TRUE(json.has_value());
+  ExtAuthzDecisionProto from_json;
+  TestUtility::loadFromJson(json.value(), from_json);
+  EXPECT_EQ(ExtAuthzDecisionProto::OK, from_json.check_result());
+  EXPECT_EQ(0U, from_json.status_code());
+
+  EXPECT_EQ("OK", absl::get<absl::string_view>(decision->getField("check_result")));
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(decision->getField("status_code")));
 }
 
 } // namespace ExtAuthz

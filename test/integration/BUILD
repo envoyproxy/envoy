@@ -728,6 +728,50 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http2_integration_test",
+    size = "large",
+    srcs = [
+        "http2_integration_test.cc",
+    ],
+    rbe_pool = "linux_x64_medium",
+    shard_count = 10,
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        ":socket_interface_swap_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//test/integration/filters:encode1xx_local_reply_config_lib",
+        "//test/integration/filters:local_reply_during_decoding_filter_lib",
+        "//test/integration/filters:local_reply_during_encoding_filter_lib",
+        "//test/integration/filters:metadata_control_filter_lib",
+        "//test/integration/filters:metadata_stop_all_filter_config_lib",
+        "//test/integration/filters:on_local_reply_filter_config_lib",
+        "//test/integration/filters:request_metadata_filter_config_lib",
+        "//test/integration/filters:response_metadata_filter_config_lib",
+        "//test/integration/filters:send_goaway_filter_lib",
+        "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
+        "//test/integration/filters:set_response_code_filter_lib",
+        "//test/integration/filters:stop_in_headers_continue_in_data_filter_lib",
+        "//test/integration/filters:stop_iteration_and_continue",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/upstream:retry_priority_factory_mocks",
+        "//test/mocks/upstream:retry_priority_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/synchronization",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "shadow_policy_integration_test",
     size = "large",
     srcs = ["shadow_policy_integration_test.cc"],
@@ -1247,6 +1291,7 @@ envoy_cc_test_library(
         ":test_host_predicate_lib",
         "//envoy/event:timer_interface",
         "//source/common/common:thread_annotations",
+        "//source/common/http:header_utility_lib",
         "//source/common/network:socket_option_lib",
         "//source/common/tls:context_lib",
         "//source/extensions/filters/http/router:config",

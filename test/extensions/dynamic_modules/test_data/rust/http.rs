@@ -87,6 +87,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "destroy_logging" => Some(Box::new(DestroyLoggingFilterConfig {})),
     "socket_option_callbacks" => Some(Box::new(SocketOptionCallbacksFilterConfig {})),
     "span_callbacks" => Some(Box::new(SpanCallbacksFilterConfig {})),
+    "span_across_callbacks" => Some(Box::new(SpanAcrossCallbacksFilterConfig {})),
     "cluster_callbacks" => Some(Box::new(ClusterCallbacksFilterConfig {})),
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
@@ -757,6 +758,47 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SpanCallbacksFilter {
     }
     envoy_filter.set_request_header("x-span-callbacks", b"true");
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
+
+struct SpanAcrossCallbacksFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SpanAcrossCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(SpanAcrossCallbacksFilter {
+      child_span: RefCell::new(None),
+    })
+  }
+}
+
+/// Spawns a child span in on_request_headers, keeps it, and finishes it in on_request_trailers to
+/// show that a span can outlive the event hook that created it.
+struct SpanAcrossCallbacksFilter {
+  child_span: RefCell<Option<Box<dyn EnvoyChildSpan>>>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SpanAcrossCallbacksFilter {
+  fn on_request_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    if let Some(span) = envoy_filter.get_active_span() {
+      *self.child_span.borrow_mut() = span.spawn_child("child");
+    }
+    envoy_filter.set_request_header("x-span-stored", b"true");
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_request_trailers(
+    &self,
+    _envoy_filter: &mut EHF,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
+    if let Some(mut child) = self.child_span.borrow_mut().take() {
+      child.set_tag("child-key", "child-value");
+      child.finish();
+    }
+    abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
   }
 }
 

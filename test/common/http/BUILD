@@ -514,11 +514,23 @@ envoy_cc_fuzz_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "header_formatter_test_lib",
+    hdrs = ["header_formatter_test_utils.h"],
+    deps = [
+        "//envoy/http:header_formatter_interface",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        ":header_formatter_test_lib",
+        "//envoy/http:header_formatter_interface",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
@@ -526,6 +538,8 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
