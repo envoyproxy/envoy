@@ -1,6 +1,8 @@
 // Changing the default behavior of ext_authz is generally not allowed. While you may add tests, you
 // generally should not change or remove existing tests.
 
+#include <atomic>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
@@ -905,7 +907,9 @@ TEST_F(ExtAuthzFilterGrpcTest, GrpcClientFactoryPerRouteGrpcServiceOverride) {
   FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_proto);
 
   auto mock_per_route_grpc_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
-  bool per_route_cluster_requested = false;
+  // `runOnAllWorkersBlocking()` below releases every worker into the body at once, so this is
+  // written concurrently from all of them.
+  std::atomic<bool> per_route_cluster_requested{false};
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
               getOrCreateRawAsyncClientWithHashKey(_, _, true))
       .WillRepeatedly(

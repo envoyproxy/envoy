@@ -5678,8 +5678,6 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
 TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseData) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream", "true");
 
   useAccessLog("%DURATION% %ROUNDTRIP_DURATION% %REQUEST_DURATION% %REQUEST_TX_DURATION% "
                "%RESPONSE_DURATION% %RESPONSE_TX_DURATION%");
