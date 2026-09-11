@@ -33,12 +33,24 @@ namespace Tls {
 
 using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
 
+// Forward declared to keep this header independent of default_validator.h; only
+// `shared_ptr`s to it are held below, which does not require a complete type.
+struct CaCertList;
+
 struct SpiffeData {
   // Mapping for "peer trust domain" -> "local trust domain" -> certificate.
   absl::flat_hash_map<std::string,
                       absl::flat_hash_map<std::string, CSmartPtr<X509_STORE, X509_STORE_free>>>
       trust_bundle_stores_;
   std::vector<bssl::UniquePtr<X509>> ca_certs_;
+  // Pins the shared parsed-CA cache entries backing `ca_certs_` and the stores
+  // above, so that a trust domain or a validator configured later with identical
+  // trust bundle content reuses them instead of parsing the PEM again. This is
+  // not needed to keep the certificates valid - both the X509s here and the ones
+  // held by each X509_STORE are independently reference counted - it only keeps
+  // the cache entry from being evicted while it is still in use. Empty for trust
+  // bundles loaded from a SPIFFE bundle map, which are not PEM and not cached.
+  std::vector<std::shared_ptr<CaCertList>> ca_cert_lists_;
 };
 
 class SPIFFEValidator : public CertValidator, Logger::Loggable<Logger::Id::secret> {
