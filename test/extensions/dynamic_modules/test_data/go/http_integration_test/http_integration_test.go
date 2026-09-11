@@ -26,6 +26,7 @@ func init() {
 		"http_callouts":                &HttpCalloutsConfigFactory{},
 		"send_response":                &SendResponseConfigFactory{},
 		"http_filter_scheduler":        &HttpFilterSchedulerConfigFactory{},
+		"span_across_callbacks":        &SpanAcrossCallbacksConfigFactory{},
 		"fake_external_cache":          &FakeExternalCacheConfigFactory{},
 		"stats_callbacks":              &StatsCallbacksConfigFactory{},
 		"streaming_terminal_filter":    &StreamingTerminalConfigFactory{},
@@ -727,6 +728,54 @@ func (p *HttpFilterSchedulerFilter) OnStreamComplete() {
 
 	// Force the GC to release the scheduler and related C resources.
 	runtime.GC()
+}
+
+// -----------------------------------------------------------------------------
+// SpanAcrossCallbacks
+// -----------------------------------------------------------------------------
+
+type SpanAcrossCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *SpanAcrossCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	c []byte) (shared.HttpFilterFactory, error) {
+	return &SpanAcrossCallbacksFilterFactory{}, nil
+}
+
+type SpanAcrossCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *SpanAcrossCallbacksFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &SpanAcrossCallbacksFilter{handle: h}
+}
+
+// SpanAcrossCallbacksFilter spawns a child span in OnRequestHeaders, starts off-thread work, and
+// finishes the span from the scheduled callback to show a span can cover work between event hooks.
+type SpanAcrossCallbacksFilter struct {
+	shared.EmptyHttpFilter
+	handle    shared.HttpFilterHandle
+	childSpan shared.ChildSpan
+}
+
+func (p *SpanAcrossCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if span := p.handle.GetActiveSpan(); span != nil {
+		p.childSpan = span.SpawnChild("off_thread_work")
+	}
+	sched := p.handle.GetScheduler()
+	go func() {
+		sched.Schedule(func() {
+			if p.childSpan != nil {
+				p.childSpan.SetTag("completed", "true")
+				p.childSpan.Finish()
+				p.childSpan = nil
+			}
+			p.handle.ContinueRequest()
+		})
+	}()
+	return shared.HeadersStatusStop
 }
 
 // -----------------------------------------------------------------------------

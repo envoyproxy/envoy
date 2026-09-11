@@ -13,6 +13,12 @@ on:
         description: JSON array of artifacts to upload to GCS
         type: string
         required: true
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
 
 
 jobs:
@@ -29,20 +35,66 @@ jobs:
       with:
         name: ${{ matrix.artifact }}
         path: ${{ matrix.artifact }}
-    - uses: envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       id: metadata
       with:
         input: ${{ matrix.artifact }}/gcs-metadata.json
         input-format: json-path
     - run: |
-        rm -rf ${{ matrix.artifact }}/gcs-metadata.json
-    - uses: envoyproxy/toolshed/actions/gcp/setup@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+        rm -rf "${ARTIFACT}/gcs-metadata.json"
+      env:
+        ARTIFACT: ${{ matrix.artifact }}
+    # The downloaded artifact - including its `gcs-metadata.json` - may have been created
+    # by a job that ran untrusted (PR) code, and nothing in it can be trusted (see POLICY.md).
+    # The upload destination (bucket/sha/redirect) is therefore validated against
+    # workflow-resolved config and the trusted `request` here, before any credential
+    # is loaded or used. The sync step below uses only the workflow-resolved values.
+    - name: Validate upload metadata
+      env:
+        BUCKET: ${{ fromJSON(steps.metadata.outputs.value).bucket }}
+        BUCKET_EXPECTED: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
+        SHA: ${{ fromJSON(steps.metadata.outputs.value).sha }}
+        SHA_EXPECTED: ${{ fromJSON(inputs.request).request.sha }}
+        REDIRECT: ${{ fromJSON(steps.metadata.outputs.value).redirect }}
+        REDIRECT_EXPECTED: >-
+          ${{ vars.GCS_ARTIFACT_PREFIX && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
+          }}${{ fromJSON(inputs.request).request.pr
+                || fromJSON(inputs.request).request.target-branch }}
+      run: |
+        if [[ -z "$BUCKET_EXPECTED" ]]; then
+            echo "::error::Expected bucket is empty"
+            exit 1
+        fi
+        if [[ -z "$BUCKET" || "$BUCKET" != "$BUCKET_EXPECTED" ]]; then
+            echo "::error::Bucket (${BUCKET}) does not match expected bucket (${BUCKET_EXPECTED})"
+            exit 1
+        fi
+        if ! [[ "$SHA_EXPECTED" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "::error::Expected SHA (${SHA_EXPECTED}) is not a valid commit sha"
+            exit 1
+        fi
+        if [[ "$SHA" != "$SHA_EXPECTED" ]]; then
+            echo "::error::SHA (${SHA}) does not match expected sha (${SHA_EXPECTED})"
+            exit 1
+        fi
+        if [[ -z "$REDIRECT_EXPECTED" ]] || ! [[ "$REDIRECT_EXPECTED" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*(/[a-zA-Z0-9][a-zA-Z0-9_.-]*)*$ ]]; then
+            echo "::error::Expected redirect (${REDIRECT_EXPECTED}) is not a valid redirect path"
+            exit 1
+        fi
+        if [[ "$REDIRECT" != "$REDIRECT_EXPECTED" ]]; then
+            echo "::error::Redirect (${REDIRECT}) does not match expected redirect (${REDIRECT_EXPECTED})"
+            exit 1
+        fi
+    - uses: envoyproxy/toolshed/actions/gcp/setup@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       with:
         key: ${{ secrets.gcp-key }}
-    - uses: envoyproxy/toolshed/actions/gcs/artefact/sync@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/gcs/artefact/sync@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       with:
-        bucket: ${{ fromJSON(steps.metadata.outputs.value).bucket }}
+        bucket: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
         path: ${{ matrix.artifact }}
         path-upload: ${{ matrix.artifact }}
-        sha: ${{ fromJSON(steps.metadata.outputs.value).sha }}
-        redirect: ${{ fromJSON(steps.metadata.outputs.value).redirect }}
+        sha: ${{ fromJSON(inputs.request).request.sha }}
+        redirect: >-
+          ${{ vars.GCS_ARTIFACT_PREFIX && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
+          }}${{ fromJSON(inputs.request).request.pr
+                || fromJSON(inputs.request).request.target-branch }}

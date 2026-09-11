@@ -197,6 +197,8 @@ const (
 	AttributeIDXdsFilterChainName
 	// health_check
 	AttributeIDHealthCheck
+	// upstream.server_name
+	AttributeIDUpstreamRequestedServerName
 )
 
 // LogLevel is the log level for messages logged via the host environment's logging mechanism.

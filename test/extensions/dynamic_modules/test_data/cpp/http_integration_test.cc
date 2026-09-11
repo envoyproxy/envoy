@@ -887,6 +887,62 @@ public:
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(HttpFilterSchedulerConfigFactory, "http_filter_scheduler");
 
 // -----------------------------------------------------------------------------
+// SpanAcrossCallbacks
+// -----------------------------------------------------------------------------
+
+// Spawns a child span in onRequestHeaders, starts off-thread work, and finishes the span from the
+// scheduled callback to show that a span can cover work that runs between event hooks.
+class SpanAcrossCallbacksFilter : public HttpFilter {
+public:
+  SpanAcrossCallbacksFilter(HttpFilterHandle& handle) : handle_(handle) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap&, bool) override {
+    auto span = handle_.getActiveSpan();
+    if (span != nullptr) {
+      child_span_ = span->spawnChild("off_thread_work");
+    }
+    auto sched = handle_.getScheduler();
+    sched->schedule([this]() {
+      if (child_span_ != nullptr) {
+        child_span_->setTag("completed", "true");
+        child_span_->finish();
+        child_span_.reset();
+      }
+      handle_.continueRequest();
+    });
+    return HeadersStatus::StopAllAndBuffer;
+  }
+
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+
+private:
+  HttpFilterHandle& handle_;
+  std::unique_ptr<ChildSpan> child_span_;
+};
+
+class SpanAcrossCallbacksFilterFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<SpanAcrossCallbacksFilter>(handle);
+  }
+};
+
+class SpanAcrossCallbacksConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<SpanAcrossCallbacksFilterFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(SpanAcrossCallbacksConfigFactory, "span_across_callbacks");
+
+// -----------------------------------------------------------------------------
 // FakeExternalCache
 // -----------------------------------------------------------------------------
 

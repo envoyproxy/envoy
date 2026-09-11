@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.compressor.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -38,6 +39,8 @@ message Compressor {
     // direction this common config is applied to), in bytes, that will trigger compression. Defaults to 30.
     google.protobuf.UInt32Value min_content_length = 2;
 
+    //    Using ``content_type`` is deprecated. Use ``content_type_matcher`` instead.
+    //
     // Set of strings that allows specifying which mime-types yield compression; e.g.,
     // ``application/json``, ``text/html``, etc.
     //
@@ -53,7 +56,17 @@ message Compressor {
     // * ``text/plain``
     // * ``text/xml``
     //
-    repeated string content_type = 3;
+    repeated string content_type = 3
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+    // Allows specifying which content types yield compression using
+    // envoy.type.matcher.v3.StringMatcher.
+    //
+    // When this field is specified, the default content type list is not used.
+    // If both ``content_type`` and ``content_type_matcher`` are specified,
+    // ``content_type_matcher`` takes precedence and the deprecated ``content_type``
+    // field is ignored.
+    repeated type.matcher.v3.StringMatcher content_type_matcher = 4;
   }
 
   // Configuration for filter behavior on the request direction.
