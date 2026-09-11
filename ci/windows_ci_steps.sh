@@ -104,7 +104,7 @@ if [[ "${TEST_TARGETS[*]}" == "//test/..." ]]; then
   bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=fails_on_${FAIL_GROUP} --build_tests_only
 
   if [[ $BUILD_ENVOY_STATIC -eq 1 ]]; then
-    # Validate introduction or updates of any dependency libraries in bazel/foreign_cc and bazel/external
+    # Validate introduction or updates of any dependency libraries in bazel/external
     # not triggered by envoy-static or //test/... targets and not deliberately tagged skip_on_windows
     bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //bazel/... --build_tag_filters=-skip_on_windows
   fi

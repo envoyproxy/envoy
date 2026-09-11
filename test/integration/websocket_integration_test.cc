@@ -829,35 +829,6 @@ TEST_P(WebsocketIntegrationTest, NoHttp1UpstreamUpgradeStatus201) {
 
 // Test Websocket Upgrade in HTTP1 with 426 response code.
 // Upgrade is a HTTP1 header.
-TEST_P(WebsocketIntegrationTest, Http1UpgradeStatusCodeUpgradeRequired) {
-  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
-      upstreamProtocol() != Http::CodecType::HTTP1) {
-    return;
-  }
-
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain", "false"}});
-
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.addConfigModifier(setRouteUsingWebsocket());
-  initialize();
-
-  auto in_correct_status_response_headers = upgradeResponseHeaders();
-  in_correct_status_response_headers.setStatus(426);
-
-  // The upgrade should be paused, but the response header is proxied back to downstream.
-  performUpgrade(upgradeRequestHeaders(), in_correct_status_response_headers, true);
-  EXPECT_EQ("426", response_->headers().Status()->value().getStringView());
-  EXPECT_EQ("upgrade", response_->headers().Connection()->value().getStringView());
-  EXPECT_EQ("websocket", response_->headers().Upgrade()->value().getStringView());
-
-  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
-  test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(0));
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-}
-
 // Test Websocket Upgrade in HTTP1 with 500 response code.
 // Upgrade is a HTTP1 header.
 TEST_P(WebsocketIntegrationTest, Http1UpgradeStatus5OOWithFilterChain) {
@@ -867,10 +838,7 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeStatus5OOWithFilterChain) {
   }
 
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.websocket_allow_4xx_"
-                               "5xx_through_filter_chain",
-                               "true"},
-                              {"envoy.reloadable_features.strip_upgrade_header_"
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.strip_upgrade_header_"
                                "on_failed_websocket_upgrades",
                                "true"}});
 
@@ -924,10 +892,7 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeStatus5OOWithUpgradeHeadersWithFilt
   }
 
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.websocket_allow_4xx_"
-                               "5xx_through_filter_chain",
-                               "true"},
-                              {"envoy.reloadable_features.strip_upgrade_header_"
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.strip_upgrade_header_"
                                "on_failed_websocket_upgrades",
                                "true"}});
 
@@ -989,10 +954,6 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeRetryWithFilterChain) {
       upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
-
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain", "true"}});
 
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
@@ -1058,10 +1019,6 @@ TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeFailedWithPrePayload) {
       upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
-
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain", "true"}});
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();

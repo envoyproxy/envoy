@@ -169,6 +169,7 @@ envoy_cc_library(
     hdrs = ["ai_request.h"],
     deps = [
         ":json_with_ext_buf_lib",
+        "@nlohmann_json//:json",
     ],
 )
 

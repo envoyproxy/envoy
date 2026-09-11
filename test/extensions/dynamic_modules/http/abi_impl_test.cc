@@ -2798,20 +2798,22 @@ TEST(ABIImpl, Log) {
 
   // Use all log levels, mostly for coverage.
   const std::string msg = "test log message";
+  const std::string file = "module_source.rs";
+  const envoy_dynamic_module_type_module_buffer source_file{file.data(), file.size()};
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Trace,
-                                    {msg.data(), msg.size()});
+                                    {msg.data(), msg.size()}, source_file, 1);
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Debug,
-                                    {msg.data(), msg.size()});
+                                    {msg.data(), msg.size()}, source_file, 2);
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info,
-                                    {msg.data(), msg.size()});
+                                    {msg.data(), msg.size()}, source_file, 3);
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Warn,
-                                    {msg.data(), msg.size()});
+                                    {msg.data(), msg.size()}, source_file, 4);
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Error,
-                                    {msg.data(), msg.size()});
+                                    {msg.data(), msg.size()}, source_file, 5);
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Critical,
-                                    {msg.data(), msg.size()});
+                                    {msg.data(), msg.size()}, source_file, 6);
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Off,
-                                    {msg.data(), msg.size()});
+                                    {msg.data(), msg.size()}, source_file, 7);
 }
 
 // Builds an ``envoy_dynamic_module_type_module_buffer`` for a string owned by the caller, the way a
