@@ -46,8 +46,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.35",
-        sha256 = "5179bc3f912d9c2dd5a6e5215e98222abe088847f021eba9f0f2e9a006deacaa",
+        version = "0.4.13",
+        sha256 = "89a3e2f2839d619687e43f8e847ec8677a1a7274bce7411fb676950f831be17f",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -683,8 +683,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/apache/thrift/archive/refs/tags/v{version}.tar.gz"],
     ),
     toolchains_llvm = dict(
-        version = "1.7.0",
-        sha256 = "85c341e957ba58482892a8088e4a34391d15bd98917f0993ecb62f008d6986d6",
+        version = "1.9.0",
+        sha256 = "779b3280571647034931c7f9ce8ef3836bfc55d00d23e7dad5370151e1f7149e",
         strip_prefix = "toolchains_llvm-v{version}",
         urls = ["https://github.com/bazel-contrib/toolchains_llvm/releases/download/v{version}/toolchains_llvm-v{version}.tar.gz"],
     ),
