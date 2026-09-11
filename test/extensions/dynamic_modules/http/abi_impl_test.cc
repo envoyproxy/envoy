@@ -6,6 +6,7 @@
 #include <set>
 #include <thread>
 
+#include "envoy/common/logger.h"
 #include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 #include "envoy/registry/registry.h"
 
@@ -2785,7 +2786,7 @@ TEST(ABIImpl, HttpCallout) {
 }
 
 TEST(ABIImpl, Log) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::err);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::error);
   EXPECT_FALSE(
       envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Trace));
   EXPECT_FALSE(

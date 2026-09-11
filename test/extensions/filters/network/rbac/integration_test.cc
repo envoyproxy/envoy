@@ -1,3 +1,4 @@
+#include "envoy/common/logger.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
@@ -42,7 +43,7 @@ public:
 
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     // Enable debug logging for all loggers to ensure coverage of debug log statements
-    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+    Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
 
     rbac_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:

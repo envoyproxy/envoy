@@ -147,7 +147,7 @@ Context::~Context() {
 void Context::activate() {
   Registry::getSink()->setLock(lock_);
   Registry::getSink()->setShouldEscape(should_escape_);
-  Registry::setLogLevel(log_level_);
+  Registry::setLogLevel(static_cast<Levels>(log_level_));
   Registry::setLogFormat(log_format_);
 
   // sets level and format for Fine-grain Logger
@@ -173,7 +173,7 @@ void Context::changeAllLogLevels(spdlog::level::level_enum level) {
   if (!useFineGrainLogger()) {
     ENVOY_LOG_MISC(info, "change all log levels: level='{}'",
                    spdlog::level::level_string_views[level]);
-    Registry::setLogLevel(level);
+    Registry::setLogLevel(static_cast<Levels>(level));
   } else {
     // Level setting with Fine-Grain Logger.
     FINE_GRAIN_LOG(
@@ -226,7 +226,7 @@ std::vector<Logger>& Registry::allLoggers() {
 
 spdlog::logger& Registry::getLog(Id id) { return allLoggers()[static_cast<int>(id)].getLogger(); }
 
-void Registry::setLogLevel(spdlog::level::level_enum log_level) {
+void Registry::setLogLevel(Levels log_level) {
   for (Logger& logger : allLoggers()) {
     logger.getLogger().set_level(static_cast<spdlog::level::level_enum>(log_level));
   }
