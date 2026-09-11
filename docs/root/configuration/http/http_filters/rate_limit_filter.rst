@@ -133,15 +133,18 @@ The following configuration
 
 Will lookup the value of the dynamic metadata. The value must be a structure with integer field
 "requests_per_unit" and a string field "unit" which is parseable to :ref:`RateLimitUnit enum
-<envoy_v3_api_enum_type.v3.RateLimitUnit>`. For example, with the following dynamic metadata
-the rate limit override of 42 requests per hour will be appended to the rate limit descriptor.
+<envoy_v3_api_enum_type.v3.RateLimitUnit>`. The optional integer field "unit_multiplier" specifies
+the number of units in the rate limit period and defaults to 1. For example, with the following
+dynamic metadata the rate limit override of 42 requests per 10 minutes will be appended to the rate
+limit descriptor.
 
 .. code-block:: yaml
 
   test.filter.key:
     test:
       requests_per_unit: 42
-      unit: HOUR
+      unit: MINUTE
+      unit_multiplier: 10
 
 Descriptor extensions
 ---------------------

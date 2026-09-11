@@ -8,6 +8,7 @@ import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -112,6 +113,10 @@ message RateLimitResponse {
 
     // The unit of time.
     Unit unit = 2;
+
+    // The number of units in the rate limit period. For example, a value of ``10`` with a unit
+    // of ``MINUTE`` specifies a 10-minute rate limit period. If not specified, defaults to ``1``.
+    google.protobuf.UInt32Value unit_multiplier = 4 [(validate.rules).uint32 = {gt: 0}];
   }
 
   // Cacheable quota for responses.

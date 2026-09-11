@@ -1,6 +1,8 @@
 #include "source/common/router/router_ratelimit.h"
 
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -75,8 +77,21 @@ bool DynamicMetadataRateLimitOverride::populateOverride(
       unit_it->second.kind_case() == Protobuf::Value::kStringValue) {
     envoy::type::v3::RateLimitUnit unit;
     if (envoy::type::v3::RateLimitUnit_Parse(unit_it->second.string_value(), &unit)) {
+      uint32_t unit_multiplier = 1;
+      const auto& unit_multiplier_it = override_value.find("unit_multiplier");
+      if (unit_multiplier_it != override_value.end()) {
+        if (unit_multiplier_it->second.kind_case() != Protobuf::Value::kNumberValue) {
+          return false;
+        }
+        const double value = unit_multiplier_it->second.number_value();
+        if (value < 1 || value > std::numeric_limits<uint32_t>::max() ||
+            std::trunc(value) != value) {
+          return false;
+        }
+        unit_multiplier = static_cast<uint32_t>(value);
+      }
       descriptor.limit_.emplace(RateLimit::RateLimitOverride{
-          static_cast<uint32_t>(limit_it->second.number_value()), unit});
+          static_cast<uint32_t>(limit_it->second.number_value()), unit, unit_multiplier});
       return true;
     }
   }
@@ -85,7 +100,8 @@ bool DynamicMetadataRateLimitOverride::populateOverride(
 
 bool StaticRateLimitOverride::populateOverride(RateLimit::Descriptor& descriptor,
                                                const envoy::config::core::v3::Metadata*) const {
-  descriptor.limit_.emplace(RateLimit::RateLimitOverride{requests_per_unit_, unit_});
+  descriptor.limit_.emplace(
+      RateLimit::RateLimitOverride{requests_per_unit_, unit_, unit_multiplier_});
   return true;
 }
 
