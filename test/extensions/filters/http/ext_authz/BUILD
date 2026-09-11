@@ -138,12 +138,11 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "ext_authz_integration_test",
-    size = "large",
     srcs = ["ext_authz_integration_test.cc"],
     data = ["ext_authz.yaml"],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = "linux_x64_small",
-    shard_count = 4,
+    rbe_pool = "linux_x64_medium",
+    shard_count = 8,
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         ":logging_test_filter_lib",
