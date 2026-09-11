@@ -22,6 +22,8 @@
 #include "source/common/network/lc_trie.h"
 #include "source/common/stats/symbol_table.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -35,10 +37,13 @@ using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
  * intern per-tag `<tag>.hit` builtins, plus the shared `total`, `no_hit`, `unknown_tag.hit`
  * and `reload_success` stat names. Also exposes the proto-to-trie parser, which is the
  * one place tag names are interned as builtins.
+ *
+ * The scope handed in is expected to already carry the `<stat_prefix>ip_tagging` prefix, so
+ * counters are named directly off it without joining a prefix on every increment.
  */
 class IpTagsStats : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
-  IpTagsStats(const std::string& stat_prefix, Stats::ScopeSharedPtr scope);
+  explicit IpTagsStats(Stats::ScopeSharedPtr scope);
 
   void incHit(absl::string_view tag);
   void incNoHit() { incCounter(no_hit_); }
@@ -61,7 +66,6 @@ private:
   // them goes away (relevant for providers shared across listeners).
   Stats::ScopeSharedPtr scope_;
   Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName stats_prefix_;
   const Stats::StatName unknown_tag_;
   const Stats::StatName total_;
   const Stats::StatName no_hit_;
@@ -92,9 +96,8 @@ public:
   IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
                  Event::Dispatcher& main_dispatcher, Api::Api& api,
                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                 ThreadLocal::SlotAllocator& tls, const std::string& stat_prefix,
-                 Stats::ScopeSharedPtr scope, Singleton::InstanceSharedPtr owner,
-                 absl::Status& creation_status);
+                 ThreadLocal::SlotAllocator& tls, Stats::ScopeSharedPtr scope,
+                 Singleton::InstanceSharedPtr owner, absl::Status& creation_status);
 
   ~IpTagsProvider();
 
@@ -109,8 +112,9 @@ private:
 using IpTagsProviderSharedPtr = std::shared_ptr<IpTagsProvider>;
 
 /**
- * A singleton that de-duplicates IpTagsProvider instances by data source filename so two
- * filter configs pointing at the same file share one provider (and thus one parsed trie).
+ * A singleton that de-duplicates IpTagsProvider instances so two filter configs that read the
+ * same file and report into the same stats location share one provider (and thus one parsed
+ * trie and one set of counters).
  */
 class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
 public:
@@ -125,12 +129,13 @@ public:
 
 private:
   // Each provider stores a shared_ptr to this singleton, keeping the singleton alive
-  // until no provider remains. Key is a hash of the data source filename.
-  absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProvider>> ip_tags_registry_;
-  // Shared stats scope used by every provider this singleton creates. Lazily
-  // initialized as a child of the first caller's scope and kept alive by the
-  // singleton so a provider can outlive any individual listener that asked for it.
-  Stats::ScopeSharedPtr scope_;
+  // until no provider remains. The key identifies what a provider is: the file its tags come
+  // from, plus where its stats land (the caller's scope prefix and the filter's stat prefix).
+  // A provider owns the counters for the tags it loads, so configs publishing under different
+  // names must not share one even when they read the same file. Keying on the joined parts
+  // rather than a hash of them means a hash collision resolves to a miss instead of silently
+  // handing back a provider that reports into someone else's counters.
+  absl::flat_hash_map<std::string, std::weak_ptr<IpTagsProvider>> ip_tags_registry_;
 };
 
 /**
