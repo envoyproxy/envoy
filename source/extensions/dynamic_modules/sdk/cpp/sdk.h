@@ -8,6 +8,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <source_location>
 #include <span>
 #include <string>
 #include <string_view>
@@ -998,8 +999,10 @@ public:
    * Logs a message at the specified log level.
    * @param level The log level.
    * @param message The message to log.
+   * @param location The source location of the log statement, defaulted to the caller.
    */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 };
 
 class HttpFilterConfigHandle {
@@ -1140,8 +1143,10 @@ public:
    * Logs a message at the specified log level.
    * @param level The log level.
    * @param message The message to log.
+   * @param location The source location of the log statement, defaulted to the caller.
    */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 
   /**
    * Initiates a one-shot HTTP callout to a cluster. The response will be delivered via
@@ -1403,7 +1408,8 @@ private:
 #define DYM_LOG(HANDLE, LEVEL, FORMAT_STRING, ...)                                                 \
   do {                                                                                             \
     if (HANDLE.logEnabled(LEVEL)) {                                                                \
-      HANDLE.log(LEVEL, std::format(FORMAT_STRING, ##__VA_ARGS__));                                \
+      HANDLE.log(LEVEL, std::format(FORMAT_STRING, ##__VA_ARGS__),                                 \
+                 std::source_location::current());                                                 \
     }                                                                                              \
   } while (0)
 
