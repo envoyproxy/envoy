@@ -232,6 +232,10 @@ void Registry::setLogLevel(Levels log_level) {
   }
 }
 
+void Registry::setLogLevel(spdlog::level::level_enum log_level) {
+  setLogLevel(static_cast<Levels>(log_level));
+}
+
 void Registry::setLogFormat(const std::string& log_format) {
   for (Logger& logger : allLoggers()) {
     Utility::setLogFormatForLogger(logger.getLogger(), log_format);
