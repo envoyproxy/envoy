@@ -26,6 +26,8 @@ struct RequestAttributes {
   bool malformed{false};
 };
 
+// TODO(botengyao): read one normalized schema once a transcoder produces an IR; the per-API
+// readers then go away.
 // `path` is the request :path, where Gemini names the model and the streaming operation.
 RequestAttributes extractRequestAttributes(HttpFilters::AiProtocolManager::ApiProtocol protocol,
                                            const nlohmann::json& json, absl::string_view path);

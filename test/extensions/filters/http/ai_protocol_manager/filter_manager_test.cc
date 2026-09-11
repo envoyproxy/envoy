@@ -6,6 +6,7 @@
 #include "source/common/coroutine/async_queue.h"
 #include "source/common/coroutine/dispatcher_executor.h"
 #include "source/common/coroutine/launch.h"
+#include "source/common/coroutine/status_macros.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
@@ -59,7 +60,7 @@ TEST_F(FilterManagerTest, ZeroFilterPassThrough) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
                         stream_info_);
 
@@ -104,7 +105,7 @@ TEST_F(FilterManagerTest, SingleFilterMutation) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-3.5"}});
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestMutationFilter>("gpt-4-turbo"));
 
   FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
@@ -152,7 +153,7 @@ TEST_F(FilterManagerTest, MultiFilterPipeline) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestFieldAdderFilter>());
   filters.push_back(std::make_unique<TestFieldModifierFilter>());
 
@@ -188,7 +189,7 @@ TEST_F(FilterManagerTest, FilterErrorPropagation) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestErrorFilter>());
 
   FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
@@ -219,7 +220,7 @@ TEST_F(FilterManagerTest, FilterBypassEarlyReturnPassesThrough) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-3.5"}});
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   // Filter 0 bypasses itself
   filters.push_back(std::make_unique<TestBypassFilter>());
   // Filter 1 still receives and modifies the request
@@ -257,7 +258,7 @@ TEST_F(FilterManagerTest, FilterConsumedWithoutPropagationFails) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestDropFilter>());
 
   FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
@@ -292,7 +293,7 @@ TEST_F(FilterManagerTest, FilterLocalReply) {
   Http::Code local_reply_code = Http::Code::OK;
   std::string local_reply_details;
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestLocalReplyFilter>());
 
   FilterManager manager(
@@ -324,7 +325,7 @@ TEST_F(FilterManagerTest, FilterErrorTriggersLocalReply) {
   Http::Code local_reply_code = Http::Code::OK;
   std::string local_reply_details;
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestErrorFilter>());
 
   FilterManager manager(
@@ -353,7 +354,7 @@ TEST_F(FilterManagerTest, FilterLocalReplyWithoutLocalReplyFnInvokesCompletionWi
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestLocalReplyFilter>());
 
   FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
@@ -409,7 +410,7 @@ TEST_F(FilterManagerTest, SynchronousFilterErrorStopsSubsequentFilterLaunches) {
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});
 
   int filter2_started = 0;
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestImmediateErrorFilter>());
   filters.push_back(std::make_unique<TestCountingFilter>(filter2_started));
 
@@ -437,7 +438,7 @@ TEST_F(FilterManagerTest, SynchronousFilterLocalReplyStopsSubsequentFilterLaunch
   std::string local_reply_details;
   int filter2_started = 0;
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestImmediateLocalReplyFilter>());
   filters.push_back(std::make_unique<TestCountingFilter>(filter2_started));
 
@@ -467,7 +468,7 @@ TEST_F(FilterManagerTest, CancelCancelsCoroutines) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestFieldAdderFilter>());
 
   auto manager = std::make_unique<FilterManager>(std::move(filters), std::move(doc),
@@ -513,7 +514,7 @@ TEST_F(FilterManagerTest, DestructWhileSuspendedIsSafe) {
   };
 
   auto queue = std::make_shared<Coroutine::AsyncQueue<bool>>(1);
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<SuspendingFilter>(queue));
 
   auto manager = std::make_unique<FilterManager>(std::move(filters), std::move(doc),
@@ -614,7 +615,7 @@ TEST_F(FilterManagerTest, FilterNullPropagationFails) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestNullPropagatorFilter>());
 
   FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
@@ -642,7 +643,7 @@ TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeaders) {
   Http::TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", "/chat/completions"}, {"content-length", "1000"}};
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
                         stream_info_, &headers);
 
@@ -668,7 +669,7 @@ TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeadersAfterMutation) {
   Http::TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", "/chat/completions"}, {"content-length", "10"}};
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestMutationFilter>("gpt-4-turbo-extra-long"));
 
   FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
@@ -695,7 +696,7 @@ TEST_F(FilterManagerTest, DoesNotSetContentLengthWhenNotPreviouslyPresent) {
 
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/chat/completions"}};
 
-  std::vector<AiFilterPtr> filters;
+  std::vector<AiFilterSharedPtr> filters;
   FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
                         stream_info_, &headers);
 
@@ -711,6 +712,54 @@ TEST_F(FilterManagerTest, DoesNotSetContentLengthWhenNotPreviouslyPresent) {
   ASSERT_OK(status);
 
   EXPECT_EQ(headers.ContentLength(), nullptr);
+}
+
+// Suspends after propagating, so its coroutine resumes only after the manager is gone.
+class OutlivingFilter : public AiFilter {
+public:
+  OutlivingFilter(std::shared_ptr<Coroutine::AsyncQueue<int>> queue, int& seen, bool& destroyed)
+      : queue_(std::move(queue)), seen_(seen), destroyed_(destroyed) {}
+  ~OutlivingFilter() override { destroyed_ = true; }
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
+    CO_RETURN_IF_ERROR(co_await std::move(propagate_request)(std::move(req)));
+    ASSIGN_OR_CO_RETURN(std::optional<int> value, co_await queue_->pop());
+    seen_ = value.value_or(-1);
+    co_return absl::OkStatus();
+  }
+
+private:
+  std::shared_ptr<Coroutine::AsyncQueue<int>> queue_;
+  int& seen_;
+  bool& destroyed_;
+};
+
+TEST_F(FilterManagerTest, FilterOutlivesManagerUntilItsCoroutineCompletes) {
+  auto queue = std::make_shared<Coroutine::AsyncQueue<int>>(/*max_size=*/1);
+  int seen = 0;
+  bool destroyed = false;
+
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_shared<OutlivingFilter>(queue, seen, destroyed));
+  auto manager = std::make_unique<FilterManager>(std::move(filters), std::move(doc),
+                                                 &buffer_manager_, *dispatcher_, stream_info_);
+  bool completed = false;
+  manager->start([&completed](absl::Status s) { completed = s.ok(); });
+  drain();
+  ASSERT_TRUE(completed);
+
+  manager.reset();
+  EXPECT_FALSE(destroyed);
+
+  ASSERT_TRUE(queue->tryPush(7));
+  drain();
+  EXPECT_EQ(seen, 7);
+  EXPECT_TRUE(destroyed);
 }
 
 } // namespace

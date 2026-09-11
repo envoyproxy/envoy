@@ -166,8 +166,11 @@ FilterConfig::FilterConfig(
 absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
     Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
+  if (proto.filters_size() > 0 && !proto.has_request_handling()) {
+    return absl::InvalidArgumentError("ai_protocol_manager: filters require request_handling");
+  }
   AiFilterFactories factories;
-  for (const auto& entry : proto.request_handling().filters()) {
+  for (const auto& entry : proto.filters()) {
     auto* factory =
         Config::Utility::getAndCheckFactory<AiFilterConfigFactory>(entry, /*is_optional=*/true);
     if (factory == nullptr) {
@@ -429,10 +432,10 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
     ASSERT(request_headers_ != nullptr);
     const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
                                   route_request_protocol_};
-    std::vector<AiFilterPtr> filters;
+    std::vector<AiFilterSharedPtr> filters;
     filters.reserve(config_->aiFilterFactories().size());
     for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
-      if (AiFilterPtr filter = factory(context); filter != nullptr) {
+      if (AiFilterSharedPtr filter = factory(context); filter != nullptr) {
         filters.push_back(std::move(filter));
       }
     }

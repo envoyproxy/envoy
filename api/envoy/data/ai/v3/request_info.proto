@@ -21,16 +21,17 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // Request attributes published as typed dynamic metadata by the :ref:`request info AI
 // filter <envoy_v3_api_msg_extensions.filters.ai.request_info.v3.RequestInfo>`. Values are
-// client-declared and unverified; a present but unusable value reads as absent.
+// client-declared and unverified. A value the client sent that Envoy cannot use, such as one
+// of the wrong type, out of range, or a string over 256 bytes, is ignored.
 // [#next-free-field: 7]
 message RequestInfo {
   // The route's declared wire API. When unspecified, only ``model`` and ``stream`` are read.
   type.ai.v3.ApiProtocol api_protocol = 1;
 
-  // The requested model; for Gemini, taken from the request path.
+  // The requested model.
   string model = 2;
 
-  // Whether a streamed response was requested; for Gemini, taken from the request path.
+  // Whether a streamed response was requested.
   google.protobuf.BoolValue stream = 3;
 
   // The requested output token cap.

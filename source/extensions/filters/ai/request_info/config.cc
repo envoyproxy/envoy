@@ -19,8 +19,8 @@ RequestInfoFilterConfigFactory::createAiFilterFactory(
       config, context.messageValidationVisitor());
   auto filter_config = std::make_shared<const RequestInfoFilterConfig>(proto, scope);
   return [filter_config](const HttpFilters::AiProtocolManager::AiFilterContext& stream_context)
-             -> HttpFilters::AiProtocolManager::AiFilterPtr {
-    return std::make_unique<RequestInfoFilter>(filter_config, stream_context);
+             -> HttpFilters::AiProtocolManager::AiFilterSharedPtr {
+    return std::make_shared<RequestInfoFilter>(filter_config, stream_context);
   };
 }
 

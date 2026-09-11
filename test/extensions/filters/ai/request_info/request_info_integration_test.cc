@@ -91,11 +91,11 @@ public:
 name: envoy.filters.http.ai_protocol_manager
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
-  request_handling:
-    filters:
-    - name: envoy.filters.ai.request_info
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.ai.request_info.v3.RequestInfo
+  request_handling: {}
+  filters:
+  - name: envoy.filters.ai.request_info
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.ai.request_info.v3.RequestInfo
 )EOF");
 
     initialize();

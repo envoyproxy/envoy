@@ -116,6 +116,7 @@ envoy_cc_library(
     hdrs = ["api_protocol_conversion.h"],
     deps = [
         ":token_usage_lib",
+        "//source/common/common:assert_lib",
         "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
     ],
 )

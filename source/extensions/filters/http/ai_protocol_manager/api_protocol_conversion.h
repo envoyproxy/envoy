@@ -2,6 +2,7 @@
 
 #include "envoy/type/ai/v3/api_protocol.pb.h"
 
+#include "source/common/common/assert.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
 
 namespace Envoy {
@@ -11,9 +12,11 @@ namespace AiProtocolManager {
 
 // Two exhaustive switches rather than one table so a new enum value fails the build.
 
-// Unrecognized values (version skew; configs are validated defined_only) auto-detect.
 inline ApiProtocol protocolFromProto(envoy::type::ai::v3::ApiProtocol protocol) {
   switch (protocol) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED:
+    return ApiProtocol::Unspecified;
   case envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS:
     return ApiProtocol::OpenAiChatCompletions;
   case envoy::type::ai::v3::OPENAI_RESPONSES:
@@ -22,9 +25,8 @@ inline ApiProtocol protocolFromProto(envoy::type::ai::v3::ApiProtocol protocol) 
     return ApiProtocol::AnthropicMessages;
   case envoy::type::ai::v3::GEMINI_GENERATE_CONTENT:
     return ApiProtocol::GeminiGenerateContent;
-  default:
-    return ApiProtocol::Unspecified;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 inline envoy::type::ai::v3::ApiProtocol protocolToProto(ApiProtocol protocol) {

@@ -278,7 +278,7 @@ public:
     if (!error_.empty()) {
       return absl::InvalidArgumentError(error_);
     }
-    return [](const AiFilterContext&) -> AiFilterPtr { return nullptr; };
+    return [](const AiFilterContext&) -> AiFilterSharedPtr { return nullptr; };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::Struct>();
@@ -292,7 +292,8 @@ public:
 envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager
 configWithAiFilter(const Protobuf::Message& typed_config) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
-  auto* entry = proto.mutable_request_handling()->add_filters();
+  proto.mutable_request_handling();
+  auto* entry = proto.add_filters();
   entry->set_name("test.ai_filter");
   EXPECT_TRUE(entry->mutable_typed_config()->PackFrom(typed_config));
   return proto;
@@ -345,6 +346,22 @@ TEST(AiProtocolManagerConfigTest, PropagatesAiFilterConfigError) {
                            *stats_store.rootScope());
   EXPECT_EQ(config.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_EQ(config.status().message(), "bad ai filter config");
+}
+
+// AI filters run only on the request path today, so they need it enabled.
+TEST(AiProtocolManagerConfigTest, RejectsAiFiltersWithoutRequestHandling) {
+  TestAiFilterConfigFactory test_factory;
+  Registry::InjectFactory<AiFilterConfigFactory> registration(test_factory);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  auto proto = configWithAiFilter(Protobuf::Struct());
+  proto.clear_request_handling();
+
+  const auto config =
+      FilterConfig::create(proto, context.server_factory_context_, *stats_store.rootScope());
+  EXPECT_EQ(config.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(config.status().message(), "ai_protocol_manager: filters require request_handling");
+  EXPECT_EQ(test_factory.factories_created_, 0);
 }
 
 TEST(AiProtocolManagerConfigTest, NoAiFiltersByDefault) {

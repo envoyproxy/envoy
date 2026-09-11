@@ -95,9 +95,10 @@ public:
                                                LocalReplier reply_locally) = 0;
 };
 
-using AiFilterPtr = std::unique_ptr<AiFilter>;
+using AiFilterSharedPtr = std::shared_ptr<AiFilter>;
 
-// A filter must copy this rather than keep the reference; its referents outlive the filters.
+// Per-stream inputs for an AI filter; copy it. The referents belong to the stream, so a filter
+// must not use them after propagating the request, replying locally, or an await failing.
 struct AiFilterContext {
   StreamInfo::StreamInfo& stream_info;
   const Http::RequestHeaderMap& request_headers;
@@ -106,10 +107,10 @@ struct AiFilterContext {
 };
 
 // Creates one AiFilter per stream, or nullptr to skip the stream; built once at config load.
-using AiFilterFactoryCb = std::function<AiFilterPtr(const AiFilterContext& context)>;
+using AiFilterFactoryCb = std::function<AiFilterSharedPtr(const AiFilterContext& context)>;
 using AiFilterFactories = std::vector<AiFilterFactoryCb>;
 
-// Extension point behind RequestHandling.filters.
+// Extension point behind AiProtocolManager.filters.
 class AiFilterConfigFactory : public Config::TypedFactory {
 public:
   ~AiFilterConfigFactory() override = default;

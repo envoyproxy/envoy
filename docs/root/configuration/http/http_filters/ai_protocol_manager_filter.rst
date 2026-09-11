@@ -155,8 +155,9 @@ AI filters
 
 After a declared AI endpoint's payload is parsed and validated, and before it
 is replayed, the filter runs the configured :ref:`AI filters
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.filters>`
-in order over the parsed document. An AI filter (category ``envoy.filters.ai``)
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.filters>`
+in order over the parsed document; they require ``request_handling``. An AI
+filter (category ``envoy.filters.ai``)
 may read or modify the document, or reject the request with a local reply.
 Routes without a per-route request declaration, and requests without a body,
 run no AI filters.
@@ -177,11 +178,11 @@ tool counts as :ref:`envoy.data.ai.v3.RequestInfo
   - name: envoy.filters.http.ai_protocol_manager
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
-      request_handling:
-        filters:
-        - name: envoy.filters.ai.request_info
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.ai.request_info.v3.RequestInfo
+      request_handling: {}
+      filters:
+      - name: envoy.filters.ai.request_info
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.ai.request_info.v3.RequestInfo
 
 Attributes are read according to the route's declared :ref:`wire API
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.api_protocol>`:
@@ -191,14 +192,14 @@ Attributes are read according to the route's declared :ref:`wire API
   :widths: 1, 1, 1, 1, 1
 
   ``model``, ``model``, ``model``, ``model``, model segment of the request path
-  ``stream``, ``stream``, ``stream``, ``stream``, ``:streamGenerateContent`` operation in the request path
+  ``stream``, ``stream``, ``stream``, ``stream``, "``:generateContent`` (false) or ``:streamGenerateContent`` (true) operation in the request path"
   ``max_output_tokens``, "``max_completion_tokens``, else ``max_tokens``", ``max_output_tokens``, ``max_tokens``, "``generationConfig.maxOutputTokens`` (camelCase or snake_case)"
   ``message_count``, ``messages``, "``input`` (a string counts as one message)", ``messages``, ``contents``
   ``tool_count``, ``tools``, ``tools``, ``tools``, ``tools``
 
 Without a declared API, only ``model`` and ``stream`` are read. Every value is
-client-declared and optional. A present but unusable value (wrong type, out of
-range, or a string over 256 bytes) reads as absent and is counted by
+client-declared and optional. A value Envoy cannot use (wrong type, out of
+range, or a string over 256 bytes) is ignored and counted by
 ``request_info.partial``.
 
 The record is written before the held request headers are released, so later
@@ -513,5 +514,5 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   unsupported_content_encoding, Counter, The response carried a non-identity ``content-encoding``; extraction skipped.
   usage_trailers_synthesized, Counter, Empty response trailers were synthesized at end of stream to carry token usage to a downstream consumer.
   request_info.published, Counter, The request info AI filter published an ``envoy.data.ai.v3.RequestInfo`` record.
-  request_info.partial, Counter, A published request info record dropped at least one present but unusable attribute.
+  request_info.partial, Counter, A published request info record ignored at least one value Envoy could not use.
   request_info.duplicate, Counter, Request info publication skipped because another installation of the filter had already published the namespace for this stream.

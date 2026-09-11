@@ -1289,7 +1289,7 @@ private:
 TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverDeclaredPayload) {
   std::vector<ContextRecordingAiFilter::Seen> seen;
   int built = 0;
-  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterPtr {
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
     ++built;
     return std::make_unique<ContextRecordingAiFilter>(context, seen);
   }});
@@ -1313,7 +1313,7 @@ TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverDeclaredPayload) 
 TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
   std::vector<ContextRecordingAiFilter::Seen> seen;
   int built = 0;
-  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterPtr {
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
     ++built;
     return std::make_unique<ContextRecordingAiFilter>(context, seen);
   }});
@@ -1331,7 +1331,7 @@ TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
 }
 
 TEST_F(AiProtocolManagerFilterTest, NullAiFilterIsSkipped) {
-  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterPtr { return nullptr; }});
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr { return nullptr; }});
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 

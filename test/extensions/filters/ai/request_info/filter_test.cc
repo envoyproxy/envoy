@@ -30,7 +30,7 @@ namespace RequestInfo {
 namespace {
 
 using HttpFilters::AiProtocolManager::AiFilterContext;
-using HttpFilters::AiProtocolManager::AiFilterPtr;
+using HttpFilters::AiProtocolManager::AiFilterSharedPtr;
 using HttpFilters::AiProtocolManager::ApiProtocol;
 using HttpFilters::AiProtocolManager::BufferManager;
 using HttpFilters::AiProtocolManager::FakeBridge;
@@ -64,7 +64,7 @@ public:
         Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", std::string(path)}};
     JsonWithExtBuf doc;
     doc.setJson(nlohmann::json::parse(payload));
-    std::vector<AiFilterPtr> filters;
+    std::vector<AiFilterSharedPtr> filters;
     filters.push_back(std::make_unique<RequestInfoFilter>(
         config != nullptr ? std::move(config) : makeConfig(),
         AiFilterContext{stream_info_, request_headers_, protocol}));
