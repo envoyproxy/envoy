@@ -105,7 +105,9 @@ public:
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
-  void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
+  void setDeterministicValue(uint64_t value = 0) { random_config_ = TestRandomValue{value}; }
+  // Make test reproducible while retaining a pseudo-random distribution.
+  void setDeterministicSeed(uint64_t seed) { random_config_ = TestRandomSeed{seed}; }
   // Get socket option for a specific listener's socket.
   bool getSocketOption(const std::string& listener_name, int level, int optname, void* optval,
                        socklen_t* optlen, int address_index = 0);
@@ -694,9 +696,7 @@ protected:
   // This does nothing if autonomous_upstream_ is false
   bool autonomous_allow_incomplete_streams_{false};
 
-  // If this member is not empty, the test will use a fixed RNG value specified
-  // by it.
-  std::optional<uint64_t> deterministic_value_;
+  TestRandomGeneratorConfig random_config_;
 
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.
