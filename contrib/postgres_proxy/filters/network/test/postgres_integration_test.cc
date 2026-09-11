@@ -825,7 +825,7 @@ public:
     Buffer::OwnedImpl ssl_request;
     ssl_request.writeBEInt<uint32_t>(8);
     ssl_request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_CODE);
-    ASSERT_TRUE(client->write(ssl_request.toString()));
+    ASSERT_TRUE(client->write(ssl_request.toString(), false, allowed));
     ASSERT_TRUE(client->waitForData(1, TestUtility::DefaultTimeout));
     ASSERT_THAT(client->data(), "S");
     enableClientTls(client);
@@ -836,7 +836,7 @@ public:
     startup.writeBEInt<uint32_t>(8 + attributes.size());
     startup.writeBEInt<uint32_t>(0x00030000);
     startup.add(attributes);
-    ASSERT_TRUE(client->write(startup.toString()));
+    ASSERT_TRUE(client->write(startup.toString(), false, allowed));
     if (allowed) {
       std::string received;
       ASSERT_TRUE(upstream->waitForData(startup.length(), &received));
@@ -876,7 +876,7 @@ TEST_P(RbacPostgresIntegrationTest, DenialDoesNotOpenDeferredUpstream) {
   Buffer::OwnedImpl ssl_request;
   ssl_request.writeBEInt<uint32_t>(8);
   ssl_request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_CODE);
-  ASSERT_TRUE(client->write(ssl_request.toString()));
+  ASSERT_TRUE(client->write(ssl_request.toString(), false, false));
   ASSERT_TRUE(client->waitForData(1, TestUtility::DefaultTimeout));
   ASSERT_THAT(client->data(), "S");
   enableClientTls(client);
@@ -886,7 +886,7 @@ TEST_P(RbacPostgresIntegrationTest, DenialDoesNotOpenDeferredUpstream) {
   startup.writeBEInt<uint32_t>(8 + attributes.size());
   startup.writeBEInt<uint32_t>(0x00030000);
   startup.add(attributes);
-  ASSERT_TRUE(client->write(startup.toString()));
+  ASSERT_TRUE(client->write(startup.toString(), false, false));
   client->waitForData("28000", false);
   client->waitForDisconnect();
   ASSERT_THAT(client->data(), testing::HasSubstr("28000"));
