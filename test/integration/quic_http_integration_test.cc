@@ -603,6 +603,9 @@ void QuicHttpIntegrationTestBase::testReliableStreamResetBodyDelivery(bool enabl
   });
   initialize();
 
+  dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+      .quic_config_.SetReliableStreamReset(enable);
+
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto* quic_session = static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   ASSERT_NE(quic_session, nullptr);
