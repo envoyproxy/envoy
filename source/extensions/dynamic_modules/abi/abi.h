@@ -29,11 +29,8 @@
 // This is the ABI version that we bump the minor version at least once for any ABI changes in same
 // Envoy release cycle to indicate the ABI change.
 //
-// Break change in the ABI is not allowed except the ABI has not been released yet.
-//
-// Until we reach v1.0, we only guarantee backward
-// compatibility in the next minor version. For example, v0.1.y is guaranteed to be compatible with
-// v0.2.x, but not with v0.3.x.
+// Until we reach v1.0, the ABI is experimental and any version change may be breaking, so a module
+// must be rebuilt against the exact Envoy version it runs with.
 //
 // This is used only for tracking the ABI version of dynamic modules and emitting warnings when
 // there's a mismatch.
@@ -44,7 +41,7 @@
 // SDK downstream users.
 // 2. In the future, after the stable ABI is established, we may want to decouple the ABI version
 // from Envoy's versioning scheme.
-#define ENVOY_DYNAMIC_MODULES_ABI_VERSION "v0.1.0"
+#define ENVOY_DYNAMIC_MODULES_ABI_VERSION "v0.2.0"
 
 #ifdef __cplusplus
 #include <cstddef>
@@ -480,11 +477,16 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
  * of the standard Envoy logging stream under [dynamic_modules] Id.
  *
  * @param level is the log level of the message.
- * @param message is the log message to be logged.
+ * @param message is the log message to be logged. The buffer is only read during the call.
+ * @param source_file is the module source file of the log statement, used to report the actual
+ * location instead of a location inside Envoy. The buffer is only read during the call.
+ * @param source_line is the line number of the log statement within source_file.
  *
  */
 void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
-                                       envoy_dynamic_module_type_module_buffer message);
+                                       envoy_dynamic_module_type_module_buffer message,
+                                       envoy_dynamic_module_type_module_buffer source_file,
+                                       uint32_t source_line);
 
 /**
  * envoy_dynamic_module_callback_log_enabled is called by the module to check if the log level is

@@ -391,6 +391,10 @@ macro_rules! envoy_log {
         if enabled {
           let message = format!($($arg)*);
           let message_bytes = message.as_bytes();
+          // file! and line! expand to the call site of the outer envoy_log_* macro so the host
+          // reports the module location instead of a location inside Envoy.
+          let source_file = file!();
+          let source_file_bytes = source_file.as_bytes();
           unsafe {
             $crate::abi::envoy_dynamic_module_callback_log(
               level,
@@ -398,6 +402,11 @@ macro_rules! envoy_log {
                 ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
                 length: message_bytes.len(),
               },
+              $crate::abi::envoy_dynamic_module_type_module_buffer {
+                ptr: source_file_bytes.as_ptr() as *const ::std::os::raw::c_char,
+                length: source_file_bytes.len(),
+              },
+              line!(),
             );
           }
         }

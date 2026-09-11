@@ -390,10 +390,13 @@ protected:
 
   // Stops the codecs from validating the request headers they encode, so that a test can use
   // Envoy's own client codecs to send a deliberately malformed request at Envoy. Only needed in
-  // non-UHV builds, where the codecs do this check themselves; the destructor restores it.
+  // non-UHV builds, where the codecs do this check themselves; the destructor restores it. Call
+  // this before initialize(), so that the write is ordered before the workers that read the flag
+  // are created.
   // TODO(yanavlasov): fold this into `disable_client_header_validation_`.
   void disableCodecHeaderValidation() {
-    Http::HeaderUtility::disable_request_header_validation_for_tests_ = true;
+    Http::HeaderUtility::disable_request_header_validation_for_tests_.store(
+        true, std::memory_order_relaxed);
   }
 
 #ifdef ENVOY_ENABLE_QUIC

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <vector>
 
 #include "envoy/common/matchers.h"
@@ -515,8 +516,11 @@ public:
    * When set, checkValidRequestHeaders() accepts every header name and value. This lets
    * integration tests drive Envoy's own codecs to send deliberately malformed requests at
    * Envoy's server codecs. Never set this outside of tests.
+   *
+   * Atomic because tests clear it while Envoy's worker threads are still running, and those
+   * threads read it whenever they encode an upstream request.
    */
-  static bool disable_request_header_validation_for_tests_;
+  static std::atomic<bool> disable_request_header_validation_for_tests_;
 
   /**
    * Returns true if a header may be safely removed without causing additional
