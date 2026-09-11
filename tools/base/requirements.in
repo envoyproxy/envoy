@@ -13,7 +13,6 @@ envoy.dependency.check>=0.2.1
 envoy.distribution.release>=0.1.2
 envoy.distribution.verify>=0.1.1
 envoy.docs.sphinx_runner>=0.3.2
-envoy.gpg.sign>=0.3.1
 gitpython
 icalendar>=6.1.1
 kafka-python-ng

@@ -10,6 +10,8 @@ load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@emsdk//:toolchains.bzl", "register_emscripten_toolchains")
 load("@envoy_toolshed//compile:sanitizer_libs.bzl", "setup_sanitizer_libs")
 load("@envoy_toolshed//coverage/grcov:grcov_repository.bzl", "grcov_repository")
+load("@envoy_toolshed//pgp:repositories.bzl", "setup_sq")
+load("@envoy_toolshed//pgp:toolchain.bzl", "load_pgp_toolchains")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
@@ -88,6 +90,8 @@ def envoy_dependency_imports(
         version = buf_version,
     )
 
+    setup_sq()
+    load_pgp_toolchains()
     setup_sanitizer_libs()
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
