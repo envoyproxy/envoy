@@ -16,6 +16,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
@@ -45,6 +46,32 @@ const Http::LowerCaseString kMcpMethod{
 
 const Http::LowerCaseString kMcpName{
     std::string(Filters::Common::Mcp::McpConstants::MCP_NAME_HEADER)};
+
+const Http::LowerCaseString kMcpProtocolVersion{
+    Filters::Common::Mcp::McpConstants::MCP_PROTOCOL_VERSION_HEADER};
+
+constexpr absl::string_view kBase64SentinelPrefix = "=?base64?";
+constexpr absl::string_view kBase64SentinelSuffix = "?=";
+
+std::optional<std::string> decodeMcpHeaderValue(absl::string_view value) {
+  if (!absl::StartsWith(value, kBase64SentinelPrefix) ||
+      !absl::EndsWith(value, kBase64SentinelSuffix)) {
+    return std::string(value);
+  }
+
+  const absl::string_view encoded =
+      value.substr(kBase64SentinelPrefix.size(),
+                   value.size() - kBase64SentinelPrefix.size() - kBase64SentinelSuffix.size());
+
+  const std::string decoded = Base64::decode(encoded);
+
+  // Base64::decode() returns an empty string for malformed non-empty input.
+  if (!encoded.empty() && decoded.empty()) {
+    return std::nullopt;
+  }
+
+  return decoded;
+}
 
 void setNestedStringValue(Protobuf::Struct& metadata, absl::string_view path,
                           absl::string_view value) {
@@ -133,6 +160,7 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
                                  : 8192), // Default: 8KB
       request_storage_mode_(proto_config.request_storage_mode()),
       attribute_source_(proto_config.attribute_source()),
+      protocol_versions_(proto_config.protocol_versions()),
       metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
@@ -308,6 +336,13 @@ bool McpFilter::needsBody() const {
     return true;
   }
 
+  // Mcp-Method and Mcp-Name header semantics are only defined for the
+  // new protocol. Legacy requests fall back to body parsing even when
+  // attribute_source is HEADERS.
+  if (!use_new_spec_semantics_) {
+    return true;
+  }
+
   if (!hasCompleteHeaderAttributes()) {
     return true;
   }
@@ -327,6 +362,26 @@ bool McpFilter::needsBody() const {
   }
 
   return false;
+}
+
+bool McpFilter::shouldUseNewSpecSemantics() const {
+  if (protocol_version_.has_value() &&
+      *protocol_version_ == Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28) {
+    return true;
+  }
+
+  const auto& supported = config_->protocolVersions().supported();
+  if (supported.empty()) {
+    return false;
+  }
+
+  for (const auto& version : supported) {
+    if (version != Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 bool McpFilter::hasCompleteHeaderAttributes() const {
@@ -353,6 +408,40 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
     return Http::FilterHeadersStatus::Continue;
   }
 
+  const auto protocol_version_headers = headers.get(kMcpProtocolVersion);
+  if (!protocol_version_headers.empty()) {
+    protocol_version_ = std::string(protocol_version_headers[0]->value().getStringView());
+
+    if (!config_->isProtocolVersionSupported(*protocol_version_)) {
+      sendUnsupportedProtocolVersionReply(*protocol_version_);
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+  }
+
+  use_new_spec_semantics_ = shouldUseNewSpecSemantics();
+
+  if (protocol_version_headers.empty() && use_new_spec_semantics_) {
+    config_->stats().header_mismatch_.inc();
+    sendHeaderMismatchReply("Missing required MCP-Protocol-Version header");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  if (use_new_spec_semantics_) {
+    if (isValidMcpDeleteRequest(headers)) {
+      sendMethodNotAllowedReply(
+          absl::StrCat("MCP DELETE is not supported for protocol version ",
+                       Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28));
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+
+    if (isValidMcpSseRequest(headers)) {
+      sendMethodNotAllowedReply(
+          absl::StrCat("MCP GET with SSE is not supported for protocol version ",
+                       Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28));
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+  }
+
   if (isValidMcpDeleteRequest(headers)) {
     is_mcp_request_ = true;
     ENVOY_LOG(debug, "valid MCP DELETE session-termination request, passing through");
@@ -368,7 +457,8 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
   if (isValidMcpPostRequest(headers)) {
     is_json_post_request_ = true;
     ENVOY_LOG(debug, "valid MCP Post request");
-    if (config_->attributeSource() != envoy::extensions::filters::http::mcp::v3::Mcp::BODY) {
+    if (use_new_spec_semantics_ ||
+        config_->attributeSource() != envoy::extensions::filters::http::mcp::v3::Mcp::BODY) {
       const auto method_headers = headers.get(kMcpMethod);
       if (!method_headers.empty()) {
         header_method_ = std::string(method_headers[0]->value().getStringView());
@@ -376,7 +466,36 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
 
       const auto name_headers = headers.get(kMcpName);
       if (!name_headers.empty()) {
-        header_name_ = std::string(name_headers[0]->value().getStringView());
+        const absl::string_view name_value = name_headers[0]->value().getStringView();
+
+        if (use_new_spec_semantics_) {
+          const auto decoded_name = decodeMcpHeaderValue(name_value);
+          if (!decoded_name.has_value()) {
+            config_->stats().header_mismatch_.inc();
+            sendHeaderMismatchReply("Invalid Base64-encoded Mcp-Name header");
+            return Http::FilterHeadersStatus::StopIteration;
+          }
+
+          header_name_ = *decoded_name;
+        } else {
+          header_name_ = std::string(name_value);
+        }
+      }
+    }
+
+    if (use_new_spec_semantics_) {
+      if (header_method_.empty()) {
+        config_->stats().header_mismatch_.inc();
+        sendHeaderMismatchReply("Missing required Mcp-Method header");
+        return Http::FilterHeadersStatus::StopIteration;
+      }
+
+      const std::string name_path = parserConfig().getNameAttributePath(header_method_);
+
+      if (!name_path.empty() && header_name_.empty()) {
+        config_->stats().header_mismatch_.inc();
+        sendHeaderMismatchReply("Missing required Mcp-Name header");
+        return Http::FilterHeadersStatus::StopIteration;
       }
     }
 
@@ -493,7 +612,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   return Http::FilterDataStatus::StopIterationAndWatermark;
 }
 
-void McpFilter::sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status) {
+void McpFilter::recordErrorState(absl::string_view error_msg, Filters::Common::Mcp::Status status) {
   ENVOY_STREAM_LOG(debug, "MCP error: {}, status: {}", *decoder_callbacks_, error_msg,
                    statusToString(status));
 
@@ -503,8 +622,10 @@ void McpFilter::sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp
   if (shouldStoreToFilterState()) {
     std::string method = parser_ ? parser_->getMethod() : "";
     Protobuf::Struct metadata = parser_ ? parser_->metadata() : Protobuf::Struct();
+
     auto filter_state_obj = std::make_shared<FilterStateObject>(method, metadata, is_mcp_request_,
                                                                 is_exceeding_limit_, status_);
+
     decoder_callbacks_->streamInfo().filterState()->setData(
         std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
         StreamInfo::FilterState::LifeSpan::Request,
@@ -515,9 +636,94 @@ void McpFilter::sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp
     Protobuf::Struct metadata = parser_ ? parser_->metadata() : Protobuf::Struct();
     setDynamicMetadataStatus(std::move(metadata));
   }
+}
+
+void McpFilter::sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status) {
+  recordErrorState(error_msg, status);
 
   decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, error_msg, nullptr, std::nullopt,
                                      statusToString(status));
+}
+
+void McpFilter::sendUnsupportedProtocolVersionReply(absl::string_view requested_version) {
+  const std::string error_msg =
+      absl::StrCat("Unsupported MCP protocol version: ", requested_version);
+
+  const auto status = Filters::Common::Mcp::Status::NotJsonRpc;
+  recordErrorState(error_msg, status);
+
+  Protobuf::Struct reply;
+
+  (*reply.mutable_fields())["jsonrpc"].set_string_value("2.0");
+  (*reply.mutable_fields())["id"].set_null_value(Protobuf::NULL_VALUE);
+
+  auto* error = (*reply.mutable_fields())["error"].mutable_struct_value();
+  (*error->mutable_fields())["code"].set_number_value(-32022);
+  (*error->mutable_fields())["message"].set_string_value(error_msg);
+
+  auto* data = (*error->mutable_fields())["data"].mutable_struct_value();
+
+  auto* supported = (*data->mutable_fields())["supported"].mutable_list_value();
+
+  for (const auto& version : config_->protocolVersions().supported()) {
+    supported->add_values()->set_string_value(version);
+  }
+
+  (*data->mutable_fields())["requested"].set_string_value(requested_version);
+
+  const std::string body = MessageUtil::getJsonStringFromMessageOrError(reply);
+
+  decoder_callbacks_->sendLocalReply(
+      Http::Code::BadRequest, body,
+      [](Http::ResponseHeaderMap& headers) {
+        headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+      },
+      std::nullopt, statusToString(status));
+}
+
+void McpFilter::sendHeaderMismatchReply(absl::string_view error_msg) {
+  const auto status = Filters::Common::Mcp::Status::NotJsonRpc;
+  recordErrorState(error_msg, status);
+
+  Protobuf::Struct reply;
+  (*reply.mutable_fields())["jsonrpc"].set_string_value("2.0");
+  auto& id = (*reply.mutable_fields())["id"];
+
+  if (parser_ != nullptr) {
+    const Protobuf::Value* request_id =
+        parser_->getNestedValue(Filters::Common::Mcp::McpConstants::ID_FIELD);
+
+    if (request_id != nullptr) {
+      id.CopyFrom(*request_id);
+    } else {
+      id.set_null_value(Protobuf::NULL_VALUE);
+    }
+  } else {
+    id.set_null_value(Protobuf::NULL_VALUE);
+  }
+
+  auto* error = (*reply.mutable_fields())["error"].mutable_struct_value();
+
+  (*error->mutable_fields())["code"].set_number_value(-32020);
+  (*error->mutable_fields())["message"].set_string_value(error_msg);
+
+  const std::string body = MessageUtil::getJsonStringFromMessageOrError(reply);
+
+  decoder_callbacks_->sendLocalReply(
+      Http::Code::BadRequest, body,
+      [](Http::ResponseHeaderMap& headers) {
+        headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+      },
+      std::nullopt, statusToString(status));
+}
+
+void McpFilter::sendMethodNotAllowedReply(absl::string_view error_msg) {
+  decoder_callbacks_->sendLocalReply(
+      Http::Code::MethodNotAllowed, error_msg,
+      [](Http::ResponseHeaderMap& headers) {
+        headers.setCopy(Http::LowerCaseString("allow"), "POST");
+      },
+      std::nullopt, "");
 }
 
 bool McpFilter::headerAttributesMatch() const {
@@ -544,11 +750,46 @@ bool McpFilter::headerAttributesMatch() const {
 }
 
 bool McpFilter::verifyHeaderAttributes() const {
-  if (config_->attributeSource() != envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY) {
+  if (!use_new_spec_semantics_) {
     return true;
   }
 
   return headerAttributesMatch();
+}
+
+McpFilter::ProtocolVersionValidationResult McpFilter::validateProtocolVersion() const {
+  if (!use_new_spec_semantics_) {
+    return ProtocolVersionValidationResult::Ok;
+  }
+
+  if (!protocol_version_.has_value() || !parser_) {
+    return ProtocolVersionValidationResult::Missing;
+  }
+
+  const Protobuf::Value* meta =
+      parser_->getNestedValue(std::string(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META));
+
+  if (meta == nullptr || meta->kind_case() != Protobuf::Value::kStructValue) {
+    return ProtocolVersionValidationResult::Missing;
+  }
+
+  const auto& fields = meta->struct_value().fields();
+  const auto it =
+      fields.find(std::string(Filters::Common::Mcp::McpConstants::PROTOCOL_VERSION_META_KEY));
+
+  if (it == fields.end()) {
+    return ProtocolVersionValidationResult::Missing;
+  }
+
+  if (it->second.kind_case() != Protobuf::Value::kStringValue) {
+    return ProtocolVersionValidationResult::Mismatch;
+  }
+
+  if (it->second.string_value() != *protocol_version_) {
+    return ProtocolVersionValidationResult::Mismatch;
+  }
+
+  return ProtocolVersionValidationResult::Ok;
 }
 
 Http::FilterDataStatus McpFilter::completeParsing() {
@@ -570,11 +811,21 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
+  const auto version_validation = validateProtocolVersion();
+
+  if (version_validation == ProtocolVersionValidationResult::Mismatch) {
+    config_->stats().header_mismatch_.inc();
+
+    sendHeaderMismatchReply("MCP-Protocol-Version header does not match request body");
+
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
   if (!verifyHeaderAttributes()) {
     config_->stats().header_mismatch_.inc();
 
-    sendErrorReply("MCP header attributes do not match request body",
-                   Filters::Common::Mcp::Status::NotJsonRpc);
+    sendHeaderMismatchReply("MCP header attributes do not match request body");
+
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
