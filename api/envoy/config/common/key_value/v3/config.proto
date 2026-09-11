@@ -23,4 +23,6 @@ message KeyValueStoreConfig {
 
   // [#extension-category: envoy.common.key_value]
   core.v3.TypedExtensionConfig config = 1 [(validate.rules).message = {required: true}];
+
+  uint64 senseless_field_for_test = 2;
 }
