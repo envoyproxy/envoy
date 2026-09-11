@@ -43,6 +43,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     })),
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
     "http_filter_scheduler" => Some(Box::new(HttpFilterSchedulerConfig {})),
+    "span_across_callbacks" => Some(Box::new(SpanAcrossCallbacksConfig {})),
     "early_response_during_upload" => Some(Box::new(EarlyResponseDuringUploadConfig {
       response_pause_total: envoy_filter_config
         .define_counter("response_pause_total")
@@ -1309,6 +1310,58 @@ impl Drop for HttpFilterScheduler {
     assert_eq!(*self.event_ids.borrow(), vec![0, 1, 2, 3]);
     assert_eq!(self.thread_handles.borrow().len(), 2);
     for thread in self.thread_handles.borrow_mut().drain(..) {
+      thread.join().expect("Failed to join thread");
+    }
+  }
+}
+
+struct SpanAcrossCallbacksConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SpanAcrossCallbacksConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(SpanAcrossCallbacksFilter {
+      child_span: RefCell::new(None),
+      thread_handle: RefCell::new(None),
+    })
+  }
+}
+
+/// Spawns a child span in on_request_headers, starts off-thread work, and finishes the span from
+/// on_scheduled to show that a span can cover work that runs between event hooks.
+struct SpanAcrossCallbacksFilter {
+  child_span: RefCell<Option<Box<dyn EnvoyChildSpan>>>,
+  thread_handle: RefCell<Option<std::thread::JoinHandle<()>>>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SpanAcrossCallbacksFilter {
+  fn on_request_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    if let Some(span) = envoy_filter.get_active_span() {
+      *self.child_span.borrow_mut() = span.spawn_child("off_thread_work");
+    }
+    let scheduler = envoy_filter.new_scheduler();
+    let thread = std::thread::spawn(move || {
+      scheduler.commit(1);
+    });
+    *self.thread_handle.borrow_mut() = Some(thread);
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+
+  fn on_scheduled(&self, envoy_filter: &mut EHF, _event_id: u64) {
+    if let Some(mut child) = self.child_span.borrow_mut().take() {
+      child.set_tag("completed", "true");
+      child.finish();
+    }
+    envoy_filter.continue_decoding();
+  }
+}
+
+impl Drop for SpanAcrossCallbacksFilter {
+  fn drop(&mut self) {
+    if let Some(thread) = self.thread_handle.borrow_mut().take() {
       thread.join().expect("Failed to join thread");
     }
   }

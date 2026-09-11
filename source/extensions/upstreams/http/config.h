@@ -32,15 +32,14 @@ class ProtocolOptionsConfigImpl : public Upstream::HttpProtocolOptionsConfig {
 public:
   static absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>> createProtocolOptionsConfig(
       const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
-      Server::Configuration::ServerFactoryContext& server_context);
+      Server::Configuration::GenericFactoryContext& context);
   static absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>> createProtocolOptionsConfig(
       const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
       const envoy::config::core::v3::HttpProtocolOptions& common_options,
       const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
       bool use_downstream_protocol, bool use_http2,
-      Server::Configuration::ServerFactoryContext& server_context,
-      ProtobufMessage::ValidationVisitor& validation_visitor);
+      Server::Configuration::GenericFactoryContext& context);
 
   // Given the supplied cluster config, and protocol options configuration,
   // returns a unit64_t representing the enabled Upstream::ClusterInfo::Features.
@@ -116,7 +115,7 @@ private:
       std::vector<Envoy::Router::ShadowPolicyPtr>&& shadow_policies,
       std::shared_ptr<const Envoy::Router::RetryPolicy>&& retry_policy,
       std::unique_ptr<Envoy::Http::HashPolicy>&& hash_policy,
-      Server::Configuration::ServerFactoryContext& server_context);
+      Server::Configuration::GenericFactoryContext& context, absl::Status& creation_status);
   // Constructor for legacy (deprecated) config.
   ProtocolOptionsConfigImpl(
       const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
@@ -124,8 +123,7 @@ private:
       const envoy::config::core::v3::HttpProtocolOptions& common_options,
       const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
       bool use_downstream_protocol, bool use_http2,
-      Server::Configuration::ServerFactoryContext& server_context,
-      ProtobufMessage::ValidationVisitor& validation_visitor);
+      Server::Configuration::GenericFactoryContext& context, absl::Status& creation_status);
 };
 
 class ProtocolOptionsConfigFactory : public Server::Configuration::ProtocolOptionsFactory {
@@ -136,8 +134,7 @@ public:
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&>(
         config, context.messageValidationVisitor());
-    auto result = ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
-        typed_config, context.serverFactoryContext());
+    auto result = ProtocolOptionsConfigImpl::createProtocolOptionsConfig(typed_config, context);
     if (!result.ok()) {
       return result.status();
     }

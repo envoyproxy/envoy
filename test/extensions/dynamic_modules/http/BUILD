@@ -164,7 +164,11 @@ envoy_cc_dyn_module_test(
     },
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/registry",
+        "//envoy/server:tracer_config_interface",
+        "//envoy/tracing:trace_driver_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",

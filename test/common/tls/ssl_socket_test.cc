@@ -2687,7 +2687,7 @@ TEST_P(SslSocketTest, PerCertTlsParamsMaxVersionApplied) {
   // Context allows TLSv1.3 by default, but cert's tls_params cap it at TLSv1.2 — mismatch.
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
   testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
-      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "ssl/tls alert protocol version")));
+      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "tlsv1 alert protocol version")));
 }
 
 // Per-cert tls_params: cert restricts ecdh_curves to P-384. Client only supports P-256 — no
@@ -2797,7 +2797,7 @@ TEST_P(SslSocketTest, PerCertTlsParamsMinVersionApplied) {
   // TLSv1_2 cannot negotiate.
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
   testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
-      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "ssl/tls alert protocol version")));
+      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "tlsv1 alert protocol version")));
 }
 
 // Certificate-level tls_params under a TLS 1.3 handshake: cert restricts to one signature
@@ -5249,7 +5249,8 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                  const std::vector<std::string>& server_names2,
                                  const std::string& client_ctx_yaml, bool expect_reuse,
                                  const Network::Address::IpVersion ip_version,
-                                 const uint32_t expected_lifetime_hint = 0) {
+                                 const uint32_t expected_lifetime_hint = 0,
+                                 const std::string& expected_sni = "") {
   Event::SimulatedTimeSystem time_system;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       transport_socket_factory_context;
@@ -5379,12 +5380,18 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   // first, so always wait until both have happened.
   size_t connect_count = 0;
   auto connect_second_time = [&connect_count, &dispatcher, &server_connection, &client_connection,
-                              expect_reuse]() {
+                              expect_reuse, &expected_sni]() {
     connect_count++;
     if (connect_count == 2) {
       if (expect_reuse) {
         EXPECT_NE(EMPTY_STRING, server_connection->ssl()->sessionId());
         EXPECT_EQ(server_connection->ssl()->sessionId(), client_connection->ssl()->sessionId());
+        // On a resumed connection the server must still be able to retrieve the SNI from the
+        // ClientHello. This depends on `SSL_get_servername()` returning the requested name for
+        // resumed sessions (see https://github.com/envoyproxy/envoy/pull/47297).
+        if (!expected_sni.empty()) {
+          EXPECT_EQ(expected_sni, server_connection->ssl()->sni());
+        }
       } else {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
       }
@@ -5520,6 +5527,34 @@ TEST_P(SslSocketTest, TicketSessionResumption) {
 
   testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
                               version_);
+}
+
+// Validates that when a session is resumed, the server can still read the SNI from the
+// connection. Retrieving the SNI relies on `SSL_get_servername()` returning the requested
+// server name for resumed sessions, which must hold for both BoringSSL and the OpenSSL
+// compatibility layer (see https://github.com/envoyproxy/envoy/pull/47297).
+TEST_P(SslSocketTest, TicketSessionResumptionWithSni) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
+)EOF";
+
+  const std::vector<std::string> server_names = {"server1.example.com"};
+
+  const std::string client_ctx_yaml = R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_yaml, server_names, server_ctx_yaml, server_names,
+                              client_ctx_yaml, true, version_, 0, "server1.example.com");
 }
 
 TEST_P(SslSocketTest, TicketSessionResumptionCustomTimeout) {

@@ -19,6 +19,7 @@
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/common/tls/utility.h"
 
+#include "test/common/tls/ocsp/test_data/good_ocsp_resp_info.h"
 #include "test/common/tls/ssl_certs_test.h"
 #include "test/common/tls/ssl_test_utility.h"
 #include "test/common/tls/test_data/no_san_cert_info.h"
@@ -34,7 +35,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -996,28 +996,8 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
   auto context = loadConfigYaml(yaml);
   auto cleanup = cleanUpHelper(context);
 
-  constexpr absl::string_view this_update = "This Update: ";
-  constexpr absl::string_view next_update = "Next Update: ";
-
-  auto ocsp_text_details =
-      absl::StrSplit(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-                         "{{ test_rundir "
-                         "}}/test/common/tls/ocsp/test_data/good_ocsp_resp_details.txt")),
-                     '\n');
-  std::string valid_from, expiration;
-  for (const auto& detail : ocsp_text_details) {
-    std::string::size_type pos = detail.find(this_update);
-    if (pos != std::string::npos) {
-      valid_from = std::string(detail.substr(pos + this_update.size()));
-      continue;
-    }
-
-    pos = detail.find(next_update);
-    if (pos != std::string::npos) {
-      expiration = std::string(detail.substr(pos + next_update.size()));
-      continue;
-    }
-  }
+  const std::string valid_from = TEST_GOOD_OCSP_RESP_THIS_UPDATE;
+  const std::string expiration = TEST_GOOD_OCSP_RESP_NEXT_UPDATE;
 
   std::string ocsp_json = absl::StrCat(R"EOF({
 "valid_from": ")EOF",
@@ -1369,59 +1349,6 @@ TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineBytes) {
           inline_bytes: ""
   )EOF";
   EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException, "DataSource cannot be empty");
-}
-
-TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAWhenRuntimeDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
-  const std::string empty_ca_path = TestEnvironment::writeStringToFileForTest("test_envoy", "");
-  const std::string yaml = fmt::format(R"EOF(
-    common_tls_context:
-      tls_certificates:
-        certificate_chain:
-          filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/san_dns_cert.pem"
-        private_key:
-          filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/san_dns_key.pem"
-      validation_context:
-        trusted_ca:
-          filename: "{}"
-  )EOF",
-                                       empty_ca_path);
-  EXPECT_NO_THROW(loadConfigYaml(yaml));
-}
-
-TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineStringWhenRuntimeDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
-  const std::string yaml = R"EOF(
-    common_tls_context:
-      tls_certificates:
-        certificate_chain:
-          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
-        private_key:
-          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
-      validation_context:
-        trusted_ca:
-          inline_string: ""
-  )EOF";
-  EXPECT_NO_THROW(loadConfigYaml(yaml));
-}
-
-TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineByteWhenRuntimeDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
-  const std::string yaml = R"EOF(
-    common_tls_context:
-      tls_certificates:
-        certificate_chain:
-          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
-        private_key:
-          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
-      validation_context:
-        trusted_ca:
-          inline_bytes: ""
-  )EOF";
-  EXPECT_NO_THROW(loadConfigYaml(yaml));
 }
 
 TEST_F(SslServerContextImplTicketTest, ValidationContextWithPinnedCertificateHash) {

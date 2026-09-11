@@ -53,8 +53,7 @@ jobs:
       target: ${{ matrix.target }}
       target-suffix: ${{ matrix.target-suffix }}
       trusted: ${{ inputs.trusted }}
-      upload-name: ${{ matrix.upload-name }}
-      upload-path: ${{ matrix.upload-path }}
+      uploads: ${{ matrix.uploads }}
     strategy:
       fail-fast: false
       matrix:
@@ -81,10 +80,10 @@ jobs:
             --config=rbe
             --config=docs-ci
           rbe: true
-          upload-name: docs
-          upload-path: generated/docs
+          uploads: |
+            docs: generated/docs
           steps-post: |
-            - uses: envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+            - uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
               with:
                 output-path: generated/docs/gcs-metadata.json
                 input-format: yaml
@@ -113,3 +112,5 @@ jobs:
     with:
       artifacts: |
         ["docs"]
+      request: ${{ inputs.request }}
+      trusted: ${{ inputs.trusted }}
