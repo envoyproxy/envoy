@@ -5,11 +5,10 @@ filter chain's :ref:`downstream TLS context
 When the filter chain instead configures a certificate validation context without
 ``require_client_certificate``, the server requests but does not require one (optional mutual TLS),
 and the handshake still succeeds if the client presents no certificate. Whenever the client
-presents a certificate, it is validated against the trust anchor of the filter chain matched for the
-connection and its fields are exposed to consumers such as ``x-forwarded-client-cert``, RBAC, and
-access logs. A filter chain that requires a client certificate must also configure
-``validation_context.trusted_ca`` and must not set ``trust_chain_verification`` to
-``ACCEPT_UNTRUSTED``, since either would let the server accept any client certificate.
+presents a certificate, its fields are exposed to consumers such as ``x-forwarded-client-cert``,
+RBAC, and access logs, and it is validated against the trust anchor of the filter chain matched for
+the connection unless ``trust_chain_verification`` is ``ACCEPT_UNTRUSTED``. A filter chain that
+requires a client certificate must also configure ``validation_context.trusted_ca``.
 
 This behavior can be reverted by setting the runtime guard
 ``envoy.reloadable_features.quic_mtls_server_enabled`` to ``false``, which restores the previous

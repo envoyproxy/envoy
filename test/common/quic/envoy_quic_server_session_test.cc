@@ -1425,9 +1425,10 @@ TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigDefault) {
   EXPECT_FALSE(config.disable_ticket_support);
 }
 
-// `GetSSLConfig` requests a client certificate and disables 0-RTT when the matched filter chain
-// requires client authentication, because replayable early data would bypass validation.
-TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigClientCertRequiredDisablesEarlyData) {
+// `GetSSLConfig` requires a client certificate when the matched filter chain requires one. Early
+// data follows the transport socket configuration, which defaults off when a validation context is
+// configured.
+TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigClientCertRequired) {
   installReadFilter();
   setupMtlsFilterChainPosition(R"EOF(
 downstream_tls_context:
@@ -1449,8 +1450,8 @@ downstream_tls_context:
   EXPECT_FALSE(*config.early_data_enabled);
 }
 
-// `GetSSLConfig` leaves client authentication and 0-RTT untouched when the matched chain does not
-// require a client certificate.
+// `GetSSLConfig` leaves client authentication and 0-RTT untouched when the matched chain configures
+// no validation context.
 TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigClientCertNotRequired) {
   installReadFilter();
   setupMtlsFilterChainPosition(R"EOF(
@@ -1477,8 +1478,8 @@ TEST_F(EnvoyQuicServerSessionTest, SetClientCertificateValidated) {
   EXPECT_TRUE(envoy_quic_session_.ssl()->peerCertificateValidated());
 }
 
-// `GetSSLConfig` requests but does not require a client certificate and keeps 0-RTT when a
-// validation context is configured without `require_client_certificate`.
+// `GetSSLConfig` requests but does not require a client certificate when a validation context is
+// configured without `require_client_certificate`. Early data defaults off for such a chain.
 TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigClientCertOptional) {
   installReadFilter();
   setupMtlsFilterChainPosition(R"EOF(
@@ -1497,7 +1498,7 @@ downstream_tls_context:
   quic::QuicSSLConfig config = envoy_quic_session_.GetSSLConfig();
   EXPECT_EQ(config.client_cert_mode, quic::ClientCertMode::kRequest);
   ASSERT_TRUE(config.early_data_enabled.has_value());
-  EXPECT_TRUE(*config.early_data_enabled);
+  EXPECT_FALSE(*config.early_data_enabled);
 }
 
 // With the `quic_mtls_server_enabled` runtime guard disabled, an optional validation context does
@@ -1522,7 +1523,7 @@ downstream_tls_context:
   quic::QuicSSLConfig config = envoy_quic_session_.GetSSLConfig();
   EXPECT_EQ(config.client_cert_mode, quic::ClientCertMode::kNone);
   ASSERT_TRUE(config.early_data_enabled.has_value());
-  EXPECT_TRUE(*config.early_data_enabled);
+  EXPECT_FALSE(*config.early_data_enabled);
 }
 
 TEST_F(EnvoyQuicServerSessionTest, SessionIdleCallbacksIdempotency) {

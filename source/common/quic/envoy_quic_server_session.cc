@@ -281,11 +281,7 @@ quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
     } else {
       config.client_cert_mode = quic::ClientCertMode::kNone;
     }
-    // 0-RTT is disabled only when a client certificate is required, because replayable early data
-    // would bypass a required client certificate. Optional client authentication does not gate the
-    // connection on the certificate, so it keeps 0-RTT.
-    config.early_data_enabled = transport_socket_factory.earlyDataEnabled() &&
-                                config.client_cert_mode != quic::ClientCertMode::kRequire;
+    config.early_data_enabled = transport_socket_factory.earlyDataEnabled();
     config.disable_ticket_support = !transport_socket_factory.resumptionEnabled();
   } else {
     config.early_data_enabled = true;
