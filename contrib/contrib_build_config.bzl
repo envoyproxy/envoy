@@ -11,6 +11,7 @@ CONTRIB_EXTENSIONS = {
     # HTTP filters
     #
     "envoy.filters.http.checksum":                              "//contrib/checksum/filters/http/source:config",
+    "envoy.filters.http.client_cert":                           "//contrib/client_cert/filters/http/source:config",
     "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
     "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",

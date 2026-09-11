@@ -492,6 +492,7 @@
 /contrib/exe/ @mattklein123 @wbpcode
 /contrib/client_ssl_auth/ @ggreenway @UNOWNED
 /contrib/checksum/ @ravenblackx @phlax
+/contrib/client_cert/ @heitzlki @UNOWNED
 /contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/dynamo/ @UNOWNED @UNOWNED
 /contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
