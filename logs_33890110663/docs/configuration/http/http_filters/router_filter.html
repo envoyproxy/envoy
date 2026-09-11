@@ -1,0 +1,854 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Router &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Set-Filter-State HTTP Filter" href="set_filter_state.html" />
+    <link rel="prev" title="Role Based Access Control (RBAC) Filter" href="rbac_filter.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../http.html">HTTP</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../http_conn_man/http_conn_man.html">HTTP connection manager</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="http_filters.html">HTTP filters</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="a2a_filter.html">A2A</a></li>
+<li class="toctree-l4"><a class="reference internal" href="adaptive_concurrency_filter.html">Adaptive Concurrency</a></li>
+<li class="toctree-l4"><a class="reference internal" href="admission_control_filter.html">Admission Control</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aws_eventstream_parser_filter.html">AWS-EventStream-Parser Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ai_protocol_manager_filter.html">AI Protocol Manager</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aws_lambda_filter.html">AWS Lambda</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api_key_auth_filter.html">API key auth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aws_request_signing_filter.html">AWS Request Signing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="bandwidth_limit_filter.html">Bandwidth limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="bandwidth_share_filter.html">Bandwidth share</a></li>
+<li class="toctree-l4"><a class="reference internal" href="basic_auth_filter.html">Basic Auth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="buffer_filter.html">Buffer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cache_filter.html">Cache filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cache_v2_filter.html">CacheV2 filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cdn_loop_filter.html">CDN-Loop header</a></li>
+<li class="toctree-l4"><a class="reference internal" href="checksum_filter.html">Checksum</a></li>
+<li class="toctree-l4"><a class="reference internal" href="compressor_filter.html">Compressor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="composite_filter.html">Composite Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="connect_grpc_bridge_filter.html">Connect-gRPC Bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cors_filter.html">CORS</a></li>
+<li class="toctree-l4"><a class="reference internal" href="credential_injector_filter.html">Credential injector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="csrf_filter.html">CSRF</a></li>
+<li class="toctree-l4"><a class="reference internal" href="custom_response_filter.html">Custom Response Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="decompressor_filter.html">Decompressor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dynamic_forward_proxy_filter.html">Dynamic forward proxy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dynamodb_filter.html">DynamoDB</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ext_authz_filter.html">External Authorization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ext_proc_filter.html">External Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="fault_filter.html">Fault Injection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="file_server_filter.html">File Server</a></li>
+<li class="toctree-l4"><a class="reference internal" href="file_system_buffer_filter.html">File System Buffer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="filter_chain_filter.html">Filter Chain</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gcp_authn_filter.html">GCP Authentication Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="geoip_filter.html">IP Geolocation Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="golang_filter.html">Golang</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_field_extraction_filter.html">gRPC Field Extraction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_http1_bridge_filter.html">gRPC HTTP/1.1 bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_http1_reverse_bridge_filter.html">gRPC HTTP/1.1 reverse bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_json_reverse_transcoder_filter.html">gRPC-JSON reverse transcoder</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_json_transcoder_filter.html">gRPC-JSON transcoder</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_stats_filter.html">gRPC Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_web_filter.html">gRPC-Web</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_mutation_filter.html">Header Mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="health_check_filter.html">Health check</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_to_metadata_filter.html">Envoy Header-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ip_tagging_filter.html">IP Tagging</a></li>
+<li class="toctree-l4"><a class="reference internal" href="json_to_metadata_filter.html">Envoy Json-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="jwt_authn_filter.html">JWT Authentication</a></li>
+<li class="toctree-l4"><a class="reference internal" href="kill_request_filter.html">Kill Request</a></li>
+<li class="toctree-l4"><a class="reference internal" href="language_filter.html">Language</a></li>
+<li class="toctree-l4"><a class="reference internal" href="local_rate_limit_filter.html">Local rate limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lua_filter.html">Lua</a></li>
+<li class="toctree-l4"><a class="reference internal" href="mcp_filter.html">Model Context Protocol (MCP)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="mcp_router_filter.html">MCP Router</a></li>
+<li class="toctree-l4"><a class="reference internal" href="oauth2_filter.html">OAuth2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="on_demand_updates_filter.html">On-demand VHDS, S/RDS and CDS Updates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="original_src_filter.html">Original Source</a></li>
+<li class="toctree-l4"><a class="reference internal" href="proto_api_scrubber_filter.html">Proto API Scrubber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="proto_message_extraction_filter.html">Proto Message Extraction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rate_limit_filter.html">Rate limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rate_limit_quota_filter.html">Rate Limit Quota</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rbac_filter.html">Role Based Access Control (RBAC) Filter</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Router</a></li>
+<li class="toctree-l4"><a class="reference internal" href="set_filter_state.html">Set-Filter-State HTTP Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="set_metadata_filter.html">Set Metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="body_size_limit_filter.html">Body Size Limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sse_to_metadata_filter.html">SSE-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="stateful_session_filter.html">Stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sxg_filter.html">SXG</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tap_filter.html">Tap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="thrift_to_metadata_filter.html">Envoy Thrift-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="upstream_codec_filter.html">Upstream Codec</a></li>
+<li class="toctree-l4"><a class="reference internal" href="upstream_rbac_filter.html">Upstream Role Based Access Control (RBAC) Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wasm_filter.html">Wasm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="transform_filter.html">Transform</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../caches/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../caches_v2/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../cluster_specifier/cluster_specifier.html">HTTP cluster specifier</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tcp_bridge/tcp_bridge.html">HTTP TCP bridge</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../http.html">HTTP</a></li>
+          <li class="breadcrumb-item"><a href="http_filters.html">HTTP filters</a></li>
+      <li class="breadcrumb-item active">Router</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/http/http_filters/router_filter.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="router">
+<span id="config-http-filters-router"></span><h1>Router<a class="headerlink" href="#router" title="Link to this heading"></a></h1>
+<p>The router filter implements HTTP forwarding. It will be used in almost all HTTP proxy scenarios
+that Envoy is deployed for. The filter’s main job is to follow the instructions specified in the
+configured <a class="reference internal" href="../../../api-v3/config/route/v3/route.proto.html#envoy-v3-api-msg-config-route-v3-routeconfiguration"><span class="std std-ref">route table</span></a>. In addition to forwarding and
+redirection, the filter also handles retry, statistics, etc.</p>
+<ul class="simple">
+<li><p>This filter should be configured with the type URL <code class="docutils literal notranslate"><span class="pre">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span></code>.</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/router/v3/router.proto.html#envoy-v3-api-msg-extensions-filters-http-router-v3-router"><span class="std std-ref">v3 API reference</span></a></p></li>
+</ul>
+<section id="http-headers-consumed-from-downstreams">
+<span id="config-http-filters-router-headers-consumed"></span><h2>HTTP headers (consumed from downstreams)<a class="headerlink" href="#http-headers-consumed-from-downstreams" title="Link to this heading"></a></h2>
+<p>The router consumes and sets various HTTP headers both on the egress/request path as well as on the
+ingress/response path. They are documented in this section.</p>
+<nav class="contents local" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#x-envoy-max-retries" id="id4">x-envoy-max-retries</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-retry-on" id="id5">x-envoy-retry-on</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-retry-grpc-on" id="id6">x-envoy-retry-grpc-on</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-retriable-header-names" id="id7">x-envoy-retriable-header-names</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-retriable-status-codes" id="id8">x-envoy-retriable-status-codes</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-upstream-alt-stat-name" id="id9">x-envoy-upstream-alt-stat-name</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-upstream-rq-timeout-alt-response" id="id10">x-envoy-upstream-rq-timeout-alt-response</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-upstream-rq-timeout-ms" id="id11">x-envoy-upstream-rq-timeout-ms</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-upstream-rq-per-try-timeout-ms" id="id12">x-envoy-upstream-rq-per-try-timeout-ms</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-hedge-on-per-try-timeout" id="id13">x-envoy-hedge-on-per-try-timeout</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-decorator-operation" id="id14">x-envoy-decorator-operation</a></p></li>
+</ul>
+</nav>
+<section id="x-envoy-max-retries">
+<span id="config-http-filters-router-x-envoy-max-retries"></span><h3><a class="toc-backref" href="#id4" role="doc-backlink">x-envoy-max-retries</a><a class="headerlink" href="#x-envoy-max-retries" title="Link to this heading"></a></h3>
+<p>If a <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-retry-policy"><span class="std std-ref">route config retry policy</span></a> or a
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-virtualhost-retry-policy"><span class="std std-ref">virtual host retry policy</span></a> is in place,
+or the cluster is configured to use <a class="reference internal" href="../../../intro/arch_overview/http/http3.html#arch-overview-http3"><span class="std std-ref">HTTP/3</span></a> to talk to the upstream server and an early-data request fails during connect or gets a TooEarly(425 response code) response, Envoy will default to retrying one time unless explicitly specified. The number of retries can be explicitly set in the virtual host retry config,
+the route retry config, or by using this header. If this header is used, its value takes precedence over the number of
+retries set in either retry policy. If a retry policy is not configured and <a class="reference internal" href="#config-http-filters-router-x-envoy-retry-on"><span class="std std-ref">x-envoy-retry-on</span></a>
+or <a class="reference internal" href="#config-http-filters-router-x-envoy-retry-grpc-on"><span class="std std-ref">x-envoy-retry-grpc-on</span></a> headers are not specified, Envoy will not retry a failed request.</p>
+<p>A few notes on how Envoy does retries:</p>
+<ul class="simple">
+<li><p>The route timeout (set via <a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-timeout-ms</span></a> or the
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-timeout"><span class="std std-ref">timeout</span></a> in route configuration or set via
+<a class="reference external" href="https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md">grpc-timeout header</a>  by specifying
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-timeout"><span class="std std-ref">max_grpc_timeout</span></a> in route configuration) <strong>includes</strong> all
+retries. Thus if the request timeout is set to 3s, and the first request attempt takes 2.7s, the
+retry (including back-off) has .3s to complete. This is by design to avoid an exponential
+retry/timeout explosion.</p></li>
+<li><p>By default, Envoy uses a fully jittered exponential back-off algorithm for retries with a default base
+interval of 25ms. Given a base interval B and retry number N, the back-off for the retry is in
+the range <span class="math notranslate nohighlight">\(\big[0, (2^N-1)B\big)\)</span>. For example, given the default interval, the first retry
+will be delayed randomly by 0-24ms, the 2nd by 0-74ms, the 3rd by 0-174ms, and so on. The
+interval is capped at a maximum interval, which defaults to 10 times the base interval (250ms).
+The default base interval (and therefore the maximum interval) can be manipulated by setting the
+upstream.base_retry_backoff_ms runtime parameter. The back-off intervals can also be modified
+by configuring the retry policy’s
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-retry-back-off"><span class="std std-ref">retry back-off</span></a>.</p></li>
+<li><p>Envoy can also be configured to use feedback from the upstream server to decide the interval between
+retries. Response headers like <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> or <code class="docutils literal notranslate"><span class="pre">X-RateLimit-Reset</span></code> instruct the client how long
+to wait before re-trying. The retry policy’s
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-rate-limited-retry-back-off"><span class="std std-ref">rate limited retry back off</span></a>
+strategy can be configured to expect a particular header, and if that header is present in the response Envoy
+will use its value to decide the back-off. If the header is not present, or if it cannot be parsed
+successfully, Envoy will use the default exponential back-off algorithm instead.</p></li>
+</ul>
+</section>
+<section id="x-envoy-retry-on">
+<span id="config-http-filters-router-x-envoy-retry-on"></span><h3><a class="toc-backref" href="#id5" role="doc-backlink">x-envoy-retry-on</a><a class="headerlink" href="#x-envoy-retry-on" title="Link to this heading"></a></h3>
+<p>Setting this header will cause Envoy to attempt to retry failed requests (number
+of retries defaults to 1 and can be controlled by <a class="reference internal" href="#config-http-filters-router-x-envoy-max-retries"><span class="std std-ref">x-envoy-max-retries</span></a> header or the <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-retry-policy"><span class="std std-ref">route config retry policy</span></a> or the <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-virtualhost-retry-policy"><span class="std std-ref">virtual host retry policy</span></a>).
+The value to which the x-envoy-retry-on header is set indicates the retry policy. One or more policies
+can be specified using a ‘,’ delimited list. The supported policies are:</p>
+<dl class="simple">
+<dt>5xx</dt><dd><p>Envoy will attempt a retry if the upstream server responds with any 5xx response code, or does not
+respond at all (disconnect/reset/read timeout). (Includes <em>connect-failure</em> and <em>refused-stream</em>)</p>
+<ul class="simple">
+<li><p><strong>NOTE:</strong> Envoy will not retry when a request exceeds
+<a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-timeout-ms</span></a> (resulting in a 504 error
+code). Use <a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-per-try-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-per-try-timeout-ms</span></a> if you want
+to retry when individual attempts take too long.
+<a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-timeout-ms</span></a> is an outer time limit for a
+request, including any retries that take place.</p></li>
+</ul>
+</dd>
+<dt>gateway-error</dt><dd><p>This policy is similar to the <em>5xx</em> policy but will attempt a retry if the upstream server responds
+with 502, 503, or 504 response code, or does not respond at all (disconnect/reset/read timeout).</p>
+</dd>
+<dt>reset</dt><dd><p>Envoy will attempt a retry if the upstream server does not respond at all (disconnect/reset/read timeout.)</p>
+</dd>
+<dt>reset-before-request</dt><dd><p>Equivalent to <em>reset</em> but will only retry requests that have not been sent to the upstream server
+(i.e. the headers have not been sent).</p>
+</dd>
+<dt>connect-failure</dt><dd><p>Envoy will attempt a retry if a request is failed because of a connection failure to the upstream
+server (connect timeout, etc.). (Included in <em>5xx</em>)</p>
+<ul class="simple">
+<li><p><strong>NOTE:</strong> A connection failure/timeout is a the TCP level, not the request level. This does not
+include upstream request timeouts specified via
+<a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-timeout-ms</span></a> or via <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-retry-policy"><span class="std std-ref">route
+configuration</span></a> or via
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-virtualhost-retry-policy"><span class="std std-ref">virtual host retry policy</span></a>.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple" id="config-http-filters-router-retry-policy-envoy-ratelimited">
+<dt>envoy-ratelimited</dt><dd><p>Envoy will retry if the header <a class="reference internal" href="#config-http-filters-router-x-envoy-ratelimited"><span class="std std-ref">x-envoy-ratelimited</span></a>
+is present.</p>
+</dd>
+<dt>retriable-4xx</dt><dd><p>Envoy will attempt a retry if the upstream server responds with a retriable 4xx response code.
+Currently, the only response code in this category is 409.</p>
+<ul class="simple">
+<li><p><strong>NOTE:</strong> Be careful turning on this retry type. There are certain cases where a 409 can indicate
+that an optimistic locking revision needs to be updated. Thus, the caller should not retry and
+needs to read then attempt another write. If a retry happens in this type of case it will always
+fail with another 409.</p></li>
+</ul>
+</dd>
+<dt>refused-stream</dt><dd><p>Envoy will attempt a retry if the upstream server resets the stream with a REFUSED_STREAM error
+code. This reset type indicates that a request is safe to retry. (Included in <em>5xx</em>)</p>
+</dd>
+<dt>retriable-status-codes</dt><dd><p>Envoy will attempt a retry if the upstream server responds with any response code matching one defined
+in either <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-retriable-status-codes"><span class="std std-ref">the retry policy</span></a>
+or in the <a class="reference internal" href="#config-http-filters-router-x-envoy-retriable-status-codes"><span class="std std-ref">x-envoy-retriable-status-codes</span></a> header.</p>
+</dd>
+<dt>retriable-headers</dt><dd><p>Envoy will attempt a retry if the upstream server response includes any headers matching in either
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-retriable-headers"><span class="std std-ref">the retry policy</span></a> or in the
+<a class="reference internal" href="#config-http-filters-router-x-envoy-retriable-header-names"><span class="std std-ref">x-envoy-retriable-header-names</span></a> header.</p>
+</dd>
+<dt>http3-post-connect-failure:</dt><dd><p>Envoy will attempt a retry if a request is sent over HTTP/3 to the upstream server and failed after getting connected.</p>
+</dd>
+</dl>
+<p>The number of retries can be controlled via the
+<a class="reference internal" href="#config-http-filters-router-x-envoy-max-retries"><span class="std std-ref">x-envoy-max-retries</span></a> header or via the <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-retry-policy"><span class="std std-ref">route
+configuration</span></a> or via the
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-virtualhost-retry-policy"><span class="std std-ref">virtual host retry policy</span></a>.</p>
+<p>Note that retry policies can also be applied at the <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-retry-policy"><span class="std std-ref">route level</span></a> or the
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-virtualhost-retry-policy"><span class="std std-ref">virtual host level</span></a>.</p>
+<p>By default, Envoy will <em>not</em> perform retries unless you’ve configured them per above.</p>
+</section>
+<section id="x-envoy-retry-grpc-on">
+<span id="config-http-filters-router-x-envoy-retry-grpc-on"></span><h3><a class="toc-backref" href="#id6" role="doc-backlink">x-envoy-retry-grpc-on</a><a class="headerlink" href="#x-envoy-retry-grpc-on" title="Link to this heading"></a></h3>
+<p>Setting this header will cause Envoy to attempt to retry failed requests (number of retries defaults
+to 1, and can be controlled by <a class="reference internal" href="#config-http-filters-router-x-envoy-max-retries"><span class="std std-ref">x-envoy-max-retries</span></a>
+header or the <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-retry-policy"><span class="std std-ref">route config retry policy</span></a> or the
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-virtualhost-retry-policy"><span class="std std-ref">virtual host retry policy</span></a>).
+gRPC retries are currently only supported for gRPC status codes in response headers. gRPC status codes in
+trailers will not trigger retry logic. One or more policies can be specified  using a ‘,’ delimited
+list. The supported policies are:</p>
+<dl class="simple">
+<dt>cancelled</dt><dd><p>Envoy will attempt a retry if the gRPC status code in the response headers is “cancelled” (1)</p>
+</dd>
+<dt>deadline-exceeded</dt><dd><p>Envoy will attempt a retry if the gRPC status code in the response headers is “deadline-exceeded” (4)</p>
+</dd>
+<dt>internal</dt><dd><p>Envoy will attempt to retry if the gRPC status code in the response headers is “internal” (13)</p>
+</dd>
+<dt>resource-exhausted</dt><dd><p>Envoy will attempt a retry if the gRPC status code in the response headers is “resource-exhausted” (8)</p>
+</dd>
+<dt>unavailable</dt><dd><p>Envoy will attempt a retry if the gRPC status code in the response headers is “unavailable” (14)</p>
+</dd>
+</dl>
+<p>As with the x-envoy-retry-grpc-on header, the number of retries can be controlled via the
+<a class="reference internal" href="#config-http-filters-router-x-envoy-max-retries"><span class="std std-ref">x-envoy-max-retries</span></a> header</p>
+<p>Note that retry policies can also be applied at the <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-retry-policy"><span class="std std-ref">route level</span></a> or the
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-virtualhost-retry-policy"><span class="std std-ref">virtual host level</span></a>.</p>
+<p>By default, Envoy will <em>not</em> perform retries unless you’ve configured them per above.</p>
+</section>
+<section id="x-envoy-retriable-header-names">
+<span id="config-http-filters-router-x-envoy-retriable-header-names"></span><h3><a class="toc-backref" href="#id7" role="doc-backlink">x-envoy-retriable-header-names</a><a class="headerlink" href="#x-envoy-retriable-header-names" title="Link to this heading"></a></h3>
+<p>Setting this header informs Envoy about what response headers should be considered retriable. It is used
+in conjunction with the <a class="reference internal" href="#config-http-filters-router-x-envoy-retry-on"><span class="std std-ref">retriable-headers</span></a> retry policy.
+When the corresponding retry policy is set, the response headers provided by this list header value will be
+considered retriable in addition to the response headers enabled for retry through other retry policies.</p>
+<p>The list is a comma-separated list of header names: “X-Upstream-Retry,X-Try-Again” would cause any upstream
+responses containing either one of the specified headers to be retriable if ‘retriable-headers’ retry policy
+is enabled. Header names are case-insensitive.</p>
+<p>Only the names of retriable response headers can be specified via the request header. A more sophisticated
+retry policy based on the response headers can be specified by using arbitrary header matching rules
+via <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-retriable-headers"><span class="std std-ref">retry policy configuration</span></a>.</p>
+<p>This header will only be honored for requests from internal clients.</p>
+</section>
+<section id="x-envoy-retriable-status-codes">
+<span id="config-http-filters-router-x-envoy-retriable-status-codes"></span><h3><a class="toc-backref" href="#id8" role="doc-backlink">x-envoy-retriable-status-codes</a><a class="headerlink" href="#x-envoy-retriable-status-codes" title="Link to this heading"></a></h3>
+<p>Setting this header informs Envoy about what status codes should be considered retriable when used in
+conjunction with the <a class="reference internal" href="#config-http-filters-router-x-envoy-retry-on"><span class="std std-ref">retriable-status-code</span></a> retry policy.
+When the corresponding retry policy is set, the list of retriable status codes will be considered retriable
+in addition to the status codes enabled for retry through other retry policies.</p>
+<p>The list is a comma delimited list of integers: “409” would cause 409 to be considered retriable, while “504,409”
+would consider both 504 and 409 retriable.</p>
+<p>This header will only be honored for requests from internal clients.</p>
+</section>
+<section id="x-envoy-upstream-alt-stat-name">
+<span id="config-http-filters-router-x-envoy-upstream-alt-stat-name"></span><h3><a class="toc-backref" href="#id9" role="doc-backlink">x-envoy-upstream-alt-stat-name</a><a class="headerlink" href="#x-envoy-upstream-alt-stat-name" title="Link to this heading"></a></h3>
+<p>Setting this header will cause Envoy to emit upstream response code/timing statistics to a dual stat tree.
+This can be useful for application level categories that Envoy doesn’t know about. The output tree
+is documented <a class="reference internal" href="../../upstream/cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats-alt-tree"><span class="std std-ref">here</span></a>.</p>
+<p>This should not be confused with <a class="reference internal" href="../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-alt-stat-name"><span class="std std-ref">alt_stat_name</span></a> which
+is specified while defining the cluster and when provided specifies an alternative name for the
+cluster at the root of the statistic tree.</p>
+</section>
+<section id="x-envoy-upstream-rq-timeout-alt-response">
+<span id="config-http-filters-router-x-envoy-upstream-rq-timeout-alt-response"></span><h3><a class="toc-backref" href="#id10" role="doc-backlink">x-envoy-upstream-rq-timeout-alt-response</a><a class="headerlink" href="#x-envoy-upstream-rq-timeout-alt-response" title="Link to this heading"></a></h3>
+<p>Setting this header will cause Envoy to set a 204 response code (instead of 504) in the event of a request timeout.
+The actual value of the header is ignored; only its presence is considered. See also
+<a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-timeout-ms</span></a>.</p>
+</section>
+<section id="x-envoy-upstream-rq-timeout-ms">
+<span id="config-http-filters-router-x-envoy-upstream-rq-timeout-ms"></span><h3><a class="toc-backref" href="#id11" role="doc-backlink">x-envoy-upstream-rq-timeout-ms</a><a class="headerlink" href="#x-envoy-upstream-rq-timeout-ms" title="Link to this heading"></a></h3>
+<p>Setting this header will cause Envoy to override the <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-timeout"><span class="std std-ref">route configuration timeout</span></a> or gRPC client timeout set via <a class="reference external" href="https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md">grpc-timeout header</a>  by specifying <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-timeout"><span class="std std-ref">max_grpc_timeout</span></a>. The timeout must be specified in millisecond
+units. See also <a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-per-try-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-per-try-timeout-ms</span></a>.</p>
+</section>
+<section id="x-envoy-upstream-rq-per-try-timeout-ms">
+<span id="config-http-filters-router-x-envoy-upstream-rq-per-try-timeout-ms"></span><h3><a class="toc-backref" href="#id12" role="doc-backlink">x-envoy-upstream-rq-per-try-timeout-ms</a><a class="headerlink" href="#x-envoy-upstream-rq-per-try-timeout-ms" title="Link to this heading"></a></h3>
+<p>Setting this header will cause Envoy to set a <em>per try</em> timeout on routed requests.
+If a global route timeout is configured, this timeout must be less than the global route
+timeout (see <a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-timeout-ms</span></a>) or it is ignored.
+This allows a caller to set a tight per try timeout to allow for retries while maintaining a
+reasonable overall timeout. This timeout only applies before any part of the response is sent to
+the downstream, which normally happens after the upstream has sent response headers.</p>
+</section>
+<section id="x-envoy-hedge-on-per-try-timeout">
+<h3><a class="toc-backref" href="#id13" role="doc-backlink">x-envoy-hedge-on-per-try-timeout</a><a class="headerlink" href="#x-envoy-hedge-on-per-try-timeout" title="Link to this heading"></a></h3>
+<p>Setting this header will cause Envoy to use a request hedging strategy in the case of a per try timeout.
+This overrides the value set in the <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-hedgepolicy-hedge-on-per-try-timeout"><span class="std std-ref">route configuration</span></a>. This means that a retry
+will be issued without resetting the original request, leaving multiple upstream requests
+in flight.</p>
+<p>The value of the header should be “true” or “false”, and is ignored if invalid.</p>
+</section>
+<section id="x-envoy-decorator-operation">
+<span id="config-http-filters-router-x-envoy-decorator-operation"></span><h3><a class="toc-backref" href="#id14" role="doc-backlink">x-envoy-decorator-operation</a><a class="headerlink" href="#x-envoy-decorator-operation" title="Link to this heading"></a></h3>
+<p>The value of this header will override any locally defined operation (span) name on the
+server span generated by the tracing mechanism.</p>
+</section>
+</section>
+<section id="http-response-headers-consumed-from-upstream">
+<h2>HTTP response headers consumed from upstream<a class="headerlink" href="#http-response-headers-consumed-from-upstream" title="Link to this heading"></a></h2>
+<section id="id2">
+<h3>x-envoy-decorator-operation<a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>The value of this header will override any locally defined operation (span) name on the
+client span generated by the tracing mechanism.</p>
+</section>
+<section id="x-envoy-upstream-canary">
+<h3>x-envoy-upstream-canary<a class="headerlink" href="#x-envoy-upstream-canary" title="Link to this heading"></a></h3>
+<p>If an upstream host sets this header, the router will use it to generate canary specific statistics.
+The output tree is documented <a class="reference internal" href="../../upstream/cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats-dynamic-http"><span class="std std-ref">here</span></a>.</p>
+</section>
+<section id="x-envoy-immediate-health-check-fail">
+<span id="config-http-filters-router-x-envoy-immediate-health-check-fail"></span><h3>x-envoy-immediate-health-check-fail<a class="headerlink" href="#x-envoy-immediate-health-check-fail" title="Link to this heading"></a></h3>
+<p>If the upstream host returns this header (set to any value), Envoy will immediately assume the
+upstream host has failed <a class="reference internal" href="../../../intro/arch_overview/upstream/health_checking.html#arch-overview-health-checking"><span class="std std-ref">active health checking</span></a> (if the
+cluster has been <a class="reference internal" href="../../upstream/cluster_manager/cluster_hc.html#config-cluster-manager-cluster-hc"><span class="std std-ref">configured</span></a> for active health checking)
+and <a class="reference internal" href="../../../intro/arch_overview/upstream/load_balancing/excluded.html#arch-overview-load-balancing-excluded"><span class="std std-ref">exclude</span></a> it from load balancing. This can be used
+to fast fail an upstream host via standard data plane processing without waiting for the next health
+check interval. The host can become healthy again via standard active health checks. See the
+<a class="reference internal" href="../../../intro/arch_overview/upstream/health_checking.html#arch-overview-health-checking-fast-failure"><span class="std std-ref">active health checking fast failure overview</span></a> for
+more information.</p>
+</section>
+<section id="x-envoy-ratelimited">
+<span id="config-http-filters-router-x-envoy-ratelimited"></span><h3>x-envoy-ratelimited<a class="headerlink" href="#x-envoy-ratelimited" title="Link to this heading"></a></h3>
+<p>If this header is set by upstream, Envoy will not retry unless the retry policy
+<a class="reference internal" href="#config-http-filters-router-retry-policy-envoy-ratelimited"><span class="std std-ref">envoy-ratelimited</span></a>
+is enabled. Currently, the value of the header is not looked at, only its
+presence. This header is set by <a class="reference internal" href="rate_limit_filter.html#config-http-filters-rate-limit"><span class="std std-ref">rate limit
+filter</span></a> when the request is rate limited.</p>
+</section>
+</section>
+<section id="http-request-headers-set-on-upstream-calls">
+<span id="config-http-filters-router-headers-set"></span><h2>HTTP request headers set on upstream calls<a class="headerlink" href="#http-request-headers-set-on-upstream-calls" title="Link to this heading"></a></h2>
+<p>The router sets various HTTP headers both on the egress/request path as well as on the
+ingress/response path. They are documented in this section.</p>
+<nav class="contents local" id="id3">
+<ul class="simple">
+<li><p><a class="reference internal" href="#x-envoy-attempt-count" id="id15">x-envoy-attempt-count</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-is-timeout-retry" id="id16">x-envoy-is-timeout-retry</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-expected-rq-timeout-ms" id="id17">x-envoy-expected-rq-timeout-ms</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-original-path" id="id18">x-envoy-original-path</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-original-host" id="id19">x-envoy-original-host</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-upstream-stream-duration-ms" id="id20">x-envoy-upstream-stream-duration-ms</a></p></li>
+</ul>
+</nav>
+<section id="x-envoy-attempt-count">
+<span id="config-http-filters-router-x-envoy-attempt-count"></span><h3><a class="toc-backref" href="#id15" role="doc-backlink">x-envoy-attempt-count</a><a class="headerlink" href="#x-envoy-attempt-count" title="Link to this heading"></a></h3>
+<p>Sent to the upstream to indicate which attempt the current request is in a series of retries. The value
+will be “1” on the initial request, incrementing by one for each retry. Only set if the
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-virtualhost-include-request-attempt-count"><span class="std std-ref">include_request_attempt_count</span></a>
+flag is set to true.</p>
+<p>Sent to the downstream to indicate how many upstream requests took place. The header will be absent if
+the router did not send any upstream requests. The value will be “1” if only the original upstream
+request was sent, incrementing by one for each retry. Only set if the
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-virtualhost-include-attempt-count-in-response"><span class="std std-ref">include_attempt_count_in_response</span></a>
+flag is set to true.</p>
+</section>
+<section id="x-envoy-is-timeout-retry">
+<span id="config-http-filters-router-x-envoy-is-timeout-retry"></span><h3><a class="toc-backref" href="#id16" role="doc-backlink">x-envoy-is-timeout-retry</a><a class="headerlink" href="#x-envoy-is-timeout-retry" title="Link to this heading"></a></h3>
+<p>Sent to the upstream to indicate that the request is a retry initiated due to timeouts. Only set if the
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-virtualhost-include-is-timeout-retry-header"><span class="std std-ref">include_is_timeout_retry_header</span></a>
+flag is set to true.</p>
+</section>
+<section id="x-envoy-expected-rq-timeout-ms">
+<span id="config-http-filters-router-x-envoy-expected-rq-timeout-ms"></span><h3><a class="toc-backref" href="#id17" role="doc-backlink">x-envoy-expected-rq-timeout-ms</a><a class="headerlink" href="#x-envoy-expected-rq-timeout-ms" title="Link to this heading"></a></h3>
+<p>This is the time in milliseconds the router expects the request to be completed. Envoy sets this
+header so that the upstream host receiving the request can make decisions based on the request
+timeout, e.g., early exit. This is set on internal requests and is either taken from the
+<a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-timeout-ms</span></a> header or the <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-timeout"><span class="std std-ref">route timeout</span></a>, in that order.</p>
+</section>
+<section id="x-envoy-original-path">
+<span id="config-http-filters-router-x-envoy-original-path"></span><h3><a class="toc-backref" href="#id18" role="doc-backlink">x-envoy-original-path</a><a class="headerlink" href="#x-envoy-original-path" title="Link to this heading"></a></h3>
+<p>If the route utilizes <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-prefix-rewrite"><span class="std std-ref">prefix_rewrite</span></a>
+or <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-regex-rewrite"><span class="std std-ref">regex_rewrite</span></a>,
+Envoy will put the original path header in this header. This can be useful for logging and
+debugging.</p>
+</section>
+<section id="x-envoy-original-host">
+<span id="config-http-filters-router-x-envoy-original-host"></span><h3><a class="toc-backref" href="#id19" role="doc-backlink">x-envoy-original-host</a><a class="headerlink" href="#x-envoy-original-host" title="Link to this heading"></a></h3>
+<p>If the route utilizes
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-host-rewrite-literal"><span class="std std-ref">host_rewrite_literal</span></a>,
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-auto-host-rewrite"><span class="std std-ref">auto_host_rewrite</span></a>,
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-host-rewrite-header"><span class="std std-ref">host_rewrite_header</span></a>,
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-host-rewrite-path-regex"><span class="std std-ref">host_rewrite_path_regex</span></a>,
+Envoy will put the original host header in this header. This can be useful for logging and
+debugging.</p>
+</section>
+<section id="x-envoy-upstream-stream-duration-ms">
+<span id="config-http-filters-router-x-envoy-upstream-stream-duration-ms"></span><h3><a class="toc-backref" href="#id20" role="doc-backlink">x-envoy-upstream-stream-duration-ms</a><a class="headerlink" href="#x-envoy-upstream-stream-duration-ms" title="Link to this heading"></a></h3>
+<p>This value is used to configure the maximum upstream stream lifetime for the stream which has this header.
+If the stream exceeds this lifetime, it will be reset and a 408 response
+will be sent to downstream. If the value of the header is 0, then the lifetime will be
+infinite and no limit will be enforced. It is similar to
+<a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-httpprotocoloptions-max-stream-duration"><span class="std std-ref">max_stream_duration</span></a>,
+but that configuration applies to all streams to this cluster. If set, this header will
+override the cluster configuration. The value set for this header is set independently for other timeout related headers.</p>
+</section>
+</section>
+<section id="http-response-headers-set-on-downstream-responses">
+<h2>HTTP response headers set on downstream responses<a class="headerlink" href="#http-response-headers-set-on-downstream-responses" title="Link to this heading"></a></h2>
+<section id="x-envoy-upstream-service-time">
+<span id="config-http-filters-router-x-envoy-upstream-service-time"></span><h3>x-envoy-upstream-service-time<a class="headerlink" href="#x-envoy-upstream-service-time" title="Link to this heading"></a></h3>
+<p>Contains the time in milliseconds spent by the upstream host processing the request and the network
+latency between Envoy and upstream host. This is useful if the client wants to determine service time
+compared to network latency between client and Envoy. This header is set on responses.</p>
+</section>
+<section id="x-envoy-overloaded">
+<span id="config-http-filters-router-x-envoy-overloaded-set"></span><h3>x-envoy-overloaded<a class="headerlink" href="#x-envoy-overloaded" title="Link to this heading"></a></h3>
+<p>Envoy will set this header on the downstream response
+if a request was dropped due to either <a class="reference internal" href="#config-http-filters-router-runtime-maintenance-mode"><span class="std std-ref">maintenance mode</span></a> or upstream <a class="reference internal" href="../../../intro/arch_overview/upstream/circuit_breaking.html#arch-overview-circuit-break"><span class="std std-ref">circuit breaking</span></a>.</p>
+</section>
+</section>
+<section id="statistics">
+<span id="config-http-filters-router-stats"></span><h2>Statistics<a class="headerlink" href="#statistics" title="Link to this heading"></a></h2>
+<p>The router outputs many statistics in the cluster namespace (depending on the cluster specified in
+the chosen route). See <a class="reference internal" href="../../upstream/cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats"><span class="std std-ref">here</span></a> for more information.</p>
+<p>The router filter outputs statistics in the <em>http.&lt;stat_prefix&gt;.</em> namespace. The <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-stat-prefix"><span class="std std-ref">stat prefix</span></a> comes from the
+owning HTTP connection manager.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>no_route</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that had no route and resulted in a 404</p></td>
+</tr>
+<tr class="row-odd"><td><p>no_cluster</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests in which the target cluster did not exist and which by default result in a 503</p></td>
+</tr>
+<tr class="row-even"><td><p>rq_redirect</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that resulted in a redirect response</p></td>
+</tr>
+<tr class="row-odd"><td><p>rq_direct_response</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that resulted in a direct response</p></td>
+</tr>
+<tr class="row-even"><td><p>rq_total</p></td>
+<td><p>Counter</p></td>
+<td><p>Total routed requests</p></td>
+</tr>
+<tr class="row-odd"><td><p>rq_reset_after_downstream_response_started</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that were reset after downstream response had started</p></td>
+</tr>
+<tr class="row-even"><td><p>rq_overload_local_reply</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that were load shed if downstream filter load shed point is configured</p></td>
+</tr>
+</tbody>
+</table>
+<section id="virtual-clusters">
+<span id="config-http-filters-router-vcluster-stats"></span><h3>Virtual Clusters<a class="headerlink" href="#virtual-clusters" title="Link to this heading"></a></h3>
+<p>Virtual cluster statistics are output in the
+<code class="docutils literal notranslate"><span class="pre">vhost.&lt;virtual</span> <span class="pre">host</span> <span class="pre">name&gt;.vcluster.&lt;virtual</span> <span class="pre">cluster</span> <span class="pre">name&gt;.</span></code> namespace and include the following
+statistics:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>upstream_rq_&lt;*xx&gt;</p></td>
+<td><p>Counter</p></td>
+<td><p>Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)</p></td>
+</tr>
+<tr class="row-odd"><td><p>upstream_rq_&lt;*&gt;</p></td>
+<td><p>Counter</p></td>
+<td><p>Specific HTTP response codes (e.g., 201, 302, etc.)</p></td>
+</tr>
+<tr class="row-even"><td><p>upstream_rq_retry</p></td>
+<td><p>Counter</p></td>
+<td><p>Total request retries</p></td>
+</tr>
+<tr class="row-odd"><td><p>upstream_rq_retry_limit_exceeded</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests not retried due to exceeding <a class="reference internal" href="#config-http-filters-router-x-envoy-max-retries"><span class="std std-ref">the configured number of maximum retries</span></a></p></td>
+</tr>
+<tr class="row-even"><td><p>upstream_rq_retry_overflow</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests not retried due to circuit breaking or exceeding the <a class="reference internal" href="../../../api-v3/config/cluster/v3/circuit_breaker.proto.html#envoy-v3-api-field-config-cluster-v3-circuitbreakers-thresholds-retry-budget"><span class="std std-ref">retry budgets</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p>upstream_rq_retry_success</p></td>
+<td><p>Counter</p></td>
+<td><p>Total request retry successes</p></td>
+</tr>
+<tr class="row-even"><td><p>upstream_rq_time</p></td>
+<td><p>Histogram</p></td>
+<td><p>Time from when the downstream request is fully received to when the upstream response is complete</p></td>
+</tr>
+<tr class="row-odd"><td><p>upstream_rq_timeout</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that timed out waiting for a response</p></td>
+</tr>
+<tr class="row-even"><td><p>upstream_rq_total</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests initiated by the router to the upstream</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">upstream_rq_&lt;*xx&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">upstream_rq_&lt;*&gt;</span></code> stats only count <strong>final</strong> responses that
+were sent to the downstream client. Responses that triggered a retry are not counted here;
+they are counted in <code class="docutils literal notranslate"><span class="pre">cluster.&lt;name&gt;.retry.upstream_rq_&lt;*&gt;</span></code> instead. See
+<a class="reference internal" href="../../upstream/cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats-retry"><span class="std std-ref">cluster retry statistics</span></a> for details.</p>
+</div>
+</section>
+</section>
+<section id="runtime">
+<h2>Runtime<a class="headerlink" href="#runtime" title="Link to this heading"></a></h2>
+<p>The router filter supports the following runtime settings:</p>
+<dl class="simple">
+<dt>upstream.base_retry_backoff_ms</dt><dd><p>Base exponential retry back-off time. See <a class="reference internal" href="../../../intro/arch_overview/http/http_routing.html#arch-overview-http-routing-retry"><span class="std std-ref">here</span></a> and
+<a class="reference internal" href="#config-http-filters-router-x-envoy-max-retries"><span class="std std-ref">x-envoy-max-retries</span></a> for more information. Defaults to 25ms.
+The default maximum retry back-off time is 10 times this value.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-http-filters-router-runtime-maintenance-mode">
+<dt>upstream.maintenance_mode.&lt;cluster name&gt;</dt><dd><p>% of requests that will result in an immediate 503 response. This overrides any routing behavior
+for requests that would have been destined for &lt;cluster name&gt;. This can be used for load
+shedding, failure injection, etc. Defaults to disabled.</p>
+</dd>
+<dt>upstream.use_retry</dt><dd><p>% of requests that are eligible for retry. This configuration is checked before any other retry
+configuration and can be used to fully disable retries across all Envoys if needed.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="rbac_filter.html" class="btn btn-neutral float-left" title="Role Based Access Control (RBAC) Filter" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="set_filter_state.html" class="btn btn-neutral float-right" title="Set-Filter-State HTTP Filter" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Router</a><ul>
+<li><a class="reference internal" href="#http-headers-consumed-from-downstreams">HTTP headers (consumed from downstreams)</a><ul>
+<li><a class="reference internal" href="#x-envoy-max-retries">x-envoy-max-retries</a></li>
+<li><a class="reference internal" href="#x-envoy-retry-on">x-envoy-retry-on</a></li>
+<li><a class="reference internal" href="#x-envoy-retry-grpc-on">x-envoy-retry-grpc-on</a></li>
+<li><a class="reference internal" href="#x-envoy-retriable-header-names">x-envoy-retriable-header-names</a></li>
+<li><a class="reference internal" href="#x-envoy-retriable-status-codes">x-envoy-retriable-status-codes</a></li>
+<li><a class="reference internal" href="#x-envoy-upstream-alt-stat-name">x-envoy-upstream-alt-stat-name</a></li>
+<li><a class="reference internal" href="#x-envoy-upstream-rq-timeout-alt-response">x-envoy-upstream-rq-timeout-alt-response</a></li>
+<li><a class="reference internal" href="#x-envoy-upstream-rq-timeout-ms">x-envoy-upstream-rq-timeout-ms</a></li>
+<li><a class="reference internal" href="#x-envoy-upstream-rq-per-try-timeout-ms">x-envoy-upstream-rq-per-try-timeout-ms</a></li>
+<li><a class="reference internal" href="#x-envoy-hedge-on-per-try-timeout">x-envoy-hedge-on-per-try-timeout</a></li>
+<li><a class="reference internal" href="#x-envoy-decorator-operation">x-envoy-decorator-operation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#http-response-headers-consumed-from-upstream">HTTP response headers consumed from upstream</a><ul>
+<li><a class="reference internal" href="#id2">x-envoy-decorator-operation</a></li>
+<li><a class="reference internal" href="#x-envoy-upstream-canary">x-envoy-upstream-canary</a></li>
+<li><a class="reference internal" href="#x-envoy-immediate-health-check-fail">x-envoy-immediate-health-check-fail</a></li>
+<li><a class="reference internal" href="#x-envoy-ratelimited">x-envoy-ratelimited</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#http-request-headers-set-on-upstream-calls">HTTP request headers set on upstream calls</a><ul>
+<li><a class="reference internal" href="#x-envoy-attempt-count">x-envoy-attempt-count</a></li>
+<li><a class="reference internal" href="#x-envoy-is-timeout-retry">x-envoy-is-timeout-retry</a></li>
+<li><a class="reference internal" href="#x-envoy-expected-rq-timeout-ms">x-envoy-expected-rq-timeout-ms</a></li>
+<li><a class="reference internal" href="#x-envoy-original-path">x-envoy-original-path</a></li>
+<li><a class="reference internal" href="#x-envoy-original-host">x-envoy-original-host</a></li>
+<li><a class="reference internal" href="#x-envoy-upstream-stream-duration-ms">x-envoy-upstream-stream-duration-ms</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#http-response-headers-set-on-downstream-responses">HTTP response headers set on downstream responses</a><ul>
+<li><a class="reference internal" href="#x-envoy-upstream-service-time">x-envoy-upstream-service-time</a></li>
+<li><a class="reference internal" href="#x-envoy-overloaded">x-envoy-overloaded</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#statistics">Statistics</a><ul>
+<li><a class="reference internal" href="#virtual-clusters">Virtual Clusters</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#runtime">Runtime</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

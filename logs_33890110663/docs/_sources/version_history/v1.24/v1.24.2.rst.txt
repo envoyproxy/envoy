@@ -1,0 +1,32 @@
+.. _version_history_1.24.2:
+
+1.24.2 (February 7, 2023)
+==========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **dependency**: Add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
+* **validation**: fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
+
+
+
+
+New features
+------------
+
+
+* **attributes**: added :ref:`attributes <v1.24:arch_overview_attributes>` for looking up xDS configuration information.
+* **bazel**: updated to version 6.0.0.
+* **docker**: use new ``nossl`` images for ``distroless`` Docker build.
+

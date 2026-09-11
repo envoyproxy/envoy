@@ -1,0 +1,108 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/ratelimit/v3/rate_limit.proto:
+
+Rate limit (proto)
+==================
+
+.. _extension_envoy.filters.network.ratelimit:
+
+This extension has the qualified name ``envoy.filters.network.ratelimit``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.ratelimit.v3.RateLimit <envoy_v3_api_msg_extensions.filters.network.ratelimit.v3.RateLimit>`
+
+
+
+Rate limit :ref:`configuration overview <config_network_filters_rate_limit>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.ratelimit.v3.RateLimit:
+
+extensions.filters.network.ratelimit.v3.RateLimit
+-------------------------------------------------
+
+
+:repo:`[extensions.filters.network.ratelimit.v3.RateLimit proto] <api/envoy/extensions/filters/network/ratelimit/v3/rate_limit.proto#L24>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "domain": ...,
+    "descriptors": [],
+    "timeout": {...},
+    "failure_mode_deny": ...,
+    "rate_limit_service": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.ratelimit.v3.RateLimit.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The prefix to use when emitting :ref:`statistics <config_network_filters_rate_limit_stats>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ratelimit.v3.RateLimit.domain:
+
+
+domain
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The rate limit domain to use in the rate limit service request.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ratelimit.v3.RateLimit.descriptors:
+
+
+descriptors
+  (**repeated** :ref:`extensions.common.ratelimit.v3.RateLimitDescriptor <envoy_v3_api_msg_extensions.common.ratelimit.v3.RateLimitDescriptor>`, *REQUIRED*) The rate limit descriptor list to use in the rate limit service request.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ratelimit.v3.RateLimit.timeout:
+
+
+timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The timeout in milliseconds for the rate limit service RPC. If not
+  set, this defaults to 20ms.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ratelimit.v3.RateLimit.failure_mode_deny:
+
+
+failure_mode_deny
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The filter's behaviour in case the rate limiting service does
+  not respond back. When it is set to true, Envoy will not allow traffic in case of
+  communication failure between rate limiting service and the proxy.
+  Defaults to false.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ratelimit.v3.RateLimit.rate_limit_service:
+
+
+rate_limit_service
+  (:ref:`config.ratelimit.v3.RateLimitServiceConfig <envoy_v3_api_msg_config.ratelimit.v3.RateLimitServiceConfig>`, *REQUIRED*) Configuration for an external rate limit service provider. If not
+  specified, any calls to the rate limit service will immediately return
+  success.
+
+

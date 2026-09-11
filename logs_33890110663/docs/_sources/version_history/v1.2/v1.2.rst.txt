@@ -1,0 +1,19 @@
+.. _version_history_v1.2:
+
+v1.2
+----
+
+Latest release:
+  `1.2.0 <https://github.com/envoyproxy/envoy/releases/tag/v1.2.0>`_ (March 7, 2017)
+
+Initial release date:
+  March 7, 2017
+
+
+.. toctree::
+  :titlesonly:
+  :maxdepth: 2
+  :caption: Changelog
+
+  v1.2.0
+

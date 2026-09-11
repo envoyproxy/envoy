@@ -1,0 +1,346 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/filter_chain/v3/filter_chain.proto:
+
+Filter Chain (proto)
+====================
+
+.. _extension_envoy.filters.http.filter_chain:
+
+This extension has the qualified name ``envoy.filters.http.filter_chain``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.filter_chain.v3.FilterChainConfig <envoy_v3_api_msg_extensions.filters.http.filter_chain.v3.FilterChainConfig>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute <envoy_v3_api_msg_extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute>`
+
+
+
+Filter Chain :ref:`configuration overview <config_http_filters_filter_chain>`.
+
+.. attention::
+  This filter is specific to Envoy and is not supported in other xDS implementations.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.filter_chain.v3.FilterChainConfig:
+
+extensions.filters.http.filter_chain.v3.FilterChainConfig
+---------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.filter_chain.v3.FilterChainConfig proto] <api/envoy/extensions/filters/http/filter_chain/v3/filter_chain.proto#L37>`
+
+Filter-level configuration for the filter chain filter. This filter acts as a wrapper
+that applies a configurable chain of HTTP filters to incoming requests.
+
+When a request arrives the filter collects all active filter chains in order from least
+to most specific: ``default_filter_chain`` first, then any per-route chains ordered from
+the outermost scope (e.g. route configuration level) to the innermost scope (route level).
+Each filter in a less-specific chain is applied **unless** a more-specific chain contains
+a filter with the same ``name``.
+
+The final set of filters is applied in order from least to most specific, so that the
+least-specific filter runs first and the most-specific filter runs last. This allows
+more specific filters to override the behavior of less specific ones.
+
+If no chains are found at all the filter passes through without modifying the request.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "default_filter_chain": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfig.default_filter_chain:
+
+
+default_filter_chain
+  (:ref:`extensions.filters.http.filter_chain.v3.FilterChain <envoy_v3_api_msg_extensions.filters.http.filter_chain.v3.FilterChain>`) Default filter chain to apply when processing every request.
+
+  This field is optional. When omitted the filter still participates in per-route
+  override resolution.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute:
+
+extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute proto] <api/envoy/extensions/filters/http/filter_chain/v3/filter_chain.proto#L55>`
+
+Per-route configuration for the filter chain filter. This allows different filter chains
+to be applied on different routes.
+
+.. note::
+  Only the initial route match is considered for filter chain selection. Subsequent
+  internal route refreshes do not affect the filter chain applied to the request.
+
+When multiple per-route configs exist along the route hierarchy (e.g. one at virtual-host
+level and one at route level) the same merge rules apply iteratively from least specific
+to most specific, so the most specific definition of any named filter always wins.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "filter_chain": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute.filter_chain:
+
+
+filter_chain
+  (:ref:`extensions.filters.http.filter_chain.v3.FilterChain <envoy_v3_api_msg_extensions.filters.http.filter_chain.v3.FilterChain>`, *REQUIRED*) Filter chain to apply on this route. Must contain at least one filter.
+
+  .. note::
+    Not all HTTP filters are compatible to be used within this route level filter chain
+    for now.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.filter_chain.v3.FilterChain:
+
+extensions.filters.http.filter_chain.v3.FilterChain
+---------------------------------------------------
+
+
+:repo:`[extensions.filters.http.filter_chain.v3.FilterChain proto] <api/envoy/extensions/filters/http/filter_chain/v3/filter_chain.proto#L67>`
+
+A filter chain is a list of HTTP filters that are applied in order.
+This message is used to define a reusable chain of filters.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "filters": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChain.filters:
+
+
+filters
+  (**repeated** :ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`, *REQUIRED*) A list of HTTP filter configurations to be applied in order.
+  Each filter in the chain will process the request/response in sequence.
+  At least one filter must be specified.
+
+  .. warning::
+    Please do not configure the ``filter_chain`` filter itself or ``composite`` filter
+    within this list recursively to avoid undefined behavior.
+
+  .. note::
+    It is possible to configure ``terminal`` filters (filters that do not expect next filter
+    in the chain, e.g., ``envoy.filters.http.router``) in the middle of the chain. However,
+    use it with caution to avoid unexpected behavior.
+
+
+
+  .. _extension_category_envoy.filters.http:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.filters.http.a2a <extension_envoy.filters.http.a2a>`
+
+    - :ref:`envoy.filters.http.adaptive_concurrency <extension_envoy.filters.http.adaptive_concurrency>`
+
+    - :ref:`envoy.filters.http.admission_control <extension_envoy.filters.http.admission_control>`
+
+    - :ref:`envoy.filters.http.ai_protocol_manager <extension_envoy.filters.http.ai_protocol_manager>`
+
+    - :ref:`envoy.filters.http.alternate_protocols_cache <extension_envoy.filters.http.alternate_protocols_cache>`
+
+    - :ref:`envoy.filters.http.api_key_auth <extension_envoy.filters.http.api_key_auth>`
+
+    - :ref:`envoy.filters.http.aws_eventstream_parser <extension_envoy.filters.http.aws_eventstream_parser>`
+
+    - :ref:`envoy.filters.http.aws_lambda <extension_envoy.filters.http.aws_lambda>`
+
+    - :ref:`envoy.filters.http.aws_request_signing <extension_envoy.filters.http.aws_request_signing>`
+
+    - :ref:`envoy.filters.http.bandwidth_limit <extension_envoy.filters.http.bandwidth_limit>`
+
+    - :ref:`envoy.filters.http.bandwidth_share <extension_envoy.filters.http.bandwidth_share>`
+
+    - :ref:`envoy.filters.http.basic_auth <extension_envoy.filters.http.basic_auth>`
+
+    - :ref:`envoy.filters.http.body_size_limit <extension_envoy.filters.http.body_size_limit>`
+
+    - :ref:`envoy.filters.http.buffer <extension_envoy.filters.http.buffer>`
+
+    - :ref:`envoy.filters.http.cache <extension_envoy.filters.http.cache>`
+
+    - :ref:`envoy.filters.http.cache_v2 <extension_envoy.filters.http.cache_v2>`
+
+    - :ref:`envoy.filters.http.cdn_loop <extension_envoy.filters.http.cdn_loop>`
+
+    - :ref:`envoy.filters.http.composite <extension_envoy.filters.http.composite>`
+
+    - :ref:`envoy.filters.http.compressor <extension_envoy.filters.http.compressor>`
+
+    - :ref:`envoy.filters.http.connect_grpc_bridge <extension_envoy.filters.http.connect_grpc_bridge>`
+
+    - :ref:`envoy.filters.http.cors <extension_envoy.filters.http.cors>`
+
+    - :ref:`envoy.filters.http.credential_injector <extension_envoy.filters.http.credential_injector>`
+
+    - :ref:`envoy.filters.http.csrf <extension_envoy.filters.http.csrf>`
+
+    - :ref:`envoy.filters.http.custom_response <extension_envoy.filters.http.custom_response>`
+
+    - :ref:`envoy.filters.http.decompressor <extension_envoy.filters.http.decompressor>`
+
+    - :ref:`envoy.filters.http.dynamic_forward_proxy <extension_envoy.filters.http.dynamic_forward_proxy>`
+
+    - :ref:`envoy.filters.http.dynamic_modules <extension_envoy.filters.http.dynamic_modules>`
+
+    - :ref:`envoy.filters.http.ext_authz <extension_envoy.filters.http.ext_authz>`
+
+    - :ref:`envoy.filters.http.ext_proc <extension_envoy.filters.http.ext_proc>`
+
+    - :ref:`envoy.filters.http.fault <extension_envoy.filters.http.fault>`
+
+    - :ref:`envoy.filters.http.file_server <extension_envoy.filters.http.file_server>`
+
+    - :ref:`envoy.filters.http.file_system_buffer <extension_envoy.filters.http.file_system_buffer>`
+
+    - :ref:`envoy.filters.http.filter_chain <extension_envoy.filters.http.filter_chain>`
+
+    - :ref:`envoy.filters.http.gcp_authn <extension_envoy.filters.http.gcp_authn>`
+
+    - :ref:`envoy.filters.http.geoip <extension_envoy.filters.http.geoip>`
+
+    - :ref:`envoy.filters.http.grpc_field_extraction <extension_envoy.filters.http.grpc_field_extraction>`
+
+    - :ref:`envoy.filters.http.grpc_http1_bridge <extension_envoy.filters.http.grpc_http1_bridge>`
+
+    - :ref:`envoy.filters.http.grpc_http1_reverse_bridge <extension_envoy.filters.http.grpc_http1_reverse_bridge>`
+
+    - :ref:`envoy.filters.http.grpc_json_reverse_transcoder <extension_envoy.filters.http.grpc_json_reverse_transcoder>`
+
+    - :ref:`envoy.filters.http.grpc_json_transcoder <extension_envoy.filters.http.grpc_json_transcoder>`
+
+    - :ref:`envoy.filters.http.grpc_stats <extension_envoy.filters.http.grpc_stats>`
+
+    - :ref:`envoy.filters.http.grpc_web <extension_envoy.filters.http.grpc_web>`
+
+    - :ref:`envoy.filters.http.header_mutation <extension_envoy.filters.http.header_mutation>`
+
+    - :ref:`envoy.filters.http.header_to_metadata <extension_envoy.filters.http.header_to_metadata>`
+
+    - :ref:`envoy.filters.http.health_check <extension_envoy.filters.http.health_check>`
+
+    - :ref:`envoy.filters.http.ip_tagging <extension_envoy.filters.http.ip_tagging>`
+
+    - :ref:`envoy.filters.http.json_to_metadata <extension_envoy.filters.http.json_to_metadata>`
+
+    - :ref:`envoy.filters.http.jwt_authn <extension_envoy.filters.http.jwt_authn>`
+
+    - :ref:`envoy.filters.http.kill_request <extension_envoy.filters.http.kill_request>`
+
+    - :ref:`envoy.filters.http.local_ratelimit <extension_envoy.filters.http.local_ratelimit>`
+
+    - :ref:`envoy.filters.http.lua <extension_envoy.filters.http.lua>`
+
+    - :ref:`envoy.filters.http.mcp <extension_envoy.filters.http.mcp>`
+
+    - :ref:`envoy.filters.http.mcp_json_rest_bridge <extension_envoy.filters.http.mcp_json_rest_bridge>`
+
+    - :ref:`envoy.filters.http.mcp_router <extension_envoy.filters.http.mcp_router>`
+
+    - :ref:`envoy.filters.http.oauth2 <extension_envoy.filters.http.oauth2>`
+
+    - :ref:`envoy.filters.http.on_demand <extension_envoy.filters.http.on_demand>`
+
+    - :ref:`envoy.filters.http.original_src <extension_envoy.filters.http.original_src>`
+
+    - :ref:`envoy.filters.http.proto_api_scrubber <extension_envoy.filters.http.proto_api_scrubber>`
+
+    - :ref:`envoy.filters.http.proto_message_extraction <extension_envoy.filters.http.proto_message_extraction>`
+
+    - :ref:`envoy.filters.http.rate_limit_quota <extension_envoy.filters.http.rate_limit_quota>`
+
+    - :ref:`envoy.filters.http.ratelimit <extension_envoy.filters.http.ratelimit>`
+
+    - :ref:`envoy.filters.http.rbac <extension_envoy.filters.http.rbac>`
+
+    - :ref:`envoy.filters.http.router <extension_envoy.filters.http.router>`
+
+    - :ref:`envoy.filters.http.set_filter_state <extension_envoy.filters.http.set_filter_state>`
+
+    - :ref:`envoy.filters.http.set_metadata <extension_envoy.filters.http.set_metadata>`
+
+    - :ref:`envoy.filters.http.sse_to_metadata <extension_envoy.filters.http.sse_to_metadata>`
+
+    - :ref:`envoy.filters.http.stateful_session <extension_envoy.filters.http.stateful_session>`
+
+    - :ref:`envoy.filters.http.tap <extension_envoy.filters.http.tap>`
+
+    - :ref:`envoy.filters.http.thrift_to_metadata <extension_envoy.filters.http.thrift_to_metadata>`
+
+    - :ref:`envoy.filters.http.transform <extension_envoy.filters.http.transform>`
+
+    - :ref:`envoy.filters.http.wasm <extension_envoy.filters.http.wasm>`
+
+
+
+
+    The following extensions are available in :ref:`contrib <install_contrib>` images only:
+
+
+    - :ref:`envoy.filters.http.alpn <extension_envoy.filters.http.alpn>`
+
+    - :ref:`envoy.filters.http.checksum <extension_envoy.filters.http.checksum>`
+
+    - :ref:`envoy.filters.http.dynamo <extension_envoy.filters.http.dynamo>`
+
+    - :ref:`envoy.filters.http.golang <extension_envoy.filters.http.golang>`
+
+    - :ref:`envoy.filters.http.istio_stats <extension_envoy.filters.http.istio_stats>`
+
+    - :ref:`envoy.filters.http.language <extension_envoy.filters.http.language>`
+
+    - :ref:`envoy.filters.http.peak_ewma <extension_envoy.filters.http.peak_ewma>`
+
+    - :ref:`envoy.filters.http.peer_metadata <extension_envoy.filters.http.peer_metadata>`
+
+    - :ref:`envoy.filters.http.sxg <extension_envoy.filters.http.sxg>`
+
+    - :ref:`envoy.tap_sinks.udp_sink <extension_envoy.tap_sinks.udp_sink>`
+
+
+

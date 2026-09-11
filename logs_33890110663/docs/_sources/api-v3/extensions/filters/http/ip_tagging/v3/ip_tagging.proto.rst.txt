@@ -1,0 +1,271 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.proto:
+
+IP tagging (proto)
+==================
+
+.. _extension_envoy.filters.http.ip_tagging:
+
+This extension has the qualified name ``envoy.filters.http.ip_tagging``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging <envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging>`
+
+
+
+IP tagging :ref:`configuration overview <config_http_filters_ip_tagging>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging:
+
+extensions.filters.http.ip_tagging.v3.IPTagging
+-----------------------------------------------
+
+
+:repo:`[extensions.filters.http.ip_tagging.v3.IPTagging proto] <api/envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.proto#L22>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_type": ...,
+    "ip_tags": [],
+    "ip_tag_header": {...},
+    "ip_tags_datasource": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.request_type:
+
+
+request_type
+  (:ref:`extensions.filters.http.ip_tagging.v3.IPTagging.RequestType <envoy_v3_api_enum_extensions.filters.http.ip_tagging.v3.IPTagging.RequestType>`) The type of request the filter should apply to.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags:
+
+
+ip_tags
+  (**repeated** :ref:`extensions.filters.http.ip_tagging.v3.IPTagging.IPTag <envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging.IPTag>`) The set of IP tags for the filter.
+  Only one of :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>`
+  or :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>`
+  can be set for the IP Tagging filter.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header:
+
+
+ip_tag_header
+  (:ref:`extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader <envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader>`) Specify to which header the tags will be written.
+
+  If left unspecified, the tags will be appended to the ``x-envoy-ip-tags`` header.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource:
+
+
+ip_tags_datasource
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) Data source from which to retrieve ip tags.
+  Only filename based data source is currently supported for IP tags.
+  When using this data source, if a ``watched_directory`` is provided, the IP tags file will be re-read when a file move is detected.
+  See :ref:`watched_directory <envoy_v3_api_msg_config.core.v3.DataSource>` for more information about the ``watched_directory`` field.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging.IPTag:
+
+extensions.filters.http.ip_tagging.v3.IPTagging.IPTag
+-----------------------------------------------------
+
+
+:repo:`[extensions.filters.http.ip_tagging.v3.IPTagging.IPTag proto] <api/envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.proto#L44>`
+
+Supplies the IP tag name and the IP address subnets.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ip_tag_name": ...,
+    "ip_list": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IPTag.ip_tag_name:
+
+
+ip_tag_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the IP tag name to apply.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IPTag.ip_list:
+
+
+ip_list
+  (**repeated** :ref:`config.core.v3.CidrRange <envoy_v3_api_msg_config.core.v3.CidrRange>`) A list of IP address subnets that will be tagged with
+  ip_tag_name. Both IPv4 and IPv6 are supported.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging.IPTags:
+
+extensions.filters.http.ip_tagging.v3.IPTagging.IPTags
+------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.ip_tagging.v3.IPTagging.IPTags proto] <api/envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.proto#L58>`
+
+Specifies the content of the IP tag file.
+Allow the file to be created with no IP tags.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ip_tags": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IPTags.ip_tags:
+
+
+ip_tags
+  (**repeated** :ref:`extensions.filters.http.ip_tagging.v3.IPTagging.IPTag <envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging.IPTag>`) 
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader:
+
+extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader
+-----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader proto] <api/envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.proto#L63>`
+
+Specify to which header the tags will be written.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "header": ...,
+    "action": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.header:
+
+
+header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Header to use for ip-tagging.
+
+  This header will be sanitized based on the config in
+  :ref:`action <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.action>`
+  rather than the defaults for x-envoy prefixed headers.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.action:
+
+
+action
+  (:ref:`extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.HeaderAction <envoy_v3_api_enum_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.HeaderAction>`) Control if the :ref:`header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.header>`
+  will be sanitized, or be appended to.
+
+  Default: *SANITIZE*.
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.HeaderAction:
+
+Enum extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.HeaderAction
+-----------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.HeaderAction proto] <api/envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.proto#L65>`
+
+Describes how to apply the tags to the headers.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.HeaderAction.SANITIZE:
+
+
+SANITIZE
+  *(DEFAULT)* ⁣(DEFAULT) The header specified in :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
+  will be dropped, before the tags are applied. The incoming header will be "sanitized" regardless of whether the request is internal or external.
+
+  Note that the header will be visible unsanitized to any filters that are invoked before the ip-tag-header filter, unless it has an *x-envoy* prefix.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.HeaderAction.APPEND_IF_EXISTS_OR_ADD:
+
+
+APPEND_IF_EXISTS_OR_ADD
+  ⁣Tags will be appended to the header specified in
+  :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`.
+
+  Please note that this could cause the header to retain values set by the http client regardless of whether the request is internal or external.
+
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.ip_tagging.v3.IPTagging.RequestType:
+
+Enum extensions.filters.http.ip_tagging.v3.IPTagging.RequestType
+----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.ip_tagging.v3.IPTagging.RequestType proto] <api/envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.proto#L32>`
+
+The type of requests the filter should apply to. The supported types
+are internal, external or both. The
+:ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for_internal_origin>` header is
+used to determine if a request is internal and will result in
+:ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>`
+being set. The filter defaults to both, and it will apply to all request types.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.ip_tagging.v3.IPTagging.RequestType.BOTH:
+
+
+BOTH
+  *(DEFAULT)* ⁣Both external and internal requests will be tagged. This is the default value.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.ip_tagging.v3.IPTagging.RequestType.INTERNAL:
+
+
+INTERNAL
+  ⁣Only internal requests will be tagged.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.ip_tagging.v3.IPTagging.RequestType.EXTERNAL:
+
+
+EXTERNAL
+  ⁣Only external requests will be tagged.
+
+
+

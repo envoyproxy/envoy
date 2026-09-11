@@ -1,0 +1,92 @@
+.. _envoy_v3_api_file_envoy/extensions/load_balancing_policies/dynamic_modules/v3/dynamic_modules.proto:
+
+Dynamic Modules Load Balancing Policy (proto)
+=============================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig:
+
+extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig
+--------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig proto] <api/envoy/extensions/load_balancing_policies/dynamic_modules/v3/dynamic_modules.proto#L26>`
+
+Configuration for a load balancing policy implemented via dynamic modules.
+This enables custom load balancing algorithms to be implemented in dynamic modules
+(shared libraries loaded at runtime).
+
+The dynamic module must implement the load balancer ABI functions defined in
+:repo:`abi.h <source/extensions/dynamic_modules/abi/abi.h>`.
+
+.. _extension_envoy.load_balancing_policies.dynamic_modules:
+
+This extension has the qualified name ``envoy.load_balancing_policies.dynamic_modules``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.load_balancing_policies <extension_category_envoy.load_balancing_policies>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "lb_policy_name": ...,
+    "lb_policy_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`, *REQUIRED*) The dynamic module configuration.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig.lb_policy_name:
+
+
+lb_policy_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name to identify the load balancer implementation within the module.
+  This is passed to the module's ``envoy_dynamic_module_on_lb_config_new``
+  function.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig.lb_policy_config:
+
+
+lb_policy_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the module's load balancer implementation.
+  This is passed to the module's ``envoy_dynamic_module_on_lb_config_new``
+  function. The configuration can be any protobuf message. However, it is recommended to use
+  ``google.protobuf.Struct``, ``google.protobuf.StringValue``, or ``google.protobuf.BytesValue``.
+  These types are passed directly as bytes to the module, so the module does not need to have
+  knowledge of protobuf encoding. Otherwise, the serialized bytes of the type are passed.
+  If not specified, an empty configuration is passed.
+
+

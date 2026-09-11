@@ -1,0 +1,82 @@
+.. _envoy_v3_api_file_envoy/admin/v3/listeners.proto:
+
+Listeners (proto)
+=================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.Listeners:
+
+admin.v3.Listeners
+------------------
+
+
+:repo:`[admin.v3.Listeners proto] <api/envoy/admin/v3/listeners.proto#L19>`
+
+Admin endpoint uses this wrapper for ``/listeners`` to display listener status information.
+See :ref:`/listeners <operations_admin_interface_listeners>` for more information.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "listener_statuses": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.Listeners.listener_statuses:
+
+
+listener_statuses
+  (**repeated** :ref:`admin.v3.ListenerStatus <envoy_v3_api_msg_admin.v3.ListenerStatus>`) List of listener statuses.
+
+
+
+.. _envoy_v3_api_msg_admin.v3.ListenerStatus:
+
+admin.v3.ListenerStatus
+-----------------------
+
+
+:repo:`[admin.v3.ListenerStatus proto] <api/envoy/admin/v3/listeners.proto#L27>`
+
+Details an individual listener's current status.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "local_address": {...},
+    "additional_local_addresses": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.ListenerStatus.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Name of the listener
+
+
+.. _envoy_v3_api_field_admin.v3.ListenerStatus.local_address:
+
+
+local_address
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) The actual local address that the listener is listening on. If a listener was configured
+  to listen on port 0, then this address has the port that was allocated by the OS.
+
+
+.. _envoy_v3_api_field_admin.v3.ListenerStatus.additional_local_addresses:
+
+
+additional_local_addresses
+  (**repeated** :ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) The additional addresses the listener is listening on as specified via the :ref:`additional_addresses <envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`
+  configuration.
+
+

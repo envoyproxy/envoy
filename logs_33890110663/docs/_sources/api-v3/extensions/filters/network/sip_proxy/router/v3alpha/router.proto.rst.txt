@@ -1,0 +1,46 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.proto:
+
+Router (proto)
+==============
+
+.. _extension_envoy.filters.sip.router:
+
+This extension has the qualified name ``envoy.filters.sip.router``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.sip_proxy.filters <extension_category_envoy.sip_proxy.filters>`
+
+
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.router.v3alpha.Router:
+
+extensions.filters.network.sip_proxy.router.v3alpha.Router
+----------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.router.v3alpha.Router proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.proto#L15>`
+
+
+
+
+

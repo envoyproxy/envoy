@@ -1,0 +1,43 @@
+.. _envoy_v3_api_file_envoy/extensions/upstreams/http/http/v3/http_connection_pool.proto:
+
+Http Connection Pool (proto)
+============================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.upstreams.http.http.v3.HttpConnectionPoolProto:
+
+extensions.upstreams.http.http.v3.HttpConnectionPoolProto
+---------------------------------------------------------
+
+
+:repo:`[extensions.upstreams.http.http.v3.HttpConnectionPoolProto proto] <api/envoy/extensions/upstreams/http/http/v3/http_connection_pool.proto#L16>`
+
+A connection pool which forwards downstream HTTP as HTTP to upstream.
+
+.. _extension_envoy.upstreams.http.http:
+
+This extension has the qualified name ``envoy.upstreams.http.http``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.upstreams <extension_category_envoy.upstreams>`
+
+
+
+
+
+
+

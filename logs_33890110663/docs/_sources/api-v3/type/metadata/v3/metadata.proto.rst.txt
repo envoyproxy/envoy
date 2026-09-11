@@ -1,0 +1,228 @@
+.. _envoy_v3_api_file_envoy/type/metadata/v3/metadata.proto:
+
+Metadata (proto)
+================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.metadata.v3.MetadataKey:
+
+type.metadata.v3.MetadataKey
+----------------------------
+
+
+:repo:`[type.metadata.v3.MetadataKey proto] <api/envoy/type/metadata/v3/metadata.proto#L39>`
+
+MetadataKey provides a way to retrieve values from
+:ref:`Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` using a ``key`` and a ``path``.
+
+For example, consider the following Metadata:
+
+.. code-block:: yaml
+
+   filter_metadata:
+     envoy.xxx:
+       prop:
+         foo: bar
+         xyz:
+           hello: envoy
+
+The following MetadataKey would retrieve the string value "bar" from the Metadata:
+
+.. code-block:: yaml
+
+   key: envoy.xxx
+   path:
+   - key: prop
+   - key: foo
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "key": ...,
+    "path": []
+  }
+
+.. _envoy_v3_api_field_type.metadata.v3.MetadataKey.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The key name of the Metadata from which to retrieve the Struct.
+  This typically represents a builtin subsystem or custom extension.
+
+
+.. _envoy_v3_api_field_type.metadata.v3.MetadataKey.path:
+
+
+path
+  (**repeated** :ref:`type.metadata.v3.MetadataKey.PathSegment <envoy_v3_api_msg_type.metadata.v3.MetadataKey.PathSegment>`, *REQUIRED*) The path used to retrieve a specific Value from the Struct.
+  This can be either a prefix or a full path, depending on the use case.
+  For example, ``[prop, xyz]`` would retrieve a struct or ``[prop, foo]`` would retrieve a string
+  in the example above.
+
+  .. note::
+    Since only key-type segments are supported, a path cannot specify a list
+    unless the list is the last segment.
+
+
+.. _envoy_v3_api_msg_type.metadata.v3.MetadataKey.PathSegment:
+
+type.metadata.v3.MetadataKey.PathSegment
+----------------------------------------
+
+
+:repo:`[type.metadata.v3.MetadataKey.PathSegment proto] <api/envoy/type/metadata/v3/metadata.proto#L44>`
+
+Specifies a segment in a path for retrieving values from Metadata.
+Currently, only key-based segments (field names) are supported.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "key": ...
+  }
+
+.. _envoy_v3_api_field_type.metadata.v3.MetadataKey.PathSegment.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) If specified, use this key to retrieve the value in a Struct.
+
+
+  
+
+
+
+.. _envoy_v3_api_msg_type.metadata.v3.MetadataKind:
+
+type.metadata.v3.MetadataKind
+-----------------------------
+
+
+:repo:`[type.metadata.v3.MetadataKind proto] <api/envoy/type/metadata/v3/metadata.proto#L72>`
+
+Describes different types of metadata sources.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request": {...},
+    "route": {...},
+    "cluster": {...},
+    "host": {...}
+  }
+
+.. _envoy_v3_api_field_type.metadata.v3.MetadataKind.request:
+
+
+request
+  (:ref:`type.metadata.v3.MetadataKind.Request <envoy_v3_api_msg_type.metadata.v3.MetadataKind.Request>`) Request kind of metadata.
+
+
+  
+
+  Precisely one of :ref:`request <envoy_v3_api_field_type.metadata.v3.MetadataKind.request>`, :ref:`route <envoy_v3_api_field_type.metadata.v3.MetadataKind.route>`, :ref:`cluster <envoy_v3_api_field_type.metadata.v3.MetadataKind.cluster>`, :ref:`host <envoy_v3_api_field_type.metadata.v3.MetadataKind.host>` must be set.
+
+.. _envoy_v3_api_field_type.metadata.v3.MetadataKind.route:
+
+
+route
+  (:ref:`type.metadata.v3.MetadataKind.Route <envoy_v3_api_msg_type.metadata.v3.MetadataKind.Route>`) Route kind of metadata.
+
+
+  
+
+  Precisely one of :ref:`request <envoy_v3_api_field_type.metadata.v3.MetadataKind.request>`, :ref:`route <envoy_v3_api_field_type.metadata.v3.MetadataKind.route>`, :ref:`cluster <envoy_v3_api_field_type.metadata.v3.MetadataKind.cluster>`, :ref:`host <envoy_v3_api_field_type.metadata.v3.MetadataKind.host>` must be set.
+
+.. _envoy_v3_api_field_type.metadata.v3.MetadataKind.cluster:
+
+
+cluster
+  (:ref:`type.metadata.v3.MetadataKind.Cluster <envoy_v3_api_msg_type.metadata.v3.MetadataKind.Cluster>`) Cluster kind of metadata.
+
+
+  
+
+  Precisely one of :ref:`request <envoy_v3_api_field_type.metadata.v3.MetadataKind.request>`, :ref:`route <envoy_v3_api_field_type.metadata.v3.MetadataKind.route>`, :ref:`cluster <envoy_v3_api_field_type.metadata.v3.MetadataKind.cluster>`, :ref:`host <envoy_v3_api_field_type.metadata.v3.MetadataKind.host>` must be set.
+
+.. _envoy_v3_api_field_type.metadata.v3.MetadataKind.host:
+
+
+host
+  (:ref:`type.metadata.v3.MetadataKind.Host <envoy_v3_api_msg_type.metadata.v3.MetadataKind.Host>`) Host kind of metadata.
+
+
+  
+
+  Precisely one of :ref:`request <envoy_v3_api_field_type.metadata.v3.MetadataKind.request>`, :ref:`route <envoy_v3_api_field_type.metadata.v3.MetadataKind.route>`, :ref:`cluster <envoy_v3_api_field_type.metadata.v3.MetadataKind.cluster>`, :ref:`host <envoy_v3_api_field_type.metadata.v3.MetadataKind.host>` must be set.
+
+.. _envoy_v3_api_msg_type.metadata.v3.MetadataKind.Request:
+
+type.metadata.v3.MetadataKind.Request
+-------------------------------------
+
+
+:repo:`[type.metadata.v3.MetadataKind.Request proto] <api/envoy/type/metadata/v3/metadata.proto#L77>`
+
+Represents dynamic metadata associated with the request.
+
+
+
+
+
+.. _envoy_v3_api_msg_type.metadata.v3.MetadataKind.Route:
+
+type.metadata.v3.MetadataKind.Route
+-----------------------------------
+
+
+:repo:`[type.metadata.v3.MetadataKind.Route proto] <api/envoy/type/metadata/v3/metadata.proto#L83>`
+
+Represents metadata from :ref:`the route<envoy_v3_api_field_config.route.v3.Route.metadata>`.
+
+
+
+
+
+.. _envoy_v3_api_msg_type.metadata.v3.MetadataKind.Cluster:
+
+type.metadata.v3.MetadataKind.Cluster
+-------------------------------------
+
+
+:repo:`[type.metadata.v3.MetadataKind.Cluster proto] <api/envoy/type/metadata/v3/metadata.proto#L89>`
+
+Represents metadata from :ref:`the upstream cluster<envoy_v3_api_field_config.cluster.v3.Cluster.metadata>`.
+
+
+
+
+
+.. _envoy_v3_api_msg_type.metadata.v3.MetadataKind.Host:
+
+type.metadata.v3.MetadataKind.Host
+----------------------------------
+
+
+:repo:`[type.metadata.v3.MetadataKind.Host proto] <api/envoy/type/metadata/v3/metadata.proto#L96>`
+
+Represents metadata from :ref:`the upstream
+host<envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>`.
+
+
+
+
+

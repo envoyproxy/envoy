@@ -1,0 +1,36 @@
+.. _envoy_v3_api_file_envoy/config/trace/v3/service.proto:
+
+Trace Service (proto)
+=====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.trace.v3.TraceServiceConfig:
+
+config.trace.v3.TraceServiceConfig
+----------------------------------
+
+
+:repo:`[config.trace.v3.TraceServiceConfig proto] <api/envoy/config/trace/v3/service.proto#L19>`
+
+Configuration structure.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "grpc_service": {...}
+  }
+
+.. _envoy_v3_api_field_config.trace.v3.TraceServiceConfig.grpc_service:
+
+
+grpc_service
+  (:ref:`config.core.v3.GrpcService <envoy_v3_api_msg_config.core.v3.GrpcService>`, *REQUIRED*) The upstream gRPC cluster that hosts the metrics service.
+
+

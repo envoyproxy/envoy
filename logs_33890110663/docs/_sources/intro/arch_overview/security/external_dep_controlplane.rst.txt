@@ -1,0 +1,109 @@
+External dependencies: ``controlplane``
+=======================================
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `Abseil <https://abseil.io/>`__, `20260107.1 <https://bcr.bazel.build/modules/abseil-cpp/20260107.1/>`__, 2026-02-11, , `Apache-2.0 <https://github.com/abseil/abseil-cpp/blob/20260107.1/LICENSE>`__
+  `BoringSSL <https://github.com/google/boringssl>`__, `0.20260508.0 <https://bcr.bazel.build/modules/boringssl/0.20260508.0/>`__, 2026-04-14, `cpe:2.3:a:google:boringssl:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Agoogle%3Aboringssl%3A%2A&search_type=all>`__, `Mixed <https://github.com/google/boringssl/blob/0.20260508.0/LICENSE>`__
+  `C++ rules for Bazel <https://github.com/bazelbuild/rules_cc>`__, `0.2.22 <https://bcr.bazel.build/modules/rules_cc/0.2.22/>`__, 2026-07-07, , `Apache-2.0 <https://github.com/bazelbuild/rules_cc/blob/0.2.22/LICENSE>`__
+  `c-ares <https://c-ares.haxx.se/>`__, `1.34.6 <https://bcr.bazel.build/modules/c-ares/1.34.6/>`__, 2026-07-07, `cpe:2.3:a:c-ares_project:c-ares:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Ac-ares_project%3Ac-ares%3A%2A&search_type=all>`__, `c-ares <https://github.com/c-ares/c-ares/blob/cares-1_34_6/LICENSE.md>`__
+  `Chrome URL parsing library <https://github.com/google/gurl>`__, `0.0.0-221103-dd4080f.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/googleurl/0.0.0-221103-dd4080f.envoy/>`__, 2022-11-03, , `BSD-3-Clause <https://github.com/google/gurl/blob/0.0.0-221103-dd4080f.envoy/LICENSE>`__
+  `envoy_toolshed <https://github.com/envoyproxy/toolshed>`__, `0.4.13.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/envoy_toolshed/0.4.13.envoy/>`__, 2026-09-03, , `Apache-2.0 <https://github.com/envoyproxy/toolshed/blob/bazel-v0.4.13.envoy/LICENSE>`__
+  `fmt <https://fmt.dev>`__, `12.1.0 <https://bcr.bazel.build/modules/fmt/12.1.0/>`__, 2026-06-16, `cpe:2.3:a:fmt:fmt:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Afmt%3Afmt%3A%2A&search_type=all>`__, `fmt <https://github.com/fmtlib/fmt/blob/12.1.0/LICENSE>`__
+  `gperftools <https://github.com/gperftools/gperftools>`__, `2.17.2 <https://bcr.bazel.build/modules/gperftools/2.17.2/>`__, 2026-03-06, `cpe:2.3:a:gperftools_project:gperftools:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Agperftools_project%3Agperftools%3A%2A&search_type=all>`__, `BSD-3-Clause <https://github.com/gperftools/gperftools/blob/gperftools-2.17.2/COPYING>`__
+  `gRPC <https://grpc.io>`__, `1.83.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/grpc/1.83.0.envoy/>`__, 2026-07-22, `cpe:2.3:a:grpc:grpc:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Agrpc%3Agrpc%3A%2A&search_type=all>`__, `Apache-2.0 <https://github.com/grpc/grpc/blob/v1.83.0.envoy/LICENSE>`__
+  `Java rules for Bazel <https://github.com/bazelbuild/rules_java/>`__, `9.3.0 <https://bcr.bazel.build/modules/rules_java/9.3.0/>`__, 2026-07-15, , `Apache-2.0 <https://github.com/bazelbuild/rules_java/blob/9.3.0/LICENSE>`__
+  `jemalloc <https://github.com/jemalloc/jemalloc>`__, `5.3.0-bcr.4 <https://bcr.bazel.build/modules/jemalloc/5.3.0-bcr.4/>`__, 2022-05-06, , `BSD-2-Clause <https://github.com/jemalloc/jemalloc/blob/5.3.0-bcr.4/COPYING>`__
+  `libcircllhist <https://github.com/openhistogram/libcircllhist>`__, `0.3.2.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/libcircllhist/0.3.2.envoy/>`__, 2021-06-08, , `Apache-2.0 <https://github.com/openhistogram/libcircllhist/blob/0.3.2.envoy/LICENSE>`__
+  `libevent <https://libevent.org>`__, `2.2.2-alpha.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/libevent/2.2.2-alpha.envoy/>`__, 2026-07-01, `cpe:2.3:a:libevent_project:libevent:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Alibevent_project%3Alibevent%3A%2A&search_type=all>`__, `BSD-3-Clause <https://github.com/libevent/libevent/blob/2.2.2-alpha.envoy/LICENSE>`__
+  `liburing <https://github.com/axboe/liburing>`__, `2.15.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/liburing/2.15.envoy/>`__, 2026-06-29, , 
+  `LLVM toolchain for Bazel <https://github.com/bazel-contrib/toolchains_llvm>`__, `1.9.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/toolchains_llvm/1.9.0.envoy/>`__, 2026-08-29, , `Apache-2.0 <https://github.com/bazel-contrib/toolchains_llvm/blob/v1.9.0.envoy/LICENSE>`__
+  `Nghttp2 <https://nghttp2.org>`__, `1.66.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/nghttp2/1.66.0.envoy/>`__, 2025-06-17, `cpe:2.3:a:nghttp2:nghttp2:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Anghttp2%3Anghttp2%3A%2A&search_type=all>`__, `MIT <https://github.com/nghttp2/nghttp2/blob/v1.66.0.envoy/LICENSE>`__
+  `nlohmann JSON <https://nlohmann.github.io/json>`__, `3.12.0 <https://bcr.bazel.build/modules/nlohmann_json/3.12.0/>`__, 2025-04-11, `cpe:2.3:a:json-for-modern-cpp_project:json-for-modern-cpp:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Ajson-for-modern-cpp_project%3Ajson-for-modern-cpp%3A%2A&search_type=all>`__, `MIT <https://github.com/nlohmann/json/blob/v3.12.0/LICENSE.MIT>`__
+  `OpenSSL <https://github.com/openssl/openssl>`__, `3.5.7.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/openssl/3.5.7.envoy/>`__, 2026-06-09, `cpe:2.3:a:openssl:openssl:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Aopenssl%3Aopenssl%3A%2A&search_type=all>`__, `Apache-2.0 <https://github.com/openssl/openssl/blob/openssl-3.5.7.envoy/LICENSE.txt>`__
+  `Perfetto <https://perfetto.dev/>`__, `57.2.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/perfetto/57.2.envoy/>`__, 2026-07-07, , `Apache-2.0 <https://github.com/google/perfetto/blob/v57.2.envoy/LICENSE>`__
+  `Protocol Buffers <https://developers.google.com/protocol-buffers>`__, `35.1.bcr.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/protobuf/35.1.bcr.envoy/>`__, 2026-06-11, `cpe:2.3:a:google:protobuf:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Agoogle%3Aprotobuf%3A%2A&search_type=all>`__, `Protocol Buffers <https://github.com/protocolbuffers/protobuf/blob/v35.1.bcr.envoy/LICENSE>`__
+  `Python rules for Bazel <https://github.com/bazelbuild/rules_python>`__, `2.2.0 <https://bcr.bazel.build/modules/rules_python/2.2.0/>`__, 2026-07-04, , `Apache-2.0 <https://github.com/bazelbuild/rules_python/blob/2.2.0/LICENSE>`__
+  `QUICHE <https://github.com/google/quiche>`__, `0.0.0-260824-0140828.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/quiche/0.0.0-260824-0140828.envoy/>`__, 2026-08-31, , `BSD-3-Clause <https://github.com/google/quiche/blob/0.0.0-260824-0140828.envoy/LICENSE>`__
+  `RE2 <https://github.com/google/re2>`__, `2025-08-12.bcr.1 <https://bcr.bazel.build/modules/re2/2025-08-12.bcr.1/>`__, 2024-07-01, , `BSD-3-Clause <https://github.com/google/re2/blob/2025-08-12.bcr.1/LICENSE>`__
+  `Rules for using foreign build systems in Bazel <https://github.com/bazelbuild/rules_foreign_cc>`__, `0.15.1 <https://bcr.bazel.build/modules/rules_foreign_cc/0.15.1/>`__, 2025-06-24, , `Apache-2.0 <https://github.com/bazelbuild/rules_foreign_cc/blob/0.15.1/LICENSE>`__
+  `rules_license <https://github.com/bazelbuild/rules_license>`__, `1.0.0 <https://bcr.bazel.build/modules/rules_license/1.0.0/>`__, 2024-09-05, , `Apache-2.0 <https://github.com/bazelbuild/rules_license/blob/1.0.0/LICENSE>`__
+  `Shell script rules for Bazel <https://github.com/bazelbuild/rules_shell>`__, `0.8.0 <https://bcr.bazel.build/modules/rules_shell/0.8.0/>`__, 2026-04-15, , `Apache-2.0 <https://github.com/protocolbuffers/rules_shell/blob/0.8.0/LICENSE>`__
+  `spdlog <https://github.com/gabime/spdlog>`__, `1.16.0 <https://bcr.bazel.build/modules/spdlog/1.16.0/>`__, 2026-01-04, , `MIT <https://github.com/gabime/spdlog/blob/v1.16.0/LICENSE>`__
+  `tcmalloc <https://github.com/google/tcmalloc>`__, `0.0.0-250926-12f2552.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/tcmalloc/0.0.0-250926-12f2552.envoy/>`__, 2025-09-26, , `Apache-2.0 <https://github.com/google/tcmalloc/blob/0.0.0-250926-12f2552.envoy/LICENSE>`__
+  `xxHash <https://github.com/Cyan4973/xxHash>`__, `0.8.3 <https://bcr.bazel.build/modules/xxhash/0.8.3/>`__, 2024-12-30, , `BSD-2-Clause <https://github.com/Cyan4973/xxHash/blob/v0.8.3/LICENSE>`__
+  `yaml-cpp <https://github.com/jbeder/yaml-cpp>`__, `0.8.0 <https://bcr.bazel.build/modules/yaml-cpp/0.8.0/>`__, 2026-02-04, `cpe:2.3:a:yaml-cpp_project:yaml-cpp:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Ayaml-cpp_project%3Ayaml-cpp%3A%2A&search_type=all>`__, `MIT <https://github.com/jbeder/yaml-cpp/blob/0.8.0/LICENSE>`__
+  `zlib-ng <https://github.com/zlib-ng/zlib-ng>`__, `2.3.2.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/zlib-ng/2.3.2.envoy/>`__, 2025-12-02, , `zlib <https://github.com/zlib-ng/zlib-ng/blob/2.3.2.envoy/LICENSE.md>`__
+
+
+envoy.filters.http.grpc_field_extraction
+----------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `proto-converter <https://github.com/grpc-ecosystem/proto-converter>`__, `0.0.0-20240625-1db7653.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/proto-converter/0.0.0-20240625-1db7653.envoy/>`__, 2024-06-25, , `Apache-2.0 <https://github.com/grpc-ecosystem/proto-converter/blob/0.0.0-20240625-1db7653.envoy/LICENSE>`__
+
+
+envoy.filters.http.grpc_json_reverse_transcoder
+-----------------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `proto-converter <https://github.com/grpc-ecosystem/proto-converter>`__, `0.0.0-20240625-1db7653.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/proto-converter/0.0.0-20240625-1db7653.envoy/>`__, 2024-06-25, , `Apache-2.0 <https://github.com/grpc-ecosystem/proto-converter/blob/0.0.0-20240625-1db7653.envoy/LICENSE>`__
+
+
+envoy.filters.http.grpc_json_transcoder
+---------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `proto-converter <https://github.com/grpc-ecosystem/proto-converter>`__, `0.0.0-20240625-1db7653.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/proto-converter/0.0.0-20240625-1db7653.envoy/>`__, 2024-06-25, , `Apache-2.0 <https://github.com/grpc-ecosystem/proto-converter/blob/0.0.0-20240625-1db7653.envoy/LICENSE>`__
+
+
+envoy.filters.http.proto_api_scrubber
+-------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `proto-converter <https://github.com/grpc-ecosystem/proto-converter>`__, `0.0.0-20240625-1db7653.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/proto-converter/0.0.0-20240625-1db7653.envoy/>`__, 2024-06-25, , `Apache-2.0 <https://github.com/grpc-ecosystem/proto-converter/blob/0.0.0-20240625-1db7653.envoy/LICENSE>`__
+
+
+envoy.filters.http.proto_message_extraction
+-------------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `proto-converter <https://github.com/grpc-ecosystem/proto-converter>`__, `0.0.0-20240625-1db7653.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/proto-converter/0.0.0-20240625-1db7653.envoy/>`__, 2024-06-25, , `Apache-2.0 <https://github.com/grpc-ecosystem/proto-converter/blob/0.0.0-20240625-1db7653.envoy/LICENSE>`__
+
+
+envoy.network.dns_resolver.hickory
+----------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `Bazel rust rules <https://github.com/bazelbuild/rules_rust>`__, `0.69.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/rules_rust/0.69.0.envoy/>`__, 2026-02-26, , `Apache-2.0 <https://github.com/bazelbuild/rules_rust/blob/0.69.0.envoy/LICENSE.txt>`__
+
+
+envoy.wasm.runtime.wasmtime
+---------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `Bazel rust rules <https://github.com/bazelbuild/rules_rust>`__, `0.69.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/rules_rust/0.69.0.envoy/>`__, 2026-02-26, , `Apache-2.0 <https://github.com/bazelbuild/rules_rust/blob/0.69.0.envoy/LICENSE.txt>`__
+

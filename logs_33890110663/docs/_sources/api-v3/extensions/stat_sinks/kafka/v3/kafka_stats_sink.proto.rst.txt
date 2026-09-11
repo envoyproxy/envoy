@@ -1,0 +1,167 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/stat_sinks/kafka/v3/kafka_stats_sink.proto:
+
+Kafka Stats Sink (proto)
+========================
+
+.. _extension_envoy.stat_sinks.kafka:
+
+This extension has the qualified name ``envoy.stat_sinks.kafka``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.stats_sinks <extension_category_envoy.stats_sinks>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig>`
+
+
+
+Kafka Stats Sink :ref:`configuration overview <config_stat_sinks_kafka>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig:
+
+extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig
+---------------------------------------------------
+
+
+:repo:`[extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig proto] <api/contrib/envoy/extensions/stat_sinks/kafka/v3/kafka_stats_sink.proto#L34>`
+
+Configuration for the Kafka stats sink. Metrics are serialized and
+produced to a Kafka topic using librdkafka.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "broker_list": ...,
+    "topic": ...,
+    "batch_size": ...,
+    "report_counters_as_deltas": {...},
+    "emit_tags_as_labels": {...},
+    "producer_config": {...},
+    "buffer_flush_timeout_ms": {...},
+    "format": ...
+  }
+
+.. _envoy_v3_api_field_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig.broker_list:
+
+
+broker_list
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Comma-separated list of Kafka broker addresses in host:port format.
+  At least one broker must be specified.
+
+
+.. _envoy_v3_api_field_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig.topic:
+
+
+topic
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Kafka topic to produce metrics to.
+
+
+.. _envoy_v3_api_field_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig.batch_size:
+
+
+batch_size
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Number of metrics to batch into a single Kafka message. If 0 or unset,
+  all metrics from a single flush are sent in one message. Setting a batch
+  size helps control message sizes when there are many metrics.
+
+
+.. _envoy_v3_api_field_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig.report_counters_as_deltas:
+
+
+report_counters_as_deltas
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If true, counters are reported as the delta since last flush rather than
+  the absolute cumulative value. Defaults to false.
+
+
+.. _envoy_v3_api_field_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig.emit_tags_as_labels:
+
+
+emit_tags_as_labels
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If true, tag-extracted metric names are used and tags are emitted as
+  separate labels/JSON fields. If false, the full metric name (including tag
+  values) is used. Defaults to true.
+
+
+.. _envoy_v3_api_field_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig.producer_config:
+
+
+producer_config
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_>) Additional librdkafka producer configuration properties as key-value pairs.
+  These are passed directly to librdkafka and can be used to configure
+  compression (``compression.type``), authentication (``security.protocol``,
+  ``sasl.mechanism``, etc.), batching (``batch.num.messages``), and more.
+  See https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
+
+
+.. _envoy_v3_api_field_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig.buffer_flush_timeout_ms:
+
+
+buffer_flush_timeout_ms
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Maximum time in milliseconds to buffer messages before forcing a produce.
+  Maps to librdkafka's ``linger.ms``. If not set, defaults to 500ms.
+
+
+.. _envoy_v3_api_field_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig.format:
+
+
+format
+  (:ref:`extensions.stat_sinks.kafka.v3.SerializationFormat <envoy_v3_api_enum_extensions.stat_sinks.kafka.v3.SerializationFormat>`) Serialization format for metric messages produced to Kafka.
+  Defaults to JSON.
+
+
+
+
+
+.. _envoy_v3_api_enum_extensions.stat_sinks.kafka.v3.SerializationFormat:
+
+Enum extensions.stat_sinks.kafka.v3.SerializationFormat
+-------------------------------------------------------
+
+
+:repo:`[extensions.stat_sinks.kafka.v3.SerializationFormat proto] <api/contrib/envoy/extensions/stat_sinks/kafka/v3/kafka_stats_sink.proto#L20>`
+
+Serialization format for metrics produced to Kafka.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.stat_sinks.kafka.v3.SerializationFormat.JSON:
+
+
+JSON
+  *(DEFAULT)* ⁣JSON serialization. Metrics are encoded as human-readable JSON objects.
+
+
+.. _envoy_v3_api_enum_value_extensions.stat_sinks.kafka.v3.SerializationFormat.PROTOBUF:
+
+
+PROTOBUF
+  ⁣Protocol Buffers serialization. Each Kafka message value is a binary-serialized
+  ``envoy.service.metrics.v3.StreamMetricsMessage`` containing
+  ``io.prometheus.client.MetricFamily`` entries -- the same wire format used by
+  the gRPC ``envoy.stat_sinks.metrics_service`` sink.
+
+

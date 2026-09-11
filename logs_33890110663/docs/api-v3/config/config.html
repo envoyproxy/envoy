@@ -1,0 +1,670 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Extensions &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Access log extension filters" href="accesslog/filters.html" />
+    <link rel="prev" title="HTTP scoped routing configuration (proto)" href="route/v3/scoped_route.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Extensions</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../api.html">v3 API reference</a></li>
+      <li class="breadcrumb-item active">Extensions</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api-v3/config/config.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="extensions">
+<span id="api-v3-config"></span><h1>Extensions<a class="headerlink" href="#extensions" title="Link to this heading"></a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="accesslog/filters.html">Access log extension filters</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="accesslog/filters/filters.html">Access log extension filters</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="formatter/formatter.html">Access log formatters</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/formatter/cel/v3/cel.proto.html">Formatter extension for printing CEL expressions (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/formatter/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Formatter (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/formatter/file_content/v3/file_content.proto.html">Formatter extension for reading file contents (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/formatter/generic_secret/v3/generic_secret.proto.html">Formatter extension for printing values from generic secrets (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/formatter/metadata/v3/metadata.proto.html">Formatter extension for printing various types of metadata (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/formatter/req_without_query/v3/req_without_query.proto.html">Formatter extension for printing request without query string (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="accesslog/accesslog.html">Access loggers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="accesslog/v3/accesslog.proto.html">Common access log types (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/access_loggers/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Access Logger (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/access_loggers/file/v3/file.proto.html">File access log (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/access_loggers/fluentd/v3/fluentd.proto.html">Fluentd access log (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/access_loggers/grpc/v3/als.proto.html">gRPC Access Log Service (ALS) (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/access_loggers/open_telemetry/v3/logs_service.proto.html">OpenTelemetry Access Log (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/access_loggers/stats/v3/stats.proto.html">Stats logger (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/access_loggers/stream/v3/stream.proto.html">Standard Streams Access loggers (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/access_loggers/wasm/v3/wasm.proto.html">Wasm access log (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/access_loggers/filters/cel/v3/cel.proto.html">ExpressionFilter (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/access_loggers/filters/process_ratelimit/v3/process_ratelimit.proto.html">ProcessRateLimiter (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="certificate_mappers/certificate_mappers.html">Certificate mappers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.proto.html">Filter state certificate mapper (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/tls/cert_mappers/sni/v3/config.proto.html">SNI certificate mapper (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/tls/cert_mappers/static_name/v3/config.proto.html">Static secret certificate mapper (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="certificate_selectors/certificate_selectors.html">Certificate selectors</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.proto.html">On-demand secret certificate selector (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="certificate_validators/certificate_validators.html">Certificate validators</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Module Certificate Validator (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cluster/cluster.html">Cluster</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/clusters/aggregate/v3/cluster.proto.html">Aggregate cluster configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/clusters/common/dns/v3/dns.proto.html">DNS configuration for clusters (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/clusters/composite/v3/cluster.proto.html">Composite cluster configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/clusters/dns/v3/dns_cluster.proto.html">DNS cluster configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/clusters/dynamic_forward_proxy/v3/cluster.proto.html">Dynamic forward proxy cluster configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/clusters/dynamic_modules/v3/cluster.proto.html">Dynamic Modules Cluster (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/clusters/mcp_multicluster/v3/cluster.proto.html">MCP multi cluster configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/clusters/original_dst/v3/original_dst.proto.html">Original Destination Cluster Configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/clusters/redis/v3/redis_cluster.proto.html">Redis Cluster Configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/clusters/reverse_connection/v3/reverse_connection.proto.html">Reverse connection cluster (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="common/common.html">Common</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="common/matcher/v3/matcher.proto.html">Unified Matcher API (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/common/dynamic_forward_proxy/v3/dns_cache.proto.html">Dynamic forward proxy common configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/common/tap/v3/common.proto.html">Common tap extension configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/common/ratelimit/v3/ratelimit.proto.html">Common rate limit components (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="compression/compression.html">Compression</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/compression/gzip/compressor/v3/gzip.proto.html">Gzip Compressor (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/compression/gzip/decompressor/v3/gzip.proto.html">Gzip Decompressor (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/compression/brotli/compressor/v3/brotli.proto.html">Brotli Compressor (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/compression/brotli/decompressor/v3/brotli.proto.html">Brotli Decompressor (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/compression/zstd/compressor/v3/zstd.proto.html">Zstd Compressor (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/compression/zstd/decompressor/v3/zstd.proto.html">Zstd Decompressor (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="config_validators/config_validators.html">Config validators</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/config/validators/minimum_clusters/v3/minimum_clusters.proto.html">Minimum Clusters (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="content_parsers/content_parsers.html">Content parsers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/content_parsers/json/v3/json_content_parser.proto.html">JSON Content Parser (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="contrib/contrib.html">Contrib extensions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="contrib/sip/sip.html">SIP proxy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contrib/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contrib/cryptomb/cryptomb.html">CryptoMb private key provider</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contrib/hyperscan/matcher.html">Hyperscan matcher</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contrib/hyperscan/regex_engine.html">Hyperscan regex engine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contrib/postgres/postgres.html">Postgres Filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/private_key_providers/qat/v3alpha/qat.proto.html"><cite>QAT</cite> private key provider (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/compression/qatzip/compressor/v3alpha/qatzip.proto.html">Qatzip Compressor (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/compression/qatzstd/compressor/v3alpha/qatzstd.proto.html">Qatzstd Compressor (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/private_key_providers/kae/v3alpha/kae.proto.html"><cite>KAE</cite> private key provider (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contrib/http_tcp_bridge/http_tcp_bridge.html">HTTP TCP Bridge</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contrib/kafka_stats_sink/kafka_stats_sink.html">Kafka Stats Sink</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contrib/wasm_filter_stats_sink/wasm_filter_stats_sink.html">Wasm Filter Stats Sink</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contrib/tap_sinks/tap_sinks.html">TAP UDP sink extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contrib/load_balancing_policies/peak_ewma/peak_ewma.html">Peak EWMA Load Balancer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contrib/istio/istio.html">Istio Contrib Extensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contrib/reverse_tunnel_reporter/reverse_tunnel_reporter.html">Reverse tunnel reporter</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dns_resolver/dns_resolver.html">DNS resolver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/network/dns_resolver/apple/v3/apple_dns_resolver.proto.html">apple DNS resolver (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/network/dns_resolver/cares/v3/cares_dns_resolver.proto.html">c-ares DNS resolver (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.proto.html">getaddrinfo DNS resolver (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/network/dns_resolver/hickory/v3/hickory_dns_resolver.proto.html">Hickory DNS resolver (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="endpoint/endpoint.html">Endpoint</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="endpoint/v3/endpoint.proto.html">Endpoint configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="endpoint/v3/endpoint_components.proto.html">Endpoints (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="endpoint/v3/load_report.proto.html">Load Report (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="filter/filter.html">Filters</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="filter/listener/listener.html">Listener filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filter/network/network.html">Network filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filter/udp/udp.html">UDP listener filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filter/udp/session.html">UDP session filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filter/http/http.html">HTTP filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filter/dubbo/dubbo.html">Dubbo filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filter/thrift/thrift.html">Thrift filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filter/generic/generic.html">Generic filters</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="grpc_credential/grpc_credential.html">Grpc credentials</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="grpc_credential/v3/file_based_metadata.proto.html">Grpc Credentials File Based Metadata (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/health_check/event_sinks/file/v3/file.proto.html">Health Check Log File Sink (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="health_checker/health_checker.html">Health checkers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="health_checker/redis/v2/redis.proto.html">Redis (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/health_checkers/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Health Checker (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/health_checkers/redis/v3/redis.proto.html">Redis (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/health_checkers/thrift/v3/thrift.proto.html">Thrift (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="http/early_header_mutation.html">HTTP early header mutation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/early_header_mutation/header_mutation/v3/header_mutation.proto.html">Default early header mutation extension (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="http/cache_v2.html">HttpCacheV2 cache implementations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/cache_v2/file_system_http_cache/v3/file_system_http_cache.proto.html">FileSystemHttpCacheV2Config (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/cache_v2/simple_http_cache/v3/config.proto.html">SimpleHttpCache CacheFilter storage plugin (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="http/custom_response.html">Custom response policies</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/custom_response/local_response_policy/v3/local_response_policy.proto.html">Local Response Policy for Custom Response (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/custom_response/redirect_policy/v3/redirect_policy.proto.html">Redirect Policy for Custom Response (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="http/ext_proc.html">External Processing Extensions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.proto.html">Mapped Attribute Builder for the external processor (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/ext_proc/response_processors/save_processing_response/v3/save_processing_response.proto.html">Save Processing Response from external processor (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="http/header_formatters.html">HTTP header formatters</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/header_formatters/preserve_case/v3/preserve_case.proto.html">Preserve case header formatter (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="http/header_validators.html">HTTP header validators</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/header_validators/envoy_default/v3/header_validator.proto.html">Envoy’s default Header Validator config (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="http/original_ip_detection.html">HTTP original IP detection</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/original_ip_detection/custom_header/v3/custom_header.proto.html">Custom header original IP detection extension (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/original_ip_detection/xff/v3/xff.proto.html">XFF original IP detection extension (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="http/stateful_session.html">HTTP stateful session</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/stateful_session/cookie/v3/cookie.proto.html">Cookie based stateful session extension (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/stateful_session/envelope/v3/envelope.proto.html">Envelope stateful session extension (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/stateful_session/header/v3/header.proto.html">Header based stateful session extension (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="injected_credentials/injected_credentials.html">Injected credentials</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/injected_credentials/generic/v3/generic.proto.html">Generic Credential (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/http/injected_credentials/oauth2/v3/oauth2.proto.html">OAuth2 Credential (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="geoip_provider/geoip_provider.html">Geolocation providers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/geoip_providers/common/v3/common.proto.html">Common Geolocation Provider Configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/geoip_providers/maxmind/v3/maxmind.proto.html">MaxMind Geolocation Provider (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="trace/trace.html">HTTP tracers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="trace/v3/datadog.proto.html">Datadog tracer (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trace/v3/dynamic_ot.proto.html">Dynamically loadable OpenTracing tracer (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trace/v3/http_tracer.proto.html">Tracing (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trace/v3/lightstep.proto.html">LightStep tracer (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trace/v3/opentelemetry.proto.html">OpenTelemetry tracer (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trace/v3/service.proto.html">Trace Service (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trace/v3/skywalking.proto.html">SkyWalking tracer (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trace/v3/trace.proto.html">envoy/config/trace/v3/trace.proto (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trace/v3/xray.proto.html">AWS X-Ray Tracer Configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trace/v3/zipkin.proto.html">Zipkin tracer (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trace/opentelemetry/resource_detectors.html">OpenTelemetry Resource Detectors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trace/opentelemetry/samplers.html">OpenTelemetry Samplers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/tracers/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Tracer (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/tracers/fluentd/v3/fluentd.proto.html">Fluentd tracer (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="internal_redirect/internal_redirect.html">Internal redirect predicates</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.proto.html">Allow listed routes internal redirect predicate (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/internal_redirect/filter_state/v3/filter_state_config.proto.html">Filter-state internal redirect predicate (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/internal_redirect/previous_routes/v3/previous_routes_config.proto.html">Previous routes internal redirect predicate (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/internal_redirect/safe_cross_scheme/v3/safe_cross_scheme_config.proto.html">SafeCrossScheme internal redirect predicate (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="path/match/path_matcher.html">Path matcher</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/path/match/uri_template/v3/uri_template_match.proto.html">Uri Template Match Config (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="path/rewrite/path_rewriter.html">Path rewriter</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/path/rewrite/uri_template/v3/uri_template_rewrite.proto.html">Uri Template Rewrite Config (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quic/quic_extensions.html">Quic extensions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/quic/crypto_stream/v3/crypto_stream.proto.html">QUIC server crypto stream config (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/quic/proof_source/v3/proof_source.proto.html">QUIC proof source config (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator.proto.html">QUIC connection ID generator config (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/quic/connection_id_generator/quic_lb/v3/quic_lb.proto.html">QUIC-LB connection ID generator config (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/quic/server_preferred_address/v3/datasource.proto.html">QUIC DataSource server preferred address config (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/quic/server_preferred_address/v3/fixed_server_preferred_address_config.proto.html">QUIC fixed server preferred address config (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/quic/connection_debug_visitor/v3/connection_debug_visitor_basic.proto.html">QUIC connection debug visitor basic config (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/quic/connection_debug_visitor/quic_stats/v3/quic_stats.proto.html">QUIC stats config (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/quic/client_writer_factory/v3/default_client_writer.proto.html">Default QUIC Client Packet Writer (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="descriptors/descriptors.html">Rate limit descriptors</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/rate_limit_descriptors/expr/v3/expr.proto.html">Rate limit descriptor expression (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/rate_limit_descriptors/jwt_claim/v3/jwt_claim.proto.html">Rate limit descriptor from JWT claim (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="rbac/rbac.html">RBAC</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="rbac/v3/rbac.proto.html">Role Based Access Control (RBAC) (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="rbac/matchers.html">RBAC matchers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="rbac/matchers/upstream/upstream.html">Upstream Matchers</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="rbac/matchers.html#rbac-principals">RBAC principals</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/rbac/principals/mtls_authenticated/v3/mtls_authenticated.proto.html">RBAC MTls Authenticated Principal (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="request_id/request_id.html">Request ID</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/request_id/uuid/v3/uuid.proto.html">UUID (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="resource_monitor/resource_monitor.html">Resource monitors</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/resource_monitors/cgroup_memory/v3/cgroup_memory.proto.html">Cgroup Memory (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.proto.html">CPU utilization (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/resource_monitors/downstream_connections/v3/downstream_connections.proto.html">Downstream connections (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/resource_monitors/fixed_heap/v3/fixed_heap.proto.html">Fixed heap (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/resource_monitors/injected_resource/v3/injected_resource.proto.html">Injected resource (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resource_monitor/fixed_heap/v2alpha/fixed_heap.proto.html">Fixed heap (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resource_monitor/injected_resource/v2alpha/injected_resource.proto.html">Injected resource (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="retry/retry.html">Retry predicates</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="retry/omit_canary_hosts/empty/omit_canary_hosts.html">Omit Canary Hosts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="retry/previous_hosts/empty/previous_hosts.html">Previous Hosts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="retry/omit_canary_hosts/v2/omit_canary_hosts.proto.html">Omit Canary Hosts Predicate (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="retry/previous_hosts/v2/previous_hosts.proto.html">Previous Hosts Predicate (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/retry/host/omit_canary_hosts/v3/omit_canary_hosts.proto.html">Omit Canary Hosts Predicate (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.proto.html">Omit host metadata retry predicate (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/retry/host/previous_hosts/v3/previous_hosts.proto.html">Previous Hosts Predicate (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/retry/priority/previous_priorities/v3/previous_priorities_config.proto.html">Previous priorities retry selector (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="stat_sinks/stat_sinks.html">Stat sinks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Stats Sink (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/stat_sinks/graphite_statsd/v3/graphite_statsd.proto.html">Graphite+Statsd (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/stat_sinks/open_telemetry/v3/open_telemetry.proto.html">Open Telemetry Stats Sink (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/stat_sinks/wasm/v3/wasm.proto.html">Wasm (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="string_matcher/string_matcher.html">String Matcher</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/string_matcher/lua/v3/lua.proto.html">Lua StringMatcher (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="transport_socket/transport_socket.html">Transport sockets</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/alts/v3/alts.proto.html">ALTS (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Module Transport Socket (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.proto.html">Upstream HTTP/1.1 Proxy (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.proto.html#behavior-when-proxying">Behavior when proxying:</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.proto.html#configuring-proxy-information">Configuring proxy information:</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/internal_upstream/v3/internal_upstream.proto.html">Internal Upstream (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.proto.html">Upstream Proxy Protocol (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/quic/v3/quic_transport.proto.html">quic transport (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/raw_buffer/v3/raw_buffer.proto.html">Raw Buffer (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/s2a/v3/s2a.proto.html">envoy/extensions/transport_sockets/s2a/v3/s2a.proto (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/starttls/v3/starttls.proto.html">StartTls (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/tap/v3/tap.proto.html">Tap (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/tcp_stats/v3/tcp_stats.proto.html">TCP Stats Transport Socket wrapper (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/tls/v3/cert.proto.html">envoy/extensions/transport_sockets/tls/v3/cert.proto (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/tls/v3/common.proto.html">Common TLS configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/tls/v3/secret.proto.html">Secrets configuration (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/tls/v3/tls.proto.html">TLS transport socket (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.proto.html">SPIFFE Certificate Validator (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="upstream/upstream.html">Upstream configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/upstreams/http/v3/http_protocol_options.proto.html">HTTP Protocol Options (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/upstreams/http/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Upstream HTTP TCP Bridge (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/upstreams/http/generic/v3/generic_connection_pool.proto.html">Generic Connection Pool (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/upstreams/http/http/v3/http_connection_pool.proto.html">Http Connection Pool (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/upstreams/http/reverse_tunnel/v3/reverse_tunnel_codec.proto.html">Reverse Tunnel Upstream Codec (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/upstreams/http/tcp/v3/tcp_connection_pool.proto.html">Tcp Connection Pool (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/upstreams/http/udp/v3/udp_connection_pool.proto.html">Udp Connection Pool (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/upstreams/tcp/v3/tcp_protocol_options.proto.html">TCP Protocol Options (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/upstreams/tcp/generic/v3/generic_connection_pool.proto.html">Generic Connection Pool (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="upstream/local_address_selector/v3/default_local_address_selector.proto.html">Default Local Address Selector (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="wasm/wasm.html">WASM</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/wasm/v3/wasm.proto.html">Wasm (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/stat_sinks/wasm/v3/wasm.proto.html">Wasm (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="watchdog/watchdog.html">Watchdog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/watchdog/backtrace_action/v3/backtrace_action.proto.html">Watchdog Action that logs backtraces. (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/watchdog/profile_action/v3/profile_action.proto.html">Watchdog Action that does CPU profiling. (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../watchdog/v3/abort_action.proto.html">Watchdog Action that kills a stuck thread to kill the process. (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="load_balancing_policies/load_balancing_policies.html">Load balancing policies</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.proto.html">Client-Side Weighted Round Robin Load Balancing Policy (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/cluster_provided/v3/cluster_provided.proto.html">Cluster Provided Load Balancing Policy (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/common/v3/common.proto.html">Common configuration for two or more load balancing policy extensions (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Load Balancing Policy (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/least_request/v3/least_request.proto.html">Least Request Load Balancing Policy (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/load_aware_locality/v3/load_aware_locality.proto.html">Load-Aware Locality-Picking Load Balancing Policy (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/maglev/v3/maglev.proto.html">Maglev Load Balancing Policy (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/override_host/v3/override_host.proto.html">Override Host Load Balancing Policy (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/random/v3/random.proto.html">Random Load Balancing Policy (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/ring_hash/v3/ring_hash.proto.html">Ring Hash Load Balancing Policy (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/round_robin/v3/round_robin.proto.html">Round Robin Load Balancing Policy (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/subset/v3/subset.proto.html">Subset Load Balancing Policy (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/load_balancing_policies/wrr_locality/v3/wrr_locality.proto.html">Weighted Round Robin Locality-Picking Load Balancing Policy (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="queue_policy/queue_policy.html">Queue policies</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/queue_policy/fifo/v3/fifo.proto.html">FIFO Queue Policy (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cluster_specifier/cluster_specifier.html">Cluster specifier</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Cluster Specifier (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/router/cluster_specifiers/lua/v3/lua.proto.html">Lua (proto)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/router/cluster_specifiers/matcher/v3/matcher.proto.html">Matcher Based Cluster Specifier (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="local_address_selectors/local_address_selectors.html">Local address selectors</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../extensions/local_address_selectors/filter_state_override/v3/config.proto.html">Linux Network Namespace Local Address Selector (proto)</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="route/v3/scoped_route.proto.html" class="btn btn-neutral float-left" title="HTTP scoped routing configuration (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="accesslog/filters.html" class="btn btn-neutral float-right" title="Access log extension filters" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Extensions</a></li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

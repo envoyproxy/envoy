@@ -1,0 +1,77 @@
+.. _envoy_v3_api_file_envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.proto:
+
+Fixed heap (proto)
+==================
+
+.. _extension_envoy.resource_monitors.fixed_heap:
+
+This extension has the qualified name ``envoy.resource_monitors.fixed_heap``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.resource_monitors <extension_category_envoy.resource_monitors>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig <envoy_v3_api_msg_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig:
+
+extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
+----------------------------------------------------------
+
+
+:repo:`[extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig proto] <api/envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.proto#L21>`
+
+The fixed heap resource monitor reports the Envoy process memory pressure, computed as a
+fraction of currently reserved heap memory divided by a statically configured maximum
+specified in the FixedHeapConfig.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_heap_size_bytes": ...,
+    "max_heap_size_bytes_runtime": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig.max_heap_size_bytes:
+
+
+max_heap_size_bytes
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Static value for max heap size in bytes set at startup.
+  Exactly one of max_heap_size_bytes or max_heap_size_bytes_runtime must be set.
+  If set, the expected value must be greater than ``0``, otherwise validation will fail.
+
+
+.. _envoy_v3_api_field_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig.max_heap_size_bytes_runtime:
+
+
+max_heap_size_bytes_runtime
+  (:ref:`config.core.v3.RuntimeUInt64 <envoy_v3_api_msg_config.core.v3.RuntimeUInt64>`) Runtime overlay for max heap size in bytes. When set, the value can be overridden
+  at runtime during startup or later without restart.
+  Exactly one of max_heap_size_bytes or max_heap_size_bytes_runtime must be set.
+  If set, the expected value must be greater than ``0``, otherwise validation will fail.
+
+

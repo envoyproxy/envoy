@@ -1,0 +1,549 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Common configuration for two or more load balancing policy extensions (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../../_static/favicon.ico"/>
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" />
+    <link rel="next" title="Dynamic Modules Load Balancing Policy (proto)" href="../../dynamic_modules/v3/dynamic_modules.proto.html" />
+    <link rel="prev" title="Cluster Provided Load Balancing Policy (proto)" href="../../cluster_provided/v3/cluster_provided.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../../searchindex.js"
+          data-envoy-search-page="../../../../../search.html"
+          data-envoy-root="../../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../config/config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../../config/config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+      <li class="breadcrumb-item active">Common configuration for two or more load balancing policy extensions (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../_sources/api-v3/extensions/load_balancing_policies/common/v3/common.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="common-configuration-for-two-or-more-load-balancing-policy-extensions-proto">
+<span id="envoy-v3-api-file-envoy-extensions-load-balancing-policies-common-v3-common-proto"></span><h1>Common configuration for two or more load balancing policy extensions (proto)<a class="headerlink" href="#common-configuration-for-two-or-more-load-balancing-policy-extensions-proto" title="Link to this heading"></a></h1>
+<section id="extensions-load-balancing-policies-common-v3-localitylbconfig">
+<span id="envoy-v3-api-msg-extensions-load-balancing-policies-common-v3-localitylbconfig"></span><h2>extensions.load_balancing_policies.common.v3.LocalityLbConfig<a class="headerlink" href="#extensions-load-balancing-policies-common-v3-localitylbconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L24">[extensions.load_balancing_policies.common.v3.LocalityLbConfig proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;zone_aware_lb_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;locality_weighted_lb_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-zone-aware-lb-config">
+<dt>zone_aware_lb_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig"><span class="std std-ref">extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig</span></a>) Configuration for local zone aware load balancing.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-zone-aware-lb-config"><span class="std std-ref">zone_aware_lb_config</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-locality-weighted-lb-config"><span class="std std-ref">locality_weighted_lb_config</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-locality-weighted-lb-config">
+<dt>locality_weighted_lb_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-load-balancing-policies-common-v3-localitylbconfig-localityweightedlbconfig"><span class="std std-ref">extensions.load_balancing_policies.common.v3.LocalityLbConfig.LocalityWeightedLbConfig</span></a>) Enable locality weighted load balancing.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-zone-aware-lb-config"><span class="std std-ref">zone_aware_lb_config</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-locality-weighted-lb-config"><span class="std std-ref">locality_weighted_lb_config</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig">
+<span id="envoy-v3-api-msg-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig"></span><h2>extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig<a class="headerlink" href="#extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L28">[extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig proto]</a></p>
+<p>Configuration for <a class="reference internal" href="../../../../../intro/arch_overview/upstream/load_balancing/zone_aware.html#arch-overview-load-balancing-zone-aware-routing"><span class="std std-ref">zone aware routing</span></a>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;routing_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;min_cluster_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;fail_traffic_on_panic&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;force_locality_direct_routing&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;force_local_zone&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;locality_basis&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-routing-enabled">
+<dt>routing_enabled</dt><dd><p>(<a class="reference internal" href="../../../../type/v3/percent.proto.html#envoy-v3-api-msg-type-v3-percent"><span class="std std-ref">type.v3.Percent</span></a>) Configures percentage of requests that will be considered for zone aware routing
+if zone aware routing is configured. If not specified, the default is 100%.
+* <a class="reference internal" href="../../../../../configuration/upstream/cluster_manager/cluster_runtime.html#config-cluster-manager-cluster-runtime-zone-routing"><span class="std std-ref">runtime values</span></a>.
+* <a class="reference internal" href="../../../../../intro/arch_overview/upstream/load_balancing/zone_aware.html#arch-overview-load-balancing-zone-aware-routing"><span class="std std-ref">Zone aware routing support</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-min-cluster-size">
+<dt>min_cluster_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value">UInt64Value</a>) Configures minimum upstream cluster size required for zone aware routing
+If upstream cluster size is less than specified, zone aware routing is not performed
+even if zone aware routing is configured. If not specified, the default is 6.
+* <a class="reference internal" href="../../../../../configuration/upstream/cluster_manager/cluster_runtime.html#config-cluster-manager-cluster-runtime-zone-routing"><span class="std std-ref">runtime values</span></a>.
+* <a class="reference internal" href="../../../../../intro/arch_overview/upstream/load_balancing/zone_aware.html#arch-overview-load-balancing-zone-aware-routing"><span class="std std-ref">Zone aware routing support</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-fail-traffic-on-panic">
+<dt>fail_traffic_on_panic</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to true, Envoy will not consider any hosts when the cluster is in <a class="reference internal" href="../../../../../intro/arch_overview/upstream/load_balancing/panic_threshold.html#arch-overview-load-balancing-panic-threshold"><span class="std std-ref">panic
+mode</span></a>. Instead, the cluster will fail all
+requests as if all hosts are unhealthy. This can help avoid potentially overwhelming a
+failing service.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-force-locality-direct-routing">
+<dt>force_locality_direct_routing</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to true, Envoy will force LocalityDirect routing if a local locality exists.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-force-local-zone">
+<dt>force_local_zone</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-forcelocalzone"><span class="std std-ref">extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.ForceLocalZone</span></a>)</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-locality-basis">
+<dt>locality_basis</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-localitybasis"><span class="std std-ref">extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.LocalityBasis</span></a>) Determines how locality percentages are computed:
+- HEALTHY_HOSTS_NUM: proportional to the count of healthy hosts.
+- HEALTHY_HOSTS_WEIGHT: proportional to the weights of healthy hosts.
+Default value is HEALTHY_HOSTS_NUM if unset.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-forcelocalzone">
+<span id="envoy-v3-api-msg-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-forcelocalzone"></span><h2>extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.ForceLocalZone<a class="headerlink" href="#extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-forcelocalzone" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L45">[extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.ForceLocalZone proto]</a></p>
+<p>Configures Envoy to always route requests to the local zone regardless of the
+upstream zone structure. In Envoy’s default configuration, traffic is distributed proportionally
+across all upstream hosts while trying to maximize local routing when possible. The approach
+with force_local_zone aims to be more predictable and if there are upstream hosts in the local
+zone, they will receive all traffic.
+* <a class="reference internal" href="../../../../../configuration/upstream/cluster_manager/cluster_runtime.html#config-cluster-manager-cluster-runtime-zone-routing"><span class="std std-ref">runtime values</span></a>.
+* <a class="reference internal" href="../../../../../intro/arch_overview/upstream/load_balancing/zone_aware.html#arch-overview-load-balancing-zone-aware-routing"><span class="std std-ref">Zone aware routing support</span></a>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;min_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-forcelocalzone-min-size">
+<dt>min_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Configures the minimum number of upstream hosts in the local zone required when force_local_zone
+is enabled. If the number of upstream hosts in the local zone is less than the specified value,
+Envoy will fall back to the default proportional-based distribution across localities.
+If not specified, the default is 1.
+* <a class="reference internal" href="../../../../../configuration/upstream/cluster_manager/cluster_runtime.html#config-cluster-manager-cluster-runtime-zone-routing"><span class="std std-ref">runtime values</span></a>.
+* <a class="reference internal" href="../../../../../intro/arch_overview/upstream/load_balancing/zone_aware.html#arch-overview-load-balancing-zone-aware-routing"><span class="std std-ref">Zone aware routing support</span></a>.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-localitybasis">
+<span id="envoy-v3-api-enum-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-localitybasis"></span><h2>Enum extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.LocalityBasis<a class="headerlink" href="#enum-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-localitybasis" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L30">[extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.LocalityBasis proto]</a></p>
+<p>Basis for computing per-locality percentages in zone-aware routing.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-localitybasis-healthy-hosts-num">
+<dt>HEALTHY_HOSTS_NUM</dt><dd><p><em>(DEFAULT)</em> ⁣Use the number of healthy hosts in each locality.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-localitybasis-healthy-hosts-weight">
+<dt>HEALTHY_HOSTS_WEIGHT</dt><dd><p>⁣Use the weights of healthy hosts in each locality.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-load-balancing-policies-common-v3-localitylbconfig-localityweightedlbconfig">
+<span id="envoy-v3-api-msg-extensions-load-balancing-policies-common-v3-localitylbconfig-localityweightedlbconfig"></span><h2>extensions.load_balancing_policies.common.v3.LocalityLbConfig.LocalityWeightedLbConfig<a class="headerlink" href="#extensions-load-balancing-policies-common-v3-localitylbconfig-localityweightedlbconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L89">[extensions.load_balancing_policies.common.v3.LocalityLbConfig.LocalityWeightedLbConfig proto]</a></p>
+<p>Configuration for <a class="reference internal" href="../../../../../intro/arch_overview/upstream/load_balancing/locality_weight.html#arch-overview-load-balancing-locality-weighted-lb"><span class="std std-ref">locality weighted load balancing</span></a></p>
+</section>
+<section id="extensions-load-balancing-policies-common-v3-slowstartconfig">
+<span id="envoy-v3-api-msg-extensions-load-balancing-policies-common-v3-slowstartconfig"></span><h2>extensions.load_balancing_policies.common.v3.SlowStartConfig<a class="headerlink" href="#extensions-load-balancing-policies-common-v3-slowstartconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L104">[extensions.load_balancing_policies.common.v3.SlowStartConfig proto]</a></p>
+<p>Configuration for <a class="reference internal" href="../../../../../intro/arch_overview/upstream/load_balancing/slow_start.html#arch-overview-load-balancing-slow-start"><span class="std std-ref">slow start mode</span></a>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;slow_start_window&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;aggression&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;min_weight_percent&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-slowstartconfig-slow-start-window">
+<dt>slow_start_window</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Represents the size of slow start window.
+If set, the newly created host remains in slow start mode starting from its creation time
+for the duration of slow start window.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-slowstartconfig-aggression">
+<dt>aggression</dt><dd><p>(<a class="reference internal" href="../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-runtimedouble"><span class="std std-ref">config.core.v3.RuntimeDouble</span></a>) This parameter controls the speed of traffic increase over the slow start window. Defaults to 1.0,
+so that endpoint would get linearly increasing amount of traffic.
+When increasing the value for this parameter, the speed of traffic ramp-up increases non-linearly.
+The value of aggression parameter should be greater than 0.0.
+By tuning the parameter, is possible to achieve polynomial or exponential shape of ramp-up curve.</p>
+<p>During slow start window, effective weight of an endpoint would be scaled with time factor and aggression:
+<code class="docutils literal notranslate"><span class="pre">new_weight</span> <span class="pre">=</span> <span class="pre">weight</span> <span class="pre">*</span> <span class="pre">max(min_weight_percent,</span> <span class="pre">time_factor</span> <span class="pre">^</span> <span class="pre">(1</span> <span class="pre">/</span> <span class="pre">aggression))</span></code>,
+where <code class="docutils literal notranslate"><span class="pre">time_factor=(time_since_start_seconds</span> <span class="pre">/</span> <span class="pre">slow_start_time_seconds)</span></code>.</p>
+<p>As time progresses, more and more traffic would be sent to endpoint, which is in slow start window.
+Once host exits slow start, time_factor and aggression no longer affect its weight.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-slowstartconfig-min-weight-percent">
+<dt>min_weight_percent</dt><dd><p>(<a class="reference internal" href="../../../../type/v3/percent.proto.html#envoy-v3-api-msg-type-v3-percent"><span class="std std-ref">type.v3.Percent</span></a>) Configures the minimum percentage of origin weight that avoids too small new weight,
+which may cause endpoints in slow start mode receive no traffic in slow start window.
+If not specified, the default is 10%.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-load-balancing-policies-common-v3-consistenthashinglbconfig">
+<span id="envoy-v3-api-msg-extensions-load-balancing-policies-common-v3-consistenthashinglbconfig"></span><h2>extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig<a class="headerlink" href="#extensions-load-balancing-policies-common-v3-consistenthashinglbconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L131">[extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig proto]</a></p>
+<p>Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;use_hostname_for_hashing&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;hash_balance_factor&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;hash_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-consistenthashinglbconfig-use-hostname-for-hashing">
+<dt>use_hostname_for_hashing</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, the cluster will use hostname instead of the resolved
+address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-consistenthashinglbconfig-hash-balance-factor">
+<dt>hash_balance_factor</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Configures percentage of average cluster load to bound per upstream host. For example, with a value of 150
+no upstream host will get a load more than 1.5 times the average load of all the hosts in the cluster.
+If not specified, the load is not bounded for any upstream host. Typical value for this parameter is between 120 and 200.
+Minimum is 100.</p>
+<p>Applies to both Ring Hash and Maglev load balancers.</p>
+<p>This is implemented based on the method described in the paper <a class="reference external" href="https://arxiv.org/abs/1608.01350">https://arxiv.org/abs/1608.01350</a>. For the specified
+<code class="docutils literal notranslate"><span class="pre">hash_balance_factor</span></code>, requests to any upstream host are capped at <code class="docutils literal notranslate"><span class="pre">hash_balance_factor/100</span></code> times the average number of requests
+across the cluster. When a request arrives for an upstream host that is currently serving at its max capacity, linear probing
+is used to identify an eligible host. Further, the linear probe is implemented using a random jump in hosts ring/table to identify
+the eligible host (this technique is as described in the paper <a class="reference external" href="https://arxiv.org/abs/1908.08762">https://arxiv.org/abs/1908.08762</a> - the random jump avoids the
+cascading overflow effect when choosing the next host in the ring/table).</p>
+<p>If weights are specified on the hosts, they are respected.</p>
+<p>This is an O(N) algorithm, unlike other load balancers. Using a lower <code class="docutils literal notranslate"><span class="pre">hash_balance_factor</span></code> results in more hosts
+being probed, so use a higher value if you require better performance.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-consistenthashinglbconfig-hash-policy">
+<dt>hash_policy</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-routeaction-hashpolicy"><span class="std std-ref">config.route.v3.RouteAction.HashPolicy</span></a>)  Specifies a list of hash policies to use for ring hash load balancing. If <code class="docutils literal notranslate"><span class="pre">hash_policy</span></code> is
+set, then
+<a class="reference internal" href="../../../../config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-hash-policy"><span class="std std-ref">route level hash policy</span></a>
+will be ignored.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-load-balancing-policies-common-v3-orcaoobreportingconfig">
+<span id="envoy-v3-api-msg-extensions-load-balancing-policies-common-v3-orcaoobreportingconfig"></span><h2>extensions.load_balancing_policies.common.v3.OrcaOobReportingConfig<a class="headerlink" href="#extensions-load-balancing-policies-common-v3-orcaoobreportingconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L168">[extensions.load_balancing_policies.common.v3.OrcaOobReportingConfig proto]</a></p>
+<p>Connection overrides for the ORCA out-of-band (OOB) reporting stream, used by
+load balancing policies that consume ORCA load reports (e.g.
+<a class="reference internal" href="../../client_side_weighted_round_robin/v3/client_side_weighted_round_robin.proto.html#envoy-v3-api-msg-extensions-load-balancing-policies-client-side-weighted-round-robin-v3-clientsideweightedroundrobin"><span class="std std-ref">client_side_weighted_round_robin</span></a>).
+Whether and when OOB reporting runs is controlled by the embedding policy.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;port_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;authority&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;transport_socket_match_criteria&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-orcaoobreportingconfig-port-value">
+<dt>port_value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) Optional alternative port for the OOB reporting connection, for example an
+ORCA reporting sidecar listening on a dedicated port. If 0 or unset, the
+port of the host’s ORCA reporting address is used. Ignored for non-IP
+(pipe/UDS) host addresses.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-orcaoobreportingconfig-authority">
+<dt>authority</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Value of the <code class="docutils literal notranslate"><span class="pre">:authority</span></code> header on the OOB gRPC stream. If empty, the
+endpoint hostname is used, then the dialed address, then the cluster name.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-load-balancing-policies-common-v3-orcaoobreportingconfig-transport-socket-match-criteria">
+<dt>transport_socket_match_criteria</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct">Struct</a>) Optional key/value pairs used to select a transport socket from the
+cluster’s <a class="reference internal" href="../../../../config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-transport-socket-matches"><span class="std std-ref">transport_socket_matches</span></a>
+for the OOB connection. If unset, or if no match is found, the cluster’s
+default transport socket is used. ALPN <code class="docutils literal notranslate"><span class="pre">h2</span></code> is always forced on the OOB
+connection regardless of this setting.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../cluster_provided/v3/cluster_provided.proto.html" class="btn btn-neutral float-left" title="Cluster Provided Load Balancing Policy (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../dynamic_modules/v3/dynamic_modules.proto.html" class="btn btn-neutral float-right" title="Dynamic Modules Load Balancing Policy (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Common configuration for two or more load balancing policy extensions (proto)</a><ul>
+<li><a class="reference internal" href="#extensions-load-balancing-policies-common-v3-localitylbconfig">extensions.load_balancing_policies.common.v3.LocalityLbConfig</a></li>
+<li><a class="reference internal" href="#extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig">extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig</a></li>
+<li><a class="reference internal" href="#extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-forcelocalzone">extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.ForceLocalZone</a></li>
+<li><a class="reference internal" href="#enum-extensions-load-balancing-policies-common-v3-localitylbconfig-zoneawarelbconfig-localitybasis">Enum extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.LocalityBasis</a></li>
+<li><a class="reference internal" href="#extensions-load-balancing-policies-common-v3-localitylbconfig-localityweightedlbconfig">extensions.load_balancing_policies.common.v3.LocalityLbConfig.LocalityWeightedLbConfig</a></li>
+<li><a class="reference internal" href="#extensions-load-balancing-policies-common-v3-slowstartconfig">extensions.load_balancing_policies.common.v3.SlowStartConfig</a></li>
+<li><a class="reference internal" href="#extensions-load-balancing-policies-common-v3-consistenthashinglbconfig">extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig</a></li>
+<li><a class="reference internal" href="#extensions-load-balancing-policies-common-v3-orcaoobreportingconfig">extensions.load_balancing_policies.common.v3.OrcaOobReportingConfig</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

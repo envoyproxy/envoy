@@ -1,0 +1,45 @@
+.. _envoy_v3_api_file_envoy/admin/v3/tap.proto:
+
+Tap (proto)
+===========
+
+
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.TapRequest:
+
+admin.v3.TapRequest
+-------------------
+
+
+:repo:`[admin.v3.TapRequest proto] <api/envoy/admin/v3/tap.proto#L19>`
+
+The /tap admin request body that is used to configure an active tap session.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config_id": ...,
+    "tap_config": {...}
+  }
+
+.. _envoy_v3_api_field_admin.v3.TapRequest.config_id:
+
+
+config_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The opaque configuration ID used to match the configuration to a loaded extension.
+  A tap extension configures a similar opaque ID that is used to match.
+
+
+.. _envoy_v3_api_field_admin.v3.TapRequest.tap_config:
+
+
+tap_config
+  (:ref:`config.tap.v3.TapConfig <envoy_v3_api_msg_config.tap.v3.TapConfig>`, *REQUIRED*) The tap configuration to load.
+
+

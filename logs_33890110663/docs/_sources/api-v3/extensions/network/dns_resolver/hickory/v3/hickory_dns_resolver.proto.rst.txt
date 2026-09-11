@@ -1,0 +1,217 @@
+.. _envoy_v3_api_file_envoy/extensions/network/dns_resolver/hickory/v3/hickory_dns_resolver.proto:
+
+Hickory DNS resolver (proto)
+============================
+
+.. _extension_envoy.network.dns_resolver.hickory:
+
+This extension has the qualified name ``envoy.network.dns_resolver.hickory``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.network.dns_resolver <extension_category_envoy.network.dns_resolver>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.network.dns_resolver.hickory.v3.DnsOverTlsConfig:
+
+extensions.network.dns_resolver.hickory.v3.DnsOverTlsConfig
+-----------------------------------------------------------
+
+
+:repo:`[extensions.network.dns_resolver.hickory.v3.DnsOverTlsConfig proto] <api/envoy/extensions/network/dns_resolver/hickory/v3/hickory_dns_resolver.proto#L22>`
+
+Configuration for DNS-over-TLS (DoT) servers.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "servers": [],
+    "tls_server_name": ...
+  }
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.hickory.v3.DnsOverTlsConfig.servers:
+
+
+servers
+  (**repeated** :ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) The list of DNS-over-TLS server addresses. The port should typically be 853.
+
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.hickory.v3.DnsOverTlsConfig.tls_server_name:
+
+
+tls_server_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The SNI hostname to use for TLS verification. Required when ``servers`` are specified.
+
+
+
+.. _envoy_v3_api_msg_extensions.network.dns_resolver.hickory.v3.DnsOverHttpsConfig:
+
+extensions.network.dns_resolver.hickory.v3.DnsOverHttpsConfig
+-------------------------------------------------------------
+
+
+:repo:`[extensions.network.dns_resolver.hickory.v3.DnsOverHttpsConfig proto] <api/envoy/extensions/network/dns_resolver/hickory/v3/hickory_dns_resolver.proto#L31>`
+
+Configuration for DNS-over-HTTPS (DoH) servers.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "server_urls": []
+  }
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.hickory.v3.DnsOverHttpsConfig.server_urls:
+
+
+server_urls
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The list of DNS-over-HTTPS endpoint URLs (e.g., ``https://dns.google/dns-query``).
+
+
+
+.. _envoy_v3_api_msg_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig:
+
+extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig proto] <api/envoy/extensions/network/dns_resolver/hickory/v3/hickory_dns_resolver.proto#L43>`
+
+Configuration for the Hickory DNS resolver. This resolver uses the Hickory DNS library,
+a pure Rust DNS implementation, for DNS resolution. It supports standard DNS (UDP/TCP),
+DNS-over-TLS (DoT), DNS-over-HTTPS (DoH), and ``DNSSEC`` validation.
+
+The resolver runs asynchronously on its own ``Tokio`` runtime threads, separate from Envoy's
+event loop threads. Results are delivered back to the calling dispatcher thread.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "resolvers": [],
+    "dns_over_tls": {...},
+    "dns_over_https": {...},
+    "enable_dnssec": ...,
+    "cache_size": {...},
+    "num_resolver_threads": {...},
+    "use_system_config": {...},
+    "query_timeout": {...},
+    "query_tries": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig.resolvers:
+
+
+resolvers
+  (**repeated** :ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) A list of DNS resolver addresses for standard UDP/TCP resolution.
+  If not specified and ``use_system_config`` is not explicitly set to ``false``, the system
+  configuration (``/etc/resolv.conf`` on Unix) will be used.
+
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig.dns_over_tls:
+
+
+dns_over_tls
+  (:ref:`extensions.network.dns_resolver.hickory.v3.DnsOverTlsConfig <envoy_v3_api_msg_extensions.network.dns_resolver.hickory.v3.DnsOverTlsConfig>`) Configuration for DNS-over-TLS (DoT). When specified, queries will be sent over TLS
+  to the configured servers.
+
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig.dns_over_https:
+
+
+dns_over_https
+  (:ref:`extensions.network.dns_resolver.hickory.v3.DnsOverHttpsConfig <envoy_v3_api_msg_extensions.network.dns_resolver.hickory.v3.DnsOverHttpsConfig>`) Configuration for DNS-over-HTTPS (DoH). When specified, queries will be sent over
+  HTTPS to the configured endpoints.
+
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig.enable_dnssec:
+
+
+enable_dnssec
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Enables ``DNSSEC`` validation for DNS responses. When enabled, the resolver will validate
+  ``DNSSEC`` signatures and reject responses that fail validation.
+
+  Defaults to ``false``.
+
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig.cache_size:
+
+
+cache_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Maximum number of entries in the DNS response cache. The cache uses an LRU eviction
+  policy and supports negative caching (caching of ``NXDOMAIN``/``NODATA`` responses).
+
+  Defaults to ``1024``.
+
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig.num_resolver_threads:
+
+
+num_resolver_threads
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Number of threads in the ``Tokio`` runtime used for asynchronous DNS resolution.
+  Each resolver instance runs its own ``Tokio`` runtime.
+
+  Defaults to ``2``. Maximum is ``16``.
+
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig.use_system_config:
+
+
+use_system_config
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If ``true``, read the system DNS configuration (``/etc/resolv.conf`` on Unix) for name server
+  addresses and search domains. When ``resolvers`` are also specified, they take precedence
+  over the system configuration.
+
+  If not specified, defaults to ``true`` when no ``resolvers``, ``dns_over_tls``, or
+  ``dns_over_https`` are configured.
+
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig.query_timeout:
+
+
+query_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Timeout for each individual DNS query attempt.
+
+  Defaults to ``5`` seconds.
+
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig.query_tries:
+
+
+query_tries
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Maximum number of query attempts before the resolver gives up. Each attempt may use
+  a different name server.
+
+  Defaults to ``3``.
+
+

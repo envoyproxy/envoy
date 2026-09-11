@@ -1,0 +1,34 @@
+  - name: github
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: hub
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: github.com
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: github.com
+  -  name: github-api
+     type: LOGICAL_DNS
+     lb_policy: ROUND_ROBIN
+     load_assignment:
+       cluster_name: hub-api
+       endpoints:
+       - lb_endpoints:
+         - endpoint:
+             address:
+               socket_address:
+                 address: api.github.com
+                 port_value: 443
+     transport_socket:
+       name: envoy.transport_sockets.tls
+       typed_config:
+         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+         sni: api.github.com

@@ -1,0 +1,919 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>External Processing Filter (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../../../_static/favicon.ico"/>
+      <script src="../../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+    <link rel="next" title="External Processing Filter (proto)" href="processing_mode.proto.html" />
+    <link rel="prev" title="External Authorization (proto)" href="../../ext_authz/v3/ext_authz.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../../../searchindex.js"
+          data-envoy-search-page="../../../../../../search.html"
+          data-envoy-root="../../../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../../config/config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../../config/filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/filter.html">Filters</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/http/http.html">HTTP filters</a></li>
+      <li class="breadcrumb-item active">External Processing Filter (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../../_sources/api-v3/extensions/filters/http/ext_proc/v3/ext_proc.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="external-processing-filter-proto">
+<span id="envoy-v3-api-file-envoy-extensions-filters-http-ext-proc-v3-ext-proc-proto"></span><h1>External Processing Filter (proto)<a class="headerlink" href="#external-processing-filter-proto" title="Link to this heading"></a></h1>
+<p id="extension-envoy-filters-http-ext-proc">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.filters.http.ext_proc</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension is intended to be robust against both untrusted downstream and
+upstream traffic.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension categories:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../filter_chain/v3/filter_chain.proto.html#extension-category-envoy-filters-http"><span class="std std-ref">envoy.filters.http</span></a></p></li>
+<li><p><a class="reference internal" href="../../router/v3/router.proto.html#extension-category-envoy-filters-http-upstream"><span class="std std-ref">envoy.filters.http.upstream</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-extprocperroute"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute</span></a></p></li>
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-externalprocessor"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor</span></a></p></li>
+</ul>
+</div>
+<p>External Processing Filter</p>
+<p>The External Processing filter allows an external service to act on HTTP traffic in a flexible way.</p>
+<section id="extensions-filters-http-ext-proc-v3-externalprocessor">
+<span id="envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-externalprocessor"></span><h2>extensions.filters.http.ext_proc.v3.ExternalProcessor<a class="headerlink" href="#extensions-filters-http-ext-proc-v3-externalprocessor" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L101">[extensions.filters.http.ext_proc.v3.ExternalProcessor proto]</a></p>
+<p>The filter communicates with an external gRPC service called an “external processor”
+that can do a variety of things with the request and response:</p>
+<ul class="simple">
+<li><p>Access and modify the HTTP headers on the request, response, or both.</p></li>
+<li><p>Access and modify the HTTP request and response bodies.</p></li>
+<li><p>Access and modify the dynamic stream metadata.</p></li>
+<li><p>Immediately send an HTTP response downstream and terminate other processing.</p></li>
+</ul>
+<p>The filter communicates with the server using a gRPC bidirectional stream. After the initial
+request, the external server is in control over what additional data is sent to it
+and how it should be processed.</p>
+<p>By implementing the protocol specified by the stream, the external server can choose:</p>
+<ul class="simple">
+<li><p>Whether it receives the response message at all.</p></li>
+<li><p>Whether it receives the message body at all, in separate chunks, or as a single buffer.</p></li>
+<li><p>To modify request or response trailers if they already exist.</p></li>
+</ul>
+<p>The filter supports up to six different processing steps. Each is represented by
+a gRPC stream message that is sent to the external processor. For each message, the
+processor must send a matching response.</p>
+<ul class="simple">
+<li><p>Request headers: Contains the headers from the original HTTP request.</p></li>
+<li><p>Request body: If the body is present, the behavior depends on the
+body send mode. In <code class="docutils literal notranslate"><span class="pre">BUFFERED</span></code> or <code class="docutils literal notranslate"><span class="pre">BUFFERED_PARTIAL</span></code> mode, the body is sent to the external
+processor in a single message. In <code class="docutils literal notranslate"><span class="pre">STREAMED</span></code> or <code class="docutils literal notranslate"><span class="pre">FULL_DUPLEX_STREAMED</span></code> mode, the body will
+be split across multiple messages sent to the external processor. In <code class="docutils literal notranslate"><span class="pre">GRPC</span></code> mode, as each
+gRPC message arrives, it will be sent to the external processor (there will be exactly one
+gRPC message in each message sent to the external processor). In <code class="docutils literal notranslate"><span class="pre">NONE</span></code> mode, the body will
+not be sent to the external processor.</p></li>
+<li><p>Request trailers: Delivered if they are present and if the trailer mode is set
+to <code class="docutils literal notranslate"><span class="pre">SEND</span></code>.</p></li>
+<li><p>Response headers: Contains the headers from the HTTP response. Keep in mind
+that if the upstream system sends them before processing the request body that
+this message may arrive before the complete body.</p></li>
+<li><p>Response body: Sent according to the processing mode like the request body.</p></li>
+<li><p>Response trailers: Delivered according to the processing mode like the
+request trailers.</p></li>
+</ul>
+<p>By default, the processor sends only the request and response headers messages.
+This may be changed to include any of the six steps by changing the <code class="docutils literal notranslate"><span class="pre">processing_mode</span></code>
+setting of the filter configuration, or by setting the <code class="docutils literal notranslate"><span class="pre">mode_override</span></code> of any response
+from the external processor. The latter is only enabled if <code class="docutils literal notranslate"><span class="pre">allow_mode_override</span></code> is
+set to true. This way, a processor may, for example, use information
+in the request header to determine whether the message body must be examined, or whether
+the data plane should simply stream it straight through.</p>
+<p>All of this together allows a server to process the filter traffic in fairly
+sophisticated ways. For example:</p>
+<ul class="simple">
+<li><p>A server may choose to examine all or part of the HTTP message bodies depending
+on the content of the headers.</p></li>
+<li><p>A server may choose to immediately reject some messages based on their HTTP
+headers (or other dynamic metadata) and more carefully examine others.</p></li>
+</ul>
+<p>The protocol itself is based on a bidirectional gRPC stream. The data plane will send the server
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-msg-service-ext-proc-v3-processingrequest"><span class="std std-ref">ProcessingRequest</span></a>
+messages, and the server must reply with
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-msg-service-ext-proc-v3-processingresponse"><span class="std std-ref">ProcessingResponse</span></a>.</p>
+<p>Stats about each gRPC call are recorded in a <a class="reference internal" href="../../../../../../intro/arch_overview/advanced/data_sharing_between_filters.html#arch-overview-advanced-filter-state-sharing"><span class="std std-ref">dynamic filter state</span></a> object in a namespace matching the filter
+name.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;grpc_service&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;http_service&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;failure_mode_allow&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;processing_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;request_attributes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;response_attributes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;message_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;stat_prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;mutation_rules&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_message_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;forward_rules&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;filter_metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;allow_mode_override&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;disable_immediate_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metadata_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;observability_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;disable_clear_route_cache&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;route_cache_action&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;deferred_close_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;send_body_without_waiting_for_header_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;allowed_override_modes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;processing_request_modifier&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;on_processing_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;status_on_error&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;allow_content_length_header&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-grpc-service">
+<dt>grpc_service</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/grpc_service.proto.html#envoy-v3-api-msg-config-core-v3-grpcservice"><span class="std std-ref">config.core.v3.GrpcService</span></a>) Configuration for the gRPC service that the filter will communicate with.
+Only one of <code class="docutils literal notranslate"><span class="pre">grpc_service</span></code> or <code class="docutils literal notranslate"><span class="pre">http_service</span></code> can be set.
+It is required that one of them must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-http-service">
+<dt>http_service</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-extprochttpservice"><span class="std std-ref">extensions.filters.http.ext_proc.v3.ExtProcHttpService</span></a>) Configuration for the HTTP service that the filter will communicate with.
+Only one of <code class="docutils literal notranslate"><span class="pre">http_service</span></code> or
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-grpc-service"><span class="std std-ref">grpc_service</span></a>
+can be set. It is required that one of them must be set.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">http_service</span></code> is set, the
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-processing-mode"><span class="std std-ref">processing_mode</span></a>
+cannot be configured to send any body or trailers. i.e., <code class="docutils literal notranslate"><span class="pre">http_service</span></code> only supports
+sending request or response headers to the side stream server.</p>
+<p>With this configuration, the data plane behavior is:</p>
+<p>1. The headers are first put in a proto message
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-msg-service-ext-proc-v3-processingrequest"><span class="std std-ref">ProcessingRequest</span></a>.</p>
+<ol class="arabic simple" start="2">
+<li><p>This proto message is then transcoded into a JSON text.</p></li>
+</ol>
+<p>3. The data plane then sends an HTTP POST message with content-type as “application/json”,
+and this JSON text as body to the side stream server.</p>
+<p>After the side-stream receives this HTTP request message, it is expected to do as follows:</p>
+<p>1. It converts the body, which is a JSON string, into a <code class="docutils literal notranslate"><span class="pre">ProcessingRequest</span></code>
+proto message to examine and mutate the headers.</p>
+<p>2. It then sets the mutated headers into a new proto message
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-msg-service-ext-proc-v3-processingresponse"><span class="std std-ref">ProcessingResponse</span></a>.</p>
+<ol class="arabic simple" start="3">
+<li><p>It converts the <code class="docutils literal notranslate"><span class="pre">ProcessingResponse</span></code> proto message into a JSON text.</p></li>
+</ol>
+<p>4. It then sends an HTTP response back to the data plane with status code as <code class="docutils literal notranslate"><span class="pre">&quot;200&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">content-type</span></code> as <code class="docutils literal notranslate"><span class="pre">&quot;application/json&quot;</span></code> and sets the JSON text as the body.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the <a class="reference internal" href="../../../../../../intro/arch_overview/security/threat_model.html#arch-overview-threat-model"><span class="std std-ref">threat model</span></a>, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-failure-mode-allow">
+<dt>failure_mode_allow</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) By default, if in the following cases:</p>
+<ol class="arabic simple">
+<li><p>The gRPC stream cannot be established.</p></li>
+<li><p>The gRPC stream is closed prematurely with an error.</p></li>
+<li><p>The external processing timeouts.</p></li>
+<li><p>The ext_proc server sends back spurious response messages.</p></li>
+</ol>
+<p>The filter will fail and a local reply with error code
+504(for timeout case) or 500(for all other cases), will be sent to the downstream.</p>
+<p>However, with this parameter set to true and if the above cases happen, the processing
+continues without error.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-processing-mode">
+<dt>processing_mode</dt><dd><p>(<a class="reference internal" href="processing_mode.proto.html#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-processingmode"><span class="std std-ref">extensions.filters.http.ext_proc.v3.ProcessingMode</span></a>) Specifies default options for how HTTP headers, trailers, and bodies are
+sent. See <code class="docutils literal notranslate"><span class="pre">ProcessingMode</span></code> for details.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-request-attributes">
+<dt>request_attributes</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The data plane provides a number of <a class="reference internal" href="../../../../../../intro/arch_overview/advanced/attributes.html#arch-overview-attributes"><span class="std std-ref">attributes</span></a>
+for expressive policies. Each attribute name provided in this field will be
+matched against that list and populated in the
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-field-service-ext-proc-v3-processingrequest-attributes"><span class="std std-ref">ProcessingRequest.attributes</span></a> field.
+See the <a class="reference internal" href="../../../../../../intro/arch_overview/advanced/attributes.html#arch-overview-request-attributes"><span class="std std-ref">attribute documentation</span></a>
+for the list of supported attributes and their types.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-response-attributes">
+<dt>response_attributes</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The data plane provides a number of <a class="reference internal" href="../../../../../../intro/arch_overview/advanced/attributes.html#arch-overview-attributes"><span class="std std-ref">attributes</span></a>
+for expressive policies. Each attribute name provided in this field will be
+matched against that list and populated in the
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-field-service-ext-proc-v3-processingrequest-attributes"><span class="std std-ref">ProcessingRequest.attributes</span></a> field.
+See the <a class="reference internal" href="../../../../../../intro/arch_overview/advanced/attributes.html#arch-overview-attributes"><span class="std std-ref">attribute documentation</span></a>
+for the list of supported attributes and their types.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-message-timeout">
+<dt>message_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Specifies the timeout for each individual message sent on the stream.
+Whenever the data plane sends a message on the stream that requires a
+response, it will reset this timer, and will stop processing and return
+an error (subject to the processing mode) if the timer expires before a
+matching response is received. There is no timeout when the filter is
+running in observability mode or when the body send mode is
+<code class="docutils literal notranslate"><span class="pre">FULL_DUPLEX_STREAMED</span></code> or <code class="docutils literal notranslate"><span class="pre">GRPC</span></code>. Zero is a valid config which means
+the timer will be triggered immediately. If not configured, default is
+200 milliseconds.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-stat-prefix">
+<dt>stat_prefix</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional additional prefix to use when emitting statistics. This allows to distinguish
+emitted statistics between configured <code class="docutils literal notranslate"><span class="pre">ext_proc</span></code> filters in an HTTP filter chain.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-mutation-rules">
+<dt>mutation_rules</dt><dd><p>(<a class="reference internal" href="../../../../../config/common/mutation_rules/v3/mutation_rules.proto.html#envoy-v3-api-msg-config-common-mutation-rules-v3-headermutationrules"><span class="std std-ref">config.common.mutation_rules.v3.HeaderMutationRules</span></a>) Rules that determine what modifications an external processing server may
+make to message headers. If not set, all headers may be modified except
+for “host”, “:authority”, “:scheme”, “:method”, and headers that start
+with the header prefix set via
+<a class="reference internal" href="../../../../../config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-header-prefix"><span class="std std-ref">header_prefix</span></a>
+(which is usually “x-envoy”).
+Note that changing headers such as “host” or “:authority” may not in itself
+change the data plane’s routing decision, as routes can be cached. To also force the
+route to be recomputed, set the
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-field-service-ext-proc-v3-commonresponse-clear-route-cache"><span class="std std-ref">clear_route_cache</span></a>
+field to true in the same response.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-max-message-timeout">
+<dt>max_message_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Specify the upper bound of
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-field-service-ext-proc-v3-processingresponse-override-message-timeout"><span class="std std-ref">override_message_timeout</span></a>
+If not specified, by default it is 0, which will effectively disable the <code class="docutils literal notranslate"><span class="pre">override_message_timeout</span></code> API.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-forward-rules">
+<dt>forward_rules</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-headerforwardingrules"><span class="std std-ref">extensions.filters.http.ext_proc.v3.HeaderForwardingRules</span></a>) Allow headers matching the <code class="docutils literal notranslate"><span class="pre">forward_rules</span></code> to be forwarded to the external processing server.
+If not set, all headers are forwarded to the external processing server.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-filter-metadata">
+<dt>filter_metadata</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct">Struct</a>) Additional metadata to be added to the filter state for logging purposes. The metadata
+will be added to StreamInfo’s filter state under the namespace corresponding to the
+ext_proc filter name.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-allow-mode-override">
+<dt>allow_mode_override</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If <code class="docutils literal notranslate"><span class="pre">allow_mode_override</span></code> is set to true, the filter config <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-processing-mode"><span class="std std-ref">processing_mode</span></a>
+can be overridden by the response message from the external processing server
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-field-service-ext-proc-v3-processingresponse-mode-override"><span class="std std-ref">mode_override</span></a>.
+If not set, <code class="docutils literal notranslate"><span class="pre">mode_override</span></code> API in the response message will be ignored.
+Mode override is not supported if the body send mode is <code class="docutils literal notranslate"><span class="pre">FULL_DUPLEX_STREAMED</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-disable-immediate-response">
+<dt>disable_immediate_response</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to true, ignore the
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-field-service-ext-proc-v3-processingresponse-immediate-response"><span class="std std-ref">immediate_response</span></a>
+message in an external processor response. In such case, no local reply will be sent.
+Instead, the stream to the external processor will be closed. There will be no
+more external processing for this stream from now on.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-metadata-options">
+<dt>metadata_options</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-metadataoptions"><span class="std std-ref">extensions.filters.http.ext_proc.v3.MetadataOptions</span></a>) Options related to the sending and receiving of dynamic metadata.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-observability-mode">
+<dt>observability_mode</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If true, send each part of the HTTP request or response specified by <code class="docutils literal notranslate"><span class="pre">ProcessingMode</span></code>
+without pausing on filter chain iteration. It is “Send and Go” mode that can be used
+by external processor to observe the request’s data and status. In this mode:</p>
+<p>1. Only <code class="docutils literal notranslate"><span class="pre">STREAMED</span></code>, <code class="docutils literal notranslate"><span class="pre">GRPC</span></code>, and <code class="docutils literal notranslate"><span class="pre">NONE</span></code> body processing modes are supported; for any
+other body processing mode, the body will not be sent.</p>
+<p>2. External processor should not send back processing response, as any responses will be ignored.
+This also means that
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-message-timeout"><span class="std std-ref">message_timeout</span></a>
+restriction doesn’t apply to this mode.</p>
+<ol class="arabic simple" start="3">
+<li><p>External processor may still close the stream to indicate that no more messages are needed.</p></li>
+</ol>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-disable-clear-route-cache">
+<dt>disable_clear_route_cache</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Prevents clearing the route-cache when the
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-field-service-ext-proc-v3-commonresponse-clear-route-cache"><span class="std std-ref">clear_route_cache</span></a>
+field is set in an external processor response.
+Only one of <code class="docutils literal notranslate"><span class="pre">disable_clear_route_cache</span></code> or <code class="docutils literal notranslate"><span class="pre">route_cache_action</span></code> can be set.
+It is recommended to set <code class="docutils literal notranslate"><span class="pre">route_cache_action</span></code> which supersedes <code class="docutils literal notranslate"><span class="pre">disable_clear_route_cache</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-route-cache-action">
+<dt>route_cache_action</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-filters-http-ext-proc-v3-externalprocessor-routecacheaction"><span class="std std-ref">extensions.filters.http.ext_proc.v3.ExternalProcessor.RouteCacheAction</span></a>) Specifies the action to be taken when an external processor response is
+received in response to request headers. It is recommended to set this field rather than set
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-disable-clear-route-cache"><span class="std std-ref">disable_clear_route_cache</span></a>.
+Only one of <code class="docutils literal notranslate"><span class="pre">disable_clear_route_cache</span></code> or <code class="docutils literal notranslate"><span class="pre">route_cache_action</span></code> can be set.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Clearing the route cache can cause Envoy to recompute route matching after earlier HTTP
+filters have already processed the request. This can be security-sensitive when filters
+that make route-dependent authorization decisions, such as the RBAC filter, run before
+ext_proc and ext_proc mutates route-matching inputs.</p>
+<p>Operators should only enable route cache clearing for trusted external processors, should
+carefully order route-dependent authorization filters, and should use mutation_rules to
+restrict sensitive mutations when appropriate.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-deferred-close-timeout">
+<dt>deferred_close_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Specifies the deferred closure timeout for gRPC stream that connects to external processor. Currently, the deferred stream closure
+is only used in <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-observability-mode"><span class="std std-ref">observability_mode</span></a>.
+In observability mode, gRPC streams may be held open to the external processor longer than the lifetime of the regular client to
+backend stream lifetime. In this case, the data plane will eventually timeout the external processor stream according to this time limit.
+The default value is 5000 milliseconds (5 seconds) if not specified.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-send-body-without-waiting-for-header-response">
+<dt>send_body_without_waiting_for_header_response</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Send body to the side stream server once it arrives without waiting for the header response from that server.
+It only works for <code class="docutils literal notranslate"><span class="pre">STREAMED</span></code> body processing mode. For any other body
+processing modes, it is ignored.
+The server has two options upon receiving a header request:</p>
+<ol class="arabic simple">
+<li><p>Instant Response: send the header response as soon as the header request is received.</p></li>
+<li><p>Delayed Response: wait for the body before sending any response.</p></li>
+</ol>
+<p>In all scenarios, the header-body ordering must always be maintained.</p>
+<p>If enabled the data plane will ignore the
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-field-service-ext-proc-v3-processingresponse-mode-override"><span class="std std-ref">mode_override</span></a>
+value that the server sends in the header response. This is because the data plane may have already
+sent the body to the server, prior to processing the header response.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-allowed-override-modes">
+<dt>allowed_override_modes</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="processing_mode.proto.html#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-processingmode"><span class="std std-ref">extensions.filters.http.ext_proc.v3.ProcessingMode</span></a>) When <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-allow-mode-override"><span class="std std-ref">allow_mode_override</span></a> is enabled and
+<code class="docutils literal notranslate"><span class="pre">allowed_override_modes</span></code> is configured, the filter config <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-processing-mode"><span class="std std-ref">processing_mode</span></a>
+can only be overridden by the response message from the external processing server iff the
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-field-service-ext-proc-v3-processingresponse-mode-override"><span class="std std-ref">mode_override</span></a> is allowed by
+the <code class="docutils literal notranslate"><span class="pre">allowed_override_modes</span></code> allow-list below.
+Since <code class="docutils literal notranslate"><span class="pre">request_header_mode</span></code> is not applicable in any way, it’s ignored in comparison.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-processing-request-modifier">
+<dt>processing_request_modifier</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Decorator to introduce custom logic that runs after the <code class="docutils literal notranslate"><span class="pre">ProcessingRequest</span></code> is constructed, but
+before it is sent to the External Processor. The <code class="docutils literal notranslate"><span class="pre">ProcessingRequest</span></code> may be modified.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Processing request modifiers are currently in alpha.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the <a class="reference internal" href="../../../../../../intro/arch_overview/security/threat_model.html#arch-overview-threat-model"><span class="std std-ref">threat model</span></a>, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.</p>
+</div>
+<div class="admonition tip" id="extension-category-envoy-http-ext-proc-processing-request-modifiers">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.proto.html#extension-envoy-http-ext-proc-processing-request-modifiers-mapped-attribute-builder"><span class="std std-ref">envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-on-processing-response">
+<dt>on_processing_response</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Decorator to introduce custom logic that runs after a message received from
+the External Processor is processed, but before continuing filter chain iteration.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Response processors are currently in alpha.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the <a class="reference internal" href="../../../../../../intro/arch_overview/security/threat_model.html#arch-overview-threat-model"><span class="std std-ref">threat model</span></a>, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.</p>
+</div>
+<div class="admonition tip" id="extension-category-envoy-http-ext-proc-response-processors">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../http/ext_proc/response_processors/save_processing_response/v3/save_processing_response.proto.html#extension-envoy-http-ext-proc-response-processors-save-processing-response"><span class="std std-ref">envoy.http.ext_proc.response_processors.save_processing_response</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-status-on-error">
+<dt>status_on_error</dt><dd><p>(<a class="reference internal" href="../../../../../type/v3/http_status.proto.html#envoy-v3-api-msg-type-v3-httpstatus"><span class="std std-ref">type.v3.HttpStatus</span></a>) Sets the HTTP status code that is returned to the client when the external processing server returns
+an error, fails to respond, or cannot be reached.</p>
+<p>The default status is <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">500</span> <span class="pre">Internal</span> <span class="pre">Server</span> <span class="pre">Error</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-allow-content-length-header">
+<dt>allow_content_length_header</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If true, the filter will not remove the <code class="docutils literal notranslate"><span class="pre">content-length</span></code> header from the request/response after external processing.
+It is typically used in
+<a class="reference internal" href="processing_mode.proto.html#envoy-v3-api-enum-value-extensions-filters-http-ext-proc-v3-processingmode-bodysendmode-full-duplex-streamed"><span class="std std-ref">FULL_DUPLEX_STREAMED</span></a>
+mode. If the original body has been modified, the external processing server needs to set the correct content-length header in HeaderMutation
+that matches the modified body length.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This configuration should only be used if you are sure that the content length matches
+the body length after external processing. Otherwise, it may cause vulnerability issues such as
+request smuggling. Thus, please use your own discretion when enabling this feature.</p>
+</div>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-filters-http-ext-proc-v3-externalprocessor-routecacheaction">
+<span id="envoy-v3-api-enum-extensions-filters-http-ext-proc-v3-externalprocessor-routecacheaction"></span><h2>Enum extensions.filters.http.ext_proc.v3.ExternalProcessor.RouteCacheAction<a class="headerlink" href="#enum-extensions-filters-http-ext-proc-v3-externalprocessor-routecacheaction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L104">[extensions.filters.http.ext_proc.v3.ExternalProcessor.RouteCacheAction proto]</a></p>
+<p>Describes the route cache action to be taken when an external processor response
+is received in response to request headers.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-ext-proc-v3-externalprocessor-routecacheaction-default">
+<dt>DEFAULT</dt><dd><p><em>(DEFAULT)</em> ⁣The default behavior is to clear the route cache only when the
+<a class="reference internal" href="../../../../../service/ext_proc/v3/external_processor.proto.html#envoy-v3-api-field-service-ext-proc-v3-commonresponse-clear-route-cache"><span class="std std-ref">clear_route_cache</span></a>
+field is set in an external processor response.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-ext-proc-v3-externalprocessor-routecacheaction-clear">
+<dt>CLEAR</dt><dd><p>⁣Always clear the route cache irrespective of the <code class="docutils literal notranslate"><span class="pre">clear_route_cache</span></code> bit in
+the external processor response.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-ext-proc-v3-externalprocessor-routecacheaction-retain">
+<dt>RETAIN</dt><dd><p>⁣Do not clear the route cache irrespective of the <code class="docutils literal notranslate"><span class="pre">clear_route_cache</span></code> bit in
+the external processor response. Setting to <code class="docutils literal notranslate"><span class="pre">RETAIN</span></code> is equivalent to setting the
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-disable-clear-route-cache"><span class="std std-ref">disable_clear_route_cache</span></a>
+to true.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-ext-proc-v3-extprochttpservice">
+<span id="envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-extprochttpservice"></span><h2>extensions.filters.http.ext_proc.v3.ExtProcHttpService<a class="headerlink" href="#extensions-filters-http-ext-proc-v3-extprochttpservice" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L391">[extensions.filters.http.ext_proc.v3.ExtProcHttpService proto]</a></p>
+<p>ExtProcHttpService is used for HTTP communication between the filter and the external processing service.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;http_service&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprochttpservice-http-service">
+<dt>http_service</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/http_service.proto.html#envoy-v3-api-msg-config-core-v3-httpservice"><span class="std std-ref">config.core.v3.HttpService</span></a>) Sets the HTTP service which the external processing requests must be sent to.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-ext-proc-v3-metadataoptions">
+<span id="envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-metadataoptions"></span><h2>extensions.filters.http.ext_proc.v3.MetadataOptions<a class="headerlink" href="#extensions-filters-http-ext-proc-v3-metadataoptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L399">[extensions.filters.http.ext_proc.v3.MetadataOptions proto]</a></p>
+<p>The MetadataOptions structure defines options for the sending and receiving of
+dynamic metadata. Specifically, which namespaces to send to the server, whether
+metadata returned by the server may be written, and how that metadata may be written.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;forwarding_namespaces&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;receiving_namespaces&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;cluster_metadata_forwarding_namespaces&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-metadataoptions-forwarding-namespaces">
+<dt>forwarding_namespaces</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-metadataoptions-metadatanamespaces"><span class="std std-ref">extensions.filters.http.ext_proc.v3.MetadataOptions.MetadataNamespaces</span></a>) Describes which typed or untyped filter dynamic metadata namespaces to forward to
+the external processing server.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-metadataoptions-receiving-namespaces">
+<dt>receiving_namespaces</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-metadataoptions-metadatanamespaces"><span class="std std-ref">extensions.filters.http.ext_proc.v3.MetadataOptions.MetadataNamespaces</span></a>) Describes which typed or untyped filter dynamic metadata namespaces to accept from
+the external processing server. Set to empty or leave unset to disallow writing
+any received dynamic metadata.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-metadataoptions-cluster-metadata-forwarding-namespaces">
+<dt>cluster_metadata_forwarding_namespaces</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-metadataoptions-metadatanamespaces"><span class="std std-ref">extensions.filters.http.ext_proc.v3.MetadataOptions.MetadataNamespaces</span></a>) Describes which cluster metadata namespaces to forward to
+the external processing server.
+.. note::
+This is the least specific metadata. Should there be any namespace collision,
+cluster level metadata can be overridden by filter metadata.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-ext-proc-v3-metadataoptions-metadatanamespaces">
+<span id="envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-metadataoptions-metadatanamespaces"></span><h2>extensions.filters.http.ext_proc.v3.MetadataOptions.MetadataNamespaces<a class="headerlink" href="#extensions-filters-http-ext-proc-v3-metadataoptions-metadatanamespaces" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L400">[extensions.filters.http.ext_proc.v3.MetadataOptions.MetadataNamespaces proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;untyped&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;typed&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-metadataoptions-metadatanamespaces-untyped">
+<dt>untyped</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Specifies a list of metadata namespaces whose values, if present,
+will be passed to the <code class="docutils literal notranslate"><span class="pre">ext_proc</span></code> service as an opaque <code class="docutils literal notranslate"><span class="pre">protobuf::Struct</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-metadataoptions-metadatanamespaces-typed">
+<dt>typed</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Specifies a list of metadata namespaces whose values, if present,
+will be passed to the <code class="docutils literal notranslate"><span class="pre">ext_proc</span></code> service as a <code class="docutils literal notranslate"><span class="pre">protobuf::Any</span></code>. This allows
+envoy and the external processing server to share the protobuf message
+definition for safe parsing.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-ext-proc-v3-headerforwardingrules">
+<span id="envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-headerforwardingrules"></span><h2>extensions.filters.http.ext_proc.v3.HeaderForwardingRules<a class="headerlink" href="#extensions-filters-http-ext-proc-v3-headerforwardingrules" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L441">[extensions.filters.http.ext_proc.v3.HeaderForwardingRules proto]</a></p>
+<p>The HeaderForwardingRules structure specifies what headers are
+allowed to be forwarded to the external processing server.</p>
+<p>This works as below:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>If neither <code class="docutils literal notranslate"><span class="pre">allowed_headers</span></code> nor <code class="docutils literal notranslate"><span class="pre">disallowed_headers</span></code> is set, all headers are forwarded.</p></li>
+<li><p>If both <code class="docutils literal notranslate"><span class="pre">allowed_headers</span></code> and <code class="docutils literal notranslate"><span class="pre">disallowed_headers</span></code> are set, only headers in the
+<code class="docutils literal notranslate"><span class="pre">allowed_headers</span></code> but not in the <code class="docutils literal notranslate"><span class="pre">disallowed_headers</span></code> are forwarded.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">allowed_headers</span></code> is set, and <code class="docutils literal notranslate"><span class="pre">disallowed_headers</span></code> is not set, only headers in
+the <code class="docutils literal notranslate"><span class="pre">allowed_headers</span></code> are forwarded.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">disallowed_headers</span></code> is set, and <code class="docutils literal notranslate"><span class="pre">allowed_headers</span></code> is not set, all headers except
+headers in the <code class="docutils literal notranslate"><span class="pre">disallowed_headers</span></code> are forwarded.</p></li>
+</ol>
+</div></blockquote>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;allowed_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;disallowed_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-headerforwardingrules-allowed-headers">
+<dt>allowed_headers</dt><dd><p>(<a class="reference internal" href="../../../../../type/matcher/v3/string.proto.html#envoy-v3-api-msg-type-matcher-v3-liststringmatcher"><span class="std std-ref">type.matcher.v3.ListStringMatcher</span></a>) If set, specifically allow any header in this list to be forwarded to the external
+processing server. This can be overridden by the below <code class="docutils literal notranslate"><span class="pre">disallowed_headers</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-headerforwardingrules-disallowed-headers">
+<dt>disallowed_headers</dt><dd><p>(<a class="reference internal" href="../../../../../type/matcher/v3/string.proto.html#envoy-v3-api-msg-type-matcher-v3-liststringmatcher"><span class="std std-ref">type.matcher.v3.ListStringMatcher</span></a>) If set, specifically disallow any header in this list to be forwarded to the external
+processing server. This overrides the above <code class="docutils literal notranslate"><span class="pre">allowed_headers</span></code> if a header matches both.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-ext-proc-v3-extprocperroute">
+<span id="envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-extprocperroute"></span><h2>extensions.filters.http.ext_proc.v3.ExtProcPerRoute<a class="headerlink" href="#extensions-filters-http-ext-proc-v3-extprocperroute" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L453">[extensions.filters.http.ext_proc.v3.ExtProcPerRoute proto]</a></p>
+<p>Extra settings that may be added to per-route configuration for a
+virtual host or cluster.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;disabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;overrides&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocperroute-disabled">
+<dt>disabled</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Disable the filter for this particular vhost or route.
+If disabled is specified in multiple per-filter-configs, the most specific one will be used.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocperroute-disabled"><span class="std std-ref">disabled</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocperroute-overrides"><span class="std std-ref">overrides</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocperroute-overrides">
+<dt>overrides</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-extprocoverrides"><span class="std std-ref">extensions.filters.http.ext_proc.v3.ExtProcOverrides</span></a>) Override aspects of the configuration for this route. A set of
+overrides in a more specific configuration will override a “disabled”
+flag set in a less-specific one.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocperroute-disabled"><span class="std std-ref">disabled</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocperroute-overrides"><span class="std std-ref">overrides</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-ext-proc-v3-extprocoverrides">
+<span id="envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-extprocoverrides"></span><h2>extensions.filters.http.ext_proc.v3.ExtProcOverrides<a class="headerlink" href="#extensions-filters-http-ext-proc-v3-extprocoverrides" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L470">[extensions.filters.http.ext_proc.v3.ExtProcOverrides proto]</a></p>
+<p>Overrides that may be set on a per-route basis</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;processing_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;grpc_service&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;metadata_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;grpc_initial_metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;failure_mode_allow&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;processing_request_modifier&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocoverrides-processing-mode">
+<dt>processing_mode</dt><dd><p>(<a class="reference internal" href="processing_mode.proto.html#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-processingmode"><span class="std std-ref">extensions.filters.http.ext_proc.v3.ProcessingMode</span></a>) Set a different processing mode for this route than the default.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocoverrides-grpc-service">
+<dt>grpc_service</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/grpc_service.proto.html#envoy-v3-api-msg-config-core-v3-grpcservice"><span class="std std-ref">config.core.v3.GrpcService</span></a>) Set a different gRPC service for this route than the default.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocoverrides-metadata-options">
+<dt>metadata_options</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-metadataoptions"><span class="std std-ref">extensions.filters.http.ext_proc.v3.MetadataOptions</span></a>) Options related to the sending and receiving of dynamic metadata.
+Lists of forwarding and receiving namespaces will be overridden in their entirety,
+meaning the most-specific config that specifies this override will be the final
+config used. It is the prerogative of the control plane to ensure this
+most-specific config contains the correct final overrides.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocoverrides-grpc-initial-metadata">
+<dt>grpc_initial_metadata</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-headervalue"><span class="std std-ref">config.core.v3.HeaderValue</span></a>) Additional metadata to include into streams initiated to the <code class="docutils literal notranslate"><span class="pre">ext_proc</span></code> gRPC
+service. This can be used for scenarios in which additional ad hoc
+authorization headers (e.g. <code class="docutils literal notranslate"><span class="pre">x-foo-bar:</span> <span class="pre">baz-key</span></code>) are to be injected or
+when a route needs to partially override inherited metadata.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocoverrides-failure-mode-allow">
+<dt>failure_mode_allow</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) If true, the filter will not fail closed if the gRPC stream is prematurely closed
+or could not be opened. This field is the per-route override of
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-failure-mode-allow"><span class="std std-ref">failure_mode_allow</span></a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocoverrides-processing-request-modifier">
+<dt>processing_request_modifier</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Decorator to introduce custom logic that runs after the <code class="docutils literal notranslate"><span class="pre">ProcessingRequest</span></code> is constructed, but
+before it is sent to the External Processor. The <code class="docutils literal notranslate"><span class="pre">ProcessingRequest</span></code> may be modified.
+This is a per-route override of
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-processing-request-modifier"><span class="std std-ref">processing_request_modifier</span></a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the <a class="reference internal" href="../../../../../../intro/arch_overview/security/threat_model.html#arch-overview-threat-model"><span class="std std-ref">threat model</span></a>, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.</p>
+</div>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../ext_authz/v3/ext_authz.proto.html" class="btn btn-neutral float-left" title="External Authorization (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="processing_mode.proto.html" class="btn btn-neutral float-right" title="External Processing Filter (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">External Processing Filter (proto)</a><ul>
+<li><a class="reference internal" href="#extensions-filters-http-ext-proc-v3-externalprocessor">extensions.filters.http.ext_proc.v3.ExternalProcessor</a></li>
+<li><a class="reference internal" href="#enum-extensions-filters-http-ext-proc-v3-externalprocessor-routecacheaction">Enum extensions.filters.http.ext_proc.v3.ExternalProcessor.RouteCacheAction</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-ext-proc-v3-extprochttpservice">extensions.filters.http.ext_proc.v3.ExtProcHttpService</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-ext-proc-v3-metadataoptions">extensions.filters.http.ext_proc.v3.MetadataOptions</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-ext-proc-v3-metadataoptions-metadatanamespaces">extensions.filters.http.ext_proc.v3.MetadataOptions.MetadataNamespaces</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-ext-proc-v3-headerforwardingrules">extensions.filters.http.ext_proc.v3.HeaderForwardingRules</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-ext-proc-v3-extprocperroute">extensions.filters.http.ext_proc.v3.ExtProcPerRoute</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-ext-proc-v3-extprocoverrides">extensions.filters.http.ext_proc.v3.ExtProcOverrides</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

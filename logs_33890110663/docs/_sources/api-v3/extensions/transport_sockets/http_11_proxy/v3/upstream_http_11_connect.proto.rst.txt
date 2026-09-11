@@ -1,0 +1,92 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.proto:
+
+Upstream HTTP/1.1 Proxy (proto)
+===============================
+
+.. _extension_envoy.transport_sockets.http_11_proxy:
+
+This extension has the qualified name ``envoy.transport_sockets.http_11_proxy``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.transport_sockets.upstream <extension_category_envoy.transport_sockets.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport <envoy_v3_api_msg_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport:
+
+extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport
+--------------------------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport proto] <api/envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.proto#L38>`
+
+HTTP/1.1 proxy transport socket establishes an upstream connection to a proxy address
+instead of the target host's address. This behavior is triggered when the transport
+socket is configured and proxy information is provided.
+
+Behavior when proxying:
+=======================
+When an upstream connection is established, instead of connecting directly to the endpoint
+address, the client will connect to the specified proxy address, send an HTTP/1.1 ``CONNECT`` request
+indicating the endpoint address, and process the response. If the response has HTTP status 200,
+the connection will be passed down to the underlying transport socket.
+
+Configuring proxy information:
+==============================
+Set ``typed_filter_metadata`` in :ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpoint.v3.lbendpoint.metadata>` or :ref:`LocalityLbEndpoints.Metadata <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata>`.
+using the key ``envoy.http11_proxy_transport_socket.proxy_address`` and the
+proxy address in ``config::core::v3::Address`` format.
+
+If the ``default_proxy_address`` is set and proxy address is not found in
+``typed_filter_metadata``, the default proxy address is used.
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "transport_socket": {...},
+    "default_proxy_address": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport.transport_socket:
+
+
+transport_socket
+  (:ref:`config.core.v3.TransportSocket <envoy_v3_api_msg_config.core.v3.TransportSocket>`) The underlying transport socket being wrapped. Defaults to plaintext (raw_buffer) if unset.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport.default_proxy_address:
+
+
+default_proxy_address
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) Specifies the default proxy address to use if the proxy address is not present in the
+  ``typed_filter_metadata`` of the endpoint.
+
+

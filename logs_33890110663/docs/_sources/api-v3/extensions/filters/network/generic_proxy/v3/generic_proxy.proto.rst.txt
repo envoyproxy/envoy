@@ -1,0 +1,195 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.proto:
+
+Generic Proxy (proto)
+=====================
+
+.. _extension_envoy.filters.network.generic_proxy:
+
+This extension has the qualified name ``envoy.filters.network.generic_proxy``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.generic_proxy.v3.GenericProxy <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+Generic proxy.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy:
+
+extensions.filters.network.generic_proxy.v3.GenericProxy
+--------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.v3.GenericProxy proto] <api/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.proto#L27>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "codec_config": {...},
+    "generic_rds": {...},
+    "route_config": {...},
+    "filters": [],
+    "tracing": {...},
+    "access_log": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The human readable prefix to use when emitting statistics.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.codec_config:
+
+
+codec_config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`, *REQUIRED*) The codec which encodes and decodes the application protocol.
+
+
+  .. _extension_category_envoy.generic_proxy.codecs:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.generic_proxy.codecs.dubbo <extension_envoy.generic_proxy.codecs.dubbo>`
+
+    - :ref:`envoy.generic_proxy.codecs.http1 <extension_envoy.generic_proxy.codecs.http1>`
+
+
+
+
+    The following extensions are available in :ref:`contrib <install_contrib>` images only:
+
+
+    - :ref:`envoy.generic_proxy.codecs.kafka <extension_envoy.generic_proxy.codecs.kafka>`
+
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.generic_rds:
+
+
+generic_rds
+  (:ref:`extensions.filters.network.generic_proxy.v3.GenericRds <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericRds>`) The generic proxies route table will be dynamically loaded via the meta RDS API.
+
+
+  
+
+  Precisely one of :ref:`generic_rds <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.generic_rds>`, :ref:`route_config <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.route_config>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.route_config:
+
+
+route_config
+  (:ref:`extensions.filters.network.generic_proxy.v3.RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.RouteConfiguration>`) The route table for the generic proxy is static and is specified in this property.
+
+
+  
+
+  Precisely one of :ref:`generic_rds <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.generic_rds>`, :ref:`route_config <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.route_config>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.filters:
+
+
+filters
+  (**repeated** :ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) A list of individual Layer-7 filters that make up the filter chain for requests made to the
+  proxy. Order matters as the filters are processed sequentially as request events
+  happen.
+
+
+  .. _extension_category_envoy.generic_proxy.filters:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.filters.generic.router <extension_envoy.filters.generic.router>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.tracing:
+
+
+tracing
+  (:ref:`extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing>`) Tracing configuration for the generic proxy.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.access_log:
+
+
+access_log
+  (**repeated** :ref:`config.accesslog.v3.AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`) Configuration for :ref:`access logs <arch_overview_access_logs>` emitted by generic proxy.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericRds:
+
+extensions.filters.network.generic_proxy.v3.GenericRds
+------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.v3.GenericRds proto] <api/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.proto#L59>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config_source": {...},
+    "route_config_name": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericRds.config_source:
+
+
+config_source
+  (:ref:`config.core.v3.ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`, *REQUIRED*) Configuration source specifier for RDS.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericRds.route_config_name:
+
+
+route_config_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the route configuration. This name will be passed to the RDS API. This allows an
+  Envoy configuration with multiple generic proxies to use different route configurations.
+
+

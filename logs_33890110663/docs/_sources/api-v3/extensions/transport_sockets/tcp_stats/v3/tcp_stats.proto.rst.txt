@@ -1,0 +1,79 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.proto:
+
+TCP Stats Transport Socket wrapper (proto)
+==========================================
+
+.. _extension_envoy.transport_sockets.tcp_stats:
+
+This extension has the qualified name ``envoy.transport_sockets.tcp_stats``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.transport_sockets.downstream <extension_category_envoy.transport_sockets.downstream>`
+
+  - :ref:`envoy.transport_sockets.upstream <extension_category_envoy.transport_sockets.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.tcp_stats.v3.Config <envoy_v3_api_msg_extensions.transport_sockets.tcp_stats.v3.Config>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tcp_stats.v3.Config:
+
+extensions.transport_sockets.tcp_stats.v3.Config
+------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tcp_stats.v3.Config proto] <api/envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.proto#L27>`
+
+Configuration for the TCP Stats transport socket wrapper, which wraps another transport socket for
+all communication, but emits stats about the underlying TCP connection.
+
+The stats are documented :ref:`here <config_listener_stats_tcp>` for listeners and
+:ref:`here <config_cluster_manager_cluster_stats_tcp>` for clusters.
+
+This transport socket is currently only supported on Linux.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "transport_socket": {...},
+    "update_period": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tcp_stats.v3.Config.transport_socket:
+
+
+transport_socket
+  (:ref:`config.core.v3.TransportSocket <envoy_v3_api_msg_config.core.v3.TransportSocket>`, *REQUIRED*) The underlying transport socket being wrapped.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tcp_stats.v3.Config.update_period:
+
+
+update_period
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Period to update stats while the connection is open. If unset, updates only happen when the
+  connection is closed. Stats are always updated one final time when the connection is closed.
+
+

@@ -1,0 +1,546 @@
+.. _envoy_v3_api_file_envoy/admin/v3/server_info.proto:
+
+Server state (proto)
+====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.ServerInfo:
+
+admin.v3.ServerInfo
+-------------------
+
+
+:repo:`[admin.v3.ServerInfo proto] <api/envoy/admin/v3/server_info.proto#L22>`
+
+Proto representation of the value returned by /server_info, containing
+server version/server status information.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "version": ...,
+    "state": ...,
+    "uptime_current_epoch": {...},
+    "uptime_all_epochs": {...},
+    "hot_restart_version": ...,
+    "command_line_options": {...},
+    "node": {...},
+    "hot_restart_initializing": ...
+  }
+
+.. _envoy_v3_api_field_admin.v3.ServerInfo.version:
+
+
+version
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Server version.
+
+
+.. _envoy_v3_api_field_admin.v3.ServerInfo.state:
+
+
+state
+  (:ref:`admin.v3.ServerInfo.State <envoy_v3_api_enum_admin.v3.ServerInfo.State>`) State of the server.
+
+
+.. _envoy_v3_api_field_admin.v3.ServerInfo.uptime_current_epoch:
+
+
+uptime_current_epoch
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Uptime since current epoch was started.
+
+
+.. _envoy_v3_api_field_admin.v3.ServerInfo.uptime_all_epochs:
+
+
+uptime_all_epochs
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Uptime since the start of the first epoch.
+
+
+.. _envoy_v3_api_field_admin.v3.ServerInfo.hot_restart_version:
+
+
+hot_restart_version
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Hot restart version.
+
+
+.. _envoy_v3_api_field_admin.v3.ServerInfo.command_line_options:
+
+
+command_line_options
+  (:ref:`admin.v3.CommandLineOptions <envoy_v3_api_msg_admin.v3.CommandLineOptions>`) Command line options the server is currently running with.
+
+
+.. _envoy_v3_api_field_admin.v3.ServerInfo.node:
+
+
+node
+  (:ref:`config.core.v3.Node <envoy_v3_api_msg_config.core.v3.Node>`) Populated node identity of this server.
+
+
+.. _envoy_v3_api_field_admin.v3.ServerInfo.hot_restart_initializing:
+
+
+hot_restart_initializing
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether the server is currently initializing during a hot restart.
+
+
+.. _envoy_v3_api_enum_admin.v3.ServerInfo.State:
+
+Enum admin.v3.ServerInfo.State
+------------------------------
+
+
+:repo:`[admin.v3.ServerInfo.State proto] <api/envoy/admin/v3/server_info.proto#L25>`
+
+
+
+
+.. _envoy_v3_api_enum_value_admin.v3.ServerInfo.State.LIVE:
+
+
+LIVE
+  *(DEFAULT)* ⁣Server is live and serving traffic.
+
+
+.. _envoy_v3_api_enum_value_admin.v3.ServerInfo.State.DRAINING:
+
+
+DRAINING
+  ⁣Server is draining listeners in response to external health checks failing.
+
+
+.. _envoy_v3_api_enum_value_admin.v3.ServerInfo.State.PRE_INITIALIZING:
+
+
+PRE_INITIALIZING
+  ⁣Server has not yet completed cluster manager initialization.
+
+
+.. _envoy_v3_api_enum_value_admin.v3.ServerInfo.State.INITIALIZING:
+
+
+INITIALIZING
+  ⁣Server is running the cluster manager initialization callbacks (e.g., RDS).
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.CommandLineOptions:
+
+admin.v3.CommandLineOptions
+---------------------------
+
+
+:repo:`[admin.v3.CommandLineOptions proto] <api/envoy/admin/v3/server_info.proto#L65>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "base_id": ...,
+    "use_dynamic_base_id": ...,
+    "skip_hot_restart_on_no_parent": ...,
+    "skip_hot_restart_parent_stats": ...,
+    "base_id_path": ...,
+    "concurrency": ...,
+    "config_path": ...,
+    "config_yaml": ...,
+    "allow_unknown_static_fields": ...,
+    "reject_unknown_dynamic_fields": ...,
+    "ignore_unknown_dynamic_fields": ...,
+    "skip_deprecated_logs": ...,
+    "admin_address_path": ...,
+    "local_address_ip_version": ...,
+    "log_level": ...,
+    "component_log_level": ...,
+    "log_format": ...,
+    "log_format_escaped": ...,
+    "log_path": ...,
+    "service_cluster": ...,
+    "service_node": ...,
+    "service_zone": ...,
+    "file_flush_interval": {...},
+    "file_flush_min_size": ...,
+    "drain_time": {...},
+    "drain_strategy": ...,
+    "parent_shutdown_time": {...},
+    "mode": ...,
+    "disable_hot_restart": ...,
+    "enable_mutex_tracing": ...,
+    "restart_epoch": ...,
+    "cpuset_threads": ...,
+    "disabled_extensions": [],
+    "enable_fine_grain_logging": ...,
+    "log_stacktrace_single_entry": ...,
+    "socket_path": ...,
+    "socket_mode": ...,
+    "enable_core_dump": ...,
+    "stats_tag": []
+  }
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.base_id:
+
+
+base_id
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--base-id` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.use_dynamic_base_id:
+
+
+use_dynamic_base_id
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--use-dynamic-base-id` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.skip_hot_restart_on_no_parent:
+
+
+skip_hot_restart_on_no_parent
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--skip-hot-restart-on-no-parent` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.skip_hot_restart_parent_stats:
+
+
+skip_hot_restart_parent_stats
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--skip-hot-restart-parent-stats` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.base_id_path:
+
+
+base_id_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--base-id-path` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.concurrency:
+
+
+concurrency
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--concurrency` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.config_path:
+
+
+config_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--config-path` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.config_yaml:
+
+
+config_yaml
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--config-yaml` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.allow_unknown_static_fields:
+
+
+allow_unknown_static_fields
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--allow-unknown-static-fields` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.reject_unknown_dynamic_fields:
+
+
+reject_unknown_dynamic_fields
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--reject-unknown-dynamic-fields` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.ignore_unknown_dynamic_fields:
+
+
+ignore_unknown_dynamic_fields
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--ignore-unknown-dynamic-fields` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.skip_deprecated_logs:
+
+
+skip_deprecated_logs
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--skip-deprecated-logs` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.admin_address_path:
+
+
+admin_address_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--admin-address-path` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.local_address_ip_version:
+
+
+local_address_ip_version
+  (:ref:`admin.v3.CommandLineOptions.IpVersion <envoy_v3_api_enum_admin.v3.CommandLineOptions.IpVersion>`) See :option:`--local-address-ip-version` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.log_level:
+
+
+log_level
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--log-level` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.component_log_level:
+
+
+component_log_level
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--component-log-level` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.log_format:
+
+
+log_format
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--log-format` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.log_format_escaped:
+
+
+log_format_escaped
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--log-format-escaped` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.log_path:
+
+
+log_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--log-path` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.service_cluster:
+
+
+service_cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--service-cluster` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.service_node:
+
+
+service_node
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--service-node` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.service_zone:
+
+
+service_zone
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--service-zone` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.file_flush_interval:
+
+
+file_flush_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) See :option:`--file-flush-interval-msec` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.file_flush_min_size:
+
+
+file_flush_min_size
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--file-flush-min-size-kb` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.drain_time:
+
+
+drain_time
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) See :option:`--drain-time-s` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.drain_strategy:
+
+
+drain_strategy
+  (:ref:`admin.v3.CommandLineOptions.DrainStrategy <envoy_v3_api_enum_admin.v3.CommandLineOptions.DrainStrategy>`) See :option:`--drain-strategy` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.parent_shutdown_time:
+
+
+parent_shutdown_time
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) See :option:`--parent-shutdown-time-s` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.mode:
+
+
+mode
+  (:ref:`admin.v3.CommandLineOptions.Mode <envoy_v3_api_enum_admin.v3.CommandLineOptions.Mode>`) See :option:`--mode` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.disable_hot_restart:
+
+
+disable_hot_restart
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--disable-hot-restart` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.enable_mutex_tracing:
+
+
+enable_mutex_tracing
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--enable-mutex-tracing` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.restart_epoch:
+
+
+restart_epoch
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--restart-epoch` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.cpuset_threads:
+
+
+cpuset_threads
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--cpuset-threads` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.disabled_extensions:
+
+
+disabled_extensions
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--disable-extensions` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.enable_fine_grain_logging:
+
+
+enable_fine_grain_logging
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--enable-fine-grain-logging` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.log_stacktrace_single_entry:
+
+
+log_stacktrace_single_entry
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--log-stacktrace-single-entry` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.socket_path:
+
+
+socket_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--socket-path` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.socket_mode:
+
+
+socket_mode
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--socket-mode` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.enable_core_dump:
+
+
+enable_core_dump
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--enable-core-dump` for details.
+
+
+.. _envoy_v3_api_field_admin.v3.CommandLineOptions.stats_tag:
+
+
+stats_tag
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) See :option:`--stats-tag` for details.
+
+
+.. _envoy_v3_api_enum_admin.v3.CommandLineOptions.IpVersion:
+
+Enum admin.v3.CommandLineOptions.IpVersion
+------------------------------------------
+
+
+:repo:`[admin.v3.CommandLineOptions.IpVersion proto] <api/envoy/admin/v3/server_info.proto#L69>`
+
+
+
+
+.. _envoy_v3_api_enum_value_admin.v3.CommandLineOptions.IpVersion.v4:
+
+
+v4
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_admin.v3.CommandLineOptions.IpVersion.v6:
+
+
+v6
+  ⁣
+
+
+.. _envoy_v3_api_enum_admin.v3.CommandLineOptions.Mode:
+
+Enum admin.v3.CommandLineOptions.Mode
+-------------------------------------
+
+
+:repo:`[admin.v3.CommandLineOptions.Mode proto] <api/envoy/admin/v3/server_info.proto#L74>`
+
+
+
+
+.. _envoy_v3_api_enum_value_admin.v3.CommandLineOptions.Mode.Serve:
+
+
+Serve
+  *(DEFAULT)* ⁣Validate configs and then serve traffic normally.
+
+
+.. _envoy_v3_api_enum_value_admin.v3.CommandLineOptions.Mode.Validate:
+
+
+Validate
+  ⁣Validate configs and exit.
+
+
+.. _envoy_v3_api_enum_value_admin.v3.CommandLineOptions.Mode.InitOnly:
+
+
+InitOnly
+  ⁣Completely load and initialize the config, and then exit without running the listener loop.
+
+
+
+.. _envoy_v3_api_enum_admin.v3.CommandLineOptions.DrainStrategy:
+
+Enum admin.v3.CommandLineOptions.DrainStrategy
+----------------------------------------------
+
+
+:repo:`[admin.v3.CommandLineOptions.DrainStrategy proto] <api/envoy/admin/v3/server_info.proto#L85>`
+
+
+
+
+.. _envoy_v3_api_enum_value_admin.v3.CommandLineOptions.DrainStrategy.Gradual:
+
+
+Gradual
+  *(DEFAULT)* ⁣Gradually discourage connections over the course of the drain period.
+
+
+.. _envoy_v3_api_enum_value_admin.v3.CommandLineOptions.DrainStrategy.Immediate:
+
+
+Immediate
+  ⁣Discourage all connections for the duration of the drain sequence.
+
+
+

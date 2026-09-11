@@ -1,0 +1,221 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/clients/grpc_client/stream_reverse_tunnels.proto:
+
+Reverse Tunnel Reporting Service (proto)
+========================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsRequest:
+
+extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsRequest
+-------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsRequest proto] <api/contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/clients/grpc_client/stream_reverse_tunnels.proto#L33>`
+
+Request message sent by Envoy to report reverse tunnel state changes.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "node": {...},
+    "added_tunnels": [],
+    "removed_tunnel_names": [],
+    "full_push": ...,
+    "nonce": ...
+  }
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsRequest.node:
+
+
+node
+  (:ref:`config.core.v3.Node <envoy_v3_api_msg_config.core.v3.Node>`, *REQUIRED*) Node identifier for the reporting Envoy instance.
+  This identifies which Envoy instance is sending the report.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsRequest.added_tunnels:
+
+
+added_tunnels
+  (**repeated** :ref:`extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.ReverseTunnel <envoy_v3_api_msg_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.ReverseTunnel>`) List of reverse tunnels that were established since the last report.
+  Each tunnel represents a new connection from a downstream Envoy.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsRequest.removed_tunnel_names:
+
+
+removed_tunnel_names
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) List of tunnel names that were disconnected since the last report.
+  Only the tunnel name is needed for removal notifications.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsRequest.full_push:
+
+
+full_push
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates whether this report contains all active tunnels (true) or
+  only changes since the last report (false). Usually invoked only on server disconnects.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsRequest.nonce:
+
+
+nonce
+  (`int64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Unique nonce for this request to enable proper ACK/NACK handling.
+  Must be non-negative and should increment for each request.
+  This can also be modified to be used for checksum and tracking in the future.
+
+
+
+.. _envoy_v3_api_msg_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsResponse:
+
+extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsResponse
+--------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsResponse proto] <api/contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/clients/grpc_client/stream_reverse_tunnels.proto#L58>`
+
+Response message sent by the management server to control reporting behavior.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "node_id": ...,
+    "report_interval": {...},
+    "request_nonce": ...,
+    "error_detail": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsResponse.node_id:
+
+
+node_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Node identifier acknowledging which Envoy instance this response is for.
+  Should match the node from the corresponding request.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsResponse.report_interval:
+
+
+report_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Interval at which Envoy should send tunnel state reports.
+  This is used to change the reporting_interval -> no need to repeat the same value.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsResponse.request_nonce:
+
+
+request_nonce
+  (`int64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Nonce from the request being acknowledged or rejected.
+  Must match the nonce from the corresponding request.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.StreamReverseTunnelsResponse.error_detail:
+
+
+error_detail
+  (`Status <https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#status>`_) Error details if the previous request failed processing.
+  If populated, indicates the request was rejected (NACK).
+  If empty, indicates successful processing (ACK).
+  NACK will terminate the connection -> useful for logging rather than just some disconnect.
+  So basically -> NACK then terminate.
+
+
+
+.. _envoy_v3_api_msg_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.ReverseTunnel:
+
+extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.ReverseTunnel
+-----------------------------------------------------------------------------
+
+
+:repo:`[extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.ReverseTunnel proto] <api/contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/clients/grpc_client/stream_reverse_tunnels.proto#L83>`
+
+Represents a single reverse tunnel connection with its metadata.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "identity": {...},
+    "created_at": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.ReverseTunnel.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Unique name to identify this tunnel connection.
+  Must be unique within the reporting Envoy instance.
+  This is also used for the reporting the disconnection with the associated tunnel initiator.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.ReverseTunnel.identity:
+
+
+identity
+  (:ref:`extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.TunnelInitiatorIdentity <envoy_v3_api_msg_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.TunnelInitiatorIdentity>`, *REQUIRED*) Identity information of the tunnel initiator (downstream Envoy).
+  Contains ``node_id``, ``cluster_id``, and ``tenant_id`` for proper identification.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.ReverseTunnel.created_at:
+
+
+created_at
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) Timestamp when this tunnel connection was created.
+  Used for ordering events and debugging connection timing issues.
+
+
+
+.. _envoy_v3_api_msg_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.TunnelInitiatorIdentity:
+
+extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.TunnelInitiatorIdentity
+---------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.TunnelInitiatorIdentity proto] <api/contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/clients/grpc_client/stream_reverse_tunnels.proto#L98>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "tenant_id": ...,
+    "cluster_id": ...,
+    "node_id": ...
+  }
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.TunnelInitiatorIdentity.tenant_id:
+
+
+tenant_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Required: Tenant identifier of the initiating Envoy instance.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.TunnelInitiatorIdentity.cluster_id:
+
+
+cluster_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Required: Cluster identifier of the initiating Envoy instance.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.TunnelInitiatorIdentity.node_id:
+
+
+node_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Required: Node identifier of the initiating Envoy instance.
+
+

@@ -1,0 +1,339 @@
+.. _envoy_v3_api_file_envoy/service/ratelimit/v3/rls.proto:
+
+Rate limit service (RLS) (proto)
+================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_service.ratelimit.v3.RateLimitRequest:
+
+service.ratelimit.v3.RateLimitRequest
+-------------------------------------
+
+
+:repo:`[service.ratelimit.v3.RateLimitRequest proto] <api/envoy/service/ratelimit/v3/rls.proto#L36>`
+
+Main message for a rate limit request. The rate limit service is designed to be fully generic
+in the sense that it can operate on arbitrary hierarchical key/value pairs. The loaded
+configuration will parse the request and find the most specific limit to apply. In addition,
+a RateLimitRequest can contain multiple "descriptors" to limit on. When multiple descriptors
+are provided, the server will limit on *ALL* of them and return an OVER_LIMIT response if any
+of them are over limit. This enables more complex application level rate limiting scenarios
+if desired.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "domain": ...,
+    "descriptors": [],
+    "hits_addend": ...
+  }
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.domain:
+
+
+domain
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) All rate limit requests must specify a domain. This enables the configuration to be per
+  application without fear of overlap. E.g., "envoy".
+
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.descriptors:
+
+
+descriptors
+  (**repeated** :ref:`extensions.common.ratelimit.v3.RateLimitDescriptor <envoy_v3_api_msg_extensions.common.ratelimit.v3.RateLimitDescriptor>`) All rate limit requests must specify at least one RateLimitDescriptor. Each descriptor is
+  processed by the service (see below). If any of the descriptors are over limit, the entire
+  request is considered to be over limit.
+
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend:
+
+
+hits_addend
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Rate limit requests can optionally specify the number of hits a request adds to the matched
+  limit. If the value is not set in the message, a request increases the matched limit by 1.
+  This value can be overridden by setting filter state value ``envoy.ratelimit.hits_addend``
+  to the desired number. Invalid number (< 0) or number will be ignored.
+
+
+
+.. _envoy_v3_api_msg_service.ratelimit.v3.RateLimitResponse:
+
+service.ratelimit.v3.RateLimitResponse
+--------------------------------------
+
+
+:repo:`[service.ratelimit.v3.RateLimitResponse proto] <api/envoy/service/ratelimit/v3/rls.proto#L58>`
+
+A response from a ShouldRateLimit call.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "overall_code": ...,
+    "statuses": [],
+    "response_headers_to_add": [],
+    "request_headers_to_add": [],
+    "raw_body": ...,
+    "dynamic_metadata": {...}
+  }
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.overall_code:
+
+
+overall_code
+  (:ref:`service.ratelimit.v3.RateLimitResponse.Code <envoy_v3_api_enum_service.ratelimit.v3.RateLimitResponse.Code>`) The overall response code which takes into account all of the descriptors that were passed
+  in the RateLimitRequest message.
+
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.statuses:
+
+
+statuses
+  (**repeated** :ref:`service.ratelimit.v3.RateLimitResponse.DescriptorStatus <envoy_v3_api_msg_service.ratelimit.v3.RateLimitResponse.DescriptorStatus>`) A list of DescriptorStatus messages which matches the length of the descriptor list passed
+  in the RateLimitRequest. This can be used by the caller to determine which individual
+  descriptors failed and/or what the currently configured limits are for all of them.
+
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.response_headers_to_add:
+
+
+response_headers_to_add
+  (**repeated** :ref:`config.core.v3.HeaderValue <envoy_v3_api_msg_config.core.v3.HeaderValue>`) A list of headers to add to the response
+
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.request_headers_to_add:
+
+
+request_headers_to_add
+  (**repeated** :ref:`config.core.v3.HeaderValue <envoy_v3_api_msg_config.core.v3.HeaderValue>`) A list of headers to add to the request when forwarded
+
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.raw_body:
+
+
+raw_body
+  (`bytes <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) A response body to send to the downstream client when the response code is not OK.
+
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.dynamic_metadata:
+
+
+dynamic_metadata
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) Optional response metadata that will be emitted as dynamic metadata to be consumed by the next
+  filter. This metadata lives in a namespace specified by the canonical name of extension filter
+  that requires it:
+
+  - :ref:`envoy.filters.http.ratelimit <config_http_filters_ratelimit_dynamic_metadata>` for HTTP filter. The default namespace can
+    be modified by setting the :ref:`metadata_namespace <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.metadata_namespace>`
+    in the filter configuration.
+  - :ref:`envoy.filters.network.ratelimit <config_network_filters_ratelimit_dynamic_metadata>` for network filter.
+  - :ref:`envoy.filters.thrift.rate_limit <config_thrift_filters_rate_limit_dynamic_metadata>` for Thrift filter.
+
+
+.. _envoy_v3_api_msg_service.ratelimit.v3.RateLimitResponse.RateLimit:
+
+service.ratelimit.v3.RateLimitResponse.RateLimit
+------------------------------------------------
+
+
+:repo:`[service.ratelimit.v3.RateLimitResponse.RateLimit proto] <api/envoy/service/ratelimit/v3/rls.proto#L74>`
+
+Defines an actual rate limit in terms of requests per unit of time and the unit itself.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "requests_per_unit": ...,
+    "unit": ...
+  }
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.RateLimit.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) A name or description of this limit.
+
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.RateLimit.requests_per_unit:
+
+
+requests_per_unit
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The number of requests per unit of time.
+
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.RateLimit.unit:
+
+
+unit
+  (:ref:`service.ratelimit.v3.RateLimitResponse.RateLimit.Unit <envoy_v3_api_enum_service.ratelimit.v3.RateLimitResponse.RateLimit.Unit>`) The unit of time.
+
+
+.. _envoy_v3_api_enum_service.ratelimit.v3.RateLimitResponse.RateLimit.Unit:
+
+Enum service.ratelimit.v3.RateLimitResponse.RateLimit.Unit
+----------------------------------------------------------
+
+
+:repo:`[service.ratelimit.v3.RateLimitResponse.RateLimit.Unit proto] <api/envoy/service/ratelimit/v3/rls.proto#L80>`
+
+Identifies the unit of of time for rate limit.
+
+
+
+.. _envoy_v3_api_enum_value_service.ratelimit.v3.RateLimitResponse.RateLimit.Unit.UNKNOWN:
+
+
+UNKNOWN
+  *(DEFAULT)* ⁣The time unit is not known.
+
+
+.. _envoy_v3_api_enum_value_service.ratelimit.v3.RateLimitResponse.RateLimit.Unit.SECOND:
+
+
+SECOND
+  ⁣The time unit representing a second.
+
+
+.. _envoy_v3_api_enum_value_service.ratelimit.v3.RateLimitResponse.RateLimit.Unit.MINUTE:
+
+
+MINUTE
+  ⁣The time unit representing a minute.
+
+
+.. _envoy_v3_api_enum_value_service.ratelimit.v3.RateLimitResponse.RateLimit.Unit.HOUR:
+
+
+HOUR
+  ⁣The time unit representing an hour.
+
+
+.. _envoy_v3_api_enum_value_service.ratelimit.v3.RateLimitResponse.RateLimit.Unit.DAY:
+
+
+DAY
+  ⁣The time unit representing a day.
+
+
+.. _envoy_v3_api_enum_value_service.ratelimit.v3.RateLimitResponse.RateLimit.Unit.WEEK:
+
+
+WEEK
+  ⁣The time unit representing a week.
+
+
+.. _envoy_v3_api_enum_value_service.ratelimit.v3.RateLimitResponse.RateLimit.Unit.MONTH:
+
+
+MONTH
+  ⁣The time unit representing a month.
+
+
+.. _envoy_v3_api_enum_value_service.ratelimit.v3.RateLimitResponse.RateLimit.Unit.YEAR:
+
+
+YEAR
+  ⁣The time unit representing a year.
+
+
+
+
+
+
+.. _envoy_v3_api_msg_service.ratelimit.v3.RateLimitResponse.DescriptorStatus:
+
+service.ratelimit.v3.RateLimitResponse.DescriptorStatus
+-------------------------------------------------------
+
+
+:repo:`[service.ratelimit.v3.RateLimitResponse.DescriptorStatus proto] <api/envoy/service/ratelimit/v3/rls.proto#L146>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "code": ...,
+    "current_limit": {...},
+    "limit_remaining": ...,
+    "duration_until_reset": {...}
+  }
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.code:
+
+
+code
+  (:ref:`service.ratelimit.v3.RateLimitResponse.Code <envoy_v3_api_enum_service.ratelimit.v3.RateLimitResponse.Code>`) The response code for an individual descriptor.
+
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.current_limit:
+
+
+current_limit
+  (:ref:`service.ratelimit.v3.RateLimitResponse.RateLimit <envoy_v3_api_msg_service.ratelimit.v3.RateLimitResponse.RateLimit>`) The current limit as configured by the server. Useful for debugging, etc.
+
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.limit_remaining:
+
+
+limit_remaining
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The limit remaining in the current time unit.
+
+
+.. _envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.duration_until_reset:
+
+
+duration_until_reset
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Duration until reset of the current limit window.
+
+
+
+.. _envoy_v3_api_enum_service.ratelimit.v3.RateLimitResponse.Code:
+
+Enum service.ratelimit.v3.RateLimitResponse.Code
+------------------------------------------------
+
+
+:repo:`[service.ratelimit.v3.RateLimitResponse.Code proto] <api/envoy/service/ratelimit/v3/rls.proto#L62>`
+
+
+
+
+.. _envoy_v3_api_enum_value_service.ratelimit.v3.RateLimitResponse.Code.UNKNOWN:
+
+
+UNKNOWN
+  *(DEFAULT)* ⁣The response code is not known.
+
+
+.. _envoy_v3_api_enum_value_service.ratelimit.v3.RateLimitResponse.Code.OK:
+
+
+OK
+  ⁣The response code to notify that the number of requests are under limit.
+
+
+.. _envoy_v3_api_enum_value_service.ratelimit.v3.RateLimitResponse.Code.OVER_LIMIT:
+
+
+OVER_LIMIT
+  ⁣The response code to notify that the number of requests are over limit.
+
+
+

@@ -1,0 +1,132 @@
+.. _envoy_v3_api_file_envoy/extensions/content_parsers/json/v3/json_content_parser.proto:
+
+JSON Content Parser (proto)
+===========================
+
+.. _extension_envoy.content_parsers.json:
+
+This extension has the qualified name ``envoy.content_parsers.json``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.content_parsers <extension_category_envoy.content_parsers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser <envoy_v3_api_msg_extensions.content_parsers.json.v3.JsonContentParser>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+Parses JSON content and extracts values using JSON path selectors.
+This parser operates on raw JSON content strings provided by the caller.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.content_parsers.json.v3.JsonContentParser:
+
+extensions.content_parsers.json.v3.JsonContentParser
+----------------------------------------------------
+
+
+:repo:`[extensions.content_parsers.json.v3.JsonContentParser proto] <api/envoy/extensions/content_parsers/json/v3/json_content_parser.proto#L26>`
+
+Configuration for the JSON content parser.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "rules": []
+  }
+
+.. _envoy_v3_api_field_extensions.content_parsers.json.v3.JsonContentParser.rules:
+
+
+rules
+  (**repeated** :ref:`extensions.content_parsers.json.v3.JsonContentParser.RuleConfig <envoy_v3_api_msg_extensions.content_parsers.json.v3.JsonContentParser.RuleConfig>`, *REQUIRED*) The rules to apply for extracting values from JSON content.
+  Rules are evaluated in order for each content item provided.
+  At least one rule must be specified.
+
+
+.. _envoy_v3_api_msg_extensions.content_parsers.json.v3.JsonContentParser.RuleConfig:
+
+extensions.content_parsers.json.v3.JsonContentParser.RuleConfig
+---------------------------------------------------------------
+
+
+:repo:`[extensions.content_parsers.json.v3.JsonContentParser.RuleConfig proto] <api/envoy/extensions/content_parsers/json/v3/json_content_parser.proto#L28>`
+
+Configuration for a single rule with its processing behavior.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "rule": {...},
+    "stop_processing_after_matches": ...
+  }
+
+.. _envoy_v3_api_field_extensions.content_parsers.json.v3.JsonContentParser.RuleConfig.rule:
+
+
+rule
+  (:ref:`extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule>`, *REQUIRED*) The json-to-metadata rule to apply for extracting values from JSON content.
+  See :ref:`json_to_metadata rule <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule>`
+  for available configuration options including selectors, on_present, on_missing, on_error actions.
+
+
+.. _envoy_v3_api_field_extensions.content_parsers.json.v3.JsonContentParser.RuleConfig.stop_processing_after_matches:
+
+
+stop_processing_after_matches
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Controls how many times this rule should successfully match before stopping evaluation
+  of this rule for subsequent content items.
+
+  - If set to 0 (default): This rule is evaluated against all content items provided.
+    Later matches may overwrite earlier values (unless
+    :ref:`preserve_existing_metadata_value <envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair.preserve_existing_metadata_value>`
+    is set in the rule), effectively extracting the LAST occurrence.
+
+  - If set to 1: Stop evaluating this rule after the first successful match.
+    This is useful for extracting values that appear early in the stream
+    to avoid unnecessary processing of subsequent content.
+
+  - If set to N > 1: Reserved for future use (e.g., aggregating multiple values).
+    Values > 1 are currently rejected to prevent behavioral changes when this feature is implemented.
+
+  Example use cases:
+
+  - Extract model name from early content: ``stop_processing_after_matches: 1``
+    (Stops checking this rule after first match, doesn't process remaining content for this rule)
+
+  - Extract token usage from final content: ``stop_processing_after_matches: 0``
+    (Processes all content items, extracts value from the last one that contains it)
+
+
+

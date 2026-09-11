@@ -1,0 +1,42 @@
+.. _envoy_v3_api_file_envoy/watchdog/v3/abort_action.proto:
+
+Watchdog Action that kills a stuck thread to kill the process. (proto)
+======================================================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_watchdog.v3.AbortActionConfig:
+
+watchdog.v3.AbortActionConfig
+-----------------------------
+
+
+:repo:`[watchdog.v3.AbortActionConfig proto] <api/envoy/watchdog/v3/abort_action.proto#L21>`
+
+A GuardDogAction that will terminate the process by killing the
+stuck thread. This would allow easier access to the call stack of the stuck
+thread since we would run signal handlers on that thread. By default
+this will be registered to run as the last watchdog action on KILL and
+MULTIKILL events if those are enabled.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "wait_duration": {...}
+  }
+
+.. _envoy_v3_api_field_watchdog.v3.AbortActionConfig.wait_duration:
+
+
+wait_duration
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) How long to wait for the thread to respond to the thread kill function
+  before killing the process from this action. This is a blocking action.
+  By default this is 5 seconds.
+
+

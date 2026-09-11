@@ -1,0 +1,81 @@
+.. _envoy_v3_api_file_envoy/extensions/common/matching/v3/extension_matcher.proto:
+
+Extension matcher (proto)
+=========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher:
+
+extensions.common.matching.v3.ExtensionWithMatcher
+--------------------------------------------------
+
+
+:repo:`[extensions.common.matching.v3.ExtensionWithMatcher proto] <api/envoy/extensions/common/matching/v3/extension_matcher.proto#L24>`
+
+Wrapper around an existing extension that provides an associated matcher. This allows
+decorating an existing extension with a matcher, which can be used to match against
+relevant protocol data.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "matcher": {...},
+    "xds_matcher": {...},
+    "extension_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.common.matching.v3.ExtensionWithMatcher.matcher:
+
+
+matcher
+  (:ref:`config.common.matcher.v3.Matcher <envoy_v3_api_msg_config.common.matcher.v3.Matcher>`) The associated matcher. This is deprecated in favor of xds_matcher.
+
+
+.. _envoy_v3_api_field_extensions.common.matching.v3.ExtensionWithMatcher.xds_matcher:
+
+
+xds_matcher
+  (:ref:`.xds.type.matcher.v3.Matcher <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`) The associated matcher.
+
+
+.. _envoy_v3_api_field_extensions.common.matching.v3.ExtensionWithMatcher.extension_config:
+
+
+extension_config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`, *REQUIRED*) The underlying extension config.
+
+
+
+.. _envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcherPerRoute:
+
+extensions.common.matching.v3.ExtensionWithMatcherPerRoute
+----------------------------------------------------------
+
+
+:repo:`[extensions.common.matching.v3.ExtensionWithMatcherPerRoute proto] <api/envoy/extensions/common/matching/v3/extension_matcher.proto#L38>`
+
+Extra settings on a per virtualhost/route/weighted-cluster level.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "xds_matcher": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.common.matching.v3.ExtensionWithMatcherPerRoute.xds_matcher:
+
+
+xds_matcher
+  (:ref:`.xds.type.matcher.v3.Matcher <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`) Matcher override.
+
+

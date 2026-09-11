@@ -1,0 +1,510 @@
+.. _envoy_v3_api_file_envoy/config/core/v3/address.proto:
+
+Network addresses (proto)
+=========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.Pipe:
+
+config.core.v3.Pipe
+-------------------
+
+
+:repo:`[config.core.v3.Pipe proto] <api/envoy/config/core/v3/address.proto#L22>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "path": ...,
+    "mode": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.Pipe.path:
+
+
+path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Unix Domain Socket path. On Linux, paths starting with '@' will use the
+  abstract namespace. The starting '@' is replaced by a null byte by Envoy.
+  Paths starting with '@' will result in an error in environments other than
+  Linux.
+
+
+.. _envoy_v3_api_field_config.core.v3.Pipe.mode:
+
+
+mode
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The mode for the Pipe. Not applicable for abstract sockets.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress:
+
+config.core.v3.EnvoyInternalAddress
+-----------------------------------
+
+
+:repo:`[config.core.v3.EnvoyInternalAddress proto] <api/envoy/config/core/v3/address.proto#L37>`
+
+The address represents an envoy internal listener.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "server_listener_name": ...,
+    "endpoint_id": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.EnvoyInternalAddress.server_listener_name:
+
+
+server_listener_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Specifies the :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>` of the
+  internal listener.
+
+
+  
+
+.. _envoy_v3_api_field_config.core.v3.EnvoyInternalAddress.endpoint_id:
+
+
+endpoint_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies an endpoint identifier to distinguish between multiple endpoints for the same internal listener in a
+  single upstream pool. Only used in the upstream addresses for tracking changes to individual endpoints. This, for
+  example, may be set to the final destination IP for the target internal listener.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.SocketAddress:
+
+config.core.v3.SocketAddress
+----------------------------
+
+
+:repo:`[config.core.v3.SocketAddress proto] <api/envoy/config/core/v3/address.proto#L53>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "protocol": ...,
+    "address": ...,
+    "port_value": ...,
+    "named_port": ...,
+    "resolver_name": ...,
+    "ipv4_compat": ...,
+    "network_namespace_filepath": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.SocketAddress.protocol:
+
+
+protocol
+  (:ref:`config.core.v3.SocketAddress.Protocol <envoy_v3_api_enum_config.core.v3.SocketAddress.Protocol>`) 
+
+.. _envoy_v3_api_field_config.core.v3.SocketAddress.address:
+
+
+address
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The address for this socket. :ref:`Listeners <config_listeners>` will bind
+  to the address. An empty address is not allowed. Specify ``0.0.0.0`` or ``::``
+  to bind to any address. When used
+  within an upstream :ref:`BindConfig <envoy_v3_api_msg_config.core.v3.BindConfig>`, the address
+  controls the source address of outbound connections. For :ref:`clusters
+  <envoy_v3_api_msg_config.cluster.v3.Cluster>`, the cluster type determines whether the
+  address must be an IP (``STATIC`` or ``EDS`` clusters) or a hostname resolved by DNS
+  (``STRICT_DNS`` or ``LOGICAL_DNS`` clusters). Address resolution can be customized
+  via :ref:`resolver_name <envoy_v3_api_field_config.core.v3.SocketAddress.resolver_name>`.
+
+
+.. _envoy_v3_api_field_config.core.v3.SocketAddress.port_value:
+
+
+port_value
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+  
+
+  Precisely one of :ref:`port_value <envoy_v3_api_field_config.core.v3.SocketAddress.port_value>`, :ref:`named_port <envoy_v3_api_field_config.core.v3.SocketAddress.named_port>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.SocketAddress.named_port:
+
+
+named_port
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This is only valid if :ref:`resolver_name
+  <envoy_v3_api_field_config.core.v3.SocketAddress.resolver_name>` is specified below and the
+  named resolver is capable of named port resolution.
+
+
+  
+
+  Precisely one of :ref:`port_value <envoy_v3_api_field_config.core.v3.SocketAddress.port_value>`, :ref:`named_port <envoy_v3_api_field_config.core.v3.SocketAddress.named_port>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.SocketAddress.resolver_name:
+
+
+resolver_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of the custom resolver. This must have been registered with Envoy. If
+  this is empty, a context dependent default applies. If the address is a concrete
+  IP address, no resolution will occur. If address is a hostname this
+  should be set for resolution other than DNS. Specifying a custom resolver with
+  ``STRICT_DNS`` or ``LOGICAL_DNS`` will generate an error at runtime.
+
+
+.. _envoy_v3_api_field_config.core.v3.SocketAddress.ipv4_compat:
+
+
+ipv4_compat
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When binding to an IPv6 address above, this enables `IPv4 compatibility
+  <https://tools.ietf.org/html/rfc3493#page-11>`_. Binding to ``::`` will
+  allow both IPv4 and IPv6 connections, with peer IPv4 addresses mapped into
+  IPv6 space as ``::FFFF:<IPv4-address>``.
+
+
+.. _envoy_v3_api_field_config.core.v3.SocketAddress.network_namespace_filepath:
+
+
+network_namespace_filepath
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Filepath that specifies the Linux network namespace this socket will be created in (see ``man 7
+  network_namespaces``). If this field is set, Envoy will create the socket in the specified
+  network namespace.
+
+  .. note::
+     Setting this parameter requires Envoy to run with the ``CAP_SYS_ADMIN`` capability.
+
+  .. attention::
+      Network namespaces are only configurable on Linux. Otherwise, this field has no effect.
+
+
+.. _envoy_v3_api_enum_config.core.v3.SocketAddress.Protocol:
+
+Enum config.core.v3.SocketAddress.Protocol
+------------------------------------------
+
+
+:repo:`[config.core.v3.SocketAddress.Protocol proto] <api/envoy/config/core/v3/address.proto#L56>`
+
+
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.SocketAddress.Protocol.TCP:
+
+
+TCP
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP:
+
+
+UDP
+  ⁣
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.TcpKeepalive:
+
+config.core.v3.TcpKeepalive
+---------------------------
+
+
+:repo:`[config.core.v3.TcpKeepalive proto] <api/envoy/config/core/v3/address.proto#L112>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "keepalive_probes": {...},
+    "keepalive_time": {...},
+    "keepalive_interval": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.TcpKeepalive.keepalive_probes:
+
+
+keepalive_probes
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Maximum number of keepalive probes to send without response before deciding
+  the connection is dead. Default is to use the OS level configuration (unless
+  overridden, Linux defaults to 9.) Setting this to ``0`` disables TCP keepalive.
+
+
+.. _envoy_v3_api_field_config.core.v3.TcpKeepalive.keepalive_time:
+
+
+keepalive_time
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The number of seconds a connection needs to be idle before keep-alive probes
+  start being sent. Default is to use the OS level configuration (unless
+  overridden, Linux defaults to 7200s (i.e., 2 hours.) Setting this to ``0`` disables
+  TCP keepalive.
+
+
+.. _envoy_v3_api_field_config.core.v3.TcpKeepalive.keepalive_interval:
+
+
+keepalive_interval
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The number of seconds between keep-alive probes. Default is to use the OS
+  level configuration (unless overridden, Linux defaults to 75s.) Setting this to
+  ``0`` disables TCP keepalive.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.ExtraSourceAddress:
+
+config.core.v3.ExtraSourceAddress
+---------------------------------
+
+
+:repo:`[config.core.v3.ExtraSourceAddress proto] <api/envoy/config/core/v3/address.proto#L132>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "address": {...},
+    "socket_options": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.ExtraSourceAddress.address:
+
+
+address
+  (:ref:`config.core.v3.SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`, *REQUIRED*) The additional address to bind.
+
+
+.. _envoy_v3_api_field_config.core.v3.ExtraSourceAddress.socket_options:
+
+
+socket_options
+  (:ref:`config.core.v3.SocketOptionsOverride <envoy_v3_api_msg_config.core.v3.SocketOptionsOverride>`) Additional socket options that may not be present in Envoy source code or
+  precompiled binaries. If specified, this will override the
+  :ref:`socket_options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>`
+  in the BindConfig. If specified with no
+  :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`
+  or an empty list of :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`,
+  it means no socket option will apply.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.BindConfig:
+
+config.core.v3.BindConfig
+-------------------------
+
+
+:repo:`[config.core.v3.BindConfig proto] <api/envoy/config/core/v3/address.proto#L147>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "source_address": {...},
+    "freebind": {...},
+    "socket_options": [],
+    "extra_source_addresses": [],
+    "additional_source_addresses": [],
+    "local_address_selector": {...},
+    "validate_network_namespaces": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.BindConfig.source_address:
+
+
+source_address
+  (:ref:`config.core.v3.SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`) The address to bind to when creating a socket.
+
+
+.. _envoy_v3_api_field_config.core.v3.BindConfig.freebind:
+
+
+freebind
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Whether to set the ``IP_FREEBIND`` option when creating the socket. When this
+  flag is set to true, allows the :ref:`source_address
+  <envoy_v3_api_field_config.core.v3.BindConfig.source_address>` to be an IP address
+  that is not configured on the system running Envoy. When this flag is set
+  to false, the option ``IP_FREEBIND`` is disabled on the socket. When this
+  flag is not set (default), the socket is not modified, i.e. the option is
+  neither enabled nor disabled.
+
+
+.. _envoy_v3_api_field_config.core.v3.BindConfig.socket_options:
+
+
+socket_options
+  (**repeated** :ref:`config.core.v3.SocketOption <envoy_v3_api_msg_config.core.v3.SocketOption>`) Additional socket options that may not be present in Envoy source code or
+  precompiled binaries.
+
+
+.. _envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses:
+
+
+extra_source_addresses
+  (**repeated** :ref:`config.core.v3.ExtraSourceAddress <envoy_v3_api_msg_config.core.v3.ExtraSourceAddress>`) Extra source addresses appended to the address specified in the ``source_address``
+  field. This enables to specify multiple source addresses.
+  The source address selection is determined by :ref:`local_address_selector
+  <envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
+
+
+.. _envoy_v3_api_field_config.core.v3.BindConfig.additional_source_addresses:
+
+
+additional_source_addresses
+  (**repeated** :ref:`config.core.v3.SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`) Deprecated by
+  :ref:`extra_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses>`
+
+
+.. _envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector:
+
+
+local_address_selector
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Custom local address selector to override the default (i.e.
+  :ref:`DefaultLocalAddressSelector
+  <envoy_v3_api_msg_config.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`).
+
+
+  .. _extension_category_envoy.upstream.local_address_selector:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.upstream.local_address_selector.default_local_address_selector <extension_envoy.upstream.local_address_selector.default_local_address_selector>`
+
+    - :ref:`envoy.upstream.local_address_selector.filter_state_override <extension_envoy.upstream.local_address_selector.filter_state_override>`
+
+
+
+
+
+.. _envoy_v3_api_field_config.core.v3.BindConfig.validate_network_namespaces:
+
+
+validate_network_namespaces
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to true, the :ref:`network_namespace_filepath
+  <envoy_v3_api_field_config.core.v3.SocketAddress.network_namespace_filepath>` of every source
+  address in this bind config is validated when the configuration is loaded, and the
+  configuration is rejected if a referenced network namespace cannot be opened.
+
+  By default no such validation is performed: a network namespace that does not exist when the
+  configuration is loaded may be created later, before connections are actually established, so
+  eager validation would wrongly reject such configurations. If a namespace is unavailable when
+  a connection is created, the connection attempt fails gracefully.
+
+  Listener addresses do not need an equivalent option: a listener creates and binds its socket
+  in the configured network namespace when the listener configuration is loaded, so an
+  unavailable namespace always rejects the listener configuration.
+
+  .. attention::
+      Network namespaces are only configurable on Linux. Otherwise, this field has no effect.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.Address:
+
+config.core.v3.Address
+----------------------
+
+
+:repo:`[config.core.v3.Address proto] <api/envoy/config/core/v3/address.proto#L205>`
+
+Addresses specify either a logical or physical address and port, which are
+used to tell Envoy where to bind/listen, connect to upstream and find
+management servers.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "socket_address": {...},
+    "pipe": {...},
+    "envoy_internal_address": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.Address.socket_address:
+
+
+socket_address
+  (:ref:`config.core.v3.SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`) 
+  
+
+  Precisely one of :ref:`socket_address <envoy_v3_api_field_config.core.v3.Address.socket_address>`, :ref:`pipe <envoy_v3_api_field_config.core.v3.Address.pipe>`, :ref:`envoy_internal_address <envoy_v3_api_field_config.core.v3.Address.envoy_internal_address>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.Address.pipe:
+
+
+pipe
+  (:ref:`config.core.v3.Pipe <envoy_v3_api_msg_config.core.v3.Pipe>`) 
+  
+
+  Precisely one of :ref:`socket_address <envoy_v3_api_field_config.core.v3.Address.socket_address>`, :ref:`pipe <envoy_v3_api_field_config.core.v3.Address.pipe>`, :ref:`envoy_internal_address <envoy_v3_api_field_config.core.v3.Address.envoy_internal_address>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.Address.envoy_internal_address:
+
+
+envoy_internal_address
+  (:ref:`config.core.v3.EnvoyInternalAddress <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>`) Specifies a user-space address handled by :ref:`internal listeners
+  <envoy_v3_api_field_config.listener.v3.Listener.internal_listener>`.
+
+
+  
+
+  Precisely one of :ref:`socket_address <envoy_v3_api_field_config.core.v3.Address.socket_address>`, :ref:`pipe <envoy_v3_api_field_config.core.v3.Address.pipe>`, :ref:`envoy_internal_address <envoy_v3_api_field_config.core.v3.Address.envoy_internal_address>` must be set.
+
+
+.. _envoy_v3_api_msg_config.core.v3.CidrRange:
+
+config.core.v3.CidrRange
+------------------------
+
+
+:repo:`[config.core.v3.CidrRange proto] <api/envoy/config/core/v3/address.proto#L224>`
+
+CidrRange specifies an IP Address and a prefix length to construct
+the subnet mask for a `CIDR <https://tools.ietf.org/html/rfc4632>`_ range.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "address_prefix": ...,
+    "prefix_len": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.CidrRange.address_prefix:
+
+
+address_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) IPv4 or IPv6 address, e.g. ``192.0.0.0`` or ``2001:db8::``.
+
+
+.. _envoy_v3_api_field_config.core.v3.CidrRange.prefix_len:
+
+
+prefix_len
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Length of prefix, e.g. 0, 32. Defaults to 0 when unset.
+
+

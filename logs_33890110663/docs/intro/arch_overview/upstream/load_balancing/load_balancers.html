@@ -1,0 +1,453 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Supported load balancers &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="Priority levels" href="priority.html" />
+    <link rel="prev" title="Overview" href="overview.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../http/http.html">HTTP</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../upstream.html">Upstream clusters</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../cluster_manager.html">Cluster manager</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../service_discovery.html">Service discovery</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../dns_resolution.html">DNS Resolution</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../health_checking.html">Health checking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../connection_pooling.html">Connection pooling</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="load_balancing.html">Load Balancing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../aggregate_cluster.html">Aggregate Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../composite_cluster.html">Composite cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../mcp_multicluster.html">MCP multi cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../outlier.html">Outlier detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../circuit_breaking.html">Circuit breaking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../upstream_filters.html">Upstream network filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../load_reporting_service.html">Load Reporting Service (LRS)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../load_balancing_policies.html">Load balancing policies</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../../arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="../upstream.html">Upstream clusters</a></li>
+          <li class="breadcrumb-item"><a href="load_balancing.html">Load Balancing</a></li>
+      <li class="breadcrumb-item active">Supported load balancers</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/intro/arch_overview/upstream/load_balancing/load_balancers.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="supported-load-balancers">
+<span id="arch-overview-load-balancing-types"></span><h1>Supported load balancers<a class="headerlink" href="#supported-load-balancers" title="Link to this heading"></a></h1>
+<p>When a filter needs to acquire a connection to a host in an upstream cluster, the cluster manager
+uses a load balancing policy to determine which host is selected. The load balancing policies are
+pluggable and are specified on a per upstream cluster basis in the <a class="reference internal" href="../../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">configuration</span></a>. Note that if no active health checking policy is <a class="reference internal" href="../../../../configuration/upstream/cluster_manager/cluster_hc.html#config-cluster-manager-cluster-hc"><span class="std std-ref">configured</span></a> for a cluster, all upstream cluster members are considered
+healthy, unless otherwise specified through
+<a class="reference internal" href="../../../../api-v3/config/endpoint/v3/endpoint_components.proto.html#envoy-v3-api-field-config-endpoint-v3-lbendpoint-health-status"><span class="std std-ref">health_status</span></a>.</p>
+<section id="weighted-round-robin">
+<span id="arch-overview-load-balancing-types-round-robin"></span><h2>Weighted round robin<a class="headerlink" href="#weighted-round-robin" title="Link to this heading"></a></h2>
+<p>This is a simple policy in which each available upstream host is selected in round
+robin order. If <a class="reference internal" href="../../../../api-v3/config/endpoint/v3/endpoint_components.proto.html#envoy-v3-api-field-config-endpoint-v3-lbendpoint-load-balancing-weight"><span class="std std-ref">weights</span></a> are assigned to
+endpoints in a locality, then a weighted round robin schedule is used, where
+higher weighted endpoints will appear more often in the rotation to achieve the
+effective weighting.</p>
+</section>
+<section id="client-side-weighted-round-robin">
+<span id="arch-overview-load-balancing-types-client-side-weighted-round-robin"></span><h2>Client-side weighted round robin<a class="headerlink" href="#client-side-weighted-round-robin" title="Link to this heading"></a></h2>
+<p>Envoy also provides a client-side weighted round robin policy implemented as an
+extension: <a class="reference internal" href="../../../../api-v3/extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.proto.html#envoy-v3-api-msg-extensions-load-balancing-policies-client-side-weighted-round-robin-v3-clientsideweightedroundrobin"><span class="std std-ref">ClientSideWeightedRoundRobin</span></a>.
+Unlike classic round robin, endpoint weights are derived from load reports sent by
+upstreams via ORCA (Open Request Cost Aggregation), incorporating queries-per-second (QPS),
+errors-per-second (EPS) and utilization to adaptively balance load.</p>
+<p>Endpoint weights are recomputed periodically from each endpoint’s most recent ORCA
+report as <code class="docutils literal notranslate"><span class="pre">qps</span> <span class="pre">/</span> <span class="pre">(utilization</span> <span class="pre">+</span> <span class="pre">eps/qps</span> <span class="pre">*</span> <span class="pre">error_utilization_penalty)</span></code>, where
+<code class="docutils literal notranslate"><span class="pre">qps</span></code> is the report’s <code class="docutils literal notranslate"><span class="pre">rps_fractional</span></code> field. Both <code class="docutils literal notranslate"><span class="pre">qps</span></code> and the final
+<code class="docutils literal notranslate"><span class="pre">utilization</span></code> (resolved utilization plus any error penalty) must be greater than 0;
+a report that fails either requirement is ignored. Utilization is resolved in the
+following order, taking the first source whose value is greater than 0 (precedence
+may be flipped by the <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.orca_weight_manager_use_named_metrics_first</span></code>
+runtime feature). By default:</p>
+<ol class="arabic simple">
+<li><p>Named metrics via <code class="docutils literal notranslate"><span class="pre">metric_names_for_computing_utilization</span></code> – max of present
+values.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">application_utilization</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cpu_utilization</span></code> – final fallback.</p></li>
+</ol>
+<p>While an endpoint has no valid weight – because its reports are being ignored, or
+during the initial <code class="docutils literal notranslate"><span class="pre">blackout_period</span></code>, or after <code class="docutils literal notranslate"><span class="pre">weight_expiration_period</span></code> has
+elapsed – it is assigned the median weight of the endpoints that currently have a
+valid weight (or 1 if none are valid).</p>
+<p>This policy supports:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="slow_start.html#arch-overview-load-balancing-slow-start"><span class="std std-ref">Slow start</span></a> via
+<a class="reference internal" href="../../../../api-v3/extensions/load_balancing_policies/common/v3/common.proto.html#envoy-v3-api-msg-extensions-load-balancing-policies-common-v3-slowstartconfig"><span class="std std-ref">SlowStartConfig</span></a>, allowing
+new or recovered endpoints to ramp up traffic gradually.</p></li>
+</ul>
+<p>Note that ClientSideWeightedRoundRobin is intended to select endpoints only within a single
+locality. To use ClientSideWeightedRoundRobin across multiple localities, configure it as the
+child endpoint-picking policy under the <a class="reference internal" href="../../../../api-v3/extensions/load_balancing_policies/wrr_locality/v3/wrr_locality.proto.html#envoy-v3-api-msg-extensions-load-balancing-policies-wrr-locality-v3-wrrlocality"><span class="std std-ref">WrrLocality</span></a> policy.</p>
+<p>Example configuration using WrrLocality with ClientSideWeightedRoundRobin as child:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">load_balancing_policy</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">policies</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">typed_extension_config</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.load_balancing_policies.wrr_locality</span>
+<span class="w">      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.load_balancing_policies.wrr_locality.v3.WrrLocality</span>
+<span class="w">        </span><span class="nt">endpoint_picking_policy</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">typed_extension_config</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.load_balancing_policies.client_side_weighted_round_robin</span>
+<span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin</span>
+</pre></div>
+</div>
+<p>See the API reference above for full configuration details.</p>
+</section>
+<section id="weighted-least-request">
+<span id="arch-overview-load-balancing-types-least-request"></span><h2>Weighted least request<a class="headerlink" href="#weighted-least-request" title="Link to this heading"></a></h2>
+<p>The least request load balancer uses different algorithms depending on whether hosts have the
+same or different weights.</p>
+<ul>
+<li><p><em>all weights equal</em>: An O(1) algorithm which selects N random available hosts as specified in the
+<a class="reference internal" href="../../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster-leastrequestlbconfig"><span class="std std-ref">configuration</span></a> (2 by default) and picks the
+host which has the fewest active requests (<a class="reference external" href="https://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf">Mitzenmacher et al.</a> has shown that this
+approach is nearly as good as an O(N) full scan). This is also known as P2C (power of two
+choices). The P2C load balancer has the property that host weights will decrease as the number of
+active requests on those hosts increases. P2C selection is particularly useful for load
+balancer implementations due to its resistance to
+<a class="reference external" href="https://en.wikipedia.org/wiki/Thundering_herd_problem">herding behavior</a>.</p></li>
+<li><p><em>all weights not equal</em>:  If two or more hosts in the cluster have different load balancing
+weights, the load balancer shifts into a mode where it uses a weighted round robin schedule in
+which weights are dynamically adjusted based on the host’s request load at the time of selection.</p>
+<p>In this case the weights are calculated at the time a host is picked using the following formula:</p>
+<p><code class="docutils literal notranslate"><span class="pre">weight</span> <span class="pre">=</span> <span class="pre">load_balancing_weight</span> <span class="pre">/</span> <span class="pre">(active_requests</span> <span class="pre">+</span> <span class="pre">1)^active_request_bias</span></code>.</p>
+<p><a class="reference internal" href="../../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-leastrequestlbconfig-active-request-bias"><span class="std std-ref">active_request_bias</span></a>
+can be configured via runtime and defaults to 1.0. It must be greater than or equal to 0.0.</p>
+<p>The larger the active request bias is, the more aggressively active requests will lower the
+effective weight.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">active_request_bias</span></code> is set to 0.0, the least request load balancer behaves like the round
+robin load balancer and ignores the active request count at the time of picking.</p>
+<p>For example, if active_request_bias is 1.0, a host with weight 2 and an active request count of 4
+will have an effective weight of 2 / (4 + 1)^1 = 0.4. This algorithm provides good balance at
+steady state but may not adapt to load imbalance as quickly. Additionally, unlike P2C, a host will
+never truly drain, though it will receive fewer requests over time.</p>
+</li>
+</ul>
+</section>
+<section id="ring-hash">
+<span id="arch-overview-load-balancing-types-ring-hash"></span><h2>Ring hash<a class="headerlink" href="#ring-hash" title="Link to this heading"></a></h2>
+<p>The ring/modulo hash load balancer implements consistent hashing to upstream hosts. Each host is
+mapped onto a circle (the “ring”) by hashing its address; each request is then routed to a host by
+hashing some property of the request, and finding the nearest corresponding host clockwise around
+the ring. This technique is also commonly known as <a class="reference external" href="https://github.com/RJ/ketama">“Ketama”</a>
+hashing, and like all hash-based load balancers, it is only effective when protocol routing is used
+that specifies a value to hash on. If you want something other than the host’s address to be used
+as the hash key (e.g. the semantic name of your host in a Kubernetes StatefulSet), then you can specify it
+in the <code class="docutils literal notranslate"><span class="pre">&quot;envoy.lb&quot;</span></code> <a class="reference internal" href="../../../../api-v3/config/endpoint/v3/endpoint_components.proto.html#envoy-v3-api-field-config-endpoint-v3-lbendpoint-metadata"><span class="std std-ref">LbEndpoint.Metadata</span></a> e.g.:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">filter_metadata</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">envoy.lb</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">hash_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;YOUR</span><span class="nv"> </span><span class="s">HASH</span><span class="nv"> </span><span class="s">KEY&quot;</span>
+</pre></div>
+</div>
+<p>This will override <a class="reference internal" href="../../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-commonlbconfig-consistent-hashing-lb-config"><span class="std std-ref">use_hostname_for_hashing</span></a>.</p>
+<p>Each host is hashed and placed on the ring some number of times proportional to its weight. For
+example, if host A has a weight of 1 and host B has a weight of 2, then there might be three entries
+on the ring: one for host A and two for host B. This doesn’t actually provide the desired 2:1
+partitioning of the circle, however, since the computed hashes could be coincidentally very close to
+one another; so it is necessary to multiply the number of hashes per host—for example inserting
+100 entries on the ring for host A and 200 entries for host B—to better approximate the desired
+distribution. Best practice is to explicitly set
+<a class="reference internal" href="../../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-ringhashlbconfig-minimum-ring-size"><span class="std std-ref">minimum_ring_size</span></a> and
+<a class="reference internal" href="../../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-ringhashlbconfig-maximum-ring-size"><span class="std std-ref">maximum_ring_size</span></a>, and monitor
+the <a class="reference internal" href="../../../../configuration/upstream/cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats-ring-hash-lb"><span class="std std-ref">min_hashes_per_host and max_hashes_per_host
+gauges</span></a> to ensure good distribution. With the
+ring partitioned appropriately, the addition or removal of one host from a set of N hosts will
+affect only 1/N requests.</p>
+<p>When priority based load balancing is in use, the priority level is also chosen by hash, so the
+endpoint selected will still be consistent when the set of backends is stable.</p>
+</section>
+<section id="maglev">
+<span id="arch-overview-load-balancing-types-maglev"></span><h2>Maglev<a class="headerlink" href="#maglev" title="Link to this heading"></a></h2>
+<p>The Maglev load balancer implements consistent hashing to upstream hosts. It uses the algorithm
+described in section 3.4 of <a class="reference external" href="https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/44824.pdf">this paper</a>
+with a fixed table size of 65537 (see section 5.3 of the same paper). Maglev can be used as a drop
+in replacement for the <a class="reference internal" href="#arch-overview-load-balancing-types-ring-hash"><span class="std std-ref">ring hash load balancer</span></a>
+any place in which consistent hashing is desired. Like the ring hash load balancer, a consistent
+hashing load balancer is only effective when protocol routing is used that specifies a value to
+hash on. If you want something other than the host’s address to be used as the hash key (e.g. the
+semantic name of your host in a Kubernetes StatefulSet), then you can specify it in the <code class="docutils literal notranslate"><span class="pre">&quot;envoy.lb&quot;</span></code>
+<a class="reference internal" href="../../../../api-v3/config/endpoint/v3/endpoint_components.proto.html#envoy-v3-api-field-config-endpoint-v3-lbendpoint-metadata"><span class="std std-ref">LbEndpoint.Metadata</span></a> e.g.:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">filter_metadata</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">envoy.lb</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">hash_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;YOUR</span><span class="nv"> </span><span class="s">HASH</span><span class="nv"> </span><span class="s">KEY&quot;</span>
+</pre></div>
+</div>
+<p>This will override <a class="reference internal" href="../../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-commonlbconfig-consistent-hashing-lb-config"><span class="std std-ref">use_hostname_for_hashing</span></a>.</p>
+<p>The table construction algorithm places each host in the table some number of times proportional
+to its weight, until the table is completely filled. For example, if host A has a weight of 1 and
+host B has a weight of 2, then host A will have 21,846 entries and host B will have 43,691 entries
+(totaling 65,537 entries). The algorithm attempts to place each host in the table at least once,
+regardless of the configured host and locality weights, so in some extreme cases the actual
+proportions may differ from the configured weights. For example, if the total number of hosts is
+larger than the fixed table size, then some hosts will get 1 entry each and the rest will get 0,
+regardless of weight. Best practice is to monitor the <a class="reference internal" href="../../../../configuration/upstream/cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats-maglev-lb"><span class="std std-ref">min_entries_per_host and
+max_entries_per_host gauges</span></a> to ensure no hosts
+are underrepresented or missing.</p>
+<p>In general, when compared to the ring hash (“ketama”) algorithm, Maglev has substantially faster
+table lookup build times as well as host selection times (approximately 10x and 5x respectively
+when using a large ring size of 256K entries). While Maglev aims for minimal disruption, it is not
+as stable as ring hash when upstream hosts change. More keys will move position when hosts are removed
+(simulations show approximately double the keys will move). The amount of disruption can be minimized
+by increasing the <a class="reference internal" href="../../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-maglevlbconfig-table-size"><span class="std std-ref">table_size</span></a>.
+With that said, for many applications
+including Redis, Maglev is very likely a superior drop in replacement for ring hash. The advanced reader can use
+<a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN//test/common/upstream/load_balancer_benchmark.cc">this benchmark</a> to compare ring hash
+versus Maglev with different parameters.</p>
+</section>
+<section id="random">
+<span id="arch-overview-load-balancing-types-random"></span><h2>Random<a class="headerlink" href="#random" title="Link to this heading"></a></h2>
+<p>The random load balancer selects a random available host. The random load balancer generally performs
+better than round robin if no health checking policy is configured. Random selection avoids bias
+towards the host in the set that comes after a failed host.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="overview.html" class="btn btn-neutral float-left" title="Overview" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="priority.html" class="btn btn-neutral float-right" title="Priority levels" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Supported load balancers</a><ul>
+<li><a class="reference internal" href="#weighted-round-robin">Weighted round robin</a></li>
+<li><a class="reference internal" href="#client-side-weighted-round-robin">Client-side weighted round robin</a></li>
+<li><a class="reference internal" href="#weighted-least-request">Weighted least request</a></li>
+<li><a class="reference internal" href="#ring-hash">Ring hash</a></li>
+<li><a class="reference internal" href="#maglev">Maglev</a></li>
+<li><a class="reference internal" href="#random">Random</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

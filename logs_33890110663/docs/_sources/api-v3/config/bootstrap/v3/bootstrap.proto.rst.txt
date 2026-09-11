@@ -1,0 +1,1647 @@
+.. _envoy_v3_api_file_envoy/config/bootstrap/v3/bootstrap.proto:
+
+Bootstrap (proto)
+=================
+
+
+This proto is supplied via the :option:`-c` CLI flag and acts as the root
+of the Envoy v3 configuration. See the :ref:`v3 configuration overview
+<config_overview_bootstrap>` for more detail.
+
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.Bootstrap:
+
+config.bootstrap.v3.Bootstrap
+-----------------------------
+
+
+:repo:`[config.bootstrap.v3.Bootstrap proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L45>`
+
+Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "node": {...},
+    "static_resources": {...},
+    "dynamic_resources": {...},
+    "cluster_manager": {...},
+    "hds_config": {...},
+    "flags_path": ...,
+    "stats_sinks": [],
+    "deferred_stat_options": {...},
+    "stats_config": {...},
+    "stats_flush_interval": {...},
+    "stats_flush_on_admin": ...,
+    "stats_eviction_interval": {...},
+    "watchdog": {...},
+    "watchdogs": {...},
+    "tracing": {...},
+    "layered_runtime": {...},
+    "admin": {...},
+    "overload_manager": {...},
+    "enable_dispatcher_stats": ...,
+    "header_prefix": ...,
+    "stats_server_version_override": {...},
+    "use_tcp_for_dns_lookups": ...,
+    "dns_resolution_config": {...},
+    "typed_dns_resolver_config": {...},
+    "bootstrap_extensions": [],
+    "fatal_actions": [],
+    "default_socket_interface": ...,
+    "inline_headers": [],
+    "perf_tracing_file_path": ...,
+    "default_regex_engine": {...},
+    "xds_config_tracker_extension": {...},
+    "application_log_config": {...},
+    "grpc_async_client_manager_config": {...},
+    "memory_allocator_manager": {...},
+    "enable_worker_cpu_affinity": ...
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node:
+
+
+node
+  (:ref:`config.core.v3.Node <envoy_v3_api_msg_config.core.v3.Node>`) Node identity to present to the management server and for instance
+  identification purposes (e.g. in generated headers).
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources:
+
+
+static_resources
+  (:ref:`config.bootstrap.v3.Bootstrap.StaticResources <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap.StaticResources>`) Statically specified resources.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources:
+
+
+dynamic_resources
+  (:ref:`config.bootstrap.v3.Bootstrap.DynamicResources <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap.DynamicResources>`) xDS configuration sources.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.cluster_manager:
+
+
+cluster_manager
+  (:ref:`config.bootstrap.v3.ClusterManager <envoy_v3_api_msg_config.bootstrap.v3.ClusterManager>`) Configuration for the cluster manager which owns all upstream clusters
+  within the server.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.hds_config:
+
+
+hds_config
+  (:ref:`config.core.v3.ApiConfigSource <envoy_v3_api_msg_config.core.v3.ApiConfigSource>`) Health discovery service config option.
+  (:ref:`core.ApiConfigSource <envoy_v3_api_msg_config.core.v3.ApiConfigSource>`)
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.flags_path:
+
+
+flags_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional file system path to search for startup flag files.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_sinks:
+
+
+stats_sinks
+  (**repeated** :ref:`config.metrics.v3.StatsSink <envoy_v3_api_msg_config.metrics.v3.StatsSink>`) Optional set of stats sinks.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.deferred_stat_options:
+
+
+deferred_stat_options
+  (:ref:`config.bootstrap.v3.Bootstrap.DeferredStatOptions <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap.DeferredStatOptions>`) Options to control behaviors of deferred creation compatible stats.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_config:
+
+
+stats_config
+  (:ref:`config.metrics.v3.StatsConfig <envoy_v3_api_msg_config.metrics.v3.StatsConfig>`) Configuration for internal processing of stats.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_interval:
+
+
+stats_flush_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Optional duration between flushes to configured stats sinks. For
+  performance reasons Envoy latches counters and only flushes counters and
+  gauges at a periodic interval. If not specified the default is ``5000ms`` (``5`` seconds).
+  Only one of ``stats_flush_interval`` or ``stats_flush_on_admin``
+  can be set.
+  Duration must be at least ``1ms`` and at most ``5 min``.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_on_admin:
+
+
+stats_flush_on_admin
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Flush stats to sinks only when queried for on the admin interface. If set,
+  a flush timer is not created. Only one of ``stats_flush_on_admin`` or
+  ``stats_flush_interval`` can be set.
+
+
+  
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_eviction_interval:
+
+
+stats_eviction_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Optional duration to perform metric eviction. At every interval, during the stats flush
+  the unused metrics are removed from the worker caches and the used metrics
+  are marked as unused. Must be a multiple of the ``stats_flush_interval``.
+
+
+  
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdog:
+
+
+watchdog
+  (:ref:`config.bootstrap.v3.Watchdog <envoy_v3_api_msg_config.bootstrap.v3.Watchdog>`) Optional watchdog configuration.
+  This is for a single watchdog configuration for the entire system.
+  Deprecated in favor of ``watchdogs`` which has finer granularity.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdogs:
+
+
+watchdogs
+  (:ref:`config.bootstrap.v3.Watchdogs <envoy_v3_api_msg_config.bootstrap.v3.Watchdogs>`) Optional watchdogs configuration.
+  This is used for specifying different watchdogs for the different subsystems.
+
+
+  .. _extension_category_envoy.guarddog_actions:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.watchdog.backtrace_action <extension_envoy.watchdog.backtrace_action>`
+
+    - :ref:`envoy.watchdog.profile_action <extension_envoy.watchdog.profile_action>`
+
+
+
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.tracing:
+
+
+tracing
+  (:ref:`config.trace.v3.Tracing <envoy_v3_api_msg_config.trace.v3.Tracing>`) Configuration for an external tracing provider.
+
+  .. attention::
+   This field has been deprecated in favor of :ref:`HttpConnectionManager.Tracing.provider
+   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.layered_runtime:
+
+
+layered_runtime
+  (:ref:`config.bootstrap.v3.LayeredRuntime <envoy_v3_api_msg_config.bootstrap.v3.LayeredRuntime>`) Configuration for the runtime configuration provider. If not
+  specified, a “null” provider will be used which will result in all defaults
+  being used.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin:
+
+
+admin
+  (:ref:`config.bootstrap.v3.Admin <envoy_v3_api_msg_config.bootstrap.v3.Admin>`) Configuration for the local administration HTTP server.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.overload_manager:
+
+
+overload_manager
+  (:ref:`config.overload.v3.OverloadManager <envoy_v3_api_msg_config.overload.v3.OverloadManager>`) Optional overload manager configuration.
+
+
+  .. attention::
+    This field should be configured in the presence of untrusted *downstreams*.
+
+    This field should be configured in the presence of untrusted *upstreams*.
+
+    Example configuration for untrusted environments:
+
+    .. code-block:: yaml
+
+      overload_manager:
+        actions:
+        - name: envoy.overload_actions.shrink_heap
+          triggers:
+          - name: envoy.resource_monitors.fixed_heap
+            threshold:
+              value: 0.9
+          typed_config:
+            '@type': type.googleapis.com/envoy.config.overload.v3.ShrinkHeapConfig
+            max_unfreed_memory_bytes: 104857600.0
+            timer_interval: 10s
+        - name: envoy.overload_actions.stop_accepting_requests
+          triggers:
+          - name: envoy.resource_monitors.fixed_heap
+            threshold:
+              value: 0.95
+        refresh_interval: 0.25s
+        resource_monitors:
+        - name: envoy.resource_monitors.fixed_heap
+          typed_config:
+            '@type': type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
+            max_heap_size_bytes: 1073741824.0
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_dispatcher_stats:
+
+
+enable_dispatcher_stats
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Enable :ref:`stats for event dispatcher <operations_performance>`. Defaults to ``false``.
+
+  .. note::
+
+    This records a value for each iteration of the event loop on every thread. This
+    should normally be minimal overhead, but when using
+    :ref:`statsd <envoy_v3_api_msg_config.metrics.v3.StatsdSink>`, it will send each observed value
+    over the wire individually because the statsd protocol doesn't have any way to represent a
+    histogram summary. Be aware that this can be a very large volume of data.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.header_prefix:
+
+
+header_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional string which will be used in lieu of ``x-envoy`` in prefixing headers.
+
+  For example, if this string is present and set to ``X-Foo``, then ``x-envoy-retry-on`` will be
+  transformed into ``x-foo-retry-on`` etc.
+
+  .. note::
+
+    This applies to the headers Envoy will generate, the headers Envoy will sanitize, and the
+    headers Envoy will trust for core code and core extensions only. Be VERY careful making
+    changes to this string, especially in multi-layer Envoy deployments or deployments using
+    extensions which are not upstream.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_server_version_override:
+
+
+stats_server_version_override
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Optional proxy version which will be used to set the value of :ref:`server.version statistic
+  <server_statistics>` if specified. Envoy will not process this value, it will be sent as is to
+  :ref:`stats sinks <envoy_v3_api_msg_config.metrics.v3.StatsSink>`.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.use_tcp_for_dns_lookups:
+
+
+use_tcp_for_dns_lookups
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Always use ``TCP`` queries instead of ``UDP`` queries for DNS lookups.
+  This may be overridden on a per-cluster basis in ``cds_config``,
+  when :ref:`dns_resolvers <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolvers>` and
+  :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are
+  specified.
+  This field is deprecated in favor of ``dns_resolution_config``
+  which aggregates all of the DNS resolver configuration in a single message.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config:
+
+
+dns_resolution_config
+  (:ref:`config.core.v3.DnsResolutionConfig <envoy_v3_api_msg_config.core.v3.DnsResolutionConfig>`) DNS resolution configuration which includes the underlying DNS resolver addresses and options.
+  This may be overridden on a per-cluster basis in ``cds_config``, when
+  :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
+  is specified.
+  This field is deprecated in favor of
+  :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>`.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config:
+
+
+typed_dns_resolver_config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) DNS resolver type configuration extension. This extension can be used to configure ``c-ares``, ``apple``,
+  or any other DNS resolver types and the related parameters.
+  For example, an object of
+  :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
+  can be packed into this ``typed_dns_resolver_config``. This configuration replaces the
+  :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>`
+  configuration.
+
+  During the transition period when both ``dns_resolution_config`` and ``typed_dns_resolver_config`` exist,
+  when ``typed_dns_resolver_config`` is in place, Envoy will use it and ignore ``dns_resolution_config``.
+  When ``typed_dns_resolver_config`` is missing, the default behavior is in place.
+
+
+  .. _extension_category_envoy.network.dns_resolver:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.network.dns_resolver.apple <extension_envoy.network.dns_resolver.apple>`
+
+    - :ref:`envoy.network.dns_resolver.cares <extension_envoy.network.dns_resolver.cares>`
+
+    - :ref:`envoy.network.dns_resolver.getaddrinfo <extension_envoy.network.dns_resolver.getaddrinfo>`
+
+    - :ref:`envoy.network.dns_resolver.hickory <extension_envoy.network.dns_resolver.hickory>`
+
+
+
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.bootstrap_extensions:
+
+
+bootstrap_extensions
+  (**repeated** :ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Specifies optional bootstrap extensions to be instantiated at startup time.
+  Each item contains extension specific configuration.
+
+
+  .. _extension_category_envoy.bootstrap:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.bootstrap.dynamic_modules <extension_envoy.bootstrap.dynamic_modules>`
+
+    - :ref:`envoy.bootstrap.internal_listener <extension_envoy.bootstrap.internal_listener>`
+
+    - :ref:`envoy.bootstrap.reverse_tunnel.downstream_socket_interface <extension_envoy.bootstrap.reverse_tunnel.downstream_socket_interface>`
+
+    - :ref:`envoy.bootstrap.reverse_tunnel.upstream_socket_interface <extension_envoy.bootstrap.reverse_tunnel.upstream_socket_interface>`
+
+    - :ref:`envoy.bootstrap.wasm <extension_envoy.bootstrap.wasm>`
+
+    - :ref:`envoy.extensions.network.socket_interface.sockmap <extension_envoy.extensions.network.socket_interface.sockmap>`
+
+
+
+
+    The following extensions are available in :ref:`contrib <install_contrib>` images only:
+
+
+    - :ref:`envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service <extension_envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service>`
+
+    - :ref:`envoy.bootstrap.vcl <extension_envoy.bootstrap.vcl>`
+
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.fatal_actions:
+
+
+fatal_actions
+  (**repeated** :ref:`config.bootstrap.v3.FatalAction <envoy_v3_api_msg_config.bootstrap.v3.FatalAction>`) Specifies optional extensions instantiated at startup time and
+  invoked during crash time on the request that caused the crash.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.default_socket_interface:
+
+
+default_socket_interface
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional overriding of default socket interface. The value must be the name of one of the
+  socket interface factories initialized through a bootstrap extension
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.inline_headers:
+
+
+inline_headers
+  (**repeated** :ref:`config.bootstrap.v3.CustomInlineHeader <envoy_v3_api_msg_config.bootstrap.v3.CustomInlineHeader>`) Specifies a set of headers that need to be registered as inline header. This configuration
+  allows users to customize the inline headers on-demand at Envoy startup without modifying
+  Envoy's source code.
+
+  .. note::
+
+    The ``set-cookie`` header cannot be registered as inline header.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.perf_tracing_file_path:
+
+
+perf_tracing_file_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional path to a file with performance tracing data created by ``Perfetto`` SDK in binary
+  ProtoBuf format. The default value is ``envoy.pftrace``.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.default_regex_engine:
+
+
+default_regex_engine
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Optional overriding of default regex engine.
+  If the value is not specified, ``Google RE2`` will be used by default.
+
+
+  .. _extension_category_envoy.regex_engines:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.regex_engines.google_re2 <extension_envoy.regex_engines.google_re2>`
+
+
+
+
+    The following extensions are available in :ref:`contrib <install_contrib>` images only:
+
+
+    - :ref:`envoy.regex_engines.hyperscan <extension_envoy.regex_engines.hyperscan>`
+
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.xds_config_tracker_extension:
+
+
+xds_config_tracker_extension
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Optional XdsConfigTracker configuration, which allows tracking xDS responses in external components,
+  e.g., external tracer or monitor. It provides the process point when receive, ingest, or fail to
+  process xDS resources and messages. If a value is not specified, no ``XdsConfigTracker`` will be used.
+
+  .. note::
+
+     There are no in-repo extensions currently, and the :repo:`XdsConfigTracker <envoy/config/xds_config_tracker.h>`
+     interface should be implemented before using.
+     See :repo:`xds_config_tracker_integration_test <test/integration/xds_config_tracker_integration_test.cc>`
+     for an example usage of the interface.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.application_log_config:
+
+
+application_log_config
+  (:ref:`config.bootstrap.v3.Bootstrap.ApplicationLogConfig <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap.ApplicationLogConfig>`) Optional application log configuration.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.grpc_async_client_manager_config:
+
+
+grpc_async_client_manager_config
+  (:ref:`config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig>`) Optional gRPC async client manager config.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.memory_allocator_manager:
+
+
+memory_allocator_manager
+  (:ref:`config.bootstrap.v3.MemoryAllocatorManager <envoy_v3_api_msg_config.bootstrap.v3.MemoryAllocatorManager>`) Optional configuration for memory allocation manager.
+  Memory releasing is only supported for `tcmalloc allocator <https://github.com/google/tcmalloc>`_.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_worker_cpu_affinity:
+
+
+enable_worker_cpu_affinity
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When enabled, Envoy pins each worker thread to a distinct CPU from the process affinity mask,
+  worker ``i`` to the ``i-th`` CPU in ascending order. This improves CPU cache and ``NUMA``
+  locality for high concurrency deployments on bare metal. It is available on Linux only and is
+  ignored on other platforms. Pinning requires a worker count no greater than the number of CPUs
+  in the process affinity mask. When the worker count exceeds the available CPUs no worker is
+  pinned. Pinning is applied once when the workers start, so a later change to the process
+  affinity mask does not re-pin.
+
+  Defaults to ``false``.
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.Bootstrap.StaticResources:
+
+config.bootstrap.v3.Bootstrap.StaticResources
+---------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.Bootstrap.StaticResources proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L49>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "listeners": [],
+    "clusters": [],
+    "secrets": []
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.listeners:
+
+
+listeners
+  (**repeated** :ref:`config.listener.v3.Listener <envoy_v3_api_msg_config.listener.v3.Listener>`) Static :ref:`Listeners <envoy_v3_api_msg_config.listener.v3.Listener>`. These listeners are
+  available regardless of LDS configuration.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.clusters:
+
+
+clusters
+  (**repeated** :ref:`config.cluster.v3.Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`) If a network based configuration source is specified for :ref:`cds_config
+  <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DynamicResources.cds_config>`, it's necessary
+  to have some initial cluster definitions available to allow Envoy to know
+  how to speak to the management server.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.secrets:
+
+
+secrets
+  (**repeated** :ref:`extensions.transport_sockets.tls.v3.Secret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.Secret>`) These static secrets can be used by :ref:`SdsSecretConfig
+  <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>`
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.Bootstrap.DynamicResources:
+
+config.bootstrap.v3.Bootstrap.DynamicResources
+----------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.Bootstrap.DynamicResources proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L69>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "lds_config": {...},
+    "cds_config": {...},
+    "ads_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DynamicResources.lds_config:
+
+
+lds_config
+  (:ref:`config.core.v3.ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`) All :ref:`Listeners <envoy_v3_api_msg_config.listener.v3.Listener>` are provided by a single
+  :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DynamicResources.cds_config:
+
+
+cds_config
+  (:ref:`config.core.v3.ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`) All post-bootstrap :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` definitions are
+  provided by a single :ref:`CDS <arch_overview_dynamic_config_cds>`
+  configuration source.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DynamicResources.ads_config:
+
+
+ads_config
+  (:ref:`config.core.v3.ApiConfigSource <envoy_v3_api_msg_config.core.v3.ApiConfigSource>`) A single :ref:`ADS <config_overview_ads>` source may be optionally
+  specified. This must have :ref:`api_type
+  <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
+  <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`. Only
+  :ref:`ConfigSources <envoy_v3_api_msg_config.core.v3.ConfigSource>` that have
+  the :ref:`ads <envoy_v3_api_field_config.core.v3.ConfigSource.ads>` field set will be
+  streamed on the ADS channel.
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.Bootstrap.ApplicationLogConfig:
+
+config.bootstrap.v3.Bootstrap.ApplicationLogConfig
+--------------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.Bootstrap.ApplicationLogConfig proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L102>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "log_format": {...}
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.log_format:
+
+
+log_format
+  (:ref:`config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat>`) Optional field to set the application logs format. If this field is set, it will override
+  the default log format. Setting both this field and :option:`--log-format` command line
+  option is not allowed, and will cause a bootstrap error.
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat:
+
+config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat
+------------------------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L103>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "json_format": {...},
+    "text_format": ...
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.json_format:
+
+
+json_format
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) Flush application logs in JSON format. The configured JSON struct can
+  support all the format flags specified in the :option:`--log-format`
+  command line options section, except for the ``%v`` and ``%_`` flags.
+
+
+  
+
+  Precisely one of :ref:`json_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.json_format>`, :ref:`text_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.text_format>` must be set.
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.text_format:
+
+
+text_format
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Flush application log in a format defined by a string. The text format
+  can support all the format flags specified in the :option:`--log-format`
+  command line option section.
+
+
+  
+
+  Precisely one of :ref:`json_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.json_format>`, :ref:`text_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat.text_format>` must be set.
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.Bootstrap.DeferredStatOptions:
+
+config.bootstrap.v3.Bootstrap.DeferredStatOptions
+-------------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.Bootstrap.DeferredStatOptions proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L125>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "enable_deferred_creation_stats": ...
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DeferredStatOptions.enable_deferred_creation_stats:
+
+
+enable_deferred_creation_stats
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When the flag is enabled, Envoy will lazily initialize a subset of the stats (see below).
+  This will save memory and CPU cycles when creating the objects that own these stats, if those
+  stats are never referenced throughout the lifetime of the process. However, it will incur additional
+  memory overhead for these objects, and a small increase of CPU usage when at least one of the stats
+  is updated for the first time.
+
+  Groups of stats that will be lazily initialized:
+
+  - Cluster traffic stats: a subgroup of the :ref:`cluster statistics <config_cluster_manager_cluster_stats>`
+    that are used when requests are routed to the cluster.
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig:
+
+config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig
+----------------------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L139>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_cached_entry_idle_duration": {...}
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig.max_cached_entry_idle_duration:
+
+
+max_cached_entry_idle_duration
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Optional field to set the expiration time for the cached gRPC client object.
+  The minimal value is ``5s`` and the default is ``50s``.
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.Admin:
+
+config.bootstrap.v3.Admin
+-------------------------
+
+
+:repo:`[config.bootstrap.v3.Admin proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L451>`
+
+Administration interface :ref:`operations documentation
+<operations_admin_interface>`.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "access_log": [],
+    "access_log_path": ...,
+    "profile_path": ...,
+    "address": {...},
+    "socket_options": [],
+    "ignore_global_conn_limit": ...,
+    "allow_paths": []
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Admin.access_log:
+
+
+access_log
+  (**repeated** :ref:`config.accesslog.v3.AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`) Configuration for :ref:`access logs <arch_overview_access_logs>`
+  emitted by the administration server.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Admin.access_log_path:
+
+
+access_log_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The path to write the access log for the administration server. If no
+  access log is desired specify ``/dev/null``. This is only required if
+  :ref:`address <envoy_v3_api_field_config.bootstrap.v3.Admin.address>` is set.
+  Deprecated in favor of ``access_log`` which offers more options.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Admin.profile_path:
+
+
+profile_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The CPU profiler output path for the administration server. If no profile
+  path is specified, the default is ``/var/log/envoy/envoy.prof``.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Admin.address:
+
+
+address
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) The TCP address that the administration server will listen on.
+  If not specified, Envoy will not start an administration server.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Admin.socket_options:
+
+
+socket_options
+  (**repeated** :ref:`config.core.v3.SocketOption <envoy_v3_api_msg_config.core.v3.SocketOption>`) Additional socket options that may not be present in Envoy source code or
+  precompiled binaries.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Admin.ignore_global_conn_limit:
+
+
+ignore_global_conn_limit
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates whether :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`
+  should apply to the admin interface or not.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths:
+
+
+allow_paths
+  (**repeated** :ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) List of admin paths that are accessible. If not specified, all admin endpoints are accessible.
+  Matchers are evaluated against the request path. For endpoints commonly queried with
+  parameters (for example ``/stats?format=...``), prefer ``prefix`` matchers.
+
+  When specified, only paths in this list will be accessible, all others will return ``HTTP 403 Forbidden``.
+
+  Example:
+
+  .. code-block:: yaml
+
+    allow_paths:
+    - prefix: /stats
+    - prefix: /config_dump
+    - exact: /ready
+    - prefix: /healthcheck
+
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.ClusterManager:
+
+config.bootstrap.v3.ClusterManager
+----------------------------------
+
+
+:repo:`[config.bootstrap.v3.ClusterManager proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L502>`
+
+Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "local_cluster_name": ...,
+    "outlier_detection": {...},
+    "upstream_bind_config": {...},
+    "load_stats_config": {...},
+    "enable_deferred_cluster_creation": ...
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.ClusterManager.local_cluster_name:
+
+
+local_cluster_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Name of the local cluster (i.e., the cluster that owns the Envoy running
+  this configuration). In order to enable :ref:`zone aware routing
+  <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
+  If ``local_cluster_name`` is defined then :ref:`clusters
+  <envoy_v3_api_msg_config.cluster.v3.Cluster>` must be defined in the :ref:`Bootstrap
+  static cluster resources
+  <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.clusters>`. This is unrelated to
+  the :option:`--service-cluster` option which does not `affect zone aware
+  routing <https://github.com/envoyproxy/envoy/issues/774>`_.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.ClusterManager.outlier_detection:
+
+
+outlier_detection
+  (:ref:`config.bootstrap.v3.ClusterManager.OutlierDetection <envoy_v3_api_msg_config.bootstrap.v3.ClusterManager.OutlierDetection>`) Optional global configuration for outlier detection.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.ClusterManager.upstream_bind_config:
+
+
+upstream_bind_config
+  (:ref:`config.core.v3.BindConfig <envoy_v3_api_msg_config.core.v3.BindConfig>`) Optional configuration used to bind newly established upstream connections.
+  This may be overridden on a per-cluster basis by ``upstream_bind_config`` in the ``cds_config``.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.ClusterManager.load_stats_config:
+
+
+load_stats_config
+  (:ref:`config.core.v3.ApiConfigSource <envoy_v3_api_msg_config.core.v3.ApiConfigSource>`) A management server endpoint to stream load stats to via
+  ``StreamLoadStats``. This must have :ref:`api_type
+  <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
+  <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.ClusterManager.enable_deferred_cluster_creation:
+
+
+enable_deferred_cluster_creation
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether the ClusterManager will create clusters on the worker threads
+  inline during requests. This will save memory and CPU cycles in cases where
+  there are lots of inactive clusters and ``> 1`` worker thread.
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.ClusterManager.OutlierDetection:
+
+config.bootstrap.v3.ClusterManager.OutlierDetection
+---------------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.ClusterManager.OutlierDetection proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L506>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "event_log_path": ...
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.ClusterManager.OutlierDetection.event_log_path:
+
+
+event_log_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the path to the outlier event log.
+
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.Watchdogs:
+
+config.bootstrap.v3.Watchdogs
+-----------------------------
+
+
+:repo:`[config.bootstrap.v3.Watchdogs proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L552>`
+
+Allows you to specify different watchdog configs for different subsystems.
+This allows finer tuned policies for the watchdog. If a subsystem is omitted
+the default values for that system will be used.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "main_thread_watchdog": {...},
+    "worker_watchdog": {...}
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Watchdogs.main_thread_watchdog:
+
+
+main_thread_watchdog
+  (:ref:`config.bootstrap.v3.Watchdog <envoy_v3_api_msg_config.bootstrap.v3.Watchdog>`) Watchdog for the main thread.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Watchdogs.worker_watchdog:
+
+
+worker_watchdog
+  (:ref:`config.bootstrap.v3.Watchdog <envoy_v3_api_msg_config.bootstrap.v3.Watchdog>`) Watchdog for the worker threads.
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.Watchdog:
+
+config.bootstrap.v3.Watchdog
+----------------------------
+
+
+:repo:`[config.bootstrap.v3.Watchdog proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L564>`
+
+Envoy process watchdog configuration. When configured, this monitors for
+nonresponsive threads and kills the process after the configured thresholds.
+See the :ref:`watchdog documentation <operations_performance_watchdog>` for more information.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "actions": [],
+    "miss_timeout": {...},
+    "megamiss_timeout": {...},
+    "kill_timeout": {...},
+    "max_kill_timeout_jitter": {...},
+    "multikill_timeout": {...},
+    "multikill_threshold": {...}
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Watchdog.actions:
+
+
+actions
+  (**repeated** :ref:`config.bootstrap.v3.Watchdog.WatchdogAction <envoy_v3_api_msg_config.bootstrap.v3.Watchdog.WatchdogAction>`) Register actions that will fire on given Watchdog events.
+  See ``WatchdogAction`` for priority of events.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Watchdog.miss_timeout:
+
+
+miss_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The duration after which Envoy counts a nonresponsive thread in the
+  ``watchdog_miss`` statistic. If not specified the default is ``200ms``.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Watchdog.megamiss_timeout:
+
+
+megamiss_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The duration after which Envoy counts a nonresponsive thread in the
+  ``watchdog_mega_miss`` statistic. If not specified the default is ``1000ms``.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Watchdog.kill_timeout:
+
+
+kill_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) If a watched thread has been nonresponsive for this duration, assume a
+  programming error and kill the entire Envoy process. Set to ``0`` to disable
+  kill behavior. If not specified the default is ``0`` (disabled).
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Watchdog.max_kill_timeout_jitter:
+
+
+max_kill_timeout_jitter
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Defines the maximum jitter used to adjust the ``kill_timeout`` if ``kill_timeout`` is
+  enabled. Enabling this feature would help to reduce risk of synchronized
+  watchdog kill events across proxies due to external triggers. Set to ``0`` to
+  disable. If not specified the default is ``0`` (disabled).
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Watchdog.multikill_timeout:
+
+
+multikill_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) If ``max(2, ceil(registered_threads * Fraction(multikill_threshold)))``
+  threads have been nonresponsive for at least this duration kill the entire
+  Envoy process. Set to ``0`` to disable this behavior. If not specified the
+  default is ``0`` (disabled).
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Watchdog.multikill_threshold:
+
+
+multikill_threshold
+  (:ref:`type.v3.Percent <envoy_v3_api_msg_type.v3.Percent>`) Sets the threshold for ``multikill_timeout`` in terms of the percentage of
+  nonresponsive threads required for the ``multikill_timeout``.
+  If not specified the default is ``0``.
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.Watchdog.WatchdogAction:
+
+config.bootstrap.v3.Watchdog.WatchdogAction
+-------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.Watchdog.WatchdogAction proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L567>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config": {...},
+    "event": ...
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Watchdog.WatchdogAction.config:
+
+
+config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Extension specific configuration for the action.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Watchdog.WatchdogAction.event:
+
+
+event
+  (:ref:`config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent <envoy_v3_api_enum_config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent>`) 
+
+.. _envoy_v3_api_enum_config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent:
+
+Enum config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent
+--------------------------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L574>`
+
+The events are fired in this order: ``KILL``, ``MULTIKILL``, ``MEGAMISS``, ``MISS``.
+Within an event type, actions execute in the order they are configured.
+For ``KILL``/``MULTIKILL`` there is a default ``PANIC`` that will run after the
+registered actions and kills the process if it wasn't already killed.
+It might be useful to specify several debug actions, and possibly an
+alternate ``FATAL`` action.
+
+
+
+.. _envoy_v3_api_enum_value_config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent.UNKNOWN:
+
+
+UNKNOWN
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent.KILL:
+
+
+KILL
+  ⁣
+
+.. _envoy_v3_api_enum_value_config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent.MULTIKILL:
+
+
+MULTIKILL
+  ⁣
+
+.. _envoy_v3_api_enum_value_config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent.MEGAMISS:
+
+
+MEGAMISS
+  ⁣
+
+.. _envoy_v3_api_enum_value_config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent.MISS:
+
+
+MISS
+  ⁣
+
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.FatalAction:
+
+config.bootstrap.v3.FatalAction
+-------------------------------
+
+
+:repo:`[config.bootstrap.v3.FatalAction proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L634>`
+
+Fatal actions to run while crashing. Actions can be safe (meaning they are
+async-signal safe) or unsafe. We run all safe actions before we run unsafe actions.
+
+.. note::
+
+  If using an unsafe action that could get stuck or deadlock, it is important to
+  have an out of band system to terminate the process.
+
+The interface for the extension is ``Envoy::Server::Configuration::FatalAction``.
+``FatalAction`` extensions live in the ``envoy.extensions.fatal_actions`` API
+namespace.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config": {...}
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.FatalAction.config:
+
+
+config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Extension specific configuration for the action. It's expected to conform
+  to the ``Envoy::Server::Configuration::FatalAction`` interface.
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.Runtime:
+
+config.bootstrap.v3.Runtime
+---------------------------
+
+
+:repo:`[config.bootstrap.v3.Runtime proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L641>`
+
+Runtime :ref:`configuration overview <config_runtime>` (deprecated).
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "symlink_root": ...,
+    "subdirectory": ...,
+    "override_subdirectory": ...,
+    "base": {...}
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Runtime.symlink_root:
+
+
+symlink_root
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The implementation assumes that the file system tree is accessed via a
+  symbolic link. An atomic link swap is used when a new tree should be
+  switched to. This parameter specifies the path to the symbolic link. Envoy
+  will watch the location for changes and reload the file system tree when
+  they happen. If this parameter is not set, there will be no disk based
+  runtime.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Runtime.subdirectory:
+
+
+subdirectory
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the subdirectory to load within the root directory. This is
+  useful if multiple systems share the same delivery mechanism. Envoy
+  configuration elements can be contained in a dedicated subdirectory.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Runtime.override_subdirectory:
+
+
+override_subdirectory
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies an optional subdirectory to load within the root directory. If
+  specified and the directory exists, configuration values within this
+  directory will override those found in the primary subdirectory. This is
+  useful when Envoy is deployed across many different types of servers.
+  Sometimes it is useful to have a per service cluster directory for runtime
+  configuration. See below for exactly how the override directory is used.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.Runtime.base:
+
+
+base
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) Static base runtime. This will be :ref:`overridden
+  <config_runtime_layering>` by other runtime layers, e.g.
+  disk or admin. This follows the :ref:`runtime protobuf JSON representation
+  encoding <config_runtime_proto_json>`.
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.RuntimeLayer:
+
+config.bootstrap.v3.RuntimeLayer
+--------------------------------
+
+
+:repo:`[config.bootstrap.v3.RuntimeLayer proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L673>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "static_layer": {...},
+    "disk_layer": {...},
+    "admin_layer": {...},
+    "rtds_layer": {...}
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Descriptive name for the runtime layer. This is only used for the runtime
+  :http:get:`/runtime` output.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.static_layer:
+
+
+static_layer
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) :ref:`Static runtime <config_runtime_bootstrap>` layer.
+  This follows the :ref:`runtime protobuf JSON representation encoding
+  <config_runtime_proto_json>`. Unlike static xDS resources, this static
+  layer is overridable by later layers in the runtime virtual filesystem.
+
+
+  
+
+  Precisely one of :ref:`static_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.static_layer>`, :ref:`disk_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.disk_layer>`, :ref:`admin_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.admin_layer>`, :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>` must be set.
+
+.. _envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.disk_layer:
+
+
+disk_layer
+  (:ref:`config.bootstrap.v3.RuntimeLayer.DiskLayer <envoy_v3_api_msg_config.bootstrap.v3.RuntimeLayer.DiskLayer>`) 
+  
+
+  Precisely one of :ref:`static_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.static_layer>`, :ref:`disk_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.disk_layer>`, :ref:`admin_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.admin_layer>`, :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>` must be set.
+
+.. _envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.admin_layer:
+
+
+admin_layer
+  (:ref:`config.bootstrap.v3.RuntimeLayer.AdminLayer <envoy_v3_api_msg_config.bootstrap.v3.RuntimeLayer.AdminLayer>`) 
+  
+
+  Precisely one of :ref:`static_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.static_layer>`, :ref:`disk_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.disk_layer>`, :ref:`admin_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.admin_layer>`, :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>` must be set.
+
+.. _envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer:
+
+
+rtds_layer
+  (:ref:`config.bootstrap.v3.RuntimeLayer.RtdsLayer <envoy_v3_api_msg_config.bootstrap.v3.RuntimeLayer.RtdsLayer>`) 
+  
+
+  Precisely one of :ref:`static_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.static_layer>`, :ref:`disk_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.disk_layer>`, :ref:`admin_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.admin_layer>`, :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>` must be set.
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.RuntimeLayer.DiskLayer:
+
+config.bootstrap.v3.RuntimeLayer.DiskLayer
+------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.RuntimeLayer.DiskLayer proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L678>`
+
+:ref:`Disk runtime <config_runtime_local_disk>` layer.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "symlink_root": ...,
+    "subdirectory": ...,
+    "append_service_cluster": ...
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.DiskLayer.symlink_root:
+
+
+symlink_root
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The implementation assumes that the file system tree is accessed via a
+  symbolic link. An atomic link swap is used when a new tree should be
+  switched to. This parameter specifies the path to the symbolic link.
+  Envoy will watch the location for changes and reload the file system tree
+  when they happen. See documentation on runtime :ref:`atomicity
+  <config_runtime_atomicity>` for further details on how reloads are
+  treated.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.DiskLayer.subdirectory:
+
+
+subdirectory
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the subdirectory to load within the root directory. This is
+  useful if multiple systems share the same delivery mechanism. Envoy
+  configuration elements can be contained in a dedicated subdirectory.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.DiskLayer.append_service_cluster:
+
+
+append_service_cluster
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) :ref:`Append <config_runtime_local_disk_service_cluster_subdirs>` the
+  service cluster to the path under symlink root.
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.RuntimeLayer.AdminLayer:
+
+config.bootstrap.v3.RuntimeLayer.AdminLayer
+-------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.RuntimeLayer.AdminLayer proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L702>`
+
+:ref:`Admin console runtime <config_runtime_admin>` layer.
+
+
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.RuntimeLayer.RtdsLayer:
+
+config.bootstrap.v3.RuntimeLayer.RtdsLayer
+------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.RuntimeLayer.RtdsLayer proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L708>`
+
+:ref:`Runtime Discovery Service (RTDS) <config_runtime_rtds>` layer.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "rtds_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.RtdsLayer.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Resource to subscribe to at the ``rtds_config`` for the RTDS layer.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.RtdsLayer.rtds_config:
+
+
+rtds_config
+  (:ref:`config.core.v3.ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`) RTDS configuration source.
+
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.LayeredRuntime:
+
+config.bootstrap.v3.LayeredRuntime
+----------------------------------
+
+
+:repo:`[config.bootstrap.v3.LayeredRuntime proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L741>`
+
+Runtime :ref:`configuration overview <config_runtime>`.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "layers": []
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.LayeredRuntime.layers:
+
+
+layers
+  (**repeated** :ref:`config.bootstrap.v3.RuntimeLayer <envoy_v3_api_msg_config.bootstrap.v3.RuntimeLayer>`) The :ref:`layers <config_runtime_layering>` of the runtime. This is ordered
+  such that later layers in the list overlay earlier entries.
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.CustomInlineHeader:
+
+config.bootstrap.v3.CustomInlineHeader
+--------------------------------------
+
+
+:repo:`[config.bootstrap.v3.CustomInlineHeader proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L774>`
+
+Used to specify the header that needs to be registered as an inline header.
+
+If request or response contain multiple headers with the same name and the header
+name is registered as an inline header, then multiple headers will be folded
+into one, and multiple header values will be concatenated by a suitable delimiter.
+The delimiter is generally a comma.
+
+For example, if ``foo`` is registered as an inline header, and the headers contain
+the following two headers:
+
+.. code-block:: text
+
+  foo: bar
+  foo: eep
+
+Then they will eventually be folded into:
+
+.. code-block:: text
+
+  foo: bar, eep
+
+Inline headers provide O(1) search performance, but each inline header imposes
+an additional memory overhead on all instances of the corresponding type of
+HeaderMap or TrailerMap.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "inline_header_name": ...,
+    "inline_header_type": ...
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.CustomInlineHeader.inline_header_name:
+
+
+inline_header_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the header that is expected to be set as the inline header.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.CustomInlineHeader.inline_header_type:
+
+
+inline_header_type
+  (:ref:`config.bootstrap.v3.CustomInlineHeader.InlineHeaderType <envoy_v3_api_enum_config.bootstrap.v3.CustomInlineHeader.InlineHeaderType>`) The type of the header that is expected to be set as the inline header.
+
+
+.. _envoy_v3_api_enum_config.bootstrap.v3.CustomInlineHeader.InlineHeaderType:
+
+Enum config.bootstrap.v3.CustomInlineHeader.InlineHeaderType
+------------------------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.CustomInlineHeader.InlineHeaderType proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L775>`
+
+
+
+
+.. _envoy_v3_api_enum_value_config.bootstrap.v3.CustomInlineHeader.InlineHeaderType.REQUEST_HEADER:
+
+
+REQUEST_HEADER
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_config.bootstrap.v3.CustomInlineHeader.InlineHeaderType.REQUEST_TRAILER:
+
+
+REQUEST_TRAILER
+  ⁣
+
+.. _envoy_v3_api_enum_value_config.bootstrap.v3.CustomInlineHeader.InlineHeaderType.RESPONSE_HEADER:
+
+
+RESPONSE_HEADER
+  ⁣
+
+.. _envoy_v3_api_enum_value_config.bootstrap.v3.CustomInlineHeader.InlineHeaderType.RESPONSE_TRAILER:
+
+
+RESPONSE_TRAILER
+  ⁣
+
+
+
+.. _envoy_v3_api_msg_config.bootstrap.v3.MemoryAllocatorManager:
+
+config.bootstrap.v3.MemoryAllocatorManager
+------------------------------------------
+
+
+:repo:`[config.bootstrap.v3.MemoryAllocatorManager proto] <api/envoy/config/bootstrap/v3/bootstrap.proto#L791>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "bytes_to_release": ...,
+    "memory_release_interval": {...},
+    "soft_memory_limit_bytes": {...},
+    "max_per_cpu_cache_size_bytes": {...},
+    "max_unfreed_memory_bytes": ...
+  }
+
+.. _envoy_v3_api_field_config.bootstrap.v3.MemoryAllocatorManager.bytes_to_release:
+
+
+bytes_to_release
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Configures tcmalloc to perform background release of free memory in amount of bytes per ``memory_release_interval`` interval.
+  If equals to ``0``, no memory release will occur. Defaults to ``0``.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.MemoryAllocatorManager.memory_release_interval:
+
+
+memory_release_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Interval in milliseconds for memory releasing. If specified, during every
+  interval Envoy will try to release ``bytes_to_release`` of free memory back to operating system for reuse.
+  Defaults to ``1000`` milliseconds.
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.MemoryAllocatorManager.soft_memory_limit_bytes:
+
+
+soft_memory_limit_bytes
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Sets the soft memory limit for tcmalloc. When the total memory used by tcmalloc exceeds this
+  limit, background release will be performed more aggressively to bring memory usage below the
+  limit. If not set, no soft memory limit is applied.
+
+  .. note::
+      This is currently only supported with tcmalloc and not with ``gperftools``.
+
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.MemoryAllocatorManager.max_per_cpu_cache_size_bytes:
+
+
+max_per_cpu_cache_size_bytes
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Sets the maximum per-CPU cache size in bytes for tcmalloc. Smaller values reduce per-CPU
+  memory overhead at the cost of increased contention on the central free list. If not set,
+  tcmalloc's default is used.
+
+  .. note::
+      This is currently only supported with tcmalloc and not with ``gperftools``.
+
+
+
+.. _envoy_v3_api_field_config.bootstrap.v3.MemoryAllocatorManager.max_unfreed_memory_bytes:
+
+
+max_unfreed_memory_bytes
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The threshold of unfreed memory in bytes that triggers the heap shrinker to release memory
+  back to the OS. When the difference between physical memory used and application-allocated
+  memory exceeds this threshold, free memory is released.
+
+  Defaults to ``104857600`` (100 MB).
+
+
+
+
+
+
+
+

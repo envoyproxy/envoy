@@ -1,0 +1,622 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UDP proxy &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="HTTP Capsule filter" href="session_filters/http_capsule.html" />
+    <link rel="prev" title="UDP listener filters" href="udp_filters.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../listeners.html">Listeners</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../stats.html">Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../runtime.html">Runtime</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../listener_filters/listener_filters.html">Listener filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../network_filters/network_filters.html">Network filters</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="udp_filters.html">UDP listener filters</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">UDP proxy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dns_filter.html">DNS Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dynamic_modules.html">Dynamic Modules</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../lds.html">Listener discovery service (LDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../network_namespace_matching.html">Network Namespace Matching</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../http/http.html">HTTP</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../listeners.html">Listeners</a></li>
+          <li class="breadcrumb-item"><a href="udp_filters.html">UDP listener filters</a></li>
+      <li class="breadcrumb-item active">UDP proxy</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/listeners/udp_filters/udp_proxy.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="udp-proxy">
+<span id="config-udp-listener-filters-udp-proxy"></span><h1>UDP proxy<a class="headerlink" href="#udp-proxy" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>This filter should be configured with the type URL <code class="docutils literal notranslate"><span class="pre">type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig</span></code>.</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.html#envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig"><span class="std std-ref">v3 API reference</span></a></p></li>
+</ul>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>The UDP proxy listener filter allows Envoy to operate as a <em>non-transparent</em> proxy between a
+UDP client and server. The lack of transparency means that the upstream server will see the
+source IP and port of the Envoy instance versus the client. All datagrams flow from the client, to
+Envoy, to the upstream server, back to Envoy, and back to the client.</p>
+<p>Because UDP is not a connection oriented protocol, Envoy must keep track of a client’s <em>session</em>
+such that the response datagrams from an upstream server can be routed back to the correct client.
+Each session is index by the 4-tuple consisting of source IP/port and local IP/port that the
+datagram is received on. Sessions last until the <a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.html#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-idle-timeout"><span class="std std-ref">idle timeout</span></a> is reached.</p>
+<p>Above <em>session stickness</em> could be disabled by setting <a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.html#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-use-per-packet-load-balancing"><span class="std std-ref">use_per_packet_load_balancing</span></a> to true.
+In that case, <em>per packet load balancing</em> is enabled. It means that upstream host is selected on every single data chunk
+received by udp proxy using currently used load balancing policy.</p>
+<p>The UDP proxy listener filter also can operate as a <em>transparent</em> proxy if the
+<a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.html#envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig"><span class="std std-ref">use_original_src_ip</span></a>
+field is set to true. But please keep in mind that it does not forward the port to upstreams. It forwards only the IP address to upstreams.</p>
+</section>
+<section id="load-balancing-and-unhealthy-host-handling">
+<h2>Load balancing and unhealthy host handling<a class="headerlink" href="#load-balancing-and-unhealthy-host-handling" title="Link to this heading"></a></h2>
+<p>Envoy will fully utilize the configured load balancer for the configured upstream cluster when
+load balancing UDP datagrams. By default, when a new session is created, Envoy will associate the session
+with an upstream host selected using the configured load balancer. All future datagrams that
+belong to the session will be routed to the same upstream host. However, if <a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.html#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-use-per-packet-load-balancing"><span class="std std-ref">use_per_packet_load_balancing</span></a>
+field is set to true, Envoy selects another upstream host on next datagram using the configured load balancer
+and creates a new session if such does not exist. So in case of several upstream hosts available for the load balancer
+each data chunk is forwarded to a different host.</p>
+<p>When an upstream host becomes unhealthy (due to <a class="reference internal" href="../../../intro/arch_overview/upstream/health_checking.html#arch-overview-health-checking"><span class="std std-ref">active health checking</span></a>), Envoy will attempt to create a new session to a healthy host
+when the next datagram is received.</p>
+</section>
+<section id="circuit-breaking">
+<h2>Circuit breaking<a class="headerlink" href="#circuit-breaking" title="Link to this heading"></a></h2>
+<p>The number of sessions that can be created per upstream cluster is limited by the cluster’s
+<a class="reference internal" href="../../../intro/arch_overview/upstream/circuit_breaking.html#arch-overview-circuit-break-cluster-maximum-connections"><span class="std std-ref">maximum connection circuit breaker</span></a>.
+By default this is 1024.</p>
+</section>
+<section id="routing">
+<span id="config-udp-listener-filters-udp-proxy-routing"></span><h2>Routing<a class="headerlink" href="#routing" title="Link to this heading"></a></h2>
+<p>The filter can route different datagrams to different upstream clusters with their source
+addresses. The matching API can be used with UDP routing, by specifying a matcher, a
+<a class="reference internal" href="../../../intro/arch_overview/advanced/matching/matching_api.html#extension-category-envoy-matching-network-input"><span class="std std-ref">UDP network input</span></a> as the matching rule and
+<a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/route.proto.html#envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-route"><span class="std std-ref">Route</span></a> as the resulting action.</p>
+<p>The following matcher configuration will lead Envoy to route UDP datagrams according to their
+source IPs, ignore datagrams other than those with a source IP of 127.0.0.1, and then filter the
+remaining datagrams to different clusters according to their source ports.</p>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/aea191839e7d58f4e16c5ae229f5f47c/udp-proxy-router.yaml"><code class="xref download docutils literal notranslate"><span class="pre">udp-proxy-router.yaml</span></code></a></span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">14</span><span class="w">        </span><span class="nt">matcher</span><span class="p">:</span>
+<span class="linenos">15</span><span class="w">          </span><span class="c1"># The outer matcher list matches source IP.</span>
+<span class="linenos">16</span><span class="w">          </span><span class="nt">matcher_list</span><span class="p">:</span>
+<span class="linenos">17</span><span class="w">            </span><span class="nt">matchers</span><span class="p">:</span>
+<span class="linenos">18</span><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">predicate</span><span class="p">:</span>
+<span class="linenos">19</span><span class="w">                </span><span class="nt">single_predicate</span><span class="p">:</span>
+<span class="linenos">20</span><span class="w">                  </span><span class="nt">input</span><span class="p">:</span>
+<span class="linenos">21</span><span class="w">                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.matching.inputs.source_ip</span>
+<span class="linenos">22</span><span class="w">                    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">23</span><span class="w">                      </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput</span>
+<span class="linenos">24</span><span class="w">                  </span><span class="nt">value_match</span><span class="p">:</span>
+<span class="linenos">25</span><span class="w">                    </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<span class="linenos">26</span><span class="w">              </span><span class="nt">on_match</span><span class="p">:</span>
+<span class="linenos">27</span><span class="w">                </span><span class="nt">matcher</span><span class="p">:</span>
+<span class="linenos">28</span><span class="w">                  </span><span class="c1"># The inner matcher tree matches source port.</span>
+<span class="linenos">29</span><span class="w">                  </span><span class="nt">matcher_tree</span><span class="p">:</span>
+<span class="linenos">30</span><span class="w">                    </span><span class="nt">input</span><span class="p">:</span>
+<span class="linenos">31</span><span class="w">                      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.matching.inputs.source_port</span>
+<span class="linenos">32</span><span class="w">                      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">                        </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourcePortInput</span>
+<span class="linenos">34</span><span class="w">                    </span><span class="nt">exact_match_map</span><span class="p">:</span>
+<span class="linenos">35</span><span class="w">                      </span><span class="nt">map</span><span class="p">:</span>
+<span class="linenos">36</span><span class="w">                        </span><span class="s">&quot;80&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">37</span><span class="w">                          </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">38</span><span class="w">                            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route</span>
+<span class="linenos">39</span><span class="w">                            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">40</span><span class="w">                              </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route</span>
+<span class="linenos">41</span><span class="w">                              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">udp_service</span>
+<span class="linenos">42</span><span class="w">                        </span><span class="s">&quot;443&quot;</span><span class="p p-Indicator">:</span>
+<span class="linenos">43</span><span class="w">                          </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">44</span><span class="w">                            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route</span>
+<span class="linenos">45</span><span class="w">                            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">46</span><span class="w">                              </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route</span>
+<span class="linenos">47</span><span class="w">                              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">udp_service2</span>
+<span class="linenos">48</span><span class="w">                  </span><span class="nt">on_no_match</span><span class="p">:</span>
+<span class="linenos">49</span><span class="w">                    </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">50</span><span class="w">                      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route</span>
+<span class="linenos">51</span><span class="w">                      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">52</span><span class="w">                        </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route</span>
+<span class="linenos">53</span><span class="w">                        </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">udp_service3</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="dynamic-cluster-selection">
+<span id="config-udp-listener-filters-udp-proxy-dynamic-cluster"></span><h2>Dynamic cluster selection<a class="headerlink" href="#dynamic-cluster-selection" title="Link to this heading"></a></h2>
+<p>The upstream cluster used by the UDP proxy can be dynamically set by
+one of the session filters on a per-session basis by setting a per-session
+state object under the key <code class="docutils literal notranslate"><span class="pre">envoy.udp_proxy.cluster</span></code>. See the
+implementation for the details.</p>
+</section>
+<section id="session-filters">
+<span id="config-udp-listener-filters-udp-proxy-session-filters"></span><h2>Session filters<a class="headerlink" href="#session-filters" title="Link to this heading"></a></h2>
+<p>The UDP proxy is able to apply <a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.html#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-session-filters"><span class="std std-ref">session filters</span></a>.
+These kinds of filters run seprately on each upstream UDP session and support a more granular API that allows running operations only
+at the start of an upstream UDP session, when a UDP datagram is received from the downstream and when a UDP datagram is received from the
+upstream, similar to network filters.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When using session filters, choosing the upstream host only happens after completing the <code class="docutils literal notranslate"><span class="pre">onNewSession()</span></code> iteration for all
+the filters in the chain. This allows choosing the host based on decisions made in one of the session filters, and prevents the
+creation of upstream sockets in cases where one of the filters stopped the filter chain.
+Additionally, since <a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.html#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-use-per-packet-load-balancing"><span class="std std-ref">per packet load balancing</span></a> require
+choosing the upstream host for each received datagram, session filters can’t be used when this option is enabled.</p>
+</div>
+<p>Envoy has the following builtin UDP session filters.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="session_filters/http_capsule.html">HTTP Capsule filter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="session_filters/dynamic_forward_proxy.html">Dynamic forward proxy</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="session_filters/dynamic_forward_proxy.html#statistics">Statistics</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="session_filters/ext_authz.html">External authorization</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="session_filters/ext_authz.html#authorization-request">Authorization request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="session_filters/ext_authz.html#authorization-response">Authorization response</a></li>
+<li class="toctree-l2"><a class="reference internal" href="session_filters/ext_authz.html#statistics">Statistics</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="udp-tunneling-over-http">
+<span id="config-udp-listener-filters-udp-proxy-tunneling-over-http"></span><h2>UDP Tunneling over HTTP<a class="headerlink" href="#udp-tunneling-over-http" title="Link to this heading"></a></h2>
+<p>The UDP proxy filter can be used to tunnel raw UDP over HTTP requests. Refer to <a class="reference internal" href="../../../intro/arch_overview/http/upgrades.html#tunneling-udp-over-http"><span class="std std-ref">HTTP upgrades</span></a> for more information.</p>
+<p>UDP tunneling configuration can be used by setting <a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.html#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-tunneling-config"><span class="std std-ref">tunneling_config</span></a></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Since <a class="reference internal" href="../../../api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.html#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-use-per-packet-load-balancing"><span class="std std-ref">per packet load balancing</span></a> require
+choosing the upstream host for each received datagram, tunneling can’t be used when this option is enabled.</p>
+</div>
+</section>
+<section id="example-configuration">
+<h2>Example configuration<a class="headerlink" href="#example-configuration" title="Link to this heading"></a></h2>
+<p>The following example configuration will cause Envoy to listen on UDP port 1234 and proxy to a UDP
+server listening on port 1235, allowing 9000 byte packets in both directions (i.e., either jumbo
+frames or fragmented IP packets).</p>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/d92786a333915556d76d0e1f6adfa27d/udp-proxy.yaml"><code class="xref download docutils literal notranslate"><span class="pre">udp-proxy.yaml</span></code></a></span><a class="headerlink" href="#id2" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="nt">admin</span><span class="p">:</span>
+<span class="linenos"> 2</span><span class="w">  </span><span class="nt">address</span><span class="p">:</span>
+<span class="linenos"> 3</span><span class="w">    </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="linenos"> 4</span><span class="w">      </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="linenos"> 5</span><span class="w">      </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<span class="linenos"> 6</span><span class="w">      </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9901</span>
+<span class="linenos"> 7</span><span class="nt">static_resources</span><span class="p">:</span>
+<span class="linenos"> 8</span><span class="w">  </span><span class="nt">listeners</span><span class="p">:</span>
+<span class="linenos"> 9</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">listener_0</span>
+<span class="linenos">10</span><span class="w">    </span><span class="nt">address</span><span class="p">:</span>
+<span class="linenos">11</span><span class="w">      </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="linenos">12</span><span class="w">        </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UDP</span>
+<span class="linenos">13</span><span class="w">        </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<span class="linenos">14</span><span class="w">        </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1234</span>
+<span class="linenos">15</span><span class="w">    </span><span class="nt">udp_listener_config</span><span class="p">:</span>
+<span class="linenos">16</span><span class="w">      </span><span class="nt">downstream_socket_config</span><span class="p">:</span>
+<span class="linenos">17</span><span class="w">        </span><span class="nt">max_rx_datagram_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9000</span>
+<span class="linenos">18</span><span class="w">    </span><span class="nt">listener_filters</span><span class="p">:</span>
+<span class="linenos">19</span><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.udp_listener.udp_proxy</span>
+<span class="linenos">20</span><span class="w">      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">21</span><span class="w">        </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig</span>
+<span class="linenos">22</span><span class="w">        </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service</span>
+<span class="linenos">23</span><span class="w">        </span><span class="nt">matcher</span><span class="p">:</span>
+<span class="linenos">24</span><span class="w">          </span><span class="nt">on_no_match</span><span class="p">:</span>
+<span class="linenos">25</span><span class="w">            </span><span class="nt">action</span><span class="p">:</span>
+<span class="linenos">26</span><span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route</span>
+<span class="linenos">27</span><span class="w">              </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">28</span><span class="w">                </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route</span>
+<span class="linenos">29</span><span class="w">                </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_udp</span>
+<span class="linenos">30</span><span class="w">        </span><span class="nt">upstream_socket_config</span><span class="p">:</span>
+<span class="linenos">31</span><span class="w">          </span><span class="nt">max_rx_datagram_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9000</span>
+<span class="linenos">32</span><span class="w">  </span><span class="nt">clusters</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_udp</span>
+<span class="linenos">34</span><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">STATIC</span>
+<span class="linenos">35</span><span class="w">    </span><span class="nt">lb_policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ROUND_ROBIN</span>
+<span class="linenos">36</span><span class="w">    </span><span class="nt">load_assignment</span><span class="p">:</span>
+<span class="linenos">37</span><span class="w">      </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_udp</span>
+<span class="linenos">38</span><span class="w">      </span><span class="nt">endpoints</span><span class="p">:</span>
+<span class="linenos">39</span><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">lb_endpoints</span><span class="p">:</span>
+<span class="linenos">40</span><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="linenos">41</span><span class="w">            </span><span class="nt">address</span><span class="p">:</span>
+<span class="linenos">42</span><span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="linenos">43</span><span class="w">                </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<span class="linenos">44</span><span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1235</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="statistics">
+<span id="config-udp-listener-filters-udp-proxy-stats"></span><h2>Statistics<a class="headerlink" href="#statistics" title="Link to this heading"></a></h2>
+<p>The UDP proxy filter emits both its own downstream statistics as well as many of the <a class="reference internal" href="../../upstream/cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats"><span class="std std-ref">cluster
+upstream statistics</span></a> where applicable. The downstream
+statistics are rooted at <em>udp.&lt;stat_prefix&gt;.</em> with the following statistics:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>downstream_sess_no_route</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagrams not routed due to no cluster</p></td>
+</tr>
+<tr class="row-odd"><td><p>downstream_sess_rx_bytes</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of bytes received</p></td>
+</tr>
+<tr class="row-even"><td><p>downstream_sess_rx_datagrams</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagrams received</p></td>
+</tr>
+<tr class="row-odd"><td><p>downstream_sess_rx_errors</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagram receive errors</p></td>
+</tr>
+<tr class="row-even"><td><p>downstream_sess_total</p></td>
+<td><p>Counter</p></td>
+<td><p>Number sessions created in total</p></td>
+</tr>
+<tr class="row-odd"><td><p>downstream_sess_tx_bytes</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of bytes transmitted</p></td>
+</tr>
+<tr class="row-even"><td><p>downstream_sess_tx_datagrams</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagrams transmitted</p></td>
+</tr>
+<tr class="row-odd"><td><p>downstream_sess_tx_errors</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagram transmission errors</p></td>
+</tr>
+<tr class="row-even"><td><p>idle_timeout</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of sessions destroyed due to idle timeout</p></td>
+</tr>
+<tr class="row-odd"><td><p>session_filter_config_missing</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of sessions destroyed due to missing session filter configuration</p></td>
+</tr>
+<tr class="row-even"><td><p>downstream_sess_active</p></td>
+<td><p>Gauge</p></td>
+<td><p>Number of sessions currently active</p></td>
+</tr>
+</tbody>
+</table>
+<p>The following standard <a class="reference internal" href="../../upstream/cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats"><span class="std std-ref">upstream cluster stats</span></a> are used
+by the UDP proxy:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>upstream_cx_none_healthy</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagrams dropped due to no healthy hosts</p></td>
+</tr>
+<tr class="row-odd"><td><p>upstream_cx_overflow</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagrams dropped due to hitting the session circuit breaker</p></td>
+</tr>
+<tr class="row-even"><td><p>upstream_cx_rx_bytes_total</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of bytes received</p></td>
+</tr>
+<tr class="row-odd"><td><p>upstream_cx_tx_bytes_total</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of bytes transmitted</p></td>
+</tr>
+</tbody>
+</table>
+<p>The UDP proxy filter also emits custom upstream cluster stats prefixed with
+<em>cluster.&lt;cluster_name&gt;.udp.</em>:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>sess_rx_datagrams</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagrams received</p></td>
+</tr>
+<tr class="row-odd"><td><p>sess_rx_datagrams_dropped</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagrams dropped due to kernel overflow or truncation</p></td>
+</tr>
+<tr class="row-even"><td><p>sess_rx_errors</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagram receive errors</p></td>
+</tr>
+<tr class="row-odd"><td><p>sess_tx_datagrams</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagrams transmitted</p></td>
+</tr>
+<tr class="row-even"><td><p>sess_tx_errors</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagrams transmitted</p></td>
+</tr>
+<tr class="row-odd"><td><p>sess_tunnel_success</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of successfully established UDP tunnels</p></td>
+</tr>
+<tr class="row-even"><td><p>sess_tunnel_failure</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of UDP tunnels failed to establish</p></td>
+</tr>
+<tr class="row-odd"><td><p>sess_tunnel_buffer_overflow</p></td>
+<td><p>Counter</p></td>
+<td><p>Number of datagrams dropped due to full tunnel buffer</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="udp_filters.html" class="btn btn-neutral float-left" title="UDP listener filters" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="session_filters/http_capsule.html" class="btn btn-neutral float-right" title="HTTP Capsule filter" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">UDP proxy</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#load-balancing-and-unhealthy-host-handling">Load balancing and unhealthy host handling</a></li>
+<li><a class="reference internal" href="#circuit-breaking">Circuit breaking</a></li>
+<li><a class="reference internal" href="#routing">Routing</a></li>
+<li><a class="reference internal" href="#dynamic-cluster-selection">Dynamic cluster selection</a></li>
+<li><a class="reference internal" href="#session-filters">Session filters</a></li>
+<li><a class="reference internal" href="#udp-tunneling-over-http">UDP Tunneling over HTTP</a></li>
+<li><a class="reference internal" href="#example-configuration">Example configuration</a></li>
+<li><a class="reference internal" href="#statistics">Statistics</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

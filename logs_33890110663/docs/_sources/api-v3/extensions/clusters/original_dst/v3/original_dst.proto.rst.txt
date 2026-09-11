@@ -1,0 +1,102 @@
+.. _envoy_v3_api_file_envoy/extensions/clusters/original_dst/v3/original_dst.proto:
+
+Original Destination Cluster Configuration (proto)
+==================================================
+
+.. _extension_envoy.clusters.original_dst:
+
+This extension has the qualified name ``envoy.clusters.original_dst``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.clusters <extension_category_envoy.clusters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.clusters.original_dst.v3.OriginalDstCluster <envoy_v3_api_msg_extensions.clusters.original_dst.v3.OriginalDstCluster>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.clusters.original_dst.v3.OriginalDstCluster:
+
+extensions.clusters.original_dst.v3.OriginalDstCluster
+------------------------------------------------------
+
+
+:repo:`[extensions.clusters.original_dst.v3.OriginalDstCluster proto] <api/envoy/extensions/clusters/original_dst/v3/original_dst.proto#L21>`
+
+Configuration for the Original Destination cluster.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "use_http_header": ...,
+    "http_header_name": ...,
+    "upstream_port_override": {...},
+    "metadata_key": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.clusters.original_dst.v3.OriginalDstCluster.use_http_header:
+
+
+use_http_header
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When true, an HTTP header can be used to override the original dst address. The default header is
+  :ref:`x-envoy-original-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>`.
+
+  .. attention::
+
+    This header isn't sanitized by default, so enabling this feature allows HTTP clients to
+    route traffic to arbitrary hosts and/or ports, which may have serious security
+    consequences.
+
+  .. note::
+
+    If the header appears multiple times only the first value is used.
+
+
+.. _envoy_v3_api_field_extensions.clusters.original_dst.v3.OriginalDstCluster.http_header_name:
+
+
+http_header_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The http header to override destination address if :ref:`use_http_header
+  <envoy_v3_api_field_extensions.clusters.original_dst.v3.OriginalDstCluster.use_http_header>`
+  is set to true. If the value is empty,
+  :ref:`x-envoy-original-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` will be used.
+
+
+.. _envoy_v3_api_field_extensions.clusters.original_dst.v3.OriginalDstCluster.upstream_port_override:
+
+
+upstream_port_override
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The port to override for the original dst address. This port
+  will take precedence over filter state and header override ports.
+
+
+.. _envoy_v3_api_field_extensions.clusters.original_dst.v3.OriginalDstCluster.metadata_key:
+
+
+metadata_key
+  (:ref:`type.metadata.v3.MetadataKey <envoy_v3_api_msg_type.metadata.v3.MetadataKey>`) The dynamic metadata key to override destination address.
+  First the request metadata is considered, then the connection one.
+
+

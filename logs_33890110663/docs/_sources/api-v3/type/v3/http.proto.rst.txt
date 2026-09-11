@@ -1,0 +1,39 @@
+.. _envoy_v3_api_file_envoy/type/v3/http.proto:
+
+HTTP (proto)
+============
+
+
+
+
+
+
+.. _envoy_v3_api_enum_type.v3.CodecClientType:
+
+Enum type.v3.CodecClientType
+----------------------------
+
+
+:repo:`[type.v3.CodecClientType proto] <api/envoy/type/v3/http.proto#L14>`
+
+
+
+
+.. _envoy_v3_api_enum_value_type.v3.CodecClientType.HTTP1:
+
+
+HTTP1
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_type.v3.CodecClientType.HTTP2:
+
+
+HTTP2
+  ⁣
+
+.. _envoy_v3_api_enum_value_type.v3.CodecClientType.HTTP3:
+
+
+HTTP3
+  ⁣
+

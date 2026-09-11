@@ -1,0 +1,110 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/buffer/v3/buffer.proto:
+
+Buffer (proto)
+==============
+
+.. _extension_envoy.filters.http.buffer:
+
+This extension has the qualified name ``envoy.filters.http.buffer``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+  - :ref:`envoy.filters.http.upstream <extension_category_envoy.filters.http.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer <envoy_v3_api_msg_extensions.filters.http.buffer.v3.Buffer>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.buffer.v3.BufferPerRoute <envoy_v3_api_msg_extensions.filters.http.buffer.v3.BufferPerRoute>`
+
+
+
+Buffer :ref:`configuration overview <config_http_filters_buffer>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.buffer.v3.Buffer:
+
+extensions.filters.http.buffer.v3.Buffer
+----------------------------------------
+
+
+:repo:`[extensions.filters.http.buffer.v3.Buffer proto] <api/envoy/extensions/filters/http/buffer/v3/buffer.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_request_bytes": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.buffer.v3.Buffer.max_request_bytes:
+
+
+max_request_bytes
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_, *REQUIRED*) The maximum request size that the filter will buffer before the connection
+  manager will stop buffering and return a 413 response.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.buffer.v3.BufferPerRoute:
+
+extensions.filters.http.buffer.v3.BufferPerRoute
+------------------------------------------------
+
+
+:repo:`[extensions.filters.http.buffer.v3.BufferPerRoute proto] <api/envoy/extensions/filters/http/buffer/v3/buffer.proto#L32>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "disabled": ...,
+    "buffer": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.buffer.v3.BufferPerRoute.disabled:
+
+
+disabled
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Disable the buffer filter for this particular vhost or route.
+
+
+  
+
+  Precisely one of :ref:`disabled <envoy_v3_api_field_extensions.filters.http.buffer.v3.BufferPerRoute.disabled>`, :ref:`buffer <envoy_v3_api_field_extensions.filters.http.buffer.v3.BufferPerRoute.buffer>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.buffer.v3.BufferPerRoute.buffer:
+
+
+buffer
+  (:ref:`extensions.filters.http.buffer.v3.Buffer <envoy_v3_api_msg_extensions.filters.http.buffer.v3.Buffer>`) Override the global configuration of the filter with this new config.
+
+
+  
+
+  Precisely one of :ref:`disabled <envoy_v3_api_field_extensions.filters.http.buffer.v3.BufferPerRoute.disabled>`, :ref:`buffer <envoy_v3_api_field_extensions.filters.http.buffer.v3.BufferPerRoute.buffer>` must be set.
+

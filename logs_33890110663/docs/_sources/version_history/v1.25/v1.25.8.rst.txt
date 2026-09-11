@@ -1,0 +1,23 @@
+.. _version_history_1.25.8:
+
+1.25.8 (July 13, 2023)
+=======================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **http2**: Fix memory leak in nghttp2 when scheduled requests are cancelled due to the ``GOAWAY`` frame being received from the
+  upstream service. Fix `CVE-2023-35945 <https://nvd.nist.gov/vuln/detail/CVE-2023-35945>`_.
+* **original_dst**: Fixes an issue with the ORIGINAL_DST cluster cleanup timer lifetime, which
+  can occur if the cluster is removed while the timer is armed.
+

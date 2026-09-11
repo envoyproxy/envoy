@@ -1,0 +1,98 @@
+.. _envoy_v3_api_file_envoy/extensions/formatter/metadata/v3/metadata.proto:
+
+Formatter extension for printing various types of metadata (proto)
+==================================================================
+
+.. _extension_envoy.formatter.metadata:
+
+This extension has the qualified name ``envoy.formatter.metadata``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.formatter <extension_category_envoy.formatter>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.formatter.metadata.v3.Metadata <envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>`
+
+
+
+
+
+Metadata formatter extension implements METADATA command operator that
+prints all types of metadata. The first parameter taken by METADATA operator defines
+type of metadata. The following types of metadata are supported (case sensitive):
+
+* DYNAMIC
+* CLUSTER
+* ROUTE
+* UPSTREAM_HOST
+* LISTENER
+* LISTENER_FILTER_CHAIN
+* VIRTUAL_HOST
+
+See :ref:`here <config_access_log>` for more information on access log configuration.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata:
+
+extensions.formatter.metadata.v3.Metadata
+-----------------------------------------
+
+
+:repo:`[extensions.formatter.metadata.v3.Metadata proto] <api/envoy/extensions/formatter/metadata/v3/metadata.proto#L63>`
+
+%METADATA(TYPE:NAMESPACE:KEY):Z%
+   :ref:`Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
+   where TYPE is type of metadata (see above for supported types),
+   NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
+   lookup key in the namespace with the option of specifying nested keys separated by ':',
+   and Z is an optional parameter denoting string truncation up to Z characters long.
+   The data will be logged as a JSON string. For example, for the following ROUTE metadata:
+
+   ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+
+   * %METADATA(ROUTE:com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+   * %METADATA(ROUTE:com.test.my_filter:test_key)% will log: ``foo``
+   * %METADATA(ROUTE:com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
+   * %METADATA(ROUTE:com.test.my_filter:test_object:inner_key)% will log: ``bar``
+   * %METADATA(ROUTE:com.unknown_filter)% will log: ``-``
+   * %METADATA(ROUTE:com.test.my_filter:unknown_key)% will log: ``-``
+   * %METADATA(ROUTE:com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
+
+ .. note::
+
+   For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+   when the referenced key is a simple value. If the referenced key is a struct or list value, a
+   JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+   length is ignored.
+
+ .. note::
+
+   METADATA(DYNAMIC:NAMESPACE:KEY):Z is equivalent to :ref:`DYNAMIC_METADATA(NAMESPACE:KEY):Z<config_access_log_format_dynamic_metadata>`
+   METADATA(CLUSTER:NAMESPACE:KEY):Z is equivalent to :ref:`CLUSTER_METADATA(NAMESPACE:KEY):Z<config_access_log_format_cluster_metadata>`
+   METADATA(UPSTREAM_HOST:NAMESPACE:KEY):Z is equivalent to :ref:`UPSTREAM_METADATA(NAMESPACE:KEY):Z<config_access_log_format_upstream_host_metadata>`
+
+.. warning::
+  This extension is treated as built-in extension and will be enabled by default now.
+  It is unnecessary to configure this extension.
+
+
+
+

@@ -1,0 +1,99 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/health_check/v3/health_check.proto:
+
+Health check (proto)
+====================
+
+.. _extension_envoy.filters.http.health_check:
+
+This extension has the qualified name ``envoy.filters.http.health_check``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck <envoy_v3_api_msg_extensions.filters.http.health_check.v3.HealthCheck>`
+
+
+
+Health check :ref:`configuration overview <config_http_filters_health_check>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.health_check.v3.HealthCheck:
+
+extensions.filters.http.health_check.v3.HealthCheck
+---------------------------------------------------
+
+
+:repo:`[extensions.filters.http.health_check.v3.HealthCheck proto] <api/envoy/extensions/filters/http/health_check/v3/health_check.proto#L25>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "pass_through_mode": {...},
+    "cache_time": {...},
+    "cluster_min_healthy_percentages": {...},
+    "headers": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.health_check.v3.HealthCheck.pass_through_mode:
+
+
+pass_through_mode
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_, *REQUIRED*) Specifies whether the filter operates in pass through mode or not.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.health_check.v3.HealthCheck.cache_time:
+
+
+cache_time
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) If operating in pass through mode, the amount of time in milliseconds
+  that the filter should cache the upstream response.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.health_check.v3.HealthCheck.cluster_min_healthy_percentages:
+
+
+cluster_min_healthy_percentages
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`type.v3.Percent <envoy_v3_api_msg_type.v3.Percent>`>) If operating in non-pass-through mode, specifies a set of upstream cluster
+  names and the minimum percentage of servers in each of those clusters that
+  must be healthy or degraded in order for the filter to return a 200. If any of
+  the clusters configured here does not exist, the filter will not return a 200.
+
+  .. note::
+
+     This value is interpreted as an integer by truncating, so 12.50% will be calculated
+     as if it were 12%.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.health_check.v3.HealthCheck.headers:
+
+
+headers
+  (**repeated** :ref:`config.route.v3.HeaderMatcher <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`) Specifies a set of health check request headers to match on. The health check filter will
+  check a request’s headers against all the specified headers. To specify the health check
+  endpoint, set the ``:path`` header to match on.
+
+
+
+

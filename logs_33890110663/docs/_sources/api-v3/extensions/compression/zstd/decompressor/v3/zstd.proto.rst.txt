@@ -1,0 +1,75 @@
+.. _envoy_v3_api_file_envoy/extensions/compression/zstd/decompressor/v3/zstd.proto:
+
+Zstd Decompressor (proto)
+=========================
+
+.. _extension_envoy.compression.zstd.decompressor:
+
+This extension has the qualified name ``envoy.compression.zstd.decompressor``
+
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.compression.decompressor <extension_category_envoy.compression.decompressor>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.compression.zstd.decompressor.v3.Zstd <envoy_v3_api_msg_extensions.compression.zstd.decompressor.v3.Zstd>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.compression.zstd.decompressor.v3.Zstd:
+
+extensions.compression.zstd.decompressor.v3.Zstd
+------------------------------------------------
+
+
+:repo:`[extensions.compression.zstd.decompressor.v3.Zstd proto] <api/envoy/extensions/compression/zstd/decompressor/v3/zstd.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dictionaries": [],
+    "chunk_size": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.compression.zstd.decompressor.v3.Zstd.dictionaries:
+
+
+dictionaries
+  (**repeated** :ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) Dictionaries for decompression. Zstd offers dictionary compression, which greatly improves
+  efficiency on small files and messages. It is necessary to ensure that the dictionary used for
+  decompression is the same as the compression dictionary. Multiple dictionaries can be set, and the
+  dictionary will be automatically selected for decompression according to the dictionary ID in the
+  source content.
+  Please refer to `zstd manual <https://github.com/facebook/zstd/blob/dev/programs/zstd.1.md#dictionary-builder>`_
+  to train specific dictionaries for decompression.
+
+
+.. _envoy_v3_api_field_extensions.compression.zstd.decompressor.v3.Zstd.chunk_size:
+
+
+chunk_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value for decompressor's next output buffer. If not set, defaults to 4096.
+
+

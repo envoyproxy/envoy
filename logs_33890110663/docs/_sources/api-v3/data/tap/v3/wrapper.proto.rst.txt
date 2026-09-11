@@ -1,0 +1,101 @@
+.. _envoy_v3_api_file_envoy/data/tap/v3/wrapper.proto:
+
+Tap data wrappers (proto)
+=========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_data.tap.v3.TraceWrapper:
+
+data.tap.v3.TraceWrapper
+------------------------
+
+
+:repo:`[data.tap.v3.TraceWrapper proto] <api/envoy/data/tap/v3/wrapper.proto#L23>`
+
+Wrapper for all fully buffered and streamed tap traces that Envoy emits. This is required for
+sending traces over gRPC APIs or more easily persisting binary messages to files.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "http_buffered_trace": {...},
+    "http_streamed_trace_segment": {...},
+    "socket_buffered_trace": {...},
+    "socket_streamed_trace_segment": {...},
+    "configured_sample_rate": {...}
+  }
+
+.. _envoy_v3_api_field_data.tap.v3.TraceWrapper.http_buffered_trace:
+
+
+http_buffered_trace
+  (:ref:`data.tap.v3.HttpBufferedTrace <envoy_v3_api_msg_data.tap.v3.HttpBufferedTrace>`) An HTTP buffered tap trace.
+
+
+  
+
+  Precisely one of :ref:`http_buffered_trace <envoy_v3_api_field_data.tap.v3.TraceWrapper.http_buffered_trace>`, :ref:`http_streamed_trace_segment <envoy_v3_api_field_data.tap.v3.TraceWrapper.http_streamed_trace_segment>`, :ref:`socket_buffered_trace <envoy_v3_api_field_data.tap.v3.TraceWrapper.socket_buffered_trace>`, :ref:`socket_streamed_trace_segment <envoy_v3_api_field_data.tap.v3.TraceWrapper.socket_streamed_trace_segment>` must be set.
+
+.. _envoy_v3_api_field_data.tap.v3.TraceWrapper.http_streamed_trace_segment:
+
+
+http_streamed_trace_segment
+  (:ref:`data.tap.v3.HttpStreamedTraceSegment <envoy_v3_api_msg_data.tap.v3.HttpStreamedTraceSegment>`) An HTTP streamed tap trace segment.
+
+
+  
+
+  Precisely one of :ref:`http_buffered_trace <envoy_v3_api_field_data.tap.v3.TraceWrapper.http_buffered_trace>`, :ref:`http_streamed_trace_segment <envoy_v3_api_field_data.tap.v3.TraceWrapper.http_streamed_trace_segment>`, :ref:`socket_buffered_trace <envoy_v3_api_field_data.tap.v3.TraceWrapper.socket_buffered_trace>`, :ref:`socket_streamed_trace_segment <envoy_v3_api_field_data.tap.v3.TraceWrapper.socket_streamed_trace_segment>` must be set.
+
+.. _envoy_v3_api_field_data.tap.v3.TraceWrapper.socket_buffered_trace:
+
+
+socket_buffered_trace
+  (:ref:`data.tap.v3.SocketBufferedTrace <envoy_v3_api_msg_data.tap.v3.SocketBufferedTrace>`) A socket buffered tap trace.
+
+
+  
+
+  Precisely one of :ref:`http_buffered_trace <envoy_v3_api_field_data.tap.v3.TraceWrapper.http_buffered_trace>`, :ref:`http_streamed_trace_segment <envoy_v3_api_field_data.tap.v3.TraceWrapper.http_streamed_trace_segment>`, :ref:`socket_buffered_trace <envoy_v3_api_field_data.tap.v3.TraceWrapper.socket_buffered_trace>`, :ref:`socket_streamed_trace_segment <envoy_v3_api_field_data.tap.v3.TraceWrapper.socket_streamed_trace_segment>` must be set.
+
+.. _envoy_v3_api_field_data.tap.v3.TraceWrapper.socket_streamed_trace_segment:
+
+
+socket_streamed_trace_segment
+  (:ref:`data.tap.v3.SocketStreamedTraceSegment <envoy_v3_api_msg_data.tap.v3.SocketStreamedTraceSegment>`) A socket streamed tap trace segment.
+
+
+  
+
+  Precisely one of :ref:`http_buffered_trace <envoy_v3_api_field_data.tap.v3.TraceWrapper.http_buffered_trace>`, :ref:`http_streamed_trace_segment <envoy_v3_api_field_data.tap.v3.TraceWrapper.http_streamed_trace_segment>`, :ref:`socket_buffered_trace <envoy_v3_api_field_data.tap.v3.TraceWrapper.socket_buffered_trace>`, :ref:`socket_streamed_trace_segment <envoy_v3_api_field_data.tap.v3.TraceWrapper.socket_streamed_trace_segment>` must be set.
+
+.. _envoy_v3_api_field_data.tap.v3.TraceWrapper.configured_sample_rate:
+
+
+configured_sample_rate
+  (:ref:`type.v3.FractionalPercent <envoy_v3_api_msg_type.v3.FractionalPercent>`) The configured sample rate at the time this trace was admitted, sourced from the
+  :ref:`default_value
+  <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.default_value>` of
+  :ref:`tap_enabled <envoy_v3_api_field_config.tap.v3.TapConfig.tap_enabled>`. For
+  buffered output (where each ``TraceWrapper`` carries a complete trace) the rate is
+  always present when sampling is configured. For streamed output (where a trace is
+  split across multiple ``TraceWrapper`` segments) the rate is set on the first
+  emitted segment only; subsequent segments belonging to the same trace can be
+  joined to it via the ``trace_id`` carried on each inner segment message. Absent
+  when sampling is unconfigured.
+
+  .. note::
+
+    When :ref:`runtime_key
+    <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` is
+    configured and an active runtime override is in effect, the effective sampling
+    rate that admitted the trace may differ from the recorded configured value.
+
+

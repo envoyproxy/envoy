@@ -1,0 +1,90 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/tap/v3/tap.proto:
+
+Tap (proto)
+===========
+
+.. _extension_envoy.filters.http.tap:
+
+This extension has the qualified name ``envoy.filters.http.tap``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap <envoy_v3_api_msg_extensions.filters.http.tap.v3.Tap>`
+
+
+
+Tap :ref:`configuration overview <config_http_filters_tap>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.tap.v3.Tap:
+
+extensions.filters.http.tap.v3.Tap
+----------------------------------
+
+
+:repo:`[extensions.filters.http.tap.v3.Tap proto] <api/envoy/extensions/filters/http/tap/v3/tap.proto#L21>`
+
+Top level configuration for the tap filter.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "common_config": {...},
+    "record_headers_received_time": ...,
+    "record_downstream_connection": ...,
+    "record_upstream_connection": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.common_config:
+
+
+common_config
+  (:ref:`extensions.common.tap.v3.CommonExtensionConfig <envoy_v3_api_msg_extensions.common.tap.v3.CommonExtensionConfig>`, *REQUIRED*) Common configuration for the HTTP tap filter.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time:
+
+
+record_headers_received_time
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates whether HTTP tap filter records the time stamp for request/response headers.
+  Request headers time stamp is stored after receiving request headers.
+  Response headers time stamp is stored after receiving response headers.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_downstream_connection:
+
+
+record_downstream_connection
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates whether report downstream connection info
+
+
+.. _envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_upstream_connection:
+
+
+record_upstream_connection
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If enabled, upstream connection information will be reported.
+
+

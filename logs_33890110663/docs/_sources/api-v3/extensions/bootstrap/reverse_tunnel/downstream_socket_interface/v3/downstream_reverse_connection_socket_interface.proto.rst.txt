@@ -1,0 +1,195 @@
+.. _envoy_v3_api_file_envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.proto:
+
+Bootstrap settings for downstream reverse connection socket interface (proto)
+=============================================================================
+
+.. _extension_envoy.bootstrap.reverse_tunnel.downstream_socket_interface:
+
+This extension has the qualified name ``envoy.bootstrap.reverse_tunnel.downstream_socket_interface``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.bootstrap <extension_category_envoy.bootstrap>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface <envoy_v3_api_msg_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface:
+
+extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
+-------------------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface proto] <api/envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.proto#L26>`
+
+Configuration for the downstream reverse connection socket interface.
+This interface initiates reverse connections to upstream Envoys and provides
+them as socket connections for downstream requests.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "enable_detailed_stats": ...,
+    "http_handshake": {...},
+    "access_log": [],
+    "max_reconnect_backoff": {...},
+    "maintain_interval": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Stat prefix to be used for downstream reverse connection socket interface stats.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.enable_detailed_stats:
+
+
+enable_detailed_stats
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Enable detailed per-host and per-cluster statistics.
+  When enabled, emits hidden statistics for individual hosts and clusters.
+  Defaults to ``false``.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.http_handshake:
+
+
+http_handshake
+  (:ref:`extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.HttpHandshakeConfig <envoy_v3_api_msg_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.HttpHandshakeConfig>`) Optional HTTP handshake configuration. When unset, the initiator envoy uses the defaults
+  provided by ``HttpHandshakeConfig``.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.access_log:
+
+
+access_log
+  (**repeated** :ref:`config.accesslog.v3.AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`) Access log configuration for reverse tunnel initiator lifecycle events.
+  Logs are emitted on handshake success, handshake failure, and connection close.
+  Reverse tunnel metadata (``node_id``, ``cluster_id``, ``tenant_id``, upstream cluster, etc.)
+  is available via ``%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:*)%`` substitutions.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.max_reconnect_backoff:
+
+
+max_reconnect_backoff
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Upper bound on the per-host reconnect backoff. The initiator retries a failed handshake on a
+  deterministic exponential schedule (1s, 2s, 4s, ...) with small upward jitter; this value caps
+  that schedule.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.maintain_interval:
+
+
+maintain_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) How often the initiator re-checks each host and dials any missing reverse tunnels.
+  Defaults to 10s. The re-check is jittered upward so agents that start together do not
+  redial in lockstep. The minimum value is 100ms.
+
+
+.. _envoy_v3_api_msg_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.HttpHandshakeConfig:
+
+extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.HttpHandshakeConfig
+---------------------------------------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.HttpHandshakeConfig proto] <api/envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.proto#L28>`
+
+HTTP handshake settings for initiator envoy initiated reverse tunnels.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_path": ...,
+    "additional_headers": [],
+    "use_http_upgrade": ...,
+    "formatters": []
+  }
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.HttpHandshakeConfig.request_path:
+
+
+request_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Request path used when issuing the HTTP reverse-connection handshake. Defaults to
+  "/reverse_connections/request".
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.HttpHandshakeConfig.additional_headers:
+
+
+additional_headers
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) Additional headers to include in the HTTP handshake request.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.HttpHandshakeConfig.use_http_upgrade:
+
+
+use_http_upgrade
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Perform the handshake as an HTTP/1.1 ``Upgrade`` exchange (``Upgrade: reverse-tunnel``,
+  success on ``101``) so HTTP proxies can route the handshake and splice the tunnel
+  afterward. The responder must set this flag to the same value.
+  Defaults to ``false``.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.HttpHandshakeConfig.formatters:
+
+
+formatters
+  (**repeated** :ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Formatter extensions usable in ``additional_headers`` substitution. See the formatter
+  extensions documentation for details. When set, ``additional_headers`` values are evaluated
+  as substitution format strings; when empty, the values are sent literally.
+
+
+  .. _extension_category_envoy.formatter:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.formatter.cel <extension_envoy.formatter.cel>`
+
+    - :ref:`envoy.formatter.dynamic_modules <extension_envoy.formatter.dynamic_modules>`
+
+    - :ref:`envoy.formatter.file_content <extension_envoy.formatter.file_content>`
+
+    - :ref:`envoy.formatter.generic_secret <extension_envoy.formatter.generic_secret>`
+
+    - :ref:`envoy.formatter.metadata <extension_envoy.formatter.metadata>`
+
+    - :ref:`envoy.formatter.req_without_query <extension_envoy.formatter.req_without_query>`
+
+
+
+
+
+

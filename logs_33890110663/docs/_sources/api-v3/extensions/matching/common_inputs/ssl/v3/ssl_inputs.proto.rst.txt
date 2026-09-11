@@ -1,0 +1,139 @@
+.. _envoy_v3_api_file_envoy/extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto:
+
+Common SSL matching inputs (proto)
+==================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.ssl.v3.UriSanInput:
+
+extensions.matching.common_inputs.ssl.v3.UriSanInput
+----------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.ssl.v3.UriSanInput proto] <api/envoy/extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto#L16>`
+
+List of comma-delimited URIs in the SAN field of the peer certificate for a downstream.
+
+.. _extension_envoy.matching.inputs.uri_san:
+
+This extension has the qualified name ``envoy.matching.inputs.uri_san``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.ssl.v3.UriSanInput <envoy_v3_api_msg_extensions.matching.common_inputs.ssl.v3.UriSanInput>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.ssl.v3.DnsSanInput:
+
+extensions.matching.common_inputs.ssl.v3.DnsSanInput
+----------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.ssl.v3.DnsSanInput proto] <api/envoy/extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto#L21>`
+
+List of comma-delimited DNS entries in the SAN field of the peer certificate for a downstream.
+
+.. _extension_envoy.matching.inputs.dns_san:
+
+This extension has the qualified name ``envoy.matching.inputs.dns_san``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.ssl.v3.DnsSanInput <envoy_v3_api_msg_extensions.matching.common_inputs.ssl.v3.DnsSanInput>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.ssl.v3.SubjectInput:
+
+extensions.matching.common_inputs.ssl.v3.SubjectInput
+-----------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.ssl.v3.SubjectInput proto] <api/envoy/extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto#L27>`
+
+Input that matches the subject field of the peer certificate in RFC 2253 format for a
+downstream.
+
+.. _extension_envoy.matching.inputs.subject:
+
+This extension has the qualified name ``envoy.matching.inputs.subject``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.ssl.v3.SubjectInput <envoy_v3_api_msg_extensions.matching.common_inputs.ssl.v3.SubjectInput>`
+
+
+
+
+

@@ -1,0 +1,126 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/cache_v2/v3/cache.proto:
+
+HTTP Cache Filter V2 (proto)
+============================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.cache_v2.v3.CacheV2Config:
+
+extensions.filters.http.cache_v2.v3.CacheV2Config
+-------------------------------------------------
+
+
+:repo:`[extensions.filters.http.cache_v2.v3.CacheV2Config proto] <api/envoy/extensions/filters/http/cache_v2/v3/cache.proto#L25>`
+
+
+.. _extension_envoy.filters.http.cache_v2:
+
+This extension has the qualified name ``envoy.filters.http.cache_v2``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.cache_v2.v3.CacheV2Config <envoy_v3_api_msg_extensions.filters.http.cache_v2.v3.CacheV2Config>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "typed_config": {...},
+    "disabled": {...},
+    "ignore_request_cache_control_header": ...,
+    "override_upstream_cluster": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.cache_v2.v3.CacheV2Config.typed_config:
+
+
+typed_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) Config specific to the cache storage implementation. Required unless ``disabled``
+  is true.
+
+
+  .. _extension_category_envoy.http.cache_v2:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.extensions.http.cache_v2.file_system_http_cache <extension_envoy.extensions.http.cache_v2.file_system_http_cache>`
+
+    - :ref:`envoy.extensions.http.cache_v2.simple <extension_envoy.extensions.http.cache_v2.simple>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cache_v2.v3.CacheV2Config.disabled:
+
+
+disabled
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) When true, the cache filter is a no-op filter.
+
+  Possible use-cases for this include:
+  - Turning a filter on and off with :ref:`ECDS <envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cache_v2.v3.CacheV2Config.ignore_request_cache_control_header:
+
+
+ignore_request_cache_control_header
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) By default, a ``cache-control: no-cache`` or ``pragma: no-cache`` header in the request
+  causes the cache to validate with its upstream even if the lookup is a hit. Setting this
+  to true will ignore these headers.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cache_v2.v3.CacheV2Config.override_upstream_cluster:
+
+
+override_upstream_cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If this is set, requests sent upstream to populate the cache will go to the
+  specified cluster rather than the cluster selected by the vhost and route.
+
+  If you have actions to be taken by the router filter - either
+  ``upstream_http_filters`` or one of the ``RouteConfiguration`` actions such as
+  ``response_headers_to_add`` - then the cache's side-channel going directly to the
+  routed cluster will bypass these actions. You can set ``override_upstream_cluster``
+  to an internal listener which duplicates the relevant ``RouteConfiguration``, to
+  replicate the desired behavior on the side-channel upstream request issued by the
+  cache.
+
+  This is a workaround for implementation constraints which it is hoped will at some
+  point become unnecessary, then unsupported and this field will be removed.
+
+
+
+

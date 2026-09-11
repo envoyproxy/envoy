@@ -1,0 +1,44 @@
+.. _version_history_1.29.3:
+
+1.29.3 (April 4, 2024)
+=======================
+
+
+
+
+Incompatible behavior changes
+-----------------------------
+
+*Changes that are expected to cause an incompatibility if applicable;
+deployment changes are likely required*
+
+
+
+* **http**: Remove the hop by hop TE header from downstream request headers if it's not set to ``trailers``, else keep it. This change can be
+  temporarily reverted by setting ``envoy.reloadable_features.sanitize_te`` to false.
+
+
+
+Minor behavior changes
+----------------------
+
+*Changes that may cause incompatibilities for some users, but should
+not for most*
+
+
+
+* **http2**: Simplifies integration with the codec by removing translation between nghttp2 callbacks and Http2VisitorInterface events.
+  Guarded by ``envoy.reloadable_features.http2_skip_callback_visitor``.
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **http2**: Update nghttp2 to resolve (CVE-2024-30255 https://github.com/envoyproxy/envoy/security/advisories/GHSA-j654-3ccm-vfmm).
+

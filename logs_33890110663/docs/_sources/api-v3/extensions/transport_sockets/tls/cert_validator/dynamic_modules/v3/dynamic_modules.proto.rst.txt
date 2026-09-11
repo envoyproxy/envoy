@@ -1,0 +1,90 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.proto:
+
+Dynamic Module Certificate Validator (proto)
+============================================
+
+.. _extension_envoy.tls.cert_validator.dynamic_modules:
+
+This extension has the qualified name ``envoy.tls.cert_validator.dynamic_modules``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tls.cert_validator <extension_category_envoy.tls.cert_validator>`
+
+
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig:
+
+extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig
+---------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig proto] <api/envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.proto#L35>`
+
+Configuration for the dynamic module certificate validator.
+
+Example:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.extensions.transport_sockets.tls.v3.CertificateValidationContext
+
+  custom_validator_config:
+    name: envoy.tls.cert_validator.dynamic_modules
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig
+      dynamic_module_config:
+        name: my_module
+      validator_name: my_validator
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "validator_name": ...,
+    "validator_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`, *REQUIRED*) Dynamic module configuration. See :ref:`dynamic module configuration
+  <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>` for details.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig.validator_name:
+
+
+validator_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the cert validator implementation in the dynamic module.
+  This is passed to the module's ``envoy_dynamic_module_on_cert_validator_config_new``
+  function.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig.validator_config:
+
+
+validator_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) Optional configuration for the cert validator. This is passed as bytes to the dynamic module.
+
+

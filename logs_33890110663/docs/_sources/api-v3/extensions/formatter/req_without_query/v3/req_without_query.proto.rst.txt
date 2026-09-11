@@ -1,0 +1,69 @@
+.. _envoy_v3_api_file_envoy/extensions/formatter/req_without_query/v3/req_without_query.proto:
+
+Formatter extension for printing request without query string (proto)
+=====================================================================
+
+.. _extension_envoy.formatter.req_without_query:
+
+This extension has the qualified name ``envoy.formatter.req_without_query``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.formatter <extension_category_envoy.formatter>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery <envoy_v3_api_msg_extensions.formatter.req_without_query.v3.ReqWithoutQuery>`
+
+
+
+
+
+ReqWithoutQuery formatter extension implements REQ_WITHOUT_QUERY command operator that
+works the same way as :ref:`REQ <config_access_log_format_req>` except that it will
+remove the query string. It is used to avoid logging any sensitive information into
+the access log.
+See :ref:`here <config_access_log>` for more information on access log configuration.
+
+
+%REQ_WITHOUT_QUERY(X?Y):Z%
+  An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
+  optional parameter denoting string truncation up to Z characters long. The value is taken from
+  the HTTP request header named X first and if it's not set, then request header Y is used. If
+  none of the headers are present '-' symbol will be in the log.
+
+
+.. warning::
+  Please use %PATH% to replace this extension.
+  See :ref:`access log formats <config_access_log_format>` for more details.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.formatter.req_without_query.v3.ReqWithoutQuery:
+
+extensions.formatter.req_without_query.v3.ReqWithoutQuery
+---------------------------------------------------------
+
+
+:repo:`[extensions.formatter.req_without_query.v3.ReqWithoutQuery proto] <api/envoy/extensions/formatter/req_without_query/v3/req_without_query.proto#L32>`
+
+Configuration for the request without query formatter.
+
+
+
+

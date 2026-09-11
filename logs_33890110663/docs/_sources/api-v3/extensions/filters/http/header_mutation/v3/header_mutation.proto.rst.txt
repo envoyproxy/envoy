@@ -1,0 +1,168 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/header_mutation/v3/header_mutation.proto:
+
+Header mutation filter configuration (proto)
+============================================
+
+.. _extension_envoy.filters.http.header_mutation:
+
+This extension has the qualified name ``envoy.filters.http.header_mutation``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+  - :ref:`envoy.filters.http.upstream <extension_category_envoy.filters.http.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutation <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute>`
+
+
+
+Mutate HTTP headers and trailers in requests and responses.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.Mutations:
+
+extensions.filters.http.header_mutation.v3.Mutations
+----------------------------------------------------
+
+
+:repo:`[extensions.filters.http.header_mutation.v3.Mutations proto] <api/envoy/extensions/filters/http/header_mutation/v3/header_mutation.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_mutations": [],
+    "query_parameter_mutations": [],
+    "response_mutations": [],
+    "response_trailers_mutations": [],
+    "request_trailers_mutations": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.request_mutations:
+
+
+request_mutations
+  (**repeated** :ref:`config.common.mutation_rules.v3.HeaderMutation <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation>`) The request mutations are applied before the request is forwarded to the upstream cluster.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.query_parameter_mutations:
+
+
+query_parameter_mutations
+  (**repeated** :ref:`config.core.v3.KeyValueMutation <envoy_v3_api_msg_config.core.v3.KeyValueMutation>`) The ``path`` header query parameter mutations are applied after ``request_mutations`` and before the request
+  is forwarded to the next filter in the filter chain.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.response_mutations:
+
+
+response_mutations
+  (**repeated** :ref:`config.common.mutation_rules.v3.HeaderMutation <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation>`) The response mutations are applied before the response is sent to the downstream client.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.response_trailers_mutations:
+
+
+response_trailers_mutations
+  (**repeated** :ref:`config.common.mutation_rules.v3.HeaderMutation <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation>`) The response trailer mutations are applied before the response is sent to the downstream client.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.request_trailers_mutations:
+
+
+request_trailers_mutations
+  (**repeated** :ref:`config.common.mutation_rules.v3.HeaderMutation <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation>`) The request trailer mutations are applied before the request is sent to the upstream cluster.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute:
+
+extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute proto] <api/envoy/extensions/filters/http/header_mutation/v3/header_mutation.proto#L39>`
+
+Per route configuration for the header mutation filter.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "mutations": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute.mutations:
+
+
+mutations
+  (:ref:`extensions.filters.http.header_mutation.v3.Mutations <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.Mutations>`) 
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation:
+
+extensions.filters.http.header_mutation.v3.HeaderMutation
+---------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.header_mutation.v3.HeaderMutation proto] <api/envoy/extensions/filters/http/header_mutation/v3/header_mutation.proto#L45>`
+
+Configuration for the header mutation filter. The mutation rules in the filter configuration will
+always be applied first and then the per-route mutation rules, if both are specified.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "mutations": {...},
+    "most_specific_header_mutations_wins": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.header_mutation.v3.HeaderMutation.mutations:
+
+
+mutations
+  (:ref:`extensions.filters.http.header_mutation.v3.Mutations <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.Mutations>`) 
+
+.. _envoy_v3_api_field_extensions.filters.http.header_mutation.v3.HeaderMutation.most_specific_header_mutations_wins:
+
+
+most_specific_header_mutations_wins
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If per route HeaderMutationPerRoute config is configured at multiple route levels, header mutations
+  at all specified levels are evaluated. By default, the order is from most specific (i.e. route entry level)
+  to least specific (i.e. route configuration level). Later header mutations may override earlier mutations.
+
+  This order can be reversed by setting this field to true. In other words, most specific level mutation
+  is evaluated last.
+
+

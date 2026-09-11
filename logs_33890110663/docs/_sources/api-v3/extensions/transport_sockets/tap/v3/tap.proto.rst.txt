@@ -1,0 +1,118 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/tap/v3/tap.proto:
+
+Tap (proto)
+===========
+
+.. _extension_envoy.transport_sockets.tap:
+
+This extension has the qualified name ``envoy.transport_sockets.tap``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.transport_sockets.downstream <extension_category_envoy.transport_sockets.downstream>`
+
+  - :ref:`envoy.transport_sockets.upstream <extension_category_envoy.transport_sockets.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.tap.v3.Tap <envoy_v3_api_msg_extensions.transport_sockets.tap.v3.Tap>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tap.v3.Tap:
+
+extensions.transport_sockets.tap.v3.Tap
+---------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tap.v3.Tap proto] <api/envoy/extensions/transport_sockets/tap/v3/tap.proto#L22>`
+
+Configuration for tap transport socket. This wraps another transport socket, providing the
+ability to interpose and record in plain text any traffic that is surfaced to Envoy.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "common_config": {...},
+    "transport_socket": {...},
+    "socket_tap_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tap.v3.Tap.common_config:
+
+
+common_config
+  (:ref:`extensions.common.tap.v3.CommonExtensionConfig <envoy_v3_api_msg_extensions.common.tap.v3.CommonExtensionConfig>`, *REQUIRED*) Common configuration for the tap transport socket.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tap.v3.Tap.transport_socket:
+
+
+transport_socket
+  (:ref:`config.core.v3.TransportSocket <envoy_v3_api_msg_config.core.v3.TransportSocket>`, *REQUIRED*) The underlying transport socket being wrapped.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tap.v3.Tap.socket_tap_config:
+
+
+socket_tap_config
+  (:ref:`extensions.transport_sockets.tap.v3.SocketTapConfig <envoy_v3_api_msg_extensions.transport_sockets.tap.v3.SocketTapConfig>`) Additional configurations for the transport socket tap
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tap.v3.SocketTapConfig:
+
+extensions.transport_sockets.tap.v3.SocketTapConfig
+---------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tap.v3.SocketTapConfig proto] <api/envoy/extensions/transport_sockets/tap/v3/tap.proto#L38>`
+
+Additional configurations for the transport socket tap
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "set_connection_per_event": ...,
+    "stats_prefix": ...
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tap.v3.SocketTapConfig.set_connection_per_event:
+
+
+set_connection_per_event
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates to whether output the connection information per event
+  This is only applicable if the streamed trace is enabled
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tap.v3.SocketTapConfig.stats_prefix:
+
+
+stats_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The contents of the transport tap's statistics prefix.
+
+

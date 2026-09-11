@@ -1,0 +1,58 @@
+.. _envoy_v3_api_file_envoy/admin/v3/mutex_stats.proto:
+
+MutexStats (proto)
+==================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_admin.v3.MutexStats:
+
+admin.v3.MutexStats
+-------------------
+
+
+:repo:`[admin.v3.MutexStats proto] <api/envoy/admin/v3/mutex_stats.proto#L22>`
+
+Proto representation of the statistics collected upon absl::Mutex contention, if Envoy is run
+under :option:`--enable-mutex-tracing`. For more information, see the ``absl::Mutex``
+`docs <https://abseil.io/about/design/mutex#extra-features>`__.
+
+*NB*: The wait cycles below are measured by ``absl::base_internal::CycleClock``, and may not
+correspond to core clock frequency. For more information, see the ``CycleClock``
+`docs <https://github.com/abseil/abseil-cpp/blob/master/absl/base/internal/cycleclock.h>`__.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "num_contentions": ...,
+    "current_wait_cycles": ...,
+    "lifetime_wait_cycles": ...
+  }
+
+.. _envoy_v3_api_field_admin.v3.MutexStats.num_contentions:
+
+
+num_contentions
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The number of individual mutex contentions which have occurred since startup.
+
+
+.. _envoy_v3_api_field_admin.v3.MutexStats.current_wait_cycles:
+
+
+current_wait_cycles
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The length of the current contention wait cycle.
+
+
+.. _envoy_v3_api_field_admin.v3.MutexStats.lifetime_wait_cycles:
+
+
+lifetime_wait_cycles
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The lifetime total of all contention wait cycles.
+
+

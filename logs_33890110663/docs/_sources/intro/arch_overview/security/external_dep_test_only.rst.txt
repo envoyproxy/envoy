@@ -1,0 +1,29 @@
+External dependencies: ``test_only``
+====================================
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `Apache Thrift <https://thrift.apache.org/>`__, `0.22.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/thrift/0.22.0.envoy/>`__, 2026-07-11, `cpe:2.3:a:apache:thrift:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Aapache%3Athrift%3A%2A&search_type=all>`__, `Apache-2.0 <https://github.com/apache/thrift/blob/v0.22.0.envoy/LICENSE>`__
+  `Aspect Bazel helpers <https://github.com/aspect-build/bazel-lib>`__, `2.22.0 <https://bcr.bazel.build/modules/aspect_bazel_lib/2.22.0/>`__, 2025-09-17, , `Apache-2.0 <https://github.com/aspect-build/bazel-lib/blob/v2.22.0/LICENSE>`__
+  `Benchmark <https://github.com/google/benchmark>`__, `1.9.5 <https://bcr.bazel.build/modules/google_benchmark/1.9.5/>`__, 2026-01-21, , `Apache-2.0 <https://github.com/google/benchmark/blob/v1.9.5/LICENSE>`__
+  `Emscripten SDK <https://github.com/emscripten-core/emsdk>`__, `4.0.23.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/emsdk/4.0.23.envoy/>`__, 2025-03-26, , `Emscripten SDK <https://github.com/emscripten-core/emsdk/blob/4.0.23.envoy/LICENSE>`__
+  `Fuzzing Rules for Bazel <https://github.com/bazelbuild/rules_fuzzing>`__, `0.6.0 <https://bcr.bazel.build/modules/rules_fuzzing/0.6.0/>`__, 2026-04-16, , `Apache-2.0 <https://github.com/bazelbuild/rules_fuzzing/blob/v0.6.0/LICENSE>`__
+  `Google Test <https://github.com/google/googletest>`__, `1.17.0.bcr.2 <https://bcr.bazel.build/modules/googletest/1.17.0.bcr.2/>`__, 2025-04-30, `cpe:2.3:a:google:google_test:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Agoogle%3Agoogle_test%3A%2A&search_type=all>`__, `BSD-3-Clause <https://github.com/google/googletest/blob/1.17.0.bcr.2/LICENSE>`__
+  `libpfm <https://sourceforge.net/projects/perfmon2>`__, `4.11.0.bcr.1 <https://bcr.bazel.build/modules/libpfm/4.11.0.bcr.1/>`__, 2020-09-02, , 
+  `libprotobuf-mutator <https://github.com/google/libprotobuf-mutator>`__, `1.5.bcr.1 <https://bcr.bazel.build/modules/libprotobuf-mutator/1.5.bcr.1/>`__, 2025-04-08, , `Apache-2.0 <https://github.com/google/libprotobuf-mutator/blob/v1.5.bcr.1/LICENSE>`__
+  `Packaging rules for Bazel <https://github.com/bazelbuild/rules_pkg>`__, `1.1.0 <https://bcr.bazel.build/modules/rules_pkg/1.1.0/>`__, 2025-12-03, , `Apache-2.0 <https://github.com/bazelbuild/rules_pkg/blob/1.1.0/LICENSE>`__
+  `Protobuf Rules for Bazel <https://github.com/bazelbuild/rules_proto>`__, `7.1.0 <https://bcr.bazel.build/modules/rules_proto/7.1.0/>`__, 2024-12-18, , `Apache-2.0 <https://github.com/bazelbuild/rules_proto/blob/7.1.0/LICENSE>`__
+  `WebAssembly for Proxies (Rust SDK) <https://github.com/proxy-wasm/proxy-wasm-rust-sdk>`__, `0.2.4-251205-5283e57.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/proxy-wasm-rust-sdk/0.2.4-251205-5283e57.envoy/>`__, 2025-10-01, , `Apache-2.0 <https://github.com/proxy-wasm/proxy-wasm-rust-sdk/blob/v0.2.4-251205-5283e57.envoy/LICENSE>`__
+
+
+envoy.filters.http.aws_request_signing
+--------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `aws-c-auth-testdata <https://github.com/awslabs/aws-c-auth>`__, `0.10.4.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/aws-c-auth-testdata/0.10.4.envoy/>`__, 2026-07-10, , `Apache-2.0 <https://github.com/awslabs/aws-c-auth/blob/v0.10.4.envoy/LICENSE>`__
+

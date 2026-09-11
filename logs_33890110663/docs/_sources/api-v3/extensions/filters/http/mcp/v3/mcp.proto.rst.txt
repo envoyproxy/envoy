@@ -1,0 +1,504 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/mcp/v3/mcp.proto:
+
+MCP (proto)
+===========
+
+.. _extension_envoy.filters.http.mcp:
+
+This extension has the qualified name ``envoy.filters.http.mcp``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp <envoy_v3_api_msg_extensions.filters.http.mcp.v3.Mcp>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.mcp.v3.McpOverride <envoy_v3_api_msg_extensions.filters.http.mcp.v3.McpOverride>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+MCP filter :ref:`configuration overview <config_http_filters_mcp>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp.v3.Mcp:
+
+extensions.filters.http.mcp.v3.Mcp
+----------------------------------
+
+
+:repo:`[extensions.filters.http.mcp.v3.Mcp proto] <api/envoy/extensions/filters/http/mcp/v3/mcp.proto#L24>`
+
+This filter will inspect and get attributes from MCP traffic.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "traffic_mode": ...,
+    "clear_route_cache": ...,
+    "max_request_body_size": {...},
+    "parser_config": {...},
+    "request_storage_mode": ...,
+    "propagate_trace_context": {...},
+    "propagate_baggage": {...},
+    "reject_duplicate_keys": {...},
+    "attribute_source": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.traffic_mode:
+
+
+traffic_mode
+  (:ref:`extensions.filters.http.mcp.v3.Mcp.TrafficMode <envoy_v3_api_enum_extensions.filters.http.mcp.v3.Mcp.TrafficMode>`) Configures how the filter handles non-MCP traffic.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.clear_route_cache:
+
+
+clear_route_cache
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When set to true, the filter will clear the route cache after setting dynamic metadata.
+  This allows the route to be re-selected based on the MCP metadata (e.g., method, params).
+  Defaults to false.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.max_request_body_size:
+
+
+max_request_body_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Maximum size of the request body to buffer for JSON-RPC parsing.
+  Only the first ``max_request_body_size`` bytes are parsed for MCP attribute extraction.
+
+  When the body exceeds this limit:
+  - In ``PASS_THROUGH`` mode: the request is allowed through with an ``is_exceeding_limit`` marker in the dynamic metadata, indicating that the MCP payload was only partially parsed.
+  - In ``REJECT_NO_MCP`` mode: the request is rejected with ``400 Bad Request`` because the complete root JSON object must fit within the size limit.
+
+  It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
+
+  Setting it to 0 would disable the limit. It is not recommended to do so in production.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.parser_config:
+
+
+parser_config
+  (:ref:`extensions.filters.http.mcp.v3.ParserConfig <envoy_v3_api_msg_extensions.filters.http.mcp.v3.ParserConfig>`) Parser configuration, this provide the attribute extraction override.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.request_storage_mode:
+
+
+request_storage_mode
+  (:ref:`extensions.filters.http.mcp.v3.Mcp.RequestStorageMode <envoy_v3_api_enum_extensions.filters.http.mcp.v3.Mcp.RequestStorageMode>`) Where to store parsed MCP request attributes.
+  Controls whether attributes are written to dynamic metadata, filter state, or both.
+  Default is DYNAMIC_METADATA when unspecified.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.propagate_trace_context:
+
+
+propagate_trace_context
+  (:ref:`extensions.filters.http.mcp.v3.Mcp.TraceContextPropagationConfig <envoy_v3_api_msg_extensions.filters.http.mcp.v3.Mcp.TraceContextPropagationConfig>`) If set, extract and validate W3C trace context from the MCP request body
+  (params._meta.traceparent & params._meta.tracestate) and propagate it in HTTP headers
+  ``traceparent`` and ``tracestate`` (respectively).
+
+  The traceparent and tracestate fields are validated and propagated according to the spec at
+  ``https://www.w3.org/TR/trace-context/``.
+
+  If unset (default), do not extract or inject trace context.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.propagate_baggage:
+
+
+propagate_baggage
+  (:ref:`extensions.filters.http.mcp.v3.Mcp.BaggagePropagationConfig <envoy_v3_api_msg_extensions.filters.http.mcp.v3.Mcp.BaggagePropagationConfig>`) Note that this is independent of ``propagate_trace_context``.
+  Also note that if this is set, the downstream request's baggage header will be overwritten if
+  the MCP request body contains a valid baggage field.
+
+  If unset (default), do not extract or inject baggage.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.reject_duplicate_keys:
+
+
+reject_duplicate_keys
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) When true, reject requests that contain duplicate JSON keys at any
+  nesting level. RFC 8259 Section 4 states that names within an object SHOULD be
+  unique. Defaults to false (last-key-wins / last-win).
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.attribute_source:
+
+
+attribute_source
+  (:ref:`extensions.filters.http.mcp.v3.Mcp.AttributeSource <envoy_v3_api_enum_extensions.filters.http.mcp.v3.Mcp.AttributeSource>`) Controls whether MCP request attributes are obtained from the request body
+  or from MCP request headers. Header-based extraction is limited to ``method``
+  and the method-specific identifier carried by ``Mcp-Name``; other configured
+  extraction rules still require body parsing.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp.v3.Mcp.TraceContextPropagationConfig:
+
+extensions.filters.http.mcp.v3.Mcp.TraceContextPropagationConfig
+----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp.v3.Mcp.TraceContextPropagationConfig proto] <api/envoy/extensions/filters/http/mcp/v3/mcp.proto#L74>`
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp.v3.Mcp.BaggagePropagationConfig:
+
+extensions.filters.http.mcp.v3.Mcp.BaggagePropagationConfig
+-----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp.v3.Mcp.BaggagePropagationConfig proto] <api/envoy/extensions/filters/http/mcp/v3/mcp.proto#L78>`
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.mcp.v3.Mcp.TrafficMode:
+
+Enum extensions.filters.http.mcp.v3.Mcp.TrafficMode
+---------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp.v3.Mcp.TrafficMode proto] <api/envoy/extensions/filters/http/mcp/v3/mcp.proto#L26>`
+
+Traffic handling mode for non-MCP traffic.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp.v3.Mcp.TrafficMode.PASS_THROUGH:
+
+
+PASS_THROUGH
+  *(DEFAULT)* ⁣Proxies the HTTP request and response without MCP spec check.
+  This is the default mode.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp.v3.Mcp.TrafficMode.REJECT_NO_MCP:
+
+
+REJECT_NO_MCP
+  ⁣Reject requests that are not following MCP spec.
+  Valid MCP requests are:
+  - POST requests with JSON-RPC 2.0 messages
+  - GET requests for SSE streams (with Accept: text/event-stream)
+  - DELETE requests for session termination (with MCP-Session-Id header)
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp.v3.Mcp.TrafficMode.NOOP:
+
+
+NOOP
+  ⁣Disables MCP processing entirely. The filter performs no inspection,
+  attribute extraction, trace context propagation, or rejection; all
+  traffic is proxied as-is.
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.mcp.v3.Mcp.RequestStorageMode:
+
+Enum extensions.filters.http.mcp.v3.Mcp.RequestStorageMode
+----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp.v3.Mcp.RequestStorageMode proto] <api/envoy/extensions/filters/http/mcp/v3/mcp.proto#L45>`
+
+Where to store parsed MCP request attributes.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp.v3.Mcp.RequestStorageMode.MODE_UNSPECIFIED:
+
+
+MODE_UNSPECIFIED
+  *(DEFAULT)* ⁣Unspecified. Uses default behavior (same as DYNAMIC_METADATA).
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp.v3.Mcp.RequestStorageMode.DYNAMIC_METADATA:
+
+
+DYNAMIC_METADATA
+  ⁣Store request attributes in dynamic metadata only.
+  This is the default behavior.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp.v3.Mcp.RequestStorageMode.FILTER_STATE:
+
+
+FILTER_STATE
+  ⁣Store request attributes in filter state only.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp.v3.Mcp.RequestStorageMode.DYNAMIC_METADATA_AND_FILTER_STATE:
+
+
+DYNAMIC_METADATA_AND_FILTER_STATE
+  ⁣Store request attributes in both dynamic metadata and filter state.
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.mcp.v3.Mcp.AttributeSource:
+
+Enum extensions.filters.http.mcp.v3.Mcp.AttributeSource
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp.v3.Mcp.AttributeSource proto] <api/envoy/extensions/filters/http/mcp/v3/mcp.proto#L61>`
+
+Source used to obtain MCP request attributes.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp.v3.Mcp.AttributeSource.BODY:
+
+
+BODY
+  *(DEFAULT)* ⁣Parse attributes from the request body and ignore MCP attribute headers.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp.v3.Mcp.AttributeSource.VERIFY:
+
+
+VERIFY
+  ⁣Use MCP attribute headers and verify that values parsed from the body agree.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp.v3.Mcp.AttributeSource.HEADERS:
+
+
+HEADERS
+  ⁣Trust MCP attribute headers for ``method`` and the method-specific
+  identifier carried by ``Mcp-Name`` (``params.name``, ``params.uri``, or
+  ``params.taskId``), and avoid parsing the body when nothing else requires it.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp.v3.ParserConfig:
+
+extensions.filters.http.mcp.v3.ParserConfig
+-------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp.v3.ParserConfig proto] <api/envoy/extensions/filters/http/mcp/v3/mcp.proto#L146>`
+
+Parser configuration with method-specific rules.
+This configuration allows overriding the default attribute extraction behavior for specific MCP methods.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "methods": [],
+    "group_metadata_key": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.ParserConfig.methods:
+
+
+methods
+  (**repeated** :ref:`extensions.filters.http.mcp.v3.ParserConfig.MethodConfig <envoy_v3_api_msg_extensions.filters.http.mcp.v3.ParserConfig.MethodConfig>`) List of rules for classification and extraction.
+  Rules are evaluated in order; the first match wins.
+  If no rule matches, extraction defaults are used and group falls back to built-in classification.
+  Built-in groups: lifecycle, tool, resource, prompt, notification, logging, sampling, completion, unknown.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.ParserConfig.group_metadata_key:
+
+
+group_metadata_key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The dynamic metadata key where the group name will be stored.
+  If empty, group classification is disabled.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp.v3.ParserConfig.AttributeExtractionRule:
+
+extensions.filters.http.mcp.v3.ParserConfig.AttributeExtractionRule
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp.v3.ParserConfig.AttributeExtractionRule proto] <api/envoy/extensions/filters/http/mcp/v3/mcp.proto#L148>`
+
+A single attribute extraction rule.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "path": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.ParserConfig.AttributeExtractionRule.path:
+
+
+path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) JSON path to extract (e.g., "params.name", "params.uri").
+  The path is a dot-separated string representing the location of the field in the JSON payload.
+  For example, "params.name" extracts the "name" field from the "params" object.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp.v3.ParserConfig.MethodConfig:
+
+extensions.filters.http.mcp.v3.ParserConfig.MethodConfig
+--------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp.v3.ParserConfig.MethodConfig proto] <api/envoy/extensions/filters/http/mcp/v3/mcp.proto#L156>`
+
+Configuration for a specific MCP method.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "method": ...,
+    "group": ...,
+    "extraction_rules": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.ParserConfig.MethodConfig.method:
+
+
+method
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Method name (e.g., "tools/call", "resources/read", "initialize").
+  This matches the "method" field in the JSON-RPC request.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.ParserConfig.MethodConfig.group:
+
+
+group
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The group/category name to assign to this method (e.g., "tool", "lifecycle").
+  This will be emitted to dynamic metadata under the key specified by group_metadata_key.
+  If empty, the built-in group classification is used.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.ParserConfig.MethodConfig.extraction_rules:
+
+
+extraction_rules
+  (**repeated** :ref:`extensions.filters.http.mcp.v3.ParserConfig.AttributeExtractionRule <envoy_v3_api_msg_extensions.filters.http.mcp.v3.ParserConfig.AttributeExtractionRule>`) Attributes to extract for this method.
+  If empty, only default attributes (jsonrpc, method) are extracted.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp.v3.McpOverride:
+
+extensions.filters.http.mcp.v3.McpOverride
+------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp.v3.McpOverride proto] <api/envoy/extensions/filters/http/mcp/v3/mcp.proto#L184>`
+
+Per-route override configuration for MCP filter
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "traffic_mode": ...,
+    "max_request_body_size": {...},
+    "clear_route_cache": ...,
+    "parser_config": {...},
+    "request_storage_mode": ...,
+    "reject_duplicate_keys": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.McpOverride.traffic_mode:
+
+
+traffic_mode
+  (:ref:`extensions.filters.http.mcp.v3.Mcp.TrafficMode <envoy_v3_api_enum_extensions.filters.http.mcp.v3.Mcp.TrafficMode>`) Overrides the global traffic mode for this route.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.McpOverride.max_request_body_size:
+
+
+max_request_body_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Optional per-route max request body size override.
+  When set, this overrides the global max_request_body_size for this route.
+  It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.McpOverride.clear_route_cache:
+
+
+clear_route_cache
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Overrides the global clear_route_cache setting for this route.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.McpOverride.parser_config:
+
+
+parser_config
+  (:ref:`extensions.filters.http.mcp.v3.ParserConfig <envoy_v3_api_msg_extensions.filters.http.mcp.v3.ParserConfig>`) Overrides the global parser config for this route.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.McpOverride.request_storage_mode:
+
+
+request_storage_mode
+  (:ref:`extensions.filters.http.mcp.v3.Mcp.RequestStorageMode <envoy_v3_api_enum_extensions.filters.http.mcp.v3.Mcp.RequestStorageMode>`) Overrides the global request storage mode for this route.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp.v3.McpOverride.reject_duplicate_keys:
+
+
+reject_duplicate_keys
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Overrides the global reject_duplicate_keys setting for this route.
+
+

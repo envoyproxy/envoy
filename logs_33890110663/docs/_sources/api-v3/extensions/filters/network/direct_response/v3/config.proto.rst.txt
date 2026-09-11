@@ -1,0 +1,63 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/direct_response/v3/config.proto:
+
+Direct response (proto)
+=======================
+
+.. _extension_envoy.filters.network.direct_response:
+
+This extension has the qualified name ``envoy.filters.network.direct_response``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config <envoy_v3_api_msg_extensions.filters.network.direct_response.v3.Config>`
+
+
+
+Direct response :ref:`configuration overview <config_network_filters_direct_response>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.direct_response.v3.Config:
+
+extensions.filters.network.direct_response.v3.Config
+----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.direct_response.v3.Config proto] <api/envoy/extensions/filters/network/direct_response/v3/config.proto#L19>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "response": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.direct_response.v3.Config.response:
+
+
+response
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) Response data as a data source.
+
+

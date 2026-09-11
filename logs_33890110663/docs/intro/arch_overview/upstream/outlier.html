@@ -1,0 +1,509 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Outlier detection &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Circuit breaking" href="circuit_breaking.html" />
+    <link rel="prev" title="MCP multi cluster" href="mcp_multicluster.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../http/http.html">HTTP</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="upstream.html">Upstream clusters</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="cluster_manager.html">Cluster manager</a></li>
+<li class="toctree-l4"><a class="reference internal" href="service_discovery.html">Service discovery</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dns_resolution.html">DNS Resolution</a></li>
+<li class="toctree-l4"><a class="reference internal" href="health_checking.html">Health checking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="connection_pooling.html">Connection pooling</a></li>
+<li class="toctree-l4"><a class="reference internal" href="load_balancing/load_balancing.html">Load Balancing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aggregate_cluster.html">Aggregate Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="composite_cluster.html">Composite cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="mcp_multicluster.html">MCP multi cluster</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Outlier detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="circuit_breaking.html">Circuit breaking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="upstream_filters.html">Upstream network filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="load_reporting_service.html">Load Reporting Service (LRS)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="load_balancing_policies.html">Load balancing policies</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../observability/observability.html">Observability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../security/security.html">Security</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced/advanced.html">Advanced</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="upstream.html">Upstream clusters</a></li>
+      <li class="breadcrumb-item active">Outlier detection</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/intro/arch_overview/upstream/outlier.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="outlier-detection">
+<span id="arch-overview-outlier-detection"></span><h1>Outlier detection<a class="headerlink" href="#outlier-detection" title="Link to this heading"></a></h1>
+<p>Outlier detection and ejection is the process of dynamically determining whether some number of
+hosts in an upstream cluster are performing unlike the others and removing them from the healthy
+<a class="reference internal" href="load_balancing/overview.html#arch-overview-load-balancing"><span class="std std-ref">load balancing</span></a> set. Performance might be along different axes
+such as consecutive failures, temporal success rate, temporal latency, etc. Outlier detection is a
+form of <em>passive</em> health checking. Envoy also supports <a class="reference internal" href="health_checking.html#arch-overview-health-checking"><span class="std std-ref">active health checking</span></a>. <em>Passive</em> and <em>active</em> health checking can be enabled together or
+independently, and form the basis for an overall upstream health checking solution.
+Outlier detection is part of the <a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-msg-config-cluster-v3-outlierdetection"><span class="std std-ref">cluster configuration</span></a>
+and it needs filters to report errors, timeouts, and resets. Currently, the following filters support
+outlier detection: <a class="reference internal" href="../../../configuration/http/http_filters/router_filter.html#config-http-filters-router"><span class="std std-ref">http router</span></a>,
+<a class="reference internal" href="../../../configuration/listeners/network_filters/tcp_proxy_filter.html#config-network-filters-tcp-proxy"><span class="std std-ref">tcp proxy</span></a>,
+<a class="reference internal" href="../../../configuration/listeners/network_filters/redis_proxy_filter.html#config-network-filters-redis-proxy"><span class="std std-ref">redis proxy</span></a> and <a class="reference internal" href="../../../configuration/listeners/network_filters/thrift_proxy_filter.html#config-network-filters-thrift-proxy"><span class="std std-ref">thrift proxy</span></a>.</p>
+<p>Detected errors fall into two categories: externally and locally originated errors. Externally generated errors
+are transaction specific and occur on the upstream server in response to the received request. For example, an HTTP server returning error code 500 or a redis server returning a payload which cannot be decoded. Those errors are generated on the upstream host after Envoy has connected to it successfully.
+Locally originated errors are generated by Envoy in response to an event which interrupted or prevented communication with the upstream host. Examples of locally originated errors are timeout, TCP reset, inability to connect to a specified port, etc.</p>
+<p>The type of detected errors depends on the filter type. The <a class="reference internal" href="../../../configuration/http/http_filters/router_filter.html#config-http-filters-router"><span class="std std-ref">http router</span></a> filter, for example,
+detects locally originated errors (timeouts, resets - errors related to connection to upstream host) and because it
+also understands the HTTP protocol it reports
+errors returned by the HTTP server (externally generated errors). In such a scenario, even when the connection to the upstream HTTP server is successful,
+the transaction with the server may fail.
+By contrast, the <a class="reference internal" href="../../../configuration/listeners/network_filters/tcp_proxy_filter.html#config-network-filters-tcp-proxy"><span class="std std-ref">tcp proxy</span></a> filter does not understand any protocol above
+the TCP layer and reports only locally originated errors.</p>
+<p>Under the default configuration (<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-split-external-local-origin-errors"><span class="std std-ref">outlier_detection.split_external_local_origin_errors</span></a> is <em>false</em>)
+locally originated errors are not distinguished from externally generated (transaction) errors, all end up
+in the same bucket, and are compared against the
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-consecutive-5xx"><span class="std std-ref">outlier_detection.consecutive_5xx</span></a>,
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-consecutive-gateway-failure"><span class="std std-ref">outlier_detection.consecutive_gateway_failure</span></a> and
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-success-rate-stdev-factor"><span class="std std-ref">outlier_detection.success_rate_stdev_factor</span></a>
+configuration items. For example, if connection to an upstream HTTP server fails twice because of timeout and
+then, after successful connection establishment, the server returns error code 500 then the total error count will be 3.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For TCP traffic, <a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-consecutive-5xx"><span class="std std-ref">outlier_detection.consecutive_5xx</span></a>
+is the correct parameter to set and transparently maps to TCP connection failures.</p>
+</div>
+<p>Outlier detection may also be configured to distinguish locally originated errors from externally originated (transaction) errors.
+It is done via the
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-split-external-local-origin-errors"><span class="std std-ref">outlier_detection.split_external_local_origin_errors</span></a> configuration item.
+In that mode locally originated errors are tracked by separate counters than externally originated
+(transaction) errors and
+the outlier detector may be configured to react to locally originated errors and ignore externally originated errors
+or vice-versa.</p>
+<p>It is important to understand that a cluster may be shared among several filter chains. If one filter chain
+ejects a host based on its outlier detection type, other filter chains will be also affected even though their
+outlier detection type would not have ejected that host.</p>
+<section id="ejection-algorithm">
+<span id="arch-overview-outlier-detection-algorithm"></span><h2>Ejection algorithm<a class="headerlink" href="#ejection-algorithm" title="Link to this heading"></a></h2>
+<p>Depending on the type of outlier detection, ejection either runs inline (for example in the case of
+consecutive 5xx) or at a specified interval (for example in the case of periodic success rate). The
+ejection algorithm works as follows:</p>
+<ol class="arabic simple">
+<li><p>A host is determined to be an outlier.</p></li>
+<li><p>It checks to make sure the number of ejected hosts is below the allowed threshold (specified via the
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-max-ejection-percent"><span class="std std-ref">outlier_detection.max_ejection_percent</span></a>
+setting). If the number of ejected hosts is above the threshold, the host is not ejected.</p></li>
+<li><p>The host is ejected for some number of milliseconds. Ejection means that the host is marked
+unhealthy and will not be used during load balancing unless the load balancer is in a
+<a class="reference internal" href="load_balancing/panic_threshold.html#arch-overview-load-balancing-panic-threshold"><span class="std std-ref">panic</span></a> scenario. The number of milliseconds
+is equal to the <a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-base-ejection-time"><span class="std std-ref">outlier_detection.base_ejection_time</span></a> value
+multiplied by the number of times the host has been ejected in a row. This causes hosts to get ejected
+for longer and longer periods if they continue to fail. When ejection time reaches
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-max-ejection-time"><span class="std std-ref">outlier_detection.max_ejection_time</span></a> it does not increase any more.
+When the host becomes healthy, the ejection time
+multiplier decreases with time. The host’s health is checked at intervals equal to
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-interval"><span class="std std-ref">outlier_detection.interval</span></a>.
+If the host is healthy during that check, the ejection time multiplier is decremented. Assuming that the host stays healthy
+it would take approximately <a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-max-ejection-time"><span class="std std-ref">outlier_detection.max_ejection_time</span></a> /
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-base-ejection-time"><span class="std std-ref">outlier_detection.base_ejection_time</span></a> *
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-interval"><span class="std std-ref">outlier_detection.interval</span></a> seconds to bring down the ejection time to the minimum
+value <a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-base-ejection-time"><span class="std std-ref">outlier_detection.base_ejection_time</span></a>.</p></li>
+<li><p>An ejected host will automatically be brought back into service after the ejection time has
+been satisfied. Generally, outlier detection is used alongside <a class="reference internal" href="health_checking.html#arch-overview-health-checking"><span class="std std-ref">active health checking</span></a> for a comprehensive health checking solution.</p></li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If <a class="reference internal" href="health_checking.html#arch-overview-health-checking"><span class="std std-ref">active health checking</span></a> is also configured, a successful active health check unejects the host and
+clears all outlier detection counters. If the host has not reached <a class="reference internal" href="../../../api-v3/config/core/v3/health_check.proto.html#envoy-v3-api-field-config-core-v3-healthcheck-unhealthy-threshold"><span class="std std-ref">unhealthy_threshold</span></a>
+failed health checks yet, a single successful health check will uneject the host. If the FAILED_ACTIVE_HC health flag is set for the host,
+<a class="reference internal" href="../../../api-v3/config/core/v3/health_check.proto.html#envoy-v3-api-field-config-core-v3-healthcheck-healthy-threshold"><span class="std std-ref">healthy_threshold</span></a> consecutive successful health checks
+will uneject the host (and clear the FAILED_ACTIVE_HC flag).
+If your active health check is not validating data plane traffic then in situations where
+active health checking passes but the traffic is failing, the endpoint will be unejected prematurely. To disable this option then set
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-successful-active-health-check-uneject-host"><span class="std std-ref">outlier_detection.successful_active_health_check_uneject_host</span></a>
+configuration flag to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p>
+</div>
+</section>
+<section id="detection-types">
+<h2>Detection types<a class="headerlink" href="#detection-types" title="Link to this heading"></a></h2>
+<p>Envoy supports the following outlier detection types:</p>
+<section id="consecutive-5xx">
+<h3>Consecutive 5xx<a class="headerlink" href="#consecutive-5xx" title="Link to this heading"></a></h3>
+<p>In the default mode (<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-split-external-local-origin-errors"><span class="std std-ref">outlier_detection.split_external_local_origin_errors</span></a> is <em>false</em>) this detection type takes into account all generated errors: locally
+originated and externally originated (transaction) errors.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Errors generated by non-HTTP filters, like <a class="reference internal" href="../../../configuration/listeners/network_filters/tcp_proxy_filter.html#config-network-filters-tcp-proxy"><span class="std std-ref">tcp proxy</span></a> or
+<a class="reference internal" href="../../../configuration/listeners/network_filters/redis_proxy_filter.html#config-network-filters-redis-proxy"><span class="std std-ref">redis proxy</span></a> are internally mapped to HTTP 5xx codes and
+treated as such.</p>
+</div>
+<p>In split mode (<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-split-external-local-origin-errors"><span class="std std-ref">outlier_detection.split_external_local_origin_errors</span></a> is <em>true</em>) this detection type takes into account only externally originated (transaction) errors, ignoring locally originated errors.
+If an upstream host is an HTTP-server, only 5xx types of error are taken into account (see <a class="reference internal" href="#consecutive-gateway-failure"><span class="std std-ref">Consecutive Gateway Failure</span></a> for exceptions).
+For redis servers, served via
+<a class="reference internal" href="../../../configuration/listeners/network_filters/redis_proxy_filter.html#config-network-filters-redis-proxy"><span class="std std-ref">redis proxy</span></a> only malformed responses from the server are taken into account.
+Properly formatted responses, even when they carry an operational error (like index not found, access denied) are not taken into account.</p>
+<p>If an upstream host returns some number of errors which are treated as consecutive 5xx type errors, it will be ejected.
+The number of consecutive 5xx required for ejection is controlled by
+the <a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-consecutive-5xx"><span class="std std-ref">outlier_detection.consecutive_5xx</span></a> value.</p>
+</section>
+<section id="consecutive-gateway-failure">
+<span id="id1"></span><h3>Consecutive Gateway Failure<a class="headerlink" href="#consecutive-gateway-failure" title="Link to this heading"></a></h3>
+<p>In the default mode (<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-split-external-local-origin-errors"><span class="std std-ref">outlier_detection.split_external_local_origin_errors</span></a> is <em>false</em>) this detection type takes into account a subset of 5xx errors, called “gateway errors” (502, 503 or 504 status code) and local origin failures, such as timeout, TCP reset etc.</p>
+<p>In split mode (<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-split-external-local-origin-errors"><span class="std std-ref">outlier_detection.split_external_local_origin_errors</span></a> is <em>true</em>) this detection type takes into account a subset of 5xx errors, called “gateway errors” (502, 503 or 504 status code) and is supported only by the <a class="reference internal" href="../../../configuration/http/http_filters/router_filter.html#config-http-filters-router"><span class="std std-ref">http router</span></a>.</p>
+<p>If an upstream host returns some number of consecutive “gateway errors” (502, 503 or 504 status
+code), it will be ejected.
+The number of consecutive gateway failures required for ejection is controlled by
+the <a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-consecutive-gateway-failure"><span class="std std-ref">outlier_detection.consecutive_gateway_failure</span></a> value.</p>
+</section>
+<section id="consecutive-local-origin-failure">
+<h3>Consecutive Local Origin Failure<a class="headerlink" href="#consecutive-local-origin-failure" title="Link to this heading"></a></h3>
+<p>This detection type is enabled only when <a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-split-external-local-origin-errors"><span class="std std-ref">outlier_detection.split_external_local_origin_errors</span></a> is <em>true</em> and takes into account only locally originated errors (timeout, reset, etc).
+If Envoy repeatedly cannot connect to an upstream host or communication with the upstream host is repeatedly interrupted, it will be ejected.
+Various locally originated problems are detected: timeout, TCP reset, ICMP errors, etc. The number of consecutive
+locally originated failures required for ejection is controlled
+by the <a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-consecutive-local-origin-failure"><span class="std std-ref">outlier_detection.consecutive_local_origin_failure</span></a> value.
+This detection type is supported by <a class="reference internal" href="../../../configuration/http/http_filters/router_filter.html#config-http-filters-router"><span class="std std-ref">http router</span></a>,
+<a class="reference internal" href="../../../configuration/listeners/network_filters/tcp_proxy_filter.html#config-network-filters-tcp-proxy"><span class="std std-ref">tcp proxy</span></a>  and <a class="reference internal" href="../../../configuration/listeners/network_filters/redis_proxy_filter.html#config-network-filters-redis-proxy"><span class="std std-ref">redis proxy</span></a>.</p>
+</section>
+<section id="success-rate">
+<h3>Success Rate<a class="headerlink" href="#success-rate" title="Link to this heading"></a></h3>
+<p>Success Rate based outlier detection aggregates success rate data from every host in a cluster. Then at given
+intervals ejects hosts based on statistical outlier detection. Success Rate outlier detection will not be
+calculated for a host if its request volume over the aggregation interval is less than the
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-success-rate-request-volume"><span class="std std-ref">outlier_detection.success_rate_request_volume</span></a>
+value. Moreover, detection will not be performed for a cluster if the number of hosts
+with the minimum required request volume in an interval is less than the
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-success-rate-minimum-hosts"><span class="std std-ref">outlier_detection.success_rate_minimum_hosts</span></a>
+value.</p>
+<p>In the default configuration mode (<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-split-external-local-origin-errors"><span class="std std-ref">outlier_detection.split_external_local_origin_errors</span></a> is <em>false</em>)
+this detection type takes into account all types of errors: locally and externally originated. The
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-enforcing-local-origin-success-rate"><span class="std std-ref">outlier_detection.enforcing_local_origin_success</span></a> config item is ignored.</p>
+<p>In split mode (<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-split-external-local-origin-errors"><span class="std std-ref">outlier_detection.split_external_local_origin_errors</span></a> is <em>true</em>),
+locally originated errors and externally originated (transaction) errors are counted and treated separately.
+Most configuration items, namely
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-success-rate-minimum-hosts"><span class="std std-ref">outlier_detection.success_rate_minimum_hosts</span></a>,
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-success-rate-request-volume"><span class="std std-ref">outlier_detection.success_rate_request_volume</span></a>,
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-success-rate-stdev-factor"><span class="std std-ref">outlier_detection.success_rate_stdev_factor</span></a> apply to both
+types of errors, but <a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-enforcing-success-rate"><span class="std std-ref">outlier_detection.enforcing_success_rate</span></a> applies
+to externally originated errors only and <a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-enforcing-local-origin-success-rate"><span class="std std-ref">outlier_detection.enforcing_local_origin_success_rate</span></a>  applies to locally originated errors only.</p>
+</section>
+<section id="failure-percentage">
+<span id="arch-overview-outlier-detection-failure-percentage"></span><h3>Failure Percentage<a class="headerlink" href="#failure-percentage" title="Link to this heading"></a></h3>
+<p>Failure Percentage based outlier detection functions similarly to success rate detection, in
+that it relies on success rate data from each host in a cluster. However, rather than compare those
+values to the mean success rate of the cluster as a whole, they are compared to a flat
+user-configured threshold. This threshold is configured via the
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-failure-percentage-threshold"><span class="std std-ref">outlier_detection.failure_percentage_threshold</span></a>
+field.</p>
+<p>The other configuration fields for failure percentage based detection are similar to the fields for
+success rate detection. Failure percentage based detection also obeys
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-split-external-local-origin-errors"><span class="std std-ref">outlier_detection.split_external_local_origin_errors</span></a>;
+the enforcement percentages for externally- and locally-originated errors are controlled by
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-enforcing-failure-percentage"><span class="std std-ref">outlier_detection.enforcing_failure_percentage</span></a>
+and
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-enforcing-failure-percentage-local-origin"><span class="std std-ref">outlier_detection.enforcing_failure_percentage_local_origin</span></a>,
+respectively. As with success rate detection, detection will not be performed for a host if its
+request volume over the aggregation interval is less than the
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-failure-percentage-request-volume"><span class="std std-ref">outlier_detection.failure_percentage_request_volume</span></a>
+value. Detection also will not be performed for a cluster if the number of hosts with the minimum
+required request volume in an interval is less than the
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-failure-percentage-minimum-hosts"><span class="std std-ref">outlier_detection.failure_percentage_minimum_hosts</span></a>
+value.</p>
+</section>
+<section id="degraded-host-detection">
+<h3>Degraded Host Detection<a class="headerlink" href="#degraded-host-detection" title="Link to this heading"></a></h3>
+<p>Degraded host detection is enabled by setting
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-detect-degraded-hosts"><span class="std std-ref">outlier_detection.detect_degraded_hosts</span></a>
+to <code class="docutils literal notranslate"><span class="pre">true</span></code>. When enabled, hosts that return
+the <code class="docutils literal notranslate"><span class="pre">x-envoy-degraded</span></code> header are marked as degraded. Unlike ejected hosts, degraded hosts
+remain in the load balancing rotation but are deprioritized, only receiving traffic when there
+are insufficient healthy hosts available. For more information about how degraded endpoints are
+handled during load balancing, see <a class="reference internal" href="load_balancing/degraded.html#arch-overview-load-balancing-degraded"><span class="std std-ref">degraded endpoints</span></a>.</p>
+<p>When a host is marked as degraded, it remains in that state for a period calculated
+using the same backoff algorithm as ejection, and automatically cleared after this period expires.</p>
+</section>
+</section>
+<section id="error-mapping">
+<span id="arch-overview-outlier-detection-error-mapping"></span><h2>Error Mapping<a class="headerlink" href="#error-mapping" title="Link to this heading"></a></h2>
+<p>By default outlier detection understands only HTTP status codes. Responses’ status codes 5xx are threated as
+errors and any other codes are treated as success. If there is a need to treat a response in different way,
+mapping is required. Currently the following mappings are available:</p>
+<section id="grpc">
+<h3>gRPC<a class="headerlink" href="#grpc" title="Link to this heading"></a></h3>
+<p>For gRPC requests, the outlier detection will use the HTTP status mapped from the <a class="reference external" href="https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses">grpc-status</a> response header.</p>
+</section>
+<section id="http">
+<h3>HTTP<a class="headerlink" href="#http" title="Link to this heading"></a></h3>
+<p>If there is a need to redefine whether a response should be treated as error, it can be done by configuring
+<a class="reference internal" href="../../../api-v3/extensions/upstreams/http/v3/http_protocol_options.proto.html#envoy-v3-api-field-extensions-upstreams-http-v3-httpprotocoloptions-outlier-detection"><span class="std std-ref">outlier_detection</span></a> section in cluster’s <a class="reference internal" href="../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-typed-extension-protocol-options"><span class="std std-ref">extension_protocol_options</span></a>. If a response matches the matcher, it is reported to outlier detection as code 5xx (error). If the response does not match the matcher, it is forwarded to the outlier detection as code 200 (success).</p>
+</section>
+</section>
+<section id="ejection-event-logging">
+<span id="arch-overview-outlier-detection-logging"></span><h2>Ejection event logging<a class="headerlink" href="#ejection-event-logging" title="Link to this heading"></a></h2>
+<p>A log of outlier ejection events can optionally be produced by Envoy. This is extremely useful
+during daily operations since global stats do not provide enough information on which hosts are
+being ejected and for what reasons. The log is structured as protobuf-based dumps of
+<a class="reference internal" href="../../../api-v3/data/cluster/v3/outlier_detection_event.proto.html#envoy-v3-api-msg-data-cluster-v3-outlierdetectionevent"><span class="std std-ref">OutlierDetectionEvent messages</span></a>.
+Ejection event logging is configured in the Cluster manager <a class="reference internal" href="../../../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-clustermanager-outlier-detection"><span class="std std-ref">outlier detection configuration</span></a>.</p>
+</section>
+<section id="configuration-reference">
+<h2>Configuration reference<a class="headerlink" href="#configuration-reference" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Cluster manager <a class="reference internal" href="../../../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-clustermanager-outlier-detection"><span class="std std-ref">global configuration</span></a></p></li>
+<li><p>Per cluster <a class="reference internal" href="../../../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-msg-config-cluster-v3-outlierdetection"><span class="std std-ref">configuration</span></a></p></li>
+<li><p>Runtime <a class="reference internal" href="../../../configuration/upstream/cluster_manager/cluster_runtime.html#config-cluster-manager-cluster-runtime-outlier-detection"><span class="std std-ref">settings</span></a></p></li>
+<li><p>Statistics <a class="reference internal" href="../../../configuration/upstream/cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats-outlier-detection"><span class="std std-ref">reference</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="mcp_multicluster.html" class="btn btn-neutral float-left" title="MCP multi cluster" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="circuit_breaking.html" class="btn btn-neutral float-right" title="Circuit breaking" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Outlier detection</a><ul>
+<li><a class="reference internal" href="#ejection-algorithm">Ejection algorithm</a></li>
+<li><a class="reference internal" href="#detection-types">Detection types</a><ul>
+<li><a class="reference internal" href="#consecutive-5xx">Consecutive 5xx</a></li>
+<li><a class="reference internal" href="#consecutive-gateway-failure">Consecutive Gateway Failure</a></li>
+<li><a class="reference internal" href="#consecutive-local-origin-failure">Consecutive Local Origin Failure</a></li>
+<li><a class="reference internal" href="#success-rate">Success Rate</a></li>
+<li><a class="reference internal" href="#failure-percentage">Failure Percentage</a></li>
+<li><a class="reference internal" href="#degraded-host-detection">Degraded Host Detection</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#error-mapping">Error Mapping</a><ul>
+<li><a class="reference internal" href="#grpc">gRPC</a></li>
+<li><a class="reference internal" href="#http">HTTP</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#ejection-event-logging">Ejection event logging</a></li>
+<li><a class="reference internal" href="#configuration-reference">Configuration reference</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

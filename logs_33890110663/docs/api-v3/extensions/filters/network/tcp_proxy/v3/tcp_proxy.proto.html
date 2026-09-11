@@ -1,0 +1,791 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TCP Proxy (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../../../_static/favicon.ico"/>
+      <script src="../../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+    <link rel="next" title="Thrift Proxy Route Configuration (proto)" href="../../thrift_proxy/v3/route.proto.html" />
+    <link rel="prev" title="TCP Bandwidth Limit (proto)" href="../../tcp_bandwidth_limit/v3/tcp_bandwidth_limit.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../../../searchindex.js"
+          data-envoy-search-page="../../../../../../search.html"
+          data-envoy-root="../../../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../../config/config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../../config/filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/filter.html">Filters</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/network/network.html">Network filters</a></li>
+      <li class="breadcrumb-item active">TCP Proxy (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../../_sources/api-v3/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="tcp-proxy-proto">
+<span id="envoy-v3-api-file-envoy-extensions-filters-network-tcp-proxy-v3-tcp-proxy-proto"></span><h1>TCP Proxy (proto)<a class="headerlink" href="#tcp-proxy-proto" title="Link to this heading"></a></h1>
+<p id="extension-envoy-filters-network-tcp-proxy">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.filters.network.tcp_proxy</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension is intended to be robust against untrusted downstream traffic. It
+assumes that the upstream is trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension category:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../health_checkers/thrift/v3/thrift.proto.html#extension-category-envoy-filters-network"><span class="std std-ref">envoy.filters.network</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-tcp-proxy-v3-tcpproxy"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy</span></a></p></li>
+</ul>
+</div>
+<p>TCP Proxy <a class="reference internal" href="../../../../../../configuration/listeners/network_filters/tcp_proxy_filter.html#config-network-filters-tcp-proxy"><span class="std std-ref">configuration overview</span></a>.</p>
+<section id="extensions-filters-network-tcp-proxy-v3-tcpproxy">
+<span id="envoy-v3-api-msg-extensions-filters-network-tcp-proxy-v3-tcpproxy"></span><h2>extensions.filters.network.tcp_proxy.v3.TcpProxy<a class="headerlink" href="#extensions-filters-network-tcp-proxy-v3-tcpproxy" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L84">[extensions.filters.network.tcp_proxy.v3.TcpProxy proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;stat_prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;weighted_clusters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;on_demand&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;metadata_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;idle_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;access_log&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;max_connect_attempts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;backoff_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;hash_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;tunneling_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_downstream_connection_duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_downstream_connection_duration_jitter_percentage&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;access_log_flush_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;flush_access_log_on_connected&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;access_log_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;proxy_protocol_tlvs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;proxy_protocol_tlv_merge_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upstream_connect_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max_early_data_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;check_drain_close&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-stat-prefix">
+<dt>stat_prefix</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The prefix to use when emitting <a class="reference internal" href="../../../../../../configuration/listeners/network_filters/tcp_proxy_filter.html#config-network-filters-tcp-proxy-stats"><span class="std std-ref">statistics</span></a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-cluster">
+<dt>cluster</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The upstream cluster to connect to.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-cluster"><span class="std std-ref">cluster</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-weighted-clusters"><span class="std std-ref">weighted_clusters</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-weighted-clusters">
+<dt>weighted_clusters</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster"><span class="std std-ref">extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster</span></a>) Multiple upstream clusters can be specified. The request is routed to one of the upstream clusters
+based on the weights assigned to each cluster.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-cluster"><span class="std std-ref">cluster</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-weighted-clusters"><span class="std std-ref">weighted_clusters</span></a> must be set.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-on-demand">
+<dt>on_demand</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-tcp-proxy-v3-tcpproxy-ondemand"><span class="std std-ref">extensions.filters.network.tcp_proxy.v3.TcpProxy.OnDemand</span></a>) The on demand policy for the upstream cluster.
+It applies to both
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-cluster"><span class="std std-ref">TcpProxy.cluster</span></a>
+and
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-weighted-clusters"><span class="std std-ref">TcpProxy.weighted_clusters</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-metadata-match">
+<dt>metadata_match</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-metadata"><span class="std std-ref">config.core.v3.Metadata</span></a>) Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints
+in the upstream cluster with metadata matching what is set in this field will be considered
+for load balancing. The filter name should be specified as <code class="docutils literal notranslate"><span class="pre">envoy.lb</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-idle-timeout">
+<dt>idle_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The idle timeout for connections managed by the TCP proxy filter. The idle timeout is defined as the
+period in which there are no bytes sent or received on either the upstream or downstream connection.
+If not set, the default idle timeout is 1 hour. If set to <code class="docutils literal notranslate"><span class="pre">0s</span></code>, the timeout is disabled.
+It is possible to dynamically override this configuration by setting a per-connection filter state
+object for the key <code class="docutils literal notranslate"><span class="pre">envoy.tcp_proxy.per_connection_idle_timeout_ms</span></code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Disabling this timeout is likely to yield connection leaks due to lost TCP FIN packets, etc.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-access-log">
+<dt>access_log</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/accesslog/v3/accesslog.proto.html#envoy-v3-api-msg-config-accesslog-v3-accesslog"><span class="std std-ref">config.accesslog.v3.AccessLog</span></a>) Configuration for <a class="reference internal" href="../../../../../../intro/arch_overview/observability/access_logging.html#arch-overview-access-logs"><span class="std std-ref">access logs</span></a> emitted by this TCP proxy.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-max-connect-attempts">
+<dt>max_connect_attempts</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The maximum number of unsuccessful connection attempts that will be made before
+giving up. If the parameter is not specified, 1 connection attempt will be made.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-backoff-options">
+<dt>backoff_options</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/backoff.proto.html#envoy-v3-api-msg-config-core-v3-backoffstrategy"><span class="std std-ref">config.core.v3.BackoffStrategy</span></a>) Sets the backoff strategy. If not set, the retries are performed without backoff.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-hash-policy">
+<dt>hash_policy</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../type/v3/hash_policy.proto.html#envoy-v3-api-msg-type-v3-hashpolicy"><span class="std std-ref">type.v3.HashPolicy</span></a>) Optional configuration for TCP proxy hash policy. If hash_policy is not set, the hash-based
+load balancing algorithms will select a host randomly. Currently the number of hash policies is
+limited to 1.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunneling-config">
+<dt>tunneling_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig"><span class="std std-ref">extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig</span></a>) If set, this configures tunneling, for example configuration options to tunnel TCP payload over
+HTTP CONNECT. If this message is absent, the payload is proxied upstream as usual.
+It is possible to dynamically override this configuration and disable tunneling per connection by
+setting a per-connection filter state object for the key <code class="docutils literal notranslate"><span class="pre">envoy.tcp_proxy.disable_tunneling</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-max-downstream-connection-duration">
+<dt>max_downstream_connection_duration</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The maximum duration of a connection. The duration is defined as the period since a connection was
+established. If not set, there is no maximum duration. When <code class="docutils literal notranslate"><span class="pre">max_downstream_connection_duration</span></code> is
+reached, the connection is closed. The duration must be at least <code class="docutils literal notranslate"><span class="pre">1ms</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-max-downstream-connection-duration-jitter-percentage">
+<dt>max_downstream_connection_duration_jitter_percentage</dt><dd><p>(<a class="reference internal" href="../../../../../type/v3/percent.proto.html#envoy-v3-api-msg-type-v3-percent"><span class="std std-ref">type.v3.Percent</span></a>) Percentage-based jitter for <code class="docutils literal notranslate"><span class="pre">max_downstream_connection_duration</span></code>. The jitter increases the
+<code class="docutils literal notranslate"><span class="pre">max_downstream_connection_duration</span></code> by a random duration up to the provided percentage.
+This field is ignored if <code class="docutils literal notranslate"><span class="pre">max_downstream_connection_duration</span></code> is not set. If not set, no jitter
+is added.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-access-log-flush-interval">
+<dt>access_log_flush_interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) If both this field and <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tcpaccesslogoptions-access-log-flush-interval"><span class="std std-ref">access_log_flush_interval</span></a>
+are specified, the former (deprecated field) is ignored.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>This field is deprecated in favor of
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tcpaccesslogoptions-access-log-flush-interval"><span class="std std-ref">access_log_flush_interval</span></a>.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-flush-access-log-on-connected">
+<dt>flush_access_log_on_connected</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If both this field and <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tcpaccesslogoptions-flush-access-log-on-connected"><span class="std std-ref">flush_access_log_on_connected</span></a>
+are specified, the former (deprecated field) is ignored.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>This field is deprecated in favor of
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tcpaccesslogoptions-flush-access-log-on-connected"><span class="std std-ref">flush_access_log_on_connected</span></a>.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-access-log-options">
+<dt>access_log_options</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-tcp-proxy-v3-tcpproxy-tcpaccesslogoptions"><span class="std std-ref">extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions</span></a>) Additional access log options for the TCP proxy.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-proxy-protocol-tlvs">
+<dt>proxy_protocol_tlvs</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/core/v3/proxy_protocol.proto.html#envoy-v3-api-msg-config-core-v3-tlventry"><span class="std std-ref">config.core.v3.TlvEntry</span></a>) TLVs to add to the PROXY protocol header sent upstream. Behavior when PROXY protocol
+state already exists (e.g., downstream TLVs from proxy_protocol listener filter) is
+controlled by <code class="docutils literal notranslate"><span class="pre">proxy_protocol_tlv_merge_policy</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To ensure the TLVs are allowed upstream, configure passthrough TLVs on the upstream
+proxy protocol transport. See <a class="reference internal" href="../../../../../config/core/v3/proxy_protocol.proto.html#envoy-v3-api-field-config-core-v3-proxyprotocolconfig-pass-through-tlvs"><span class="std std-ref">core.v3.ProxyProtocolConfig.pass_through_tlvs</span></a> for details.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-proxy-protocol-tlv-merge-policy">
+<dt>proxy_protocol_tlv_merge_policy</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-filters-network-tcp-proxy-v3-proxyprotocoltlvmergepolicy"><span class="std std-ref">extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy</span></a>) Specifies how TLVs in <code class="docutils literal notranslate"><span class="pre">proxy_protocol_tlvs</span></code> are merged with existing PROXY protocol state
+(e.g., downstream TLVs from the proxy_protocol listener filter). See
+<a class="reference internal" href="#envoy-v3-api-enum-extensions-filters-network-tcp-proxy-v3-proxyprotocoltlvmergepolicy"><span class="std std-ref">ProxyProtocolTlvMergePolicy</span></a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-upstream-connect-mode">
+<dt>upstream_connect_mode</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-filters-network-tcp-proxy-v3-upstreamconnectmode"><span class="std std-ref">extensions.filters.network.tcp_proxy.v3.UpstreamConnectMode</span></a>) Specifies when to establish the upstream connection.</p>
+<p>When not specified, defaults to <code class="docutils literal notranslate"><span class="pre">IMMEDIATE</span></code> for backward compatibility.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Server-first protocols (e.g., SMTP, MySQL, POP3) require <code class="docutils literal notranslate"><span class="pre">IMMEDIATE</span></code> mode.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-max-early-data-bytes">
+<dt>max_early_data_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Maximum bytes of early data to buffer from the downstream connection before
+the upstream connection is established.</p>
+<p>If not set, the TCP proxy will read-disable the downstream connection until the
+upstream connection is established (legacy behavior).</p>
+<p>If set, enables <code class="docutils literal notranslate"><span class="pre">receive_before_connect</span></code> mode where the filter allows the filter
+chain to read downstream data before the upstream connection exists. The data is
+buffered and forwarded once the upstream connection is ready. When the buffer exceeds
+this limit, the downstream connection is read-disabled to prevent excessive memory usage.</p>
+<p>This field is required when <code class="docutils literal notranslate"><span class="pre">upstream_connect_mode</span></code> is not <code class="docutils literal notranslate"><span class="pre">IMMEDIATE</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Use this carefully with server-first protocols. The upstream may send data before
+receiving anything from downstream, which could fill the early data buffer.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-check-drain-close">
+<dt>check_drain_close</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, the TCP proxy checks if the downstream connection was marked as drained
+after each read or write. When drain close is requested for the listener’s traffic direction,
+the downstream connection is closed with <code class="docutils literal notranslate"><span class="pre">FlushWrite</span></code>.</p>
+<p>This is disabled by default for backward compatibility.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster">
+<span id="envoy-v3-api-msg-extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster"></span><h2>extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster<a class="headerlink" href="#extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L90">[extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster proto]</a></p>
+<p>Allows specification of multiple upstream clusters along with weights indicating the percentage of
+traffic forwarded to each cluster. The cluster selection is based on these weights.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;clusters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster-clusters">
+<dt>clusters</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster-clusterweight"><span class="std std-ref">extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight</span></a>, <em>REQUIRED</em>) Specifies the upstream clusters associated with this configuration.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster-clusterweight">
+<span id="envoy-v3-api-msg-extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster-clusterweight"></span><h2>extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight<a class="headerlink" href="#extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster-clusterweight" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L94">[extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;weight&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metadata_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster-clusterweight-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) Name of the upstream cluster.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster-clusterweight-weight">
+<dt>weight</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) When a request matches the route, the choice of an upstream cluster is
+determined by its weight. The sum of weights across all entries in the
+clusters array determines the total weight.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster-clusterweight-metadata-match">
+<dt>metadata_match</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-metadata"><span class="std std-ref">config.core.v3.Metadata</span></a>) Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints
+in the upstream cluster with metadata matching what is set in this field will be considered
+for load balancing. Note that this will be merged with what’s provided in
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-metadata-match"><span class="std std-ref">TcpProxy.metadata_match</span></a>, with values
+here taking precedence. The filter name should be specified as <code class="docutils literal notranslate"><span class="pre">envoy.lb</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig">
+<span id="envoy-v3-api-msg-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig"></span><h2>extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig<a class="headerlink" href="#extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L123">[extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig proto]</a></p>
+<p>Configuration for tunneling TCP over other transports or application layers.
+Tunneling is supported over HTTP/1.1 and HTTP/2. The upstream protocol is
+determined by the cluster configuration.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;hostname&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;use_post&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;headers_to_add&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;propagate_response_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;post_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;propagate_response_trailers&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;request_id_extension&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;request_id_header&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;request_id_metadata_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;formatters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig-hostname">
+<dt>hostname</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The hostname to send in the synthesized CONNECT headers to the upstream proxy.
+This field evaluates command operators if present; otherwise, the value is used as-is.</p>
+<p>For example, dynamically set the hostname using downstream SNI:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tunneling_config</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">hostname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%REQUESTED_SERVER_NAME%:443&quot;</span>
+</pre></div>
+</div>
+<p>For example, dynamically set the hostname using dynamic metadata:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tunneling_config</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">hostname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%DYNAMIC_METADATA(tunnel:address)%&quot;</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig-use-post">
+<dt>use_post</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Use the <code class="docutils literal notranslate"><span class="pre">POST</span></code> method instead of the <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> method to tunnel the TCP stream.
+The <code class="docutils literal notranslate"><span class="pre">protocol:</span> <span class="pre">bytestream</span></code> header is not set for HTTP/2 to comply with the specification.</p>
+<p>The upstream proxy is expected to interpret the POST payload as raw TCP.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig-headers-to-add">
+<dt>headers_to_add</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-headervalueoption"><span class="std std-ref">config.core.v3.HeaderValueOption</span></a>) Additional request headers to send to the upstream proxy. This is mainly used to
+trigger the upstream to convert POST requests back to CONNECT requests.</p>
+<p>Neither <code class="docutils literal notranslate"><span class="pre">:</span></code>-prefixed pseudo-headers like <code class="docutils literal notranslate"><span class="pre">:path</span></code> nor the <code class="docutils literal notranslate"><span class="pre">host</span></code> header can be overridden.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig-propagate-response-headers">
+<dt>propagate_response_headers</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Save response headers to the downstream connection’s filter state for consumption
+by network filters. The filter state key is <code class="docutils literal notranslate"><span class="pre">envoy.tcp_proxy.propagate_response_headers</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig-post-path">
+<dt>post_path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The path used with the POST method. The default path is <code class="docutils literal notranslate"><span class="pre">/</span></code>. If this field is specified and
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig-use-post"><span class="std std-ref">use_post field</span></a>
+is not set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, the configuration will be rejected.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig-propagate-response-trailers">
+<dt>propagate_response_trailers</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Save response trailers to the downstream connection’s filter state for consumption
+by network filters. The filter state key is <code class="docutils literal notranslate"><span class="pre">envoy.tcp_proxy.propagate_response_trailers</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig-request-id-extension">
+<dt>request_id_extension</dt><dd><p>(<a class="reference internal" href="../../http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-msg-extensions-filters-network-http-connection-manager-v3-requestidextension"><span class="std std-ref">extensions.filters.network.http_connection_manager.v3.RequestIDExtension</span></a>) The configuration of the request ID extension used for generation, validation, and
+associated tracing operations when tunneling.</p>
+<p>If this field is set, a request ID is generated using the specified extension. If
+this field is not set, no request ID is generated.</p>
+<p>When a request ID is generated, it is also stored in the downstream connection’s
+dynamic metadata under the namespace <code class="docutils literal notranslate"><span class="pre">envoy.filters.network.tcp_proxy</span></code> with the key
+<code class="docutils literal notranslate"><span class="pre">tunnel_request_id</span></code> to allow emission from TCP proxy access logs via the
+<code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:tunnel_request_id)%</span></code> formatter.</p>
+<div class="admonition tip" id="extension-category-envoy-request-id">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../request_id/uuid/v3/uuid.proto.html#extension-envoy-request-id-uuid"><span class="std std-ref">envoy.request_id.uuid</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig-request-id-header">
+<dt>request_id_header</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The request header name to use for emitting the generated request ID on the tunneling
+HTTP request.</p>
+<p>If not specified or set to an empty string, the default header name <code class="docutils literal notranslate"><span class="pre">x-request-id</span></code> is
+used.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This setting does not alter the internal request ID handling elsewhere in Envoy and
+only controls the header emitted on the tunneling request.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig-request-id-metadata-key">
+<dt>request_id_metadata_key</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The dynamic metadata key to use when storing the generated request ID. The metadata is
+stored under the namespace <code class="docutils literal notranslate"><span class="pre">envoy.filters.network.tcp_proxy</span></code>.</p>
+<p>If not specified or set to an empty string, the default key <code class="docutils literal notranslate"><span class="pre">tunnel_request_id</span></code> is used.
+This enables customizing the key used by access log formatters such as
+<code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:&lt;key&gt;)%</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig-formatters">
+<dt>formatters</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Specifies a collection of Formatter plugins that can be used in substitution formatters
+in <code class="docutils literal notranslate"><span class="pre">headers_to_add</span></code>.
+See the formatters extensions documentation for details.</p>
+<div class="admonition tip" id="extension-category-envoy-formatter">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../formatter/cel/v3/cel.proto.html#extension-envoy-formatter-cel"><span class="std std-ref">envoy.formatter.cel</span></a></p></li>
+<li><p><a class="reference internal" href="../../../../formatter/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-formatter-dynamic-modules"><span class="std std-ref">envoy.formatter.dynamic_modules</span></a></p></li>
+<li><p><a class="reference internal" href="../../../../formatter/file_content/v3/file_content.proto.html#extension-envoy-formatter-file-content"><span class="std std-ref">envoy.formatter.file_content</span></a></p></li>
+<li><p><a class="reference internal" href="../../../../formatter/generic_secret/v3/generic_secret.proto.html#extension-envoy-formatter-generic-secret"><span class="std std-ref">envoy.formatter.generic_secret</span></a></p></li>
+<li><p><a class="reference internal" href="../../../../formatter/metadata/v3/metadata.proto.html#extension-envoy-formatter-metadata"><span class="std std-ref">envoy.formatter.metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../../../../formatter/req_without_query/v3/req_without_query.proto.html#extension-envoy-formatter-req-without-query"><span class="std std-ref">envoy.formatter.req_without_query</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-tcp-proxy-v3-tcpproxy-ondemand">
+<span id="envoy-v3-api-msg-extensions-filters-network-tcp-proxy-v3-tcpproxy-ondemand"></span><h2>extensions.filters.network.tcp_proxy.v3.TcpProxy.OnDemand<a class="headerlink" href="#extensions-filters-network-tcp-proxy-v3-tcpproxy-ondemand" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L211">[extensions.filters.network.tcp_proxy.v3.TcpProxy.OnDemand proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;odcds_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-ondemand-odcds-config">
+<dt>odcds_config</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">config.core.v3.ConfigSource</span></a>) Optional configuration for the on-demand cluster discovery service.
+If not specified, on-demand cluster discovery is disabled. When specified, the filter pauses a request
+to an unknown cluster and begins a cluster discovery process. When discovery completes (successfully
+or not), the request is resumed.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-tcp-proxy-v3-tcpproxy-tcpaccesslogoptions">
+<span id="envoy-v3-api-msg-extensions-filters-network-tcp-proxy-v3-tcpproxy-tcpaccesslogoptions"></span><h2>extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions<a class="headerlink" href="#extensions-filters-network-tcp-proxy-v3-tcpproxy-tcpaccesslogoptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L228">[extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;access_log_flush_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;flush_access_log_on_connected&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;flush_access_log_on_start&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tcpaccesslogoptions-access-log-flush-interval">
+<dt>access_log_flush_interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The interval for flushing access logs. By default, the TCP proxy flushes a single access log when the
+connection is closed. If this field is set, the TCP proxy flushes access logs periodically at the
+specified interval.
+The interval must be at least 1ms.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tcpaccesslogoptions-flush-access-log-on-connected">
+<dt>flush_access_log_on_connected</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, the access log is flushed when the TCP proxy successfully establishes a
+connection with the upstream. If the connection fails, the access log is not flushed.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-tcpaccesslogoptions-flush-access-log-on-start">
+<dt>flush_access_log_on_start</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, the access log is flushed when the TCP proxy accepts a connection.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-filters-network-tcp-proxy-v3-upstreamconnectmode">
+<span id="envoy-v3-api-enum-extensions-filters-network-tcp-proxy-v3-upstreamconnectmode"></span><h2>Enum extensions.filters.network.tcp_proxy.v3.UpstreamConnectMode<a class="headerlink" href="#enum-extensions-filters-network-tcp-proxy-v3-upstreamconnectmode" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L33">[extensions.filters.network.tcp_proxy.v3.UpstreamConnectMode proto]</a></p>
+<p>Specifies when the TCP proxy establishes the upstream connection.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-tcp-proxy-v3-upstreamconnectmode-immediate">
+<dt>IMMEDIATE</dt><dd><p><em>(DEFAULT)</em> ⁣Establish the upstream connection immediately when the downstream connection is accepted.
+This is the default behavior and provides the lowest latency.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-enum-value-extensions-filters-network-tcp-proxy-v3-upstreamconnectmode-on-downstream-data">
+<dt>ON_DOWNSTREAM_DATA</dt><dd><p>⁣Wait for initial data from the downstream connection before establishing the upstream connection.
+This allows preceding filters to inspect the initial data (e.g., extracting SNI from TLS ClientHello)
+before the upstream connection is established.</p>
+<p>This mode requires <code class="docutils literal notranslate"><span class="pre">max_early_data_bytes</span></code> to be set.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This mode is not suitable for server-first protocols (e.g., SMTP, MySQL, POP3) where the
+server sends the initial greeting. For such protocols, use <code class="docutils literal notranslate"><span class="pre">IMMEDIATE</span></code> mode.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-enum-value-extensions-filters-network-tcp-proxy-v3-upstreamconnectmode-on-downstream-tls-handshake">
+<dt>ON_DOWNSTREAM_TLS_HANDSHAKE</dt><dd><p>⁣Wait for the downstream TLS handshake to complete before establishing the upstream connection.
+This allows access to the full TLS connection information, including client certificates
+and negotiated parameters, which can be used for routing decisions or passed as metadata
+to the upstream.</p>
+<p>This mode requires <code class="docutils literal notranslate"><span class="pre">max_early_data_bytes</span></code> to be set (can be zero to disable buffering).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This mode is only effective when the downstream connection uses TLS. For non-TLS
+connections, it behaves the same as <code class="docutils literal notranslate"><span class="pre">IMMEDIATE</span></code>.</p>
+</div>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-filters-network-tcp-proxy-v3-proxyprotocoltlvmergepolicy">
+<span id="envoy-v3-api-enum-extensions-filters-network-tcp-proxy-v3-proxyprotocoltlvmergepolicy"></span><h2>Enum extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy<a class="headerlink" href="#enum-extensions-filters-network-tcp-proxy-v3-proxyprotocoltlvmergepolicy" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto#L64">[extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy proto]</a></p>
+<p>Specifies how TLVs in <code class="docutils literal notranslate"><span class="pre">proxy_protocol_tlvs</span></code> are merged with existing PROXY protocol state
+(e.g., downstream TLVs parsed by the proxy_protocol listener filter).</p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-tcp-proxy-v3-proxyprotocoltlvmergepolicy-add-if-absent">
+<dt>ADD_IF_ABSENT</dt><dd><p><em>(DEFAULT)</em> ⁣Add configured TLVs only if no PROXY protocol state exists (e.g., no downstream TLVs).
+If state exists, ignore configured TLVs and use only the existing TLVs.
+This is the default for backward compatibility.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-tcp-proxy-v3-proxyprotocoltlvmergepolicy-overwrite-by-type-if-exists-or-add">
+<dt>OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD</dt><dd><p>⁣Overwrite existing TLVs (e.g., downstream TLVs) by type with configured TLVs.
+Non-conflicting TLVs from both sources are preserved.
+If no state exists, add all configured TLVs.
+Source/destination addresses from existing state are preserved.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-tcp-proxy-v3-proxyprotocoltlvmergepolicy-append-if-exists-or-add">
+<dt>APPEND_IF_EXISTS_OR_ADD</dt><dd><p>⁣Append configured TLVs to existing TLVs (e.g., downstream TLVs), preserving all TLVs
+from both sources (PROXY protocol v2 allows duplicate types).
+If no state exists, add all configured TLVs.
+Source/destination addresses from existing state are preserved.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../tcp_bandwidth_limit/v3/tcp_bandwidth_limit.proto.html" class="btn btn-neutral float-left" title="TCP Bandwidth Limit (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../thrift_proxy/v3/route.proto.html" class="btn btn-neutral float-right" title="Thrift Proxy Route Configuration (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">TCP Proxy (proto)</a><ul>
+<li><a class="reference internal" href="#extensions-filters-network-tcp-proxy-v3-tcpproxy">extensions.filters.network.tcp_proxy.v3.TcpProxy</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster">extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-tcp-proxy-v3-tcpproxy-weightedcluster-clusterweight">extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-tcp-proxy-v3-tcpproxy-tunnelingconfig">extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-tcp-proxy-v3-tcpproxy-ondemand">extensions.filters.network.tcp_proxy.v3.TcpProxy.OnDemand</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-tcp-proxy-v3-tcpproxy-tcpaccesslogoptions">extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions</a></li>
+<li><a class="reference internal" href="#enum-extensions-filters-network-tcp-proxy-v3-upstreamconnectmode">Enum extensions.filters.network.tcp_proxy.v3.UpstreamConnectMode</a></li>
+<li><a class="reference internal" href="#enum-extensions-filters-network-tcp-proxy-v3-proxyprotocoltlvmergepolicy">Enum extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

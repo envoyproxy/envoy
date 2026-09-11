@@ -1,0 +1,238 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.proto:
+
+Dubbo Proxy (proto)
+===================
+
+.. _extension_envoy.filters.network.dubbo_proxy:
+
+This extension has the qualified name ``envoy.filters.network.dubbo_proxy``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.dubbo_proxy.v3.DubboProxy <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.DubboProxy>`
+
+
+
+Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.Drds:
+
+extensions.filters.network.dubbo_proxy.v3.Drds
+----------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.v3.Drds proto] <api/envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.proto#L37>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config_source": {...},
+    "route_config_name": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.Drds.config_source:
+
+
+config_source
+  (:ref:`config.core.v3.ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`, *REQUIRED*) Configuration source specifier.
+  In case of ``api_config_source`` only aggregated ``api_type`` is supported.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.Drds.route_config_name:
+
+
+route_config_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of the multiple route configuration. This allows to use different multiple route
+  configurations. Tells which multiple route configuration should be fetched from the configuration
+  source. Leave unspecified is also valid and means the unnamed multiple route configuration.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.DubboProxy:
+
+extensions.filters.network.dubbo_proxy.v3.DubboProxy
+----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.v3.DubboProxy proto] <api/envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.proto#L49>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "protocol_type": ...,
+    "serialization_type": ...,
+    "route_config": [],
+    "drds": {...},
+    "multiple_route_config": {...},
+    "dubbo_filters": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The human readable prefix to use when emitting statistics.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.protocol_type:
+
+
+protocol_type
+  (:ref:`extensions.filters.network.dubbo_proxy.v3.ProtocolType <envoy_v3_api_enum_extensions.filters.network.dubbo_proxy.v3.ProtocolType>`) Configure the protocol used.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.serialization_type:
+
+
+serialization_type
+  (:ref:`extensions.filters.network.dubbo_proxy.v3.SerializationType <envoy_v3_api_enum_extensions.filters.network.dubbo_proxy.v3.SerializationType>`) Configure the serialization protocol used.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.route_config:
+
+
+route_config
+  (**repeated** :ref:`extensions.filters.network.dubbo_proxy.v3.RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.RouteConfiguration>`) The route table for the connection manager is static and is specified in this property.
+
+  .. note::
+
+    This field is deprecated. Please use ``drds`` or ``multiple_route_config`` first.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds:
+
+
+drds
+  (:ref:`extensions.filters.network.dubbo_proxy.v3.Drds <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.Drds>`) Use xDS to fetch the route configuration. It is invalid to define both ``route_config`` and ``drds``.
+
+
+  
+
+  Only one of :ref:`drds <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>`, :ref:`multiple_route_config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.multiple_route_config>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.multiple_route_config:
+
+
+multiple_route_config
+  (:ref:`extensions.filters.network.dubbo_proxy.v3.MultipleRouteConfiguration <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.MultipleRouteConfiguration>`) 
+  
+
+  Only one of :ref:`drds <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>`, :ref:`multiple_route_config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.multiple_route_config>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.dubbo_filters:
+
+
+dubbo_filters
+  (**repeated** :ref:`extensions.filters.network.dubbo_proxy.v3.DubboFilter <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.DubboFilter>`) A list of individual Dubbo filters that make up the filter chain for requests made to the
+  Dubbo proxy. Order matters as the filters are processed sequentially. For backwards
+  compatibility, if no dubbo_filters are specified, a default Dubbo router filter
+  (``envoy.filters.dubbo.router``) is used.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.DubboFilter:
+
+extensions.filters.network.dubbo_proxy.v3.DubboFilter
+-----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.v3.DubboFilter proto] <api/envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.proto#L85>`
+
+DubboFilter configures a Dubbo filter.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboFilter.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the filter to instantiate. The name must match a supported
+  filter.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboFilter.config:
+
+
+config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) Filter specific configuration which depends on the filter being
+  instantiated. See the supported filters for further documentation.
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.dubbo_proxy.v3.ProtocolType:
+
+Enum extensions.filters.network.dubbo_proxy.v3.ProtocolType
+-----------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.v3.ProtocolType proto] <api/envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.proto#L26>`
+
+Dubbo Protocol types supported by Envoy.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.dubbo_proxy.v3.ProtocolType.Dubbo:
+
+
+Dubbo
+  *(DEFAULT)* ⁣the default protocol.
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.dubbo_proxy.v3.SerializationType:
+
+Enum extensions.filters.network.dubbo_proxy.v3.SerializationType
+----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.v3.SerializationType proto] <api/envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.proto#L32>`
+
+Dubbo Serialization types supported by Envoy.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.dubbo_proxy.v3.SerializationType.Hessian2:
+
+
+Hessian2
+  *(DEFAULT)* ⁣the default serialization protocol.
+
+

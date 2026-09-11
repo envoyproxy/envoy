@@ -1,0 +1,53 @@
+.. _envoy_v3_api_file_envoy/type/matcher/v3/number.proto:
+
+Number matcher (proto)
+======================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.DoubleMatcher:
+
+type.matcher.v3.DoubleMatcher
+-----------------------------
+
+
+:repo:`[type.matcher.v3.DoubleMatcher proto] <api/envoy/type/matcher/v3/number.proto#L19>`
+
+Specifies the way to match a double value.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "range": {...},
+    "exact": ...
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.DoubleMatcher.range:
+
+
+range
+  (:ref:`type.v3.DoubleRange <envoy_v3_api_msg_type.v3.DoubleRange>`) If specified, the input double value must be in the range specified here.
+  Note: The range is using half-open interval semantics [start, end).
+
+
+  
+
+  Precisely one of :ref:`range <envoy_v3_api_field_type.matcher.v3.DoubleMatcher.range>`, :ref:`exact <envoy_v3_api_field_type.matcher.v3.DoubleMatcher.exact>` must be set.
+
+.. _envoy_v3_api_field_type.matcher.v3.DoubleMatcher.exact:
+
+
+exact
+  (`double <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If specified, the input double value must be equal to the value specified here.
+
+
+  
+
+  Precisely one of :ref:`range <envoy_v3_api_field_type.matcher.v3.DoubleMatcher.range>`, :ref:`exact <envoy_v3_api_field_type.matcher.v3.DoubleMatcher.exact>` must be set.
+

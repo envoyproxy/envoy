@@ -1,0 +1,165 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/stateful_session/v3/stateful_session.proto:
+
+Stateful session filter (proto)
+===============================
+
+.. _extension_envoy.filters.http.stateful_session:
+
+This extension has the qualified name ``envoy.filters.http.stateful_session``
+
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute>`
+
+
+
+Stateful session :ref:`configuration overview <config_http_filters_stateful_session>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession:
+
+extensions.filters.http.stateful_session.v3.StatefulSession
+-----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.stateful_session.v3.StatefulSession proto] <api/envoy/extensions/filters/http/stateful_session/v3/stateful_session.proto#L19>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "session_state": {...},
+    "strict": ...,
+    "stat_prefix": ...,
+    "status_on_strict_destination_not_found": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.session_state:
+
+
+session_state
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Specifies the implementation of session state. This session state is used to store and retrieve the address of the
+  upstream host assigned to the session.
+
+
+
+  .. _extension_category_envoy.http.stateful_session:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.http.stateful_session.cookie <extension_envoy.http.stateful_session.cookie>`
+
+    - :ref:`envoy.http.stateful_session.envelope <extension_envoy.http.stateful_session.envelope>`
+
+    - :ref:`envoy.http.stateful_session.header <extension_envoy.http.stateful_session.header>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.strict:
+
+
+strict
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Determines whether the HTTP request must be strictly routed to the requested destination. When set to ``true``,
+  if the requested destination is not found in the set of available endpoints, Envoy will return a status code
+  determined by ``status_on_strict_destination_not_found``. If the destination exists but is unhealthy, Envoy will
+  always return ``503`` regardless of ``status_on_strict_destination_not_found``. The default value is ``false``,
+  which allows Envoy to fall back to its load balancing mechanism and route the request according to the load
+  balancing algorithm.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional stat prefix. If specified, the filter will emit statistics in the
+  ``http.<stat_prefix>.stateful_session.<stat_prefix>.`` namespace. If not specified, no statistics will be emitted.
+
+  .. note::
+
+    Per-route configuration overrides do not support statistics and will not emit stats even if this field is set
+    in the per-route config.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.status_on_strict_destination_not_found:
+
+
+status_on_strict_destination_not_found
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The HTTP status code to return when ``strict`` mode is enabled and the requested destination
+  is not found in the set of available endpoints. This does not apply when the destination exists
+  but is unhealthy. This field has no effect when ``strict`` is set to ``false`` and will be
+  ignored. Defaults to ``503`` (Service Unavailable) if not specified or set to ``0``.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute:
+
+extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute proto] <api/envoy/extensions/filters/http/stateful_session/v3/stateful_session.proto#L50>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "disabled": ...,
+    "stateful_session": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute.disabled:
+
+
+disabled
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Disable the stateful session filter for this particular vhost or route. If disabled is
+  specified in multiple per-filter-configs, the most specific one will be used.
+
+
+  
+
+  Precisely one of :ref:`disabled <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute.disabled>`, :ref:`stateful_session <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute.stateful_session>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute.stateful_session:
+
+
+stateful_session
+  (:ref:`extensions.filters.http.stateful_session.v3.StatefulSession <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>`) Per-route stateful session configuration that can be served by RDS or static route table.
+
+
+  
+
+  Precisely one of :ref:`disabled <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute.disabled>`, :ref:`stateful_session <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute.stateful_session>` must be set.
+

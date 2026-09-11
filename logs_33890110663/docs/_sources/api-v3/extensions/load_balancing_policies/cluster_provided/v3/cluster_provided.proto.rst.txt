@@ -1,0 +1,55 @@
+.. _envoy_v3_api_file_envoy/extensions/load_balancing_policies/cluster_provided/v3/cluster_provided.proto:
+
+Cluster Provided Load Balancing Policy (proto)
+==============================================
+
+.. _extension_envoy.load_balancing_policies.cluster_provided:
+
+This extension has the qualified name ``envoy.load_balancing_policies.cluster_provided``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.load_balancing_policies <extension_category_envoy.load_balancing_policies>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided <envoy_v3_api_msg_extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided:
+
+extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided proto] <api/envoy/extensions/load_balancing_policies/cluster_provided/v3/cluster_provided.proto#L22>`
+
+The cluster provided load balancing policy allows cluster to specify its own load balancing.
+If this extension is configured, the target cluster must provide load balancer when the cluster
+is created.
+
+.. note::
+  Cluster provided load balancing policy could not be used as sub-policy of other hierarchical
+  load balancing policies, such as subset load balancing policy.
+
+
+
+

@@ -1,0 +1,201 @@
+.. _envoy_v3_api_file_xds/type/matcher/v3/range.proto:
+
+Range matcher (proto)
+=====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Int64RangeMatcher:
+
+.xds.type.matcher.v3.Int64RangeMatcher
+--------------------------------------
+
+
+`[.xds.type.matcher.v3.Int64RangeMatcher proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/range.proto#L18>`_
+
+Specifies a set of ranges for matching an int64 number and the associated
+match actions.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "range_matchers": []
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Int64RangeMatcher.range_matchers:
+
+
+range_matchers
+  (**repeated** :ref:`.xds.type.matcher.v3.Int64RangeMatcher.RangeMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.Int64RangeMatcher.RangeMatcher>`) Match a number by a list of number ranges. If multiple ranges contain the
+  input number, then the first action in this list is taken.
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Int64RangeMatcher.RangeMatcher:
+
+.xds.type.matcher.v3.Int64RangeMatcher.RangeMatcher
+---------------------------------------------------
+
+
+`[.xds.type.matcher.v3.Int64RangeMatcher.RangeMatcher proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/range.proto#L20>`_
+
+Specifies a list of number ranges and a match action.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ranges": [],
+    "on_match": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Int64RangeMatcher.RangeMatcher.ranges:
+
+
+ranges
+  (**repeated** :ref:`.xds.type.v3.Int64Range <envoy_v3_api_msg_.xds.type.v3.Int64Range>`, *REQUIRED*) A non-empty set of int64 ranges.
+
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Int64RangeMatcher.RangeMatcher.on_match:
+
+
+on_match
+  (:ref:`.xds.type.matcher.v3.Matcher.OnMatch <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.OnMatch>`) Match action to apply when the input number is within one of the ranges.
+
+
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Int32RangeMatcher:
+
+.xds.type.matcher.v3.Int32RangeMatcher
+--------------------------------------
+
+
+`[.xds.type.matcher.v3.Int32RangeMatcher proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/range.proto#L36>`_
+
+Specifies a set of ranges for matching an int32 number and the associated
+match actions.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "range_matchers": []
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Int32RangeMatcher.range_matchers:
+
+
+range_matchers
+  (**repeated** :ref:`.xds.type.matcher.v3.Int32RangeMatcher.RangeMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.Int32RangeMatcher.RangeMatcher>`) Match a number by a list of number ranges. If multiple ranges contain the
+  input number, then the first action in this list is taken.
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Int32RangeMatcher.RangeMatcher:
+
+.xds.type.matcher.v3.Int32RangeMatcher.RangeMatcher
+---------------------------------------------------
+
+
+`[.xds.type.matcher.v3.Int32RangeMatcher.RangeMatcher proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/range.proto#L38>`_
+
+Specifies a list of number ranges and a match action.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ranges": [],
+    "on_match": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Int32RangeMatcher.RangeMatcher.ranges:
+
+
+ranges
+  (**repeated** :ref:`.xds.type.v3.Int32Range <envoy_v3_api_msg_.xds.type.v3.Int32Range>`, *REQUIRED*) A non-empty set of int32 ranges.
+
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Int32RangeMatcher.RangeMatcher.on_match:
+
+
+on_match
+  (:ref:`.xds.type.matcher.v3.Matcher.OnMatch <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.OnMatch>`) Match action to apply when the input number is within one of the ranges.
+
+
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.DoubleRangeMatcher:
+
+.xds.type.matcher.v3.DoubleRangeMatcher
+---------------------------------------
+
+
+`[.xds.type.matcher.v3.DoubleRangeMatcher proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/range.proto#L54>`_
+
+Specifies a set of ranges for matching a double number and the associated
+match actions.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "range_matchers": []
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.DoubleRangeMatcher.range_matchers:
+
+
+range_matchers
+  (**repeated** :ref:`.xds.type.matcher.v3.DoubleRangeMatcher.RangeMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.DoubleRangeMatcher.RangeMatcher>`) Match a number by a list of number ranges. If multiple ranges contain the
+  input number, then the first action in this list is taken.
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.DoubleRangeMatcher.RangeMatcher:
+
+.xds.type.matcher.v3.DoubleRangeMatcher.RangeMatcher
+----------------------------------------------------
+
+
+`[.xds.type.matcher.v3.DoubleRangeMatcher.RangeMatcher proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/range.proto#L56>`_
+
+Specifies a list of number ranges and a match action.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ranges": [],
+    "on_match": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.DoubleRangeMatcher.RangeMatcher.ranges:
+
+
+ranges
+  (**repeated** :ref:`.xds.type.v3.DoubleRange <envoy_v3_api_msg_.xds.type.v3.DoubleRange>`, *REQUIRED*) A non-empty set of double ranges.
+
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.DoubleRangeMatcher.RangeMatcher.on_match:
+
+
+on_match
+  (:ref:`.xds.type.matcher.v3.Matcher.OnMatch <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.OnMatch>`) Match action to apply when the input number is within one of the ranges.
+
+
+

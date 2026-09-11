@@ -1,0 +1,84 @@
+.. _envoy_v3_api_file_envoy/type/v3/scope.proto:
+
+Scope (proto)
+=============
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.v3.Scope:
+
+type.v3.Scope
+-------------
+
+
+:repo:`[type.v3.Scope proto] <api/envoy/type/v3/scope.proto#L20>`
+
+Stats scope configuration.
+This configuration can be used to create a singleton scope that is shared
+across multiple instances within the process.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_counters": {...},
+    "max_gauges": {...},
+    "max_histograms": {...},
+    "enable_eviction": ...,
+    "prefix": ...,
+    "sharing_name": ...
+  }
+
+.. _envoy_v3_api_field_type.v3.Scope.max_counters:
+
+
+max_counters
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Max number of counters allowed in this scope.
+
+
+.. _envoy_v3_api_field_type.v3.Scope.max_gauges:
+
+
+max_gauges
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Max number of gauges allowed in this scope.
+
+
+.. _envoy_v3_api_field_type.v3.Scope.max_histograms:
+
+
+max_histograms
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Max number of histograms allowed in this scope.
+
+
+.. _envoy_v3_api_field_type.v3.Scope.enable_eviction:
+
+
+enable_eviction
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether the scope and its stats can be evicted from the store caches.
+  The eviction policy is a mark-and-sweep approach where stats are evicted
+  if they are not updated or accessed between two successive eviction sweeps.
+  The eviction will happen only if the :ref:`stats_eviction_interval <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_eviction_interval>` is configured in
+  the bootstrap.
+
+
+.. _envoy_v3_api_field_type.v3.Scope.prefix:
+
+
+prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The stats scope prefix.
+
+
+.. _envoy_v3_api_field_type.v3.Scope.sharing_name:
+
+
+sharing_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The sharing name of the scope. If non-empty, the scope is shared across
+  multiple instances with the same sharing_name if all fields in this message
+  have the same values.
+
+

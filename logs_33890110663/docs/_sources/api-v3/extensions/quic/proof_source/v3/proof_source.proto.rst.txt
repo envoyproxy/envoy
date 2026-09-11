@@ -1,0 +1,49 @@
+.. _envoy_v3_api_file_envoy/extensions/quic/proof_source/v3/proof_source.proto:
+
+QUIC proof source config (proto)
+================================
+
+.. _extension_envoy.quic.proof_source.filter_chain:
+
+This extension has the qualified name ``envoy.quic.proof_source.filter_chain``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.quic.proof_source <extension_category_envoy.quic.proof_source>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.quic.proof_source.v3.ProofSourceConfig <envoy_v3_api_msg_extensions.quic.proof_source.v3.ProofSourceConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.quic.proof_source.v3.ProofSourceConfig:
+
+extensions.quic.proof_source.v3.ProofSourceConfig
+-------------------------------------------------
+
+
+:repo:`[extensions.quic.proof_source.v3.ProofSourceConfig proto] <api/envoy/extensions/quic/proof_source/v3/proof_source.proto#L16>`
+
+Configuration for the default QUIC proof source.
+
+
+
+

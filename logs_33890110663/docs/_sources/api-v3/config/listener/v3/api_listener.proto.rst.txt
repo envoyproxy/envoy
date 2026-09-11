@@ -1,0 +1,40 @@
+.. _envoy_v3_api_file_envoy/config/listener/v3/api_listener.proto:
+
+API listener (proto)
+====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.listener.v3.ApiListener:
+
+config.listener.v3.ApiListener
+------------------------------
+
+
+:repo:`[config.listener.v3.ApiListener proto] <api/envoy/config/listener/v3/api_listener.proto#L19>`
+
+Describes a type of API listener, which is used in non-proxy clients. The type of API
+exposed to the non-proxy application depends on the type of API listener.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "api_listener": {...}
+  }
+
+.. _envoy_v3_api_field_config.listener.v3.ApiListener.api_listener:
+
+
+api_listener
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The type in this field determines the type of API listener. At present, the following
+  types are supported:
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager (HTTP)
+  envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager (HTTP)
+
+

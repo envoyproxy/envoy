@@ -1,0 +1,53 @@
+.. _envoy_v3_api_file_envoy/config/core/v3/socket_cmsg_headers.proto:
+
+Socket CMSG headers (proto)
+===========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.SocketCmsgHeaders:
+
+config.core.v3.SocketCmsgHeaders
+--------------------------------
+
+
+:repo:`[config.core.v3.SocketCmsgHeaders proto] <api/envoy/config/core/v3/socket_cmsg_headers.proto#L18>`
+
+Configuration for socket cmsg headers.
+See `:ref:CMSG <https://man7.org/linux/man-pages/man3/cmsg.3.html>`_ for further information.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "level": {...},
+    "type": {...},
+    "expected_size": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.SocketCmsgHeaders.level:
+
+
+level
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) cmsg level. Default is unset.
+
+
+.. _envoy_v3_api_field_config.core.v3.SocketCmsgHeaders.type:
+
+
+type
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) cmsg type. Default is unset.
+
+
+.. _envoy_v3_api_field_config.core.v3.SocketCmsgHeaders.expected_size:
+
+
+expected_size
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Expected size of cmsg value. Default is zero.
+
+

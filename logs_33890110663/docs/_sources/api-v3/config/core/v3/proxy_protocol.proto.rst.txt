@@ -1,0 +1,252 @@
+.. _envoy_v3_api_file_envoy/config/core/v3/proxy_protocol.proto:
+
+Proxy protocol (proto)
+======================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.ProxyProtocolPassThroughTLVs:
+
+config.core.v3.ProxyProtocolPassThroughTLVs
+-------------------------------------------
+
+
+:repo:`[config.core.v3.ProxyProtocolPassThroughTLVs proto] <api/envoy/config/core/v3/proxy_protocol.proto#L17>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "match_type": ...,
+    "tlv_type": []
+  }
+
+.. _envoy_v3_api_field_config.core.v3.ProxyProtocolPassThroughTLVs.match_type:
+
+
+match_type
+  (:ref:`config.core.v3.ProxyProtocolPassThroughTLVs.PassTLVsMatchType <envoy_v3_api_enum_config.core.v3.ProxyProtocolPassThroughTLVs.PassTLVsMatchType>`) The strategy to pass through TLVs. Default is INCLUDE_ALL.
+  If INCLUDE_ALL is set, all TLVs will be passed through no matter the tlv_type field.
+
+
+.. _envoy_v3_api_field_config.core.v3.ProxyProtocolPassThroughTLVs.tlv_type:
+
+
+tlv_type
+  (**repeated** `uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The TLV types that are applied based on match_type.
+  TLV type is defined as uint8_t in proxy protocol. See `the spec
+  <https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt>`_ for details.
+
+
+.. _envoy_v3_api_enum_config.core.v3.ProxyProtocolPassThroughTLVs.PassTLVsMatchType:
+
+Enum config.core.v3.ProxyProtocolPassThroughTLVs.PassTLVsMatchType
+------------------------------------------------------------------
+
+
+:repo:`[config.core.v3.ProxyProtocolPassThroughTLVs.PassTLVsMatchType proto] <api/envoy/config/core/v3/proxy_protocol.proto#L18>`
+
+
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.ProxyProtocolPassThroughTLVs.PassTLVsMatchType.INCLUDE_ALL:
+
+
+INCLUDE_ALL
+  *(DEFAULT)* ⁣Pass all TLVs.
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.ProxyProtocolPassThroughTLVs.PassTLVsMatchType.INCLUDE:
+
+
+INCLUDE
+  ⁣Pass specific TLVs defined in tlv_type.
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.TlvEntry:
+
+config.core.v3.TlvEntry
+-----------------------
+
+
+:repo:`[config.core.v3.TlvEntry proto] <api/envoy/config/core/v3/proxy_protocol.proto#L37>`
+
+Represents a single Type-Length-Value (TLV) entry.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "type": ...,
+    "value": ...,
+    "format_string": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.TlvEntry.type:
+
+
+type
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The type of the TLV. Must be a uint8 (0-255) as per the Proxy Protocol v2 specification.
+
+
+.. _envoy_v3_api_field_config.core.v3.TlvEntry.value:
+
+
+value
+  (`bytes <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The static value of the TLV.
+  Only one of ``value`` or ``format_string`` may be set.
+
+
+.. _envoy_v3_api_field_config.core.v3.TlvEntry.format_string:
+
+
+format_string
+  (:ref:`config.core.v3.SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`) Uses the :ref:`format string <config_access_log_format_strings>` to dynamically
+  populate the TLV value from stream information. This allows dynamic values
+  such as metadata, filter state, or other stream properties to be included in
+  the TLV.
+
+  For example:
+
+  .. code-block:: yaml
+
+    type: 0xF0
+    format_string:
+      text_format_source:
+        inline_string: "%DYNAMIC_METADATA(envoy.filters.network:key)%"
+
+  The formatted string will be used directly as the TLV value.
+  Only one of ``value`` or ``format_string`` may be set.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.ProxyProtocolConfig:
+
+config.core.v3.ProxyProtocolConfig
+----------------------------------
+
+
+:repo:`[config.core.v3.ProxyProtocolConfig proto] <api/envoy/config/core/v3/proxy_protocol.proto#L64>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "version": ...,
+    "pass_through_tlvs": {...},
+    "added_tlvs": []
+  }
+
+.. _envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.version:
+
+
+version
+  (:ref:`config.core.v3.ProxyProtocolConfig.Version <envoy_v3_api_enum_config.core.v3.ProxyProtocolConfig.Version>`) The PROXY protocol version to use. See https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details
+
+
+.. _envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs:
+
+
+pass_through_tlvs
+  (:ref:`config.core.v3.ProxyProtocolPassThroughTLVs <envoy_v3_api_msg_config.core.v3.ProxyProtocolPassThroughTLVs>`) This config controls which TLVs can be passed to upstream if it is Proxy Protocol
+  V2 header. If there is no setting for this field, no TLVs will be passed through.
+
+
+.. _envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.added_tlvs:
+
+
+added_tlvs
+  (**repeated** :ref:`config.core.v3.TlvEntry <envoy_v3_api_msg_config.core.v3.TlvEntry>`) This config allows additional TLVs to be included in the upstream PROXY protocol
+  V2 header. Unlike ``pass_through_tlvs``, which passes TLVs from the downstream request,
+  ``added_tlvs`` provides an extension mechanism for defining new TLVs that are included
+  with the upstream request. These TLVs may not be present in the downstream request and
+  can be defined at either the transport socket level or the host level to provide more
+  granular control over the TLVs that are included in the upstream request.
+
+  Host-level TLVs are specified in the ``metadata.typed_filter_metadata`` field under the
+  ``envoy.transport_sockets.proxy_protocol`` namespace.
+
+  .. literalinclude:: /_configs/repo/proxy_protocol.yaml
+     :language: yaml
+     :lines: 49-57
+     :linenos:
+     :lineno-start: 49
+     :caption: :download:`proxy_protocol.yaml </_configs/repo/proxy_protocol.yaml>`
+
+  **Precedence behavior**:
+
+  - When a TLV is defined at both the host level and the transport socket level, the value
+    from the host level configuration takes precedence. This allows users to define default TLVs
+    at the transport socket level and override them at the host level.
+  - Any TLV defined in the ``pass_through_tlvs`` field will be overridden by either the host-level
+    or transport socket-level TLV.
+
+  If there are multiple TLVs with the same type, only the TLVs from the highest precedence level
+  will be used.
+
+
+.. _envoy_v3_api_enum_config.core.v3.ProxyProtocolConfig.Version:
+
+Enum config.core.v3.ProxyProtocolConfig.Version
+-----------------------------------------------
+
+
+:repo:`[config.core.v3.ProxyProtocolConfig.Version proto] <api/envoy/config/core/v3/proxy_protocol.proto#L65>`
+
+
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.ProxyProtocolConfig.Version.V1:
+
+
+V1
+  *(DEFAULT)* ⁣PROXY protocol version 1. Human readable format.
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.ProxyProtocolConfig.Version.V2:
+
+
+V2
+  ⁣PROXY protocol version 2. Binary format.
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.PerHostConfig:
+
+config.core.v3.PerHostConfig
+----------------------------
+
+
+:repo:`[config.core.v3.PerHostConfig proto] <api/envoy/config/core/v3/proxy_protocol.proto#L110>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "added_tlvs": []
+  }
+
+.. _envoy_v3_api_field_config.core.v3.PerHostConfig.added_tlvs:
+
+
+added_tlvs
+  (**repeated** :ref:`config.core.v3.TlvEntry <envoy_v3_api_msg_config.core.v3.TlvEntry>`) Enables per-host configuration for Proxy Protocol.
+
+

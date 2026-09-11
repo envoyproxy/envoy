@@ -1,0 +1,139 @@
+.. _envoy_v3_api_file_envoy/config/trace/v3/skywalking.proto:
+
+SkyWalking tracer (proto)
+=========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.trace.v3.SkyWalkingConfig:
+
+config.trace.v3.SkyWalkingConfig
+--------------------------------
+
+
+:repo:`[config.trace.v3.SkyWalkingConfig proto] <api/envoy/config/trace/v3/skywalking.proto#L29>`
+
+Configuration for the SkyWalking tracer. Please note that if SkyWalking tracer is used as the
+provider of tracing, then
+:ref:`spawn_upstream_span <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`
+in the tracing config must be set to true to get the correct topology and tracing data. Moreover, SkyWalking
+Tracer does not support SkyWalking extension header (``sw8-x``) temporarily.
+
+.. _extension_envoy.tracers.skywalking:
+
+This extension has the qualified name ``envoy.tracers.skywalking``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers <extension_category_envoy.tracers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.config.trace.v3.SkyWalkingConfig <envoy_v3_api_msg_config.trace.v3.SkyWalkingConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "grpc_service": {...},
+    "client_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.trace.v3.SkyWalkingConfig.grpc_service:
+
+
+grpc_service
+  (:ref:`config.core.v3.GrpcService <envoy_v3_api_msg_config.core.v3.GrpcService>`, *REQUIRED*) SkyWalking collector service.
+
+
+.. _envoy_v3_api_field_config.trace.v3.SkyWalkingConfig.client_config:
+
+
+client_config
+  (:ref:`config.trace.v3.ClientConfig <envoy_v3_api_msg_config.trace.v3.ClientConfig>`) 
+
+
+.. _envoy_v3_api_msg_config.trace.v3.ClientConfig:
+
+config.trace.v3.ClientConfig
+----------------------------
+
+
+:repo:`[config.trace.v3.ClientConfig proto] <api/envoy/config/trace/v3/skywalking.proto#L37>`
+
+Client config for SkyWalking tracer.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "service_name": ...,
+    "instance_name": ...,
+    "backend_token": ...,
+    "max_cache_size": {...}
+  }
+
+.. _envoy_v3_api_field_config.trace.v3.ClientConfig.service_name:
+
+
+service_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Service name for SkyWalking tracer. If this field is empty, then local service cluster name
+  that configured by :ref:`Bootstrap node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>`
+  message's :ref:`cluster <envoy_v3_api_field_config.core.v3.Node.cluster>` field or command line
+  option :option:`--service-cluster` will be used. If both this field and local service cluster
+  name are empty, ``EnvoyProxy`` is used as the service name by default.
+
+
+.. _envoy_v3_api_field_config.trace.v3.ClientConfig.instance_name:
+
+
+instance_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Service instance name for SkyWalking tracer. If this field is empty, then local service node
+  that configured by :ref:`Bootstrap node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>`
+  message's :ref:`id <envoy_v3_api_field_config.core.v3.Node.id>` field or command line  option
+  :option:`--service-node` will be used. If both this field and local service node are empty,
+  ``EnvoyProxy`` is used as the instance name by default.
+
+
+.. _envoy_v3_api_field_config.trace.v3.ClientConfig.backend_token:
+
+
+backend_token
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Inline authentication token string.
+
+
+  Authentication token config for SkyWalking. SkyWalking can use token authentication to secure
+  that monitoring application data can be trusted. In current version, Token is considered as a
+  simple string.
+
+
+.. _envoy_v3_api_field_config.trace.v3.ClientConfig.max_cache_size:
+
+
+max_cache_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Envoy caches the segment in memory when the SkyWalking backend service is temporarily unavailable.
+  This field specifies the maximum number of segments that can be cached. If not specified, the
+  default is 1024.
+
+

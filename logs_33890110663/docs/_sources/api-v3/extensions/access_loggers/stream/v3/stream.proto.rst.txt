@@ -1,0 +1,123 @@
+.. _envoy_v3_api_file_envoy/extensions/access_loggers/stream/v3/stream.proto:
+
+Standard Streams Access loggers (proto)
+=======================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.stream.v3.StdoutAccessLog:
+
+extensions.access_loggers.stream.v3.StdoutAccessLog
+---------------------------------------------------
+
+
+:repo:`[extensions.access_loggers.stream.v3.StdoutAccessLog proto] <api/envoy/extensions/access_loggers/stream/v3/stream.proto#L20>`
+
+Custom configuration for an :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
+that writes log entries directly to the operating system's standard output.
+
+.. _extension_envoy.access_loggers.stdout:
+
+This extension has the qualified name ``envoy.access_loggers.stdout``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.access_loggers <extension_category_envoy.access_loggers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StdoutAccessLog>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "log_format": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.stream.v3.StdoutAccessLog.log_format:
+
+
+log_format
+  (:ref:`config.core.v3.SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`, *REQUIRED*) Configuration to form access log data and format.
+  If not specified, use :ref:`default format <config_access_log_default_format>`.
+
+
+  
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.stream.v3.StderrAccessLog:
+
+extensions.access_loggers.stream.v3.StderrAccessLog
+---------------------------------------------------
+
+
+:repo:`[extensions.access_loggers.stream.v3.StderrAccessLog proto] <api/envoy/extensions/access_loggers/stream/v3/stream.proto#L32>`
+
+Custom configuration for an :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
+that writes log entries directly to the operating system's standard error.
+
+.. _extension_envoy.access_loggers.stderr:
+
+This extension has the qualified name ``envoy.access_loggers.stderr``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.access_loggers <extension_category_envoy.access_loggers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StderrAccessLog <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StderrAccessLog>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "log_format": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.stream.v3.StderrAccessLog.log_format:
+
+
+log_format
+  (:ref:`config.core.v3.SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`, *REQUIRED*) Configuration to form access log data and format.
+  If not specified, use :ref:`default format <config_access_log_default_format>`.
+
+
+  
+

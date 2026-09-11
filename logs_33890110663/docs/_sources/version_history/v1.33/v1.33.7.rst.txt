@@ -1,0 +1,37 @@
+.. _version_history_1.33.7:
+
+1.33.7 (August 19, 2025)
+=========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **http**: Fixed a bug where the premature resets of streams may result in the recursive draining and potential
+  stack overflow. Setting proper ``max_concurrent_streams`` value for HTTP/2 or HTTP/3 could eliminate
+  the risk of the stack overflow before this fix.
+* **listeners**: Fixed issue where :ref:`TLS inspector listener filter <v1.33:config_listener_filters_tls_inspector>` timed out
+  when used with other listener filters. The bug was triggered when a previous listener filter processed more data
+  than the TLS inspector had requested, causing the TLS inspector to incorrectly calculate its buffer growth strategy.
+  The fix ensures that buffer growth is now based on actual bytes available rather than the previously requested amount.
+
+
+
+
+New features
+------------
+
+
+* **http**: Added :ref:`ignore_http_11_upgrade
+  <v1.33:envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.ignore_http_11_upgrade>`
+  to ignore HTTP/1.1 Upgrade values matching any of the supplied matchers.
+

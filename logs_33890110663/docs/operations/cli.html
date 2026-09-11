@@ -1,0 +1,790 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Command line options &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Hot restart Python wrapper" href="hot_restarter.html" />
+    <link rel="prev" title="Operations and administration" href="operations.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../searchindex.js"
+          data-envoy-search-page="../search.html"
+          data-envoy-root="../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="operations.html">Operations and administration</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Command line options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hot_restarter.html">Hot restart Python wrapper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="admin.html">Administration interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stats_overview.html">Statistics overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime.html">Runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fs_flags.html">File system flags</a></li>
+<li class="toctree-l2"><a class="reference internal" href="traffic_tapping.html">Traffic tapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="certificates.html">Certificate Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tools/tools.html">Tools</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="operations.html">Operations and administration</a></li>
+      <li class="breadcrumb-item active">Command line options</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/operations/cli.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="command-line-options">
+<span id="operations-cli"></span><h1>Command line options<a class="headerlink" href="#command-line-options" title="Link to this heading"></a></h1>
+<p>Envoy is driven both by a configuration file as well as a set of command line options. The
+following are the command line options that Envoy supports.</p>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-c">
+<span id="cmdoption-config-path"></span><span class="sig-name descname"><span class="pre">-c</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;path</span> <span class="pre">string&gt;</span></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--config-path</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;path</span> <span class="pre">string&gt;</span></span><a class="headerlink" href="#cmdoption-c" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The path to the <a class="reference internal" href="../configuration/configuration.html#config"><span class="std std-ref">JSON/YAML/proto3 configuration
+file</span></a>. If this flag is missing, <a class="reference internal" href="#cmdoption-config-yaml"><code class="xref std std-option docutils literal notranslate"><span class="pre">--config-yaml</span></code></a> is required.
+This will be parsed as a <a class="reference internal" href="../configuration/overview/bootstrap.html#config-overview-bootstrap"><span class="std std-ref">bootstrap configuration file</span></a>.
+Valid extensions are <code class="docutils literal notranslate"><span class="pre">.json</span></code>, <code class="docutils literal notranslate"><span class="pre">.yaml</span></code>, <code class="docutils literal notranslate"><span class="pre">.pb</span></code> and <code class="docutils literal notranslate"><span class="pre">.pb_text</span></code>, which indicate
+JSON, YAML, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/encoding">binary proto3</a> and <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/cpp/google.protobuf.text_format">text
+proto3</a>
+formats respectively.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-config-yaml">
+<span class="sig-name descname"><span class="pre">--config-yaml</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;yaml</span> <span class="pre">string&gt;</span></span><a class="headerlink" href="#cmdoption-config-yaml" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The YAML string for a bootstrap configuration. If <a class="reference internal" href="#cmdoption-c"><code class="xref std std-option docutils literal notranslate"><span class="pre">--config-path</span></code></a> is also set,
+the values in this YAML string will override and merge with the bootstrap loaded from <a class="reference internal" href="#cmdoption-c"><code class="xref std std-option docutils literal notranslate"><span class="pre">--config-path</span></code></a>.
+Because YAML is a superset of JSON, a JSON string may also be passed to <a class="reference internal" href="#cmdoption-config-yaml"><code class="xref std std-option docutils literal notranslate"><span class="pre">--config-yaml</span></code></a>.</p>
+<p>Example overriding the node id on the command line:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./envoy -c bootstrap.yaml --config-yaml &quot;node: {id: &#39;node1&#39;}&quot;</span>
+</pre></div>
+</div>
+</div></blockquote>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-mode">
+<span class="sig-name descname"><span class="pre">--mode</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;string&gt;</span></span><a class="headerlink" href="#cmdoption-mode" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> One of the operating modes for Envoy:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">serve</span></code>: <em>(default)</em> Validate the JSON configuration and then serve traffic normally.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">validate</span></code>: Validate the JSON configuration and then exit, printing either an “OK” message (in
+which case the exit code is 0) or any errors generated by the configuration file (exit code 1).
+No network traffic is generated, and the hot restart process is not performed, so no other Envoy
+process on the machine will be disturbed.</p></li>
+</ul>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-admin-address-path">
+<span class="sig-name descname"><span class="pre">--admin-address-path</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;path</span> <span class="pre">string&gt;</span></span><a class="headerlink" href="#cmdoption-admin-address-path" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The output file path where the admin address and port will be written.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-local-address-ip-version">
+<span class="sig-name descname"><span class="pre">--local-address-ip-version</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;string&gt;</span></span><a class="headerlink" href="#cmdoption-local-address-ip-version" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The IP address version that is used to populate the server local IP address. This
+parameter affects various headers including what is appended to the X-Forwarded-For (XFF) header.
+The options are <code class="docutils literal notranslate"><span class="pre">v4</span></code> or <code class="docutils literal notranslate"><span class="pre">v6</span></code>. The default is <code class="docutils literal notranslate"><span class="pre">v4</span></code>.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-base-id">
+<span class="sig-name descname"><span class="pre">--base-id</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;integer&gt;</span></span><a class="headerlink" href="#cmdoption-base-id" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The base ID to use when allocating shared memory regions. Envoy uses shared memory
+regions during <a class="reference internal" href="../intro/arch_overview/operations/hot_restart.html#arch-overview-hot-restart"><span class="std std-ref">hot restart</span></a>. Most users will never have to
+set this option. However, if Envoy needs to be run multiple times on the same machine, each
+running Envoy will need a unique base ID so that the shared memory regions do not conflict.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-use-dynamic-base-id">
+<span class="sig-name descname"><span class="pre">--use-dynamic-base-id</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-use-dynamic-base-id" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> Selects an unused base ID to use when allocating shared memory regions. Using
+preselected values with <a class="reference internal" href="#cmdoption-base-id"><code class="xref std std-option docutils literal notranslate"><span class="pre">--base-id</span></code></a> is preferred, however. If this option is enabled,
+it supersedes the <a class="reference internal" href="#cmdoption-base-id"><code class="xref std std-option docutils literal notranslate"><span class="pre">--base-id</span></code></a> value. This flag may not be used when the value of
+<a class="reference internal" href="#cmdoption-restart-epoch"><code class="xref std std-option docutils literal notranslate"><span class="pre">--restart-epoch</span></code></a> is non-zero. Instead, for subsequent hot restarts, set
+<a class="reference internal" href="#cmdoption-base-id"><code class="xref std std-option docutils literal notranslate"><span class="pre">--base-id</span></code></a> option with the selected base ID. See <a class="reference internal" href="#cmdoption-base-id-path"><code class="xref std std-option docutils literal notranslate"><span class="pre">--base-id-path</span></code></a>.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-skip-hot-restart-on-no-parent">
+<span class="sig-name descname"><span class="pre">--skip-hot-restart-on-no-parent</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-skip-hot-restart-on-no-parent" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> In conjunction with <a class="reference internal" href="#cmdoption-restart-epoch"><code class="xref std std-option docutils literal notranslate"><span class="pre">--restart-epoch</span></code></a>, this flag allows for a failing hot
+restart to fall back to normal startup behavior. When this flag is false, if the parent instance
+was terminated, the child instance will also terminate during startup.</p>
+<p>This only impacts if the parent instance was terminated before the new instance is initialized -
+an unexpected parent termination after interprocess communication is established will still cause
+the child instance to terminate due to failing communication.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-skip-hot-restart-parent-stats">
+<span class="sig-name descname"><span class="pre">--skip-hot-restart-parent-stats</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-skip-hot-restart-parent-stats" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> In conjunction with <a class="reference internal" href="#cmdoption-restart-epoch"><code class="xref std std-option docutils literal notranslate"><span class="pre">--restart-epoch</span></code></a>, this flag allows for hot restart
+to proceed without duplicating stats from the parent instance. Transferring stats can be an
+expensive operation; skipping it can prevent overloading the main thread with this work, or
+potentially dramatically increased memory load.</p>
+<p>Has no effect if hot restarting is not in use.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-base-id-path">
+<span class="sig-name descname"><span class="pre">--base-id-path</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;path_string&gt;</span></span><a class="headerlink" href="#cmdoption-base-id-path" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> Writes the base ID to the given path. While this option is compatible with
+<a class="reference internal" href="#cmdoption-base-id"><code class="xref std std-option docutils literal notranslate"><span class="pre">--base-id</span></code></a>, its intended use is to provide access to the dynamic base ID selected by
+<a class="reference internal" href="#cmdoption-use-dynamic-base-id"><code class="xref std std-option docutils literal notranslate"><span class="pre">--use-dynamic-base-id</span></code></a>.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-concurrency">
+<span class="sig-name descname"><span class="pre">--concurrency</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;integer&gt;</span></span><a class="headerlink" href="#cmdoption-concurrency" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The number of <a class="reference internal" href="../intro/arch_overview/intro/threading_model.html#arch-overview-threading"><span class="std std-ref">worker threads</span></a> to run. If not
+specified, defaults to the minimum of the number of hardware threads, the CPU affinity (cpuset)
+size, and the cgroup CPU limit on Linux-based systems; on other platforms it defaults to the
+number of hardware threads. This makes Envoy respect container CPU limits (for example a
+Kubernetes <code class="docutils literal notranslate"><span class="pre">resources.limits.cpu</span></code> or Docker <code class="docutils literal notranslate"><span class="pre">--cpus</span></code>) by default. The cgroup component of
+this detection can be disabled by setting the <code class="docutils literal notranslate"><span class="pre">ENVOY_CGROUP_CPU_DETECTION</span></code> environment variable
+to <code class="docutils literal notranslate"><span class="pre">false</span></code>. If set to zero, Envoy will still run one worker thread.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-l">
+<span id="cmdoption-log-level"></span><span class="sig-name descname"><span class="pre">-l</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;string&gt;</span></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--log-level</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;string&gt;</span></span><a class="headerlink" href="#cmdoption-l" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The logging level. Non developers should generally never set this option. See the
+help text for the available log levels and the default.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-component-log-level">
+<span class="sig-name descname"><span class="pre">--component-log-level</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;string&gt;</span></span><a class="headerlink" href="#cmdoption-component-log-level" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The comma separated list of logging level per component. Non developers should generally
+never set this option. For example, if you want <code class="docutils literal notranslate"><span class="pre">upstream</span></code> component to run at <code class="docutils literal notranslate"><span class="pre">debug</span></code> level and
+<code class="docutils literal notranslate"><span class="pre">connection</span></code> component to run at <code class="docutils literal notranslate"><span class="pre">trace</span></code> level, you should pass <code class="docutils literal notranslate"><span class="pre">upstream:debug,connection:trace</span></code> to
+this flag. See <code class="docutils literal notranslate"><span class="pre">ALL_LOGGER_IDS</span></code> in <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN//source/common/common/logger.h">/source/common/common/logger.h</a> for a list of components.
+This option is incompatible with <a class="reference internal" href="#cmdoption-enable-fine-grain-logging"><code class="xref std std-option docutils literal notranslate"><span class="pre">--enable-fine-grain-logging</span></code></a>.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-cpuset-threads">
+<span class="sig-name descname"><span class="pre">--cpuset-threads</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-cpuset-threads" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> This flag is no longer required and is retained for backwards compatibility. When
+<a class="reference internal" href="#cmdoption-concurrency"><code class="xref std std-option docutils literal notranslate"><span class="pre">--concurrency</span></code></a> is not set, the assigned cpuset (CPU affinity) size is already used as one
+of the inputs to the default worker thread count, so passing this flag has no additional effect.
+You can read more about cpusets in the
+<a class="reference external" href="https://www.kernel.org/doc/Documentation/cgroup-v1/cpusets.txt">kernel documentation</a>.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-log-path">
+<span class="sig-name descname"><span class="pre">--log-path</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;path</span> <span class="pre">string&gt;</span></span><a class="headerlink" href="#cmdoption-log-path" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The output file path where logs should be written. This file will be re-opened
+when SIGUSR1 is handled. If this is not set, log to stderr.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-log-format">
+<span class="sig-name descname"><span class="pre">--log-format</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;format</span> <span class="pre">string&gt;</span></span><a class="headerlink" href="#cmdoption-log-format" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The format string to use for laying out the log message metadata. If this is not
+set, a default format string <code class="docutils literal notranslate"><span class="pre">&quot;[%Y-%m-%d</span> <span class="pre">%T.%e][%t][%l][%n]</span> <span class="pre">[%g:%#]</span> <span class="pre">%v&quot;</span></code> is used.</p>
+<p>When used in conjunction with <a class="reference internal" href="#cmdoption-log-format-escaped"><code class="xref std std-option docutils literal notranslate"><span class="pre">--log-format-escaped</span></code></a>, the logger can be configured
+to log in a format that is parsable by log viewers. Known integrations are documented
+in the <a class="reference internal" href="../configuration/observability/application_logging.html#config-application-logs"><span class="std std-ref">application logging configuration</span></a> section.</p>
+<p>The supported format flags are (with example output):</p>
+<dl class="field-list simple">
+<dt class="field-odd">%v<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The actual message to log (“some user text”)</p>
+</dd>
+<dt class="field-even">%_<span class="colon">:</span></dt>
+<dd class="field-even"><p>The actual message to log, but with escaped newlines (from (if using <code class="docutils literal notranslate"><span class="pre">%v</span></code>) “some user textnbelow”, to “some user text\nbelow”)</p>
+</dd>
+<dt class="field-odd">%j<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The actual message to log as JSON escaped string (<a class="reference external" href="https://tools.ietf.org/html/rfc7159#page-8">https://tools.ietf.org/html/rfc7159#page-8</a>).</p>
+</dd>
+<dt class="field-even">%N<span class="colon">:</span></dt>
+<dd class="field-even"><p>The Envoy version string: <code class="docutils literal notranslate"><span class="pre">{revision}/{version}/{status}/{build_type}/{ssl_version}</span></code> (e.g. “c93f9f6c1e5adddd10a3e3646c7e049c649ae177/1.38.0/Clean/RELEASE/BoringSSL”), matching the output of <a class="reference internal" href="#cmdoption-version"><code class="xref std std-option docutils literal notranslate"><span class="pre">--version</span></code></a>.</p>
+</dd>
+<dt class="field-odd">%t<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Thread id (“1232”)</p>
+</dd>
+<dt class="field-even">%P<span class="colon">:</span></dt>
+<dd class="field-even"><p>Process id (“3456”)</p>
+</dd>
+<dt class="field-odd">%n<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Logger’s name (“filter”)</p>
+</dd>
+<dt class="field-even">%l<span class="colon">:</span></dt>
+<dd class="field-even"><p>The log level of the message (“debug”, “info”, etc.)</p>
+</dd>
+<dt class="field-odd">%L<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Short log level of the message (“D”, “I”, etc.)</p>
+</dd>
+<dt class="field-even">%a<span class="colon">:</span></dt>
+<dd class="field-even"><p>Abbreviated weekday name (“Tue”)</p>
+</dd>
+<dt class="field-odd">%A<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Full weekday name (“Tuesday”)</p>
+</dd>
+<dt class="field-even">%b<span class="colon">:</span></dt>
+<dd class="field-even"><p>Abbreviated month name (“Mar”)</p>
+</dd>
+<dt class="field-odd">%B<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Full month name (“March”)</p>
+</dd>
+<dt class="field-even">%c<span class="colon">:</span></dt>
+<dd class="field-even"><p>Date and time representation (“Tue Mar 27 15:25:06 2018”)</p>
+</dd>
+<dt class="field-odd">%C<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Year in 2 digits (“18”)</p>
+</dd>
+<dt class="field-even">%Y<span class="colon">:</span></dt>
+<dd class="field-even"><p>Year in 4 digits (“2018”)</p>
+</dd>
+<dt class="field-odd">%D, %x<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Short MM/DD/YY date (“03/27/18”)</p>
+</dd>
+<dt class="field-even">%m<span class="colon">:</span></dt>
+<dd class="field-even"><p>Month 01-12 (“03”)</p>
+</dd>
+<dt class="field-odd">%d<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Day of month 01-31 (“27”)</p>
+</dd>
+<dt class="field-even">%H<span class="colon">:</span></dt>
+<dd class="field-even"><p>Hours in 24 format 00-23 (“15”)</p>
+</dd>
+<dt class="field-odd">%I<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Hours in 12 format 01-12 (“03”)</p>
+</dd>
+<dt class="field-even">%M<span class="colon">:</span></dt>
+<dd class="field-even"><p>Minutes 00-59 (“25”)</p>
+</dd>
+<dt class="field-odd">%S<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Seconds 00-59 (“06”)</p>
+</dd>
+<dt class="field-even">%e<span class="colon">:</span></dt>
+<dd class="field-even"><p>Millisecond part of the current second 000-999 (“008”)</p>
+</dd>
+<dt class="field-odd">%f<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Microsecond part of the current second 000000-999999 (“008789”)</p>
+</dd>
+<dt class="field-even">%F<span class="colon">:</span></dt>
+<dd class="field-even"><p>Nanosecond part of the current second 000000000-999999999 (“008789123”)</p>
+</dd>
+<dt class="field-odd">%p<span class="colon">:</span></dt>
+<dd class="field-odd"><p>AM/PM (“AM”)</p>
+</dd>
+<dt class="field-even">%r<span class="colon">:</span></dt>
+<dd class="field-even"><p>12-hour clock (“03:25:06 PM”)</p>
+</dd>
+<dt class="field-odd">%R<span class="colon">:</span></dt>
+<dd class="field-odd"><p>24-hour HH:MM time, equivalent to %H:%M (“15:25”)</p>
+</dd>
+<dt class="field-even">%T, %X<span class="colon">:</span></dt>
+<dd class="field-even"><p>ISO 8601 time format (HH:MM:SS), equivalent to %H:%M:%S (“13:25:06”)</p>
+</dd>
+<dt class="field-odd">%z<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ISO 8601 offset from UTC in timezone ([+/-]HH:MM) (“-07:00”)</p>
+</dd>
+<dt class="field-even">%%<span class="colon">:</span></dt>
+<dd class="field-even"><p>The % sign (“%”)</p>
+</dd>
+<dt class="field-odd">%&#64;<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Source file and line (“my_file.cc:123”)</p>
+</dd>
+<dt class="field-even">%s<span class="colon">:</span></dt>
+<dd class="field-even"><p>Basename of the source file (“my_file.cc”)</p>
+</dd>
+<dt class="field-odd">%g<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Full relative path of the source file (“/some/dir/my_file.cc”)</p>
+</dd>
+<dt class="field-even">%#<span class="colon">:</span></dt>
+<dd class="field-even"><p>Source line (“123”)</p>
+</dd>
+<dt class="field-odd">%!<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Source function (“myFunc”)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-log-format-escaped">
+<span class="sig-name descname"><span class="pre">--log-format-escaped</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-log-format-escaped" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> This flag enables application log sanitization to escape C-style escape sequences.
+This can be used to prevent a single log line from spanning multiple lines in the underlying log.
+This sanitizes all escape sequences in <a class="reference external" href="https://en.cppreference.com/w/cpp/language/escape">this list</a>.
+Note that each line’s final EOL character will not be escaped to preserve line format.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-restart-epoch">
+<span class="sig-name descname"><span class="pre">--restart-epoch</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;integer&gt;</span></span><a class="headerlink" href="#cmdoption-restart-epoch" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The <a class="reference internal" href="../intro/arch_overview/operations/hot_restart.html#arch-overview-hot-restart"><span class="std std-ref">hot restart</span></a> epoch. (The number of times
+Envoy has been hot restarted instead of a fresh start). Defaults to 0 for the first start. This
+option tells Envoy whether to attempt to create the shared memory region needed for hot restart,
+or whether to open an existing one. It should be incremented every time a hot restart takes place.
+The <a class="reference internal" href="hot_restarter.html#operations-hot-restarter"><span class="std std-ref">hot restart wrapper</span></a> sets the <em>RESTART_EPOCH</em> environment
+variable which should be passed to this option in most cases.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-log-stacktrace-single-entry">
+<span class="sig-name descname"><span class="pre">--log-stacktrace-single-entry</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-log-stacktrace-single-entry" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> Emit the entire stack trace in a single log entry instead of one log call per frame.
+Frames are still newline-delimited within the message. This is useful for log aggregation systems
+where each log call produces a separate entry (e.g. JSON logging).</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-enable-fine-grain-logging">
+<span class="sig-name descname"><span class="pre">--enable-fine-grain-logging</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-enable-fine-grain-logging" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> Enables fine-grain logger with file level log control and runtime update at administration
+interface. If enabled, main log macros including <code class="docutils literal notranslate"><span class="pre">ENVOY_LOG</span></code>, <code class="docutils literal notranslate"><span class="pre">ENVOY_CONN_LOG</span></code>, <code class="docutils literal notranslate"><span class="pre">ENVOY_STREAM_LOG</span></code> and
+<code class="docutils literal notranslate"><span class="pre">ENVOY_FLUSH_LOG</span></code> will use a per-file logger, and the usage doesn’t need <code class="docutils literal notranslate"><span class="pre">Envoy::Logger::Loggable</span></code> any
+more. The administration interface usage is similar. Please see <a class="reference internal" href="admin.html#operations-admin-interface"><span class="std std-ref">Administration interface</span></a> for more detail. This option is incompatible with <a class="reference internal" href="#cmdoption-component-log-level"><code class="xref std std-option docutils literal notranslate"><span class="pre">--component-log-level</span></code></a>.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-socket-path">
+<span class="sig-name descname"><span class="pre">--socket-path</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;path</span> <span class="pre">string&gt;</span></span><a class="headerlink" href="#cmdoption-socket-path" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The output file path to the socket address for <a class="reference internal" href="../intro/arch_overview/operations/hot_restart.html#arch-overview-hot-restart"><span class="std std-ref">hot restart</span></a>.
+Default to “&#64;envoy_domain_socket” which will be created in the abstract namespace. Suffix _{role}_{id}
+is appended to provide name. All envoy processes wanting to participate in hot-restart together must
+use the same value for this option.</p>
+<p><strong>NOTE</strong>: The path started with “&#64;” will be created in the abstract namespace.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-socket-mode">
+<span class="sig-name descname"><span class="pre">--socket-mode</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;string&gt;</span></span><a class="headerlink" href="#cmdoption-socket-mode" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The socket file permission for <a class="reference internal" href="../intro/arch_overview/operations/hot_restart.html#arch-overview-hot-restart"><span class="std std-ref">hot restart</span></a>.
+This must be a valid octal file permission, such as 644. The default value is 600.
+This flag may not be used when <a class="reference internal" href="#cmdoption-socket-path"><code class="xref std std-option docutils literal notranslate"><span class="pre">--socket-path</span></code></a> is start with “&#64;” or not set.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-hot-restart-version">
+<span class="sig-name descname"><span class="pre">--hot-restart-version</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-hot-restart-version" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> Outputs an opaque hot restart compatibility version for the binary. This can be
+matched against the output of the <a class="reference internal" href="admin.html#get--hot_restart_version" title="GET /hot_restart_version"><code class="xref http http-get docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/hot_restart_version</span></code></a> admin endpoint to determine
+whether the new binary and the running binary are hot restart compatible.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-service-cluster">
+<span class="sig-name descname"><span class="pre">--service-cluster</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;string&gt;</span></span><a class="headerlink" href="#cmdoption-service-cluster" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> Defines the local service cluster name where Envoy is running. The
+local service cluster name is first sourced from the <a class="reference internal" href="../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-node"><span class="std std-ref">Bootstrap node</span></a> message’s <a class="reference internal" href="../api-v3/config/core/v3/base.proto.html#envoy-v3-api-field-config-core-v3-node-cluster"><span class="std std-ref">cluster</span></a> field. This CLI option provides an alternative
+method for specifying this value and will override any value set in bootstrap
+configuration. It should be set if any of the following features are used:
+<a class="reference internal" href="../intro/arch_overview/observability/statistics.html#arch-overview-statistics"><span class="std std-ref">statsd</span></a>, <a class="reference internal" href="../api-v3/config/core/v3/health_check.proto.html#envoy-v3-api-field-config-core-v3-healthcheck-httphealthcheck-service-name-matcher"><span class="std std-ref">health check cluster
+verification</span></a>,
+<a class="reference internal" href="../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-msg-config-bootstrap-v3-runtime"><span class="std std-ref">runtime override directory</span></a>,
+<a class="reference internal" href="../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-add-user-agent"><span class="std std-ref">user agent addition</span></a>,
+<a class="reference internal" href="../configuration/http/http_filters/rate_limit_filter.html#config-http-filters-rate-limit"><span class="std std-ref">HTTP global rate limiting</span></a>,
+<a class="reference internal" href="../configuration/upstream/cluster_manager/cds.html#config-cluster-manager-cds"><span class="std std-ref">CDS</span></a>, and <a class="reference internal" href="../intro/arch_overview/observability/tracing.html#arch-overview-tracing"><span class="std std-ref">HTTP tracing</span></a>, either via this CLI option or in the bootstrap
+configuration.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-service-node">
+<span class="sig-name descname"><span class="pre">--service-node</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;string&gt;</span></span><a class="headerlink" href="#cmdoption-service-node" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> Defines the local service node name where Envoy is running. The
+local service node name is first sourced from the <a class="reference internal" href="../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-node"><span class="std std-ref">Bootstrap node</span></a> message’s <a class="reference internal" href="../api-v3/config/core/v3/base.proto.html#envoy-v3-api-field-config-core-v3-node-id"><span class="std std-ref">id</span></a> field. This CLI option provides an alternative
+method for specifying this value and will override any value set in bootstrap
+configuration. It should be set if any of the following features are used:
+<a class="reference internal" href="../intro/arch_overview/observability/statistics.html#arch-overview-statistics"><span class="std std-ref">statsd</span></a>, <a class="reference internal" href="../configuration/upstream/cluster_manager/cds.html#config-cluster-manager-cds"><span class="std std-ref">CDS</span></a>, and <a class="reference internal" href="../intro/arch_overview/observability/tracing.html#arch-overview-tracing"><span class="std std-ref">HTTP tracing</span></a>, either via this CLI option or in the bootstrap
+configuration.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-service-zone">
+<span class="sig-name descname"><span class="pre">--service-zone</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;string&gt;</span></span><a class="headerlink" href="#cmdoption-service-zone" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> Defines the local service zone where Envoy is running. The local
+service zone is first sourced from the <a class="reference internal" href="../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-node"><span class="std std-ref">Bootstrap node</span></a> message’s <a class="reference internal" href="../api-v3/config/core/v3/base.proto.html#envoy-v3-api-field-config-core-v3-locality-zone"><span class="std std-ref">locality.zone</span></a> field. This CLI option provides an
+alternative method for specifying this value and will override any value set
+in bootstrap configuration. It should be set if discovery service routing is
+used and the discovery service exposes <a class="reference internal" href="../api-v3/config/endpoint/v3/endpoint_components.proto.html#envoy-v3-api-msg-config-endpoint-v3-localitylbendpoints"><span class="std std-ref">zone data</span></a>, either via this CLI option or in
+the bootstrap configuration. The meaning of zone is context dependent, e.g.
+<a class="reference external" href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html">Availability Zone (AZ)</a>
+on AWS, <a class="reference external" href="https://cloud.google.com/compute/docs/regions-zones/">Zone</a> on GCP,
+etc.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-file-flush-interval-msec">
+<span class="sig-name descname"><span class="pre">--file-flush-interval-msec</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;integer&gt;</span></span><a class="headerlink" href="#cmdoption-file-flush-interval-msec" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The file flushing interval in milliseconds. Defaults to 10 seconds.
+This setting is used during file creation to determine the duration between flushes
+of buffers to files. The buffer will flush every time it gets full, or every time
+the interval has elapsed, whichever comes first. Adjusting this setting is useful
+when tailing <a class="reference internal" href="../intro/arch_overview/observability/access_logging.html#arch-overview-access-logs"><span class="std std-ref">access logs</span></a> in order to
+get more (or less) immediate flushing.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-file-flush-min-size-kb">
+<span class="sig-name descname"><span class="pre">--file-flush-min-size-kb</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;integer&gt;</span></span><a class="headerlink" href="#cmdoption-file-flush-min-size-kb" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The minimum size in kilobytes for file flushing. Defaults to 64.
+This setting is used during file creation to determine the minimum buffer size
+before flushing to files. The buffer will flush every time it gets full, or every time
+the interval has elapsed, whichever comes first. Adjusting this setting is useful
+when tailing <a class="reference internal" href="../intro/arch_overview/observability/access_logging.html#arch-overview-access-logs"><span class="std std-ref">access logs</span></a> in order to
+get more (or less) immediate flushing.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-drain-time-s">
+<span class="sig-name descname"><span class="pre">--drain-time-s</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;integer&gt;</span></span><a class="headerlink" href="#cmdoption-drain-time-s" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The time in seconds that Envoy will drain connections during
+a <a class="reference internal" href="../intro/arch_overview/operations/hot_restart.html#arch-overview-hot-restart"><span class="std std-ref">hot restart</span></a> or when individual listeners are being
+modified or removed via <a class="reference internal" href="../intro/arch_overview/operations/dynamic_configuration.html#arch-overview-dynamic-config-lds"><span class="std std-ref">LDS</span></a>.
+Defaults to 600 seconds (10 minutes). Generally the drain time should be less than
+the parent shutdown time set via the <a class="reference internal" href="#cmdoption-parent-shutdown-time-s"><code class="xref std std-option docutils literal notranslate"><span class="pre">--parent-shutdown-time-s</span></code></a> option. How the two
+settings are configured depends on the specific deployment. In edge scenarios, it might be
+desirable to have a very long drain time. In service to service scenarios, it might be possible
+to make the drain and shutdown time much shorter (e.g., 60s/90s).</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-drain-strategy">
+<span class="sig-name descname"><span class="pre">--drain-strategy</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;string&gt;</span></span><a class="headerlink" href="#cmdoption-drain-strategy" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> Determine behaviour of Envoy during the hot restart drain sequence. During the drain sequence, the drain manager encourages draining through terminating connections on request completion, sending “Connection: CLOSE” on HTTP1, and sending GOAWAY on HTTP2.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">gradual</span></code>: <em>(default)</em> The percentage of requests encouraged to drain increases to 100% as the drain time elapses.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">immediate</span></code>: All requests are encouraged to drain as soon as the drain sequence begins.</p></li>
+</ul>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-parent-shutdown-time-s">
+<span class="sig-name descname"><span class="pre">--parent-shutdown-time-s</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;integer&gt;</span></span><a class="headerlink" href="#cmdoption-parent-shutdown-time-s" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> The time in seconds that Envoy will wait before shutting down the parent process
+during a hot restart. See the <a class="reference internal" href="../intro/arch_overview/operations/hot_restart.html#arch-overview-hot-restart"><span class="std std-ref">hot restart overview</span></a> for more
+information. Defaults to 900 seconds (15 minutes).</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-disable-hot-restart">
+<span class="sig-name descname"><span class="pre">--disable-hot-restart</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-disable-hot-restart" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> This flag disables Envoy hot restart for builds that have it enabled. By default, hot
+restart is enabled.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-enable-mutex-tracing">
+<span class="sig-name descname"><span class="pre">--enable-mutex-tracing</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-enable-mutex-tracing" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> This flag enables the collection of mutex contention statistics
+(<a class="reference internal" href="../api-v3/admin/v3/mutex_stats.proto.html#envoy-v3-api-msg-admin-v3-mutexstats"><span class="std std-ref">MutexStats</span></a>) as well as a contention endpoint
+(<a class="reference internal" href="admin.html#get--contention" title="GET /contention"><code class="xref http http-get docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/contention</span></code></a>). Mutex tracing is not enabled by default, since it incurs a slight performance
+penalty for those Envoys which already experience mutex contention.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-allow-unknown-fields">
+<span class="sig-name descname"><span class="pre">--allow-unknown-fields</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-allow-unknown-fields" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> Deprecated alias for <a class="reference internal" href="#cmdoption-allow-unknown-static-fields"><code class="xref std std-option docutils literal notranslate"><span class="pre">--allow-unknown-static-fields</span></code></a>.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-allow-unknown-static-fields">
+<span class="sig-name descname"><span class="pre">--allow-unknown-static-fields</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-allow-unknown-static-fields" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> This flag disables validation of protobuf configurations for unknown fields. By default, the
+validation is enabled. For most deployments, the default should be used which ensures configuration errors
+are caught upfront and Envoy is configured as intended. Warnings are logged for the first use of
+any unknown field and these occurrences are counted in the <a class="reference internal" href="../configuration/observability/statistics.html#server-statistics"><span class="std std-ref">server.static_unknown_fields</span></a> statistic.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-reject-unknown-dynamic-fields">
+<span class="sig-name descname"><span class="pre">--reject-unknown-dynamic-fields</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-reject-unknown-dynamic-fields" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> This flag disables validation of protobuf configuration for unknown fields in
+dynamic configuration. By default, this flag is set false, disabling validation for fields beyond
+bootstrap. This allows newer xDS configurations to be delivered to older Envoys. This can be set
+true for strict dynamic checking when this behavior is not wanted but the default should be
+desirable for most Envoy deployments. Warnings are logged for the first use of any unknown field
+and these occurrences are counted in the <a class="reference internal" href="../configuration/observability/statistics.html#server-statistics"><span class="std std-ref">server.dynamic_unknown_fields</span></a>
+statistic.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-ignore-unknown-dynamic-fields">
+<span class="sig-name descname"><span class="pre">--ignore-unknown-dynamic-fields</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-ignore-unknown-dynamic-fields" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> This flag disables validation of protobuf configuration for unknown fields in dynamic
+configuration. Unlike setting <a class="reference internal" href="#cmdoption-reject-unknown-dynamic-fields"><code class="xref std std-option docutils literal notranslate"><span class="pre">--reject-unknown-dynamic-fields</span></code></a> to false, it does not log warnings
+or count occurrences of unknown fields, in the interest of configuration processing speed. If
+<a class="reference internal" href="#cmdoption-reject-unknown-dynamic-fields"><code class="xref std std-option docutils literal notranslate"><span class="pre">--reject-unknown-dynamic-fields</span></code></a> is set to true, this flag has no effect.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>In addition to not logging warnings or counting occurrences of unknown fields, setting this
+option also disables counting and warnings of deprecated fields as well as work-in-progress
+message and fields. It is <em>strongly</em> recommended that this option is not set on at least a
+small portion of the fleet (staging, canary, etc.) in order to monitor for unknown,
+deprecated, or work-in-progress usage.</p>
+</div>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-skip-deprecated-logs">
+<span class="sig-name descname"><span class="pre">--skip-deprecated-logs</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-skip-deprecated-logs" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> This option disables the logging of deprecated field warnings during Protobuf message validation.
+When enabled, deprecated fields will be silently ignored without generating log messages, which can be useful
+for reducing log verbosity in production environments. By default, deprecated warnings are logged. The suppression
+of these warnings is only activated when this CLI option is explicitly used.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-disable-extensions">
+<span class="sig-name descname"><span class="pre">--disable-extensions</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;extension</span> <span class="pre">list&gt;</span></span><a class="headerlink" href="#cmdoption-disable-extensions" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> This flag disabled the provided list of comma-separated extension names. Disabled
+extensions cannot be used by static or dynamic configuration, though they are still linked into
+Envoy and may run start-up code or have other runtime effects. Extension names are created by
+joining the extension category and name with a forward slash,
+e.g. <code class="docutils literal notranslate"><span class="pre">envoy.grpc_credentials/envoy.grpc_credentials.file_based_metadata</span></code>.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-version">
+<span class="sig-name descname"><span class="pre">--version</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-version" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> This flag is used to display Envoy version and build information, e.g.
+<code class="docutils literal notranslate"><span class="pre">c93f9f6c1e5adddd10a3e3646c7e049c649ae177/1.9.0-dev/Clean/RELEASE/BoringSSL-FIPS</span></code>.</p>
+<p>It consists of five slash-separated fields:</p>
+<ul class="simple">
+<li><p>source revision - git commit from which Envoy was built,</p></li>
+<li><p>release number - either release (e.g. <code class="docutils literal notranslate"><span class="pre">1.9.0</span></code>) or a development build (e.g. <code class="docutils literal notranslate"><span class="pre">1.9.0-dev</span></code>),</p></li>
+<li><p>status of the source tree at the build time - either <code class="docutils literal notranslate"><span class="pre">Clean</span></code> or <code class="docutils literal notranslate"><span class="pre">Modified</span></code>,</p></li>
+<li><p>build mode - either <code class="docutils literal notranslate"><span class="pre">RELEASE</span></code> or <code class="docutils literal notranslate"><span class="pre">DEBUG</span></code>,</p></li>
+<li><p>TLS library - <code class="docutils literal notranslate"><span class="pre">BoringSSL</span></code>, <code class="docutils literal notranslate"><span class="pre">BoringSSL-FIPS</span></code>, or <code class="docutils literal notranslate"><span class="pre">OpenSSL</span></code>.</p></li>
+</ul>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-enable-core-dump">
+<span class="sig-name descname"><span class="pre">--enable-core-dump</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-enable-core-dump" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> This flag is intended for Linux-based systems and it’s a no-op for all other platforms.
+It enables core dumps by invoking <a class="reference external" href="https://man7.org/linux/man-pages/man2/prctl.2.html">prctl</a> using the
+PR_SET_DUMPABLE option. This is useful for container environments when using capabilities, given that when
+Envoy has more capabilities than its base environment core dumping will be disabled by the kernel.</p>
+</dd></dl>
+
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-stats-tag">
+<span class="sig-name descname"><span class="pre">--stats-tag</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-stats-tag" title="Link to this definition"></a></dt>
+<dd><p><em>(optional)</em> This flag provides a universal tag for all stats generated by Envoy. The format is <code class="docutils literal notranslate"><span class="pre">tag:value</span></code>. Only
+alphanumeric values are allowed for tag names. For tag values all characters are permitted except for ‘.’ (dot).
+This flag can be repeated multiple times to set multiple universal tags. Multiple values for the same tag name are not allowed.</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="operations.html" class="btn btn-neutral float-left" title="Operations and administration" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="hot_restarter.html" class="btn btn-neutral float-right" title="Hot restart Python wrapper" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Command line options</a></li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

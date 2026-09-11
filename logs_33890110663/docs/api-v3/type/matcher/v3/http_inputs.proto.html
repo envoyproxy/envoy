@@ -1,0 +1,467 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Common HTTP inputs (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="Custom Tag (proto)" href="../../tracing/v3/custom_tag.proto.html" />
+    <link rel="prev" title="AI API protocol (proto)" href="../../ai/v3/api_protocol.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../config/config.html">Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../types/types.html">Types</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../ai/v3/api_protocol.proto.html">AI API protocol (proto)</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Common HTTP inputs (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tracing/v3/custom_tag.proto.html">Custom Tag (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../v3/hash_policy.proto.html">Hash Policy (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../v3/http.proto.html">HTTP (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../v3/http_status.proto.html">HTTP status codes (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../http/v3/cookie.proto.html">HTTP cookie API (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../metadata/v3/metadata.proto.html">Metadata (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="filter_state.proto.html">Filter state matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="metadata.proto.html">Metadata matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="node.proto.html">Node matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="number.proto.html">Number matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="path.proto.html">Path matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../http/v3/path_transformation.proto.html">Path Transformations API (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../v3/percent.proto.html">Percent (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../v3/range.proto.html">Range (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../v3/ratelimit_unit.proto.html">Ratelimit Time Unit (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../v3/ratelimit_strategy.proto.html">Rate Limit Strategies (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="regex.proto.html">Regex matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../v3/semantic_version.proto.html">Semantic version (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="string.proto.html">String matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="struct.proto.html">Struct matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../v3/token_bucket.proto.html">Token bucket (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="value.proto.html">Value matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="status_code_input.proto.html">Common HTTP Inputs (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="address.proto.html">Address Matcher (proto)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../types/types.html">Types</a></li>
+      <li class="breadcrumb-item active">Common HTTP inputs (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/type/matcher/v3/http_inputs.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="common-http-inputs-proto">
+<span id="envoy-v3-api-file-envoy-type-matcher-v3-http-inputs-proto"></span><h1>Common HTTP inputs (proto)<a class="headerlink" href="#common-http-inputs-proto" title="Link to this heading"></a></h1>
+<section id="type-matcher-v3-httprequestheadermatchinput">
+<span id="envoy-v3-api-msg-type-matcher-v3-httprequestheadermatchinput"></span><h2>type.matcher.v3.HttpRequestHeaderMatchInput<a class="headerlink" href="#type-matcher-v3-httprequestheadermatchinput" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/type/matcher/v3/http_inputs.proto#L21">[type.matcher.v3.HttpRequestHeaderMatchInput proto]</a></p>
+<p>Match input indicates that matching should be done on a specific request header.
+The resulting input string will be all headers for the given key joined by a comma,
+e.g. if the request contains two ‘foo’ headers with value ‘bar’ and ‘baz’, the input
+string will be ‘bar,baz’.</p>
+<p id="extension-envoy-matching-inputs-request-headers">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.matching.inputs.request_headers</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension has an unknown security posture and should only be
+used in deployments where both the downstream and upstream are
+trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension category:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../intro/arch_overview/advanced/matching/matching_api.html#extension-category-envoy-matching-http-input"><span class="std std-ref">envoy.matching.http.input</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-type-matcher-v3-httprequestheadermatchinput"><span class="std std-ref">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span></a></p></li>
+</ul>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;header_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-type-matcher-v3-httprequestheadermatchinput-header-name">
+<dt>header_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The request header to match on.</p>
+</dd>
+</dl>
+</section>
+<section id="type-matcher-v3-httprequesttrailermatchinput">
+<span id="envoy-v3-api-msg-type-matcher-v3-httprequesttrailermatchinput"></span><h2>type.matcher.v3.HttpRequestTrailerMatchInput<a class="headerlink" href="#type-matcher-v3-httprequesttrailermatchinput" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/type/matcher/v3/http_inputs.proto#L33">[type.matcher.v3.HttpRequestTrailerMatchInput proto]</a></p>
+<p>Match input indicates that matching should be done on a specific request trailer.
+The resulting input string will be all headers for the given key joined by a comma,
+e.g. if the request contains two ‘foo’ headers with value ‘bar’ and ‘baz’, the input
+string will be ‘bar,baz’.</p>
+<p id="extension-envoy-matching-inputs-request-trailers">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.matching.inputs.request_trailers</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension has an unknown security posture and should only be
+used in deployments where both the downstream and upstream are
+trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension category:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../intro/arch_overview/advanced/matching/matching_api.html#extension-category-envoy-matching-http-input"><span class="std std-ref">envoy.matching.http.input</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-type-matcher-v3-httprequesttrailermatchinput"><span class="std std-ref">type.googleapis.com/envoy.type.matcher.v3.HttpRequestTrailerMatchInput</span></a></p></li>
+</ul>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;header_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-type-matcher-v3-httprequesttrailermatchinput-header-name">
+<dt>header_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The request trailer to match on.</p>
+</dd>
+</dl>
+</section>
+<section id="type-matcher-v3-httpresponseheadermatchinput">
+<span id="envoy-v3-api-msg-type-matcher-v3-httpresponseheadermatchinput"></span><h2>type.matcher.v3.HttpResponseHeaderMatchInput<a class="headerlink" href="#type-matcher-v3-httpresponseheadermatchinput" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/type/matcher/v3/http_inputs.proto#L45">[type.matcher.v3.HttpResponseHeaderMatchInput proto]</a></p>
+<p>Match input indicating that matching should be done on a specific response header.
+The resulting input string will be all headers for the given key joined by a comma,
+e.g. if the response contains two ‘foo’ headers with value ‘bar’ and ‘baz’, the input
+string will be ‘bar,baz’.</p>
+<p id="extension-envoy-matching-inputs-response-headers">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.matching.inputs.response_headers</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension has an unknown security posture and should only be
+used in deployments where both the downstream and upstream are
+trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension category:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../intro/arch_overview/advanced/matching/matching_api.html#extension-category-envoy-matching-http-input"><span class="std std-ref">envoy.matching.http.input</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-type-matcher-v3-httpresponseheadermatchinput"><span class="std std-ref">type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput</span></a></p></li>
+</ul>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;header_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-type-matcher-v3-httpresponseheadermatchinput-header-name">
+<dt>header_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The response header to match on.</p>
+</dd>
+</dl>
+</section>
+<section id="type-matcher-v3-httpresponsetrailermatchinput">
+<span id="envoy-v3-api-msg-type-matcher-v3-httpresponsetrailermatchinput"></span><h2>type.matcher.v3.HttpResponseTrailerMatchInput<a class="headerlink" href="#type-matcher-v3-httpresponsetrailermatchinput" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/type/matcher/v3/http_inputs.proto#L57">[type.matcher.v3.HttpResponseTrailerMatchInput proto]</a></p>
+<p>Match input indicates that matching should be done on a specific response trailer.
+The resulting input string will be all headers for the given key joined by a comma,
+e.g. if the request contains two ‘foo’ headers with value ‘bar’ and ‘baz’, the input
+string will be ‘bar,baz’.</p>
+<p id="extension-envoy-matching-inputs-response-trailers">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.matching.inputs.response_trailers</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension has an unknown security posture and should only be
+used in deployments where both the downstream and upstream are
+trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension category:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../intro/arch_overview/advanced/matching/matching_api.html#extension-category-envoy-matching-http-input"><span class="std std-ref">envoy.matching.http.input</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-type-matcher-v3-httpresponsetrailermatchinput"><span class="std std-ref">type.googleapis.com/envoy.type.matcher.v3.HttpResponseTrailerMatchInput</span></a></p></li>
+</ul>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;header_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-type-matcher-v3-httpresponsetrailermatchinput-header-name">
+<dt>header_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The response trailer to match on.</p>
+</dd>
+</dl>
+</section>
+<section id="type-matcher-v3-httprequestqueryparammatchinput">
+<span id="envoy-v3-api-msg-type-matcher-v3-httprequestqueryparammatchinput"></span><h2>type.matcher.v3.HttpRequestQueryParamMatchInput<a class="headerlink" href="#type-matcher-v3-httprequestqueryparammatchinput" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/type/matcher/v3/http_inputs.proto#L67">[type.matcher.v3.HttpRequestQueryParamMatchInput proto]</a></p>
+<p>Match input indicates that matching should be done on a specific query parameter.
+The resulting input string will be the first query parameter for the value
+‘query_param’.</p>
+<p id="extension-envoy-matching-inputs-query-params">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.matching.inputs.query_params</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension has an unknown security posture and should only be
+used in deployments where both the downstream and upstream are
+trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension category:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../intro/arch_overview/advanced/matching/matching_api.html#extension-category-envoy-matching-http-input"><span class="std std-ref">envoy.matching.http.input</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-type-matcher-v3-httprequestqueryparammatchinput"><span class="std std-ref">type.googleapis.com/envoy.type.matcher.v3.HttpRequestQueryParamMatchInput</span></a></p></li>
+</ul>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;query_param&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-type-matcher-v3-httprequestqueryparammatchinput-query-param">
+<dt>query_param</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The query parameter to match on.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../ai/v3/api_protocol.proto.html" class="btn btn-neutral float-left" title="AI API protocol (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../tracing/v3/custom_tag.proto.html" class="btn btn-neutral float-right" title="Custom Tag (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Common HTTP inputs (proto)</a><ul>
+<li><a class="reference internal" href="#type-matcher-v3-httprequestheadermatchinput">type.matcher.v3.HttpRequestHeaderMatchInput</a></li>
+<li><a class="reference internal" href="#type-matcher-v3-httprequesttrailermatchinput">type.matcher.v3.HttpRequestTrailerMatchInput</a></li>
+<li><a class="reference internal" href="#type-matcher-v3-httpresponseheadermatchinput">type.matcher.v3.HttpResponseHeaderMatchInput</a></li>
+<li><a class="reference internal" href="#type-matcher-v3-httpresponsetrailermatchinput">type.matcher.v3.HttpResponseTrailerMatchInput</a></li>
+<li><a class="reference internal" href="#type-matcher-v3-httprequestqueryparammatchinput">type.matcher.v3.HttpRequestQueryParamMatchInput</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

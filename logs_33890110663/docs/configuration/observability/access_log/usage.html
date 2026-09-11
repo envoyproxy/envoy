@@ -1,0 +1,379 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Access logging &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Dynamic Modules Access Logger" href="dynamic_modules.html" />
+    <link rel="prev" title="Statistics" href="stats.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../http/http.html">HTTP</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../observability.html">Observability</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../statistics.html">Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../application_logging.html">Application logging</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="access_log.html">Access Logs</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="stats.html">Statistics</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Access logging</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dynamic_modules.html">Dynamic Modules Access Logger</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../observability.html">Observability</a></li>
+          <li class="breadcrumb-item"><a href="access_log.html">Access Logs</a></li>
+      <li class="breadcrumb-item active">Access logging</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/observability/access_log/usage.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <blockquote>
+<div></div></blockquote>
+<section id="access-logging">
+<span id="config-access-log"></span><h1>Access logging<a class="headerlink" href="#access-logging" title="Link to this heading"></a></h1>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
+<p>Access logs are configured as part of the <a class="reference internal" href="../../http/http_conn_man/http_conn_man.html#config-http-conn-man"><span class="std std-ref">HTTP connection manager config</span></a>, <a class="reference internal" href="../../listeners/network_filters/tcp_proxy_filter.html#config-network-filters-tcp-proxy"><span class="std std-ref">TCP Proxy</span></a>,
+<a class="reference internal" href="../../listeners/udp_filters/udp_proxy.html#config-udp-listener-filters-udp-proxy"><span class="std std-ref">UDP Proxy</span></a> or
+<a class="reference internal" href="../../listeners/network_filters/thrift_proxy_filter.html#config-network-filters-thrift-proxy"><span class="std std-ref">Thrift Proxy</span></a>.</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api-v3/config/accesslog/v3/accesslog.proto.html#envoy-v3-api-msg-config-accesslog-v3-accesslog"><span class="std std-ref">v3 API reference</span></a></p></li>
+</ul>
+</section>
+<section id="format-rules">
+<span id="config-access-log-format"></span><h2>Format Rules<a class="headerlink" href="#format-rules" title="Link to this heading"></a></h2>
+<p>Access log formats contain command operators that extract the relevant data and insert it.
+They support two formats: <a class="reference internal" href="#config-access-log-format-strings"><span class="std std-ref">“format strings”</span></a> and
+<a class="reference internal" href="#config-access-log-format-dictionaries"><span class="std std-ref">“format dictionaries”</span></a>. In both cases, the command operators
+are used to extract the relevant data, which is then inserted into the specified log format.
+Only one access log format may be specified at a time.</p>
+</section>
+<section id="format-strings">
+<span id="config-access-log-format-strings"></span><h2>Format Strings<a class="headerlink" href="#format-strings" title="Link to this heading"></a></h2>
+<p>Format strings are plain strings, specified using the <code class="docutils literal notranslate"><span class="pre">format</span></code> key. They may contain
+either command operators or other characters interpreted as a plain string.
+The access log formatter does not make any assumptions about a new line separator, so one
+has to be specified as part of the format string.
+See the <a class="reference internal" href="#config-access-log-default-format"><span class="std std-ref">default format</span></a> for an example.</p>
+</section>
+<section id="default-format-string">
+<span id="config-access-log-default-format"></span><h2>Default Format String<a class="headerlink" href="#default-format-string" title="Link to this heading"></a></h2>
+<p>If a custom format string is not specified, Envoy uses the following default format:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[%START_TIME%] &quot;%REQUEST_HEADER(:METHOD)% %REQUEST_HEADER(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%&quot;
+%RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
+%RESPONSE_HEADER(X-ENVOY-UPSTREAM-SERVICE-TIME)% &quot;%REQUEST_HEADER(X-FORWARDED-FOR)%&quot; &quot;%REQUEST_HEADER(USER-AGENT)%&quot;
+&quot;%REQUEST_HEADER(X-REQUEST-ID)%&quot; &quot;%REQUEST_HEADER(:AUTHORITY)%&quot; &quot;%UPSTREAM_HOST%&quot;
+</pre></div>
+</div>
+<p>Example of the default Envoy access log format:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[2016-04-15T20:17:00.310Z] &quot;POST /api/v1/locations HTTP/2&quot; 204 - 154 0 226 100 &quot;10.0.35.28&quot;</span>
+<span class="go">&quot;nsq2http&quot; &quot;cc21d9b0-cf5c-432b-8c7e-98aeb7988cd2&quot; &quot;locations&quot; &quot;tcp://10.0.2.1:80&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="format-dictionaries">
+<span id="config-access-log-format-dictionaries"></span><h2>Format Dictionaries<a class="headerlink" href="#format-dictionaries" title="Link to this heading"></a></h2>
+<p>Format dictionaries are dictionaries that specify a structured access log output format,
+specified using the <code class="docutils literal notranslate"><span class="pre">json_format</span></code> or <code class="docutils literal notranslate"><span class="pre">typed_json_format</span></code> keys. This allows logs to be output in
+a structured format such as JSON. Similar to format strings, command operators are evaluated and
+their values inserted into the format dictionary to construct the log output.</p>
+<p>For example, the following Envoy configuration snippet shows how to configure <code class="docutils literal notranslate"><span class="pre">json_format</span></code>:</p>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/b5a006884896578c9b2d227b1c3ac38e/json-format-config.yaml"><code class="xref download docutils literal notranslate"><span class="pre">json-format-config.yaml</span></code></a></span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+<span class="linenos"> 2</span><span class="w">          </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress_http</span>
+<span class="hll"><span class="linenos"> 3</span><span class="w">          </span><span class="nt">access_log</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos"> 4</span><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.access_loggers.stdout</span>
+</span><span class="hll"><span class="linenos"> 5</span><span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos"> 6</span><span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog</span>
+</span><span class="hll"><span class="linenos"> 7</span><span class="w">              </span><span class="nt">log_format</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos"> 8</span><span class="w">                </span><span class="nt">json_format</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos"> 9</span><span class="w">                  </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%PROTOCOL%&quot;</span>
+</span><span class="hll"><span class="linenos">10</span><span class="w">                  </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%DURATION%&quot;</span>
+</span><span class="hll"><span class="linenos">11</span><span class="w">                  </span><span class="nt">my_custom_header</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%REQUEST_HEADER(MY_CUSTOM_HEADER)%&quot;</span>
+</span><span class="linenos">12</span><span class="w">          </span><span class="nt">route_config</span><span class="p">:</span>
+<span class="linenos">13</span><span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_route</span>
+</pre></div>
+</div>
+</div>
+<p>The following JSON object would be written to the log file:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;protocol&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;HTTP/1.1&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;123&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;my_custom_header&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;value_of_MY_CUSTOM_HEADER&quot;</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>This allows you to specify a custom key for each command operator.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">typed_json_format</span></code> differs from <code class="docutils literal notranslate"><span class="pre">json_format</span></code> in that values are rendered as JSON numbers,
+booleans, and nested objects or lists where applicable. In the example, the request duration
+would be rendered as the number <code class="docutils literal notranslate"><span class="pre">123</span></code>.</p>
+<p>Format dictionaries have the following restrictions:</p>
+<ul class="simple">
+<li><p>The dictionary must map strings to strings (specifically, strings to command operators). Nesting
+is supported.</p></li>
+<li><p>When using the <code class="docutils literal notranslate"><span class="pre">typed_json_format</span></code> command operators will only produce typed output if the
+command operator is the only string that appears in the dictionary value. For example,
+<code class="docutils literal notranslate"><span class="pre">&quot;%DURATION%&quot;</span></code> will log a numeric duration value, but <code class="docutils literal notranslate"><span class="pre">&quot;%DURATION%.0&quot;</span></code> will log a string
+value.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When using the <code class="docutils literal notranslate"><span class="pre">typed_json_format</span></code>, integer values that exceed <span class="math notranslate nohighlight">\(2^{53}\)</span> will be
+represented with reduced precision as they must be converted to floating point numbers.</p>
+</div>
+</section>
+<section id="command-operators">
+<span id="config-access-log-command-operators"></span><h2>Command Operators<a class="headerlink" href="#command-operators" title="Link to this heading"></a></h2>
+<p>Command operators are used to extract values that will be inserted into the access logs.
+The same operators are used by different types of access logs (such as HTTP and TCP). Some
+fields may have slightly different meanings, depending on what type of log it is. Differences
+are noted in the descriptions.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If a value is not set/empty, the logs will contain a <code class="docutils literal notranslate"><span class="pre">-</span></code> character or, for JSON logs,
+the string <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code>. For typed JSON logs unset values are represented as <code class="docutils literal notranslate"><span class="pre">null</span></code> values and empty
+strings are rendered as <code class="docutils literal notranslate"><span class="pre">&quot;&quot;</span></code>. The <a class="reference internal" href="../../../api-v3/config/core/v3/substitution_format_string.proto.html#envoy-v3-api-field-config-core-v3-substitutionformatstring-omit-empty-values"><span class="std std-ref">omit_empty_values</span></a> option could be used
+to omit empty values entirely.</p>
+</div>
+<p>Unless otherwise noted, command operators produce string outputs for typed JSON logs.</p>
+<p>See all the available command operators in the <a class="reference internal" href="../../advanced/substitution_formatter.html#config-advanced-substitution-operators"><span class="std std-ref">substitution formatter documentation</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="stats.html" class="btn btn-neutral float-left" title="Statistics" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="dynamic_modules.html" class="btn btn-neutral float-right" title="Dynamic Modules Access Logger" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Access logging</a><ul>
+<li><a class="reference internal" href="#configuration">Configuration</a></li>
+<li><a class="reference internal" href="#format-rules">Format Rules</a></li>
+<li><a class="reference internal" href="#format-strings">Format Strings</a></li>
+<li><a class="reference internal" href="#default-format-string">Default Format String</a></li>
+<li><a class="reference internal" href="#format-dictionaries">Format Dictionaries</a></li>
+<li><a class="reference internal" href="#command-operators">Command Operators</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

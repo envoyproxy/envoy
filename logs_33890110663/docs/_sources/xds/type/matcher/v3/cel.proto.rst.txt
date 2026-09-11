@@ -1,0 +1,58 @@
+.. _envoy_v3_api_file_xds/type/matcher/v3/cel.proto:
+
+Common Expression Language (CEL) matchers (proto)
+=================================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.CelMatcher:
+
+.xds.type.matcher.v3.CelMatcher
+-------------------------------
+
+
+`[.xds.type.matcher.v3.CelMatcher proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/cel.proto#L29>`_
+
+Performs a match by evaluating a `Common Expression Language
+<https://github.com/google/cel-spec>`_ (CEL) expression against the standardized set of
+:ref:`HTTP attributes <arch_overview_attributes>` specified via ``HttpAttributesCelMatchInput``.
+
+.. attention::
+
+  The match is ``true``, iff the result of the evaluation is a bool AND true.
+  In all other cases, the match is ``false``, including but not limited to: non-bool types,
+  ``false``, ``null``, ``int(1)``, etc.
+  In case CEL expression raises an error, the result of the evaluation is interpreted "no match".
+
+Refer to :ref:`Unified Matcher API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>` documentation
+for usage details.
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "expr_match": {...},
+    "description": ...
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.CelMatcher.expr_match:
+
+
+expr_match
+  (:ref:`.xds.type.v3.CelExpression <envoy_v3_api_msg_.xds.type.v3.CelExpression>`, *REQUIRED*) Either parsed or checked representation of the CEL program.
+
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.CelMatcher.description:
+
+
+description
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Free-form description of the CEL AST, e.g. the original expression text, to be
+  used for debugging assistance.
+
+

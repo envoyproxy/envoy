@@ -1,0 +1,134 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/upstreams/http/tcp/golang/v3alpha/golang.proto:
+
+Golang (proto)
+==============
+
+.. _extension_envoy.upstreams.http.tcp.golang:
+
+This extension has the qualified name ``envoy.upstreams.http.tcp.golang``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.upstreams <extension_category_envoy.upstreams>`
+
+
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+This bridge enables an Http client to connect to a TCP server via a Golang plugin, facilitating Protocol Convert from HTTP to any RPC protocol in Envoy.
+
+For an overview of the Golang HTTP TCP bridge please see the :ref:`configuration reference documentation <config_http_tcp_bridge_golang>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.upstreams.http.tcp.golang.v3alpha.Config:
+
+extensions.upstreams.http.tcp.golang.v3alpha.Config
+---------------------------------------------------
+
+
+:repo:`[extensions.upstreams.http.tcp.golang.v3alpha.Config proto] <api/contrib/envoy/extensions/upstreams/http/tcp/golang/v3alpha/golang.proto#L26>`
+
+
+
+.. _extension_category_envoy.upstreams:
+
+.. tip::
+
+  This extension category has the following known extensions:
+
+
+  - :ref:`envoy.upstreams.http.dynamic_modules <extension_envoy.upstreams.http.dynamic_modules>`
+
+  - :ref:`envoy.upstreams.http.generic <extension_envoy.upstreams.http.generic>`
+
+  - :ref:`envoy.upstreams.http.http <extension_envoy.upstreams.http.http>`
+
+  - :ref:`envoy.upstreams.http.tcp <extension_envoy.upstreams.http.tcp>`
+
+  - :ref:`envoy.upstreams.http.udp <extension_envoy.upstreams.http.udp>`
+
+  - :ref:`envoy.upstreams.tcp.generic <extension_envoy.upstreams.tcp.generic>`
+
+
+
+
+  The following extensions are available in :ref:`contrib <install_contrib>` images only:
+
+
+  - :ref:`envoy.upstreams.http.tcp.golang <extension_envoy.upstreams.http.tcp.golang>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "library_id": ...,
+    "library_path": ...,
+    "plugin_name": ...,
+    "plugin_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.upstreams.http.tcp.golang.v3alpha.Config.library_id:
+
+
+library_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Globally unique ID for a dynamic library file.
+
+
+.. _envoy_v3_api_field_extensions.upstreams.http.tcp.golang.v3alpha.Config.library_path:
+
+
+library_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Path to a dynamic library implementing the
+  :repo:`HttpTcpBridge API <contrib/golang/common/go/api.HttpTcpBridge>`
+  interface.
+
+
+.. _envoy_v3_api_field_extensions.upstreams.http.tcp.golang.v3alpha.Config.plugin_name:
+
+
+plugin_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Globally unique name of the Go plugin.
+
+  This name **must** be consistent with the name registered in ``tcp::RegisterHttpTcpBridgeFactoryAndConfigParser``
+
+
+
+.. _envoy_v3_api_field_extensions.upstreams.http.tcp.golang.v3alpha.Config.plugin_config:
+
+
+plugin_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) Configuration for the Go plugin.
+
+  .. note::
+      This configuration is only parsed in the Golang plugin, and is therefore not validated
+      by Envoy.
+
+      See the :repo:`HttpTcpBridge API <contrib/golang/common/go/api/filter.go>`
+      for more information about how the plugin's configuration data can be accessed.
+
+
+

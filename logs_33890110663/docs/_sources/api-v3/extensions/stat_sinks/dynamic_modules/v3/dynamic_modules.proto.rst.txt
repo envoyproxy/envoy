@@ -1,0 +1,110 @@
+.. _envoy_v3_api_file_envoy/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.proto:
+
+Dynamic Modules Stats Sink (proto)
+==================================
+
+.. _extension_envoy.stat_sinks.dynamic_modules:
+
+This extension has the qualified name ``envoy.stat_sinks.dynamic_modules``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.stats_sinks <extension_category_envoy.stats_sinks>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink <envoy_v3_api_msg_extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink:
+
+extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink
+---------------------------------------------------------------
+
+
+:repo:`[extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink proto] <api/envoy/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.proto#L28>`
+
+Configuration for the Dynamic Modules Stats Sink. This sink allows loading shared object
+files via ``dlopen`` to implement custom stats sink behavior.
+
+A module can be loaded by multiple stat sinks. It is loaded only once and shared
+across multiple sink instances.
+
+The stats sink receives periodic metric snapshots of counters, gauges, and text readouts,
+and is also called synchronously when histogram observations are recorded.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "sink_name": ...,
+    "sink_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`, *REQUIRED*) Specifies the shared-object level configuration. This field is required.
+
+
+.. _envoy_v3_api_field_extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink.sink_name:
+
+
+sink_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name for this sink configuration. If not specified, defaults to an empty string.
+
+  This can be used to distinguish between different sink implementations inside a dynamic
+  module. When Envoy receives this configuration, it passes the ``sink_name`` to the dynamic
+  module's sink config init function together with the ``sink_config``.
+
+
+.. _envoy_v3_api_field_extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink.sink_config:
+
+
+sink_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the sink chosen by ``sink_name``. If not specified, an empty
+  configuration is passed to the module.
+
+  ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
+  without the wrapper.
+
+  .. code-block:: yaml
+
+   # Passing a JSON struct configuration
+   sink_config:
+     "@type": "type.googleapis.com/google.protobuf.Struct"
+     value:
+       endpoint: "metrics.example.com:9125"
+       prefix: "envoy"
+
+   # Passing a simple string configuration
+   sink_config:
+     "@type": "type.googleapis.com/google.protobuf.StringValue"
+     value: "metrics.example.com:9125"
+
+
+

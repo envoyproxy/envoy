@@ -1,0 +1,83 @@
+.. _envoy_v3_api_file_envoy/extensions/matching/input_matchers/ip/v3/ip.proto:
+
+IP matcher (proto)
+==================
+
+.. _extension_envoy.matching.matchers.ip:
+
+This extension has the qualified name ``envoy.matching.matchers.ip``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.input_matchers <extension_category_envoy.matching.input_matchers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.input_matchers.ip.v3.Ip <envoy_v3_api_msg_extensions.matching.input_matchers.ip.v3.Ip>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.input_matchers.ip.v3.Ip:
+
+extensions.matching.input_matchers.ip.v3.Ip
+-------------------------------------------
+
+
+:repo:`[extensions.matching.input_matchers.ip.v3.Ip proto] <api/envoy/extensions/matching/input_matchers/ip/v3/ip.proto#L25>`
+
+This input matcher matches IPv4 or IPv6 addresses against a list of CIDR
+ranges. It returns true if and only if the input IP belongs to at least one
+of these CIDR ranges. Internally, it uses a Level-Compressed trie, as
+described in the paper `IP-address lookup using LC-tries
+<https://www.nada.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/>`_
+by S. Nilsson and G. Karlsson. For "big" lists of IPs, this matcher is more
+efficient than multiple single IP matcher, that would have a linear cost.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cidr_ranges": [],
+    "stat_prefix": ...
+  }
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.ip.v3.Ip.cidr_ranges:
+
+
+cidr_ranges
+  (**repeated** :ref:`config.core.v3.CidrRange <envoy_v3_api_msg_config.core.v3.CidrRange>`, *REQUIRED*) Match if the IP belongs to any of these CIDR ranges.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.ip.v3.Ip.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The human readable prefix to use when emitting statistics for the IP input
+  matcher. Names in the table below are concatenated to this prefix.
+
+  .. csv-table::
+     :header: Name, Type, Description
+     :widths: 1, 1, 2
+
+     ip_parsing_failed, Counter, Total number of IP addresses the matcher was unable to parse
+
+

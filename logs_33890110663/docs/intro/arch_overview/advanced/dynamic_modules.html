@@ -1,0 +1,440 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dynamic modules &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Life of a Request" href="../../life_of_a_request.html" />
+    <link rel="prev" title="Wasm" href="wasm.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../http/http.html">HTTP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../observability/observability.html">Observability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../security/security.html">Security</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="advanced.html">Advanced</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="data_sharing_between_filters.html">Sharing data between filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="attributes.html">Attributes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="matching/matching.html">Generic Matching</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wasm.html">Wasm</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Dynamic modules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="advanced.html">Advanced</a></li>
+      <li class="breadcrumb-item active">Dynamic modules</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/intro/arch_overview/advanced/dynamic_modules.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dynamic-modules">
+<span id="arch-overview-dynamic-modules"></span><h1>Dynamic modules<a class="headerlink" href="#dynamic-modules" title="Link to this heading"></a></h1>
+<p>Envoy has support for loading shared libraries at runtime to extend its functionality. In Envoy, these are known as “dynamic modules.” More specifically, dynamic modules are shared libraries that implement the
+<a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/source/extensions/dynamic_modules/abi/abi.h">ABI</a> written in a pure C header file. The ABI defines a set of functions
+that the dynamic module must implement to be loaded by Envoy. Also, it specifies the functions implemented by Envoy
+that the dynamic module can call to interact with Envoy.</p>
+<p>Implementing the ABI from scratch requires an extensive understanding of the Envoy internals. For users, we provide an
+official SDK that abstracts these details and provides a high-level API to implement dynamic modules. The SDK is currently
+available in C++, Go, and Rust. In theory, any language that can produce a shared library can be used to implement dynamic modules.
+Future development may include support for other languages.</p>
+<p>Currently, dynamic modules are supported at the following extension points:</p>
+<ul class="simple">
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/bootstrap/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-bootstrap-dynamic-modules-v3-dynamicmodulebootstrapextension"><span class="std std-ref">bootstrap extension</span></a>
+(<a class="reference internal" href="../../../configuration/other_features/bootstrap_extensions/dynamic_modules.html#config-bootstrap-extensions-dynamic-modules"><span class="std std-ref">configuration</span></a>).</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/clusters/dynamic_modules/v3/cluster.proto.html#envoy-v3-api-msg-extensions-clusters-dynamic-modules-v3-clusterconfig"><span class="std std-ref">cluster</span></a>.</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/filters/listener/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-filters-listener-dynamic-modules-v3-dynamicmodulelistenerfilter"><span class="std std-ref">listener filter</span></a>.</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/filters/udp/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-filters-udp-dynamic-modules-v3-dynamicmoduleudplistenerfilter"><span class="std std-ref">UDP listener filter</span></a>
+(<a class="reference internal" href="../../../configuration/listeners/udp_filters/dynamic_modules.html#config-udp-listener-filters-dynamic-modules"><span class="std std-ref">configuration</span></a>).</p></li>
+<li><p>As an <a class="reference internal" href="../../../api-v3/extensions/access_loggers/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-access-loggers-dynamic-modules-v3-dynamicmoduleaccesslog"><span class="std std-ref">access logger</span></a>
+(<a class="reference internal" href="../../../configuration/observability/access_log/dynamic_modules.html#config-access-log-dynamic-modules"><span class="std std-ref">configuration</span></a>).</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/formatter/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-formatter-dynamic-modules-v3-dynamicmoduleformatter"><span class="std std-ref">formatter</span></a>.</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-stat-sinks-dynamic-modules-v3-dynamicmodulestatssink"><span class="std std-ref">stats sink</span></a>
+(<a class="reference internal" href="../../../configuration/observability/stat_sinks/dynamic_modules_stat_sink.html#config-stat-sinks-dynamic-modules"><span class="std std-ref">configuration</span></a>).</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/filters/network/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-filters-network-dynamic-modules-v3-dynamicmodulenetworkfilter"><span class="std std-ref">network filter</span></a>.</p></li>
+<li><p>As an <a class="reference internal" href="../../../api-v3/extensions/filters/http/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-filters-http-dynamic-modules-v3-dynamicmodulefilter"><span class="std std-ref">HTTP filter</span></a>.</p></li>
+<li><p>As an <a class="reference internal" href="../../../api-v3/extensions/matching/http/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-matching-http-dynamic-modules-v3-httpdynamicmodulematchinput"><span class="std std-ref">HTTP matching data input</span></a>.</p></li>
+<li><p>As an <a class="reference internal" href="../../../api-v3/extensions/matching/input_matchers/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-matching-input-matchers-dynamic-modules-v3-dynamicmodulematcher"><span class="std std-ref">input matcher</span></a>.</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-cert-validator-dynamic-modules-v3-dynamicmodulecertvalidatorconfig"><span class="std std-ref">TLS certificate validator</span></a>.</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/transport_sockets/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-transport-sockets-dynamic-modules-v3-dynamicmoduletransportsocket"><span class="std std-ref">transport socket</span></a>.</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/load_balancing_policies/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-load-balancing-policies-dynamic-modules-v3-dynamicmodulesloadbalancerconfig"><span class="std std-ref">load balancing policy</span></a>.</p></li>
+<li><p>As an <a class="reference internal" href="../../../api-v3/extensions/upstreams/http/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-upstreams-http-dynamic-modules-v3-config"><span class="std std-ref">upstream HTTP TCP bridge</span></a>.</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/tracers/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-tracers-dynamic-modules-v3-dynamicmoduletracer"><span class="std std-ref">tracer</span></a>.</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/health_checkers/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-health-checkers-dynamic-modules-v3-dynamicmodulehealthcheck"><span class="std std-ref">health checker</span></a>
+(<a class="reference internal" href="../../../configuration/upstream/health_checkers/dynamic_modules.html#config-health-checkers-dynamic-modules"><span class="std std-ref">configuration</span></a>).</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-router-cluster-specifiers-dynamic-modules-v3-dynamicmoduleclusterspecifier"><span class="std std-ref">cluster specifier</span></a>
+(<a class="reference internal" href="../../../configuration/http/cluster_specifier/dynamic_modules.html#config-http-cluster-specifier-dynamic-modules"><span class="std std-ref">configuration</span></a>).</p></li>
+<li><p>As a <a class="reference internal" href="../../../api-v3/extensions/network/dns_resolver/hickory/v3/hickory_dns_resolver.proto.html#envoy-v3-api-msg-extensions-network-dns-resolver-hickory-v3-hickorydnsresolverconfig"><span class="std std-ref">DNS resolver</span></a>
+(<a class="reference internal" href="../upstream/dns_resolution.html#arch-overview-dns-resolution"><span class="std std-ref">architecture</span></a>). The Hickory resolver is implemented as a
+builtin dynamic module; the ABI and SDKs also support custom DNS resolvers.</p></li>
+</ul>
+<p>There are a few design goals for the dynamic modules:</p>
+<ol class="arabic simple">
+<li><p><strong>Performance</strong>: The dynamic modules should have minimal overhead compared to the built-in C++ extensions. For example, the dynamic modules are able to access HTTP headers as well as body without copying them unlike any other extension mechanisms.</p></li>
+<li><p><strong>Ease of Use</strong>: The SDK should provide a high-level API that abstracts the details of the Envoy internals.</p></li>
+<li><p><strong>Flexibility</strong>: The dynamic modules should be able to implement any functionality that can be implemented by the built-in C++ extensions without performance penalty. This is work in progress and many features are not yet available.</p></li>
+</ol>
+<section id="compatibility">
+<h2>Compatibility<a class="headerlink" href="#compatibility" title="Link to this heading"></a></h2>
+<p>Since a dynamic module is loaded at runtime, it must be ABI-compatible with the
+Envoy binary that loads it.</p>
+<p>Envoy’s dynamic modules have stricter compatibility requirements than Envoy’s other extension mechanisms, such as Lua, Wasm or External Processor.
+Stabilizing the ABI is challenging due to the way the ABI needs to be tightly coupled to Envoy’s internals.</p>
+<p>Currently, we guarantee <strong>forward compatibility within one version</strong>: a dynamic module built with the SDK for Envoy version X.Y will work with Envoy versions X.Y and X.(Y+1).
+Breaking changes to the ABI may occur in later versions.</p>
+<p>To ensure compatibility, it is recommended to rebuild your dynamic modules with the SDK matching your target Envoy version in a timely manner.</p>
+</section>
+<section id="module-discovery">
+<h2>Module discovery<a class="headerlink" href="#module-discovery" title="Link to this heading"></a></h2>
+<p>A dynamic module is referenced by its name as in the <a class="reference internal" href="../../../api-v3/extensions/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-dynamic-modules-v3-dynamicmoduleconfig"><span class="std std-ref">configuration API</span></a>.
+The name is used to search for the shared library file in the search path. The search path is configured by the environment variable
+<code class="docutils literal notranslate"><span class="pre">ENVOY_DYNAMIC_MODULES_SEARCH_PATH</span></code>. The actual search path is <code class="docutils literal notranslate"><span class="pre">${ENVOY_DYNAMIC_MODULES_SEARCH_PATH}/lib${name}.so</span></code>. If
+the environment variable is not set, the current working directory is used instead. After searching in the specified search path,
+the standard library paths such as <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code> and <code class="docutils literal notranslate"><span class="pre">/usr/lib</span></code> are searched as well following the behavior of <code class="docutils literal notranslate"><span class="pre">dlopen(3)</span></code>.</p>
+<p>For example, when the name <code class="docutils literal notranslate"><span class="pre">my_module</span></code> is referenced in the configuration and <code class="docutils literal notranslate"><span class="pre">ENVOY_DYNAMIC_MODULES_SEARCH_PATH</span></code> is set to <code class="docutils literal notranslate"><span class="pre">/path/to/modules</span></code>,
+Envoy will first look for <code class="docutils literal notranslate"><span class="pre">/path/to/modules/libmy_module.so</span></code>, then <code class="docutils literal notranslate"><span class="pre">$LD_LIBRARY_PATH/libmy_module.so</span></code>, and finally <code class="docutils literal notranslate"><span class="pre">/usr/lib/libmy_module.so</span></code>, etc.</p>
+</section>
+<section id="safety">
+<h2>Safety<a class="headerlink" href="#safety" title="Link to this heading"></a></h2>
+<p>The dynamic modules should be used under the assumption that all modules are fully trusted and have the same privilege level as the main Envoy program.
+Since these modules run in the same process as Envoy, they can access all memory and resources available to the main process.
+This makes it unfeasible to enforce security boundaries between Envoy and the modules, as they share the same address space and permissions.
+It is essential that any dynamic module undergo thorough testing and validation before deployment just like any other application code.</p>
+</section>
+<section id="error-handling-rust-sdk">
+<h2>Error handling (Rust SDK)<a class="headerlink" href="#error-handling-rust-sdk" title="Link to this heading"></a></h2>
+<p>The Rust SDK provides an optional <code class="docutils literal notranslate"><span class="pre">CatchUnwind</span></code> wrapper that can be used to wrap
+filter implementations. When a wrapped callback panics, the SDK logs the panic payload
+and returns a fail-closed default:</p>
+<ul class="simple">
+<li><p>HTTP request-path callbacks send a 500 response and return <code class="docutils literal notranslate"><span class="pre">StopIteration</span></code>.</p></li>
+<li><p>HTTP response-path callbacks reset the stream and return <code class="docutils literal notranslate"><span class="pre">StopIteration</span></code>.</p></li>
+<li><p>Network filter callbacks close the connection and return <code class="docutils literal notranslate"><span class="pre">StopIteration</span></code>.</p></li>
+<li><p>Listener filter callbacks close the socket and return <code class="docutils literal notranslate"><span class="pre">StopIteration</span></code>.</p></li>
+</ul>
+<p>The SDK always guards each callback at the FFI boundary so a panic can never unwind into
+Envoy and corrupt the process, regardless of whether <code class="docutils literal notranslate"><span class="pre">CatchUnwind</span></code> is used. The wrapper
+adds graceful filter-level teardown on top of that guard. The affected request or
+connection is terminated. Other traffic is unaffected.</p>
+</section>
+<section id="getting-started">
+<h2>Getting started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h2>
+<p>We have a dedicated repository for the dynamic module examples to help you get started.
+The repository is available at <a class="reference external" href="https://github.com/envoyproxy/dynamic-modules-examples">envoyproxy/dynamic-modules-examples</a></p>
+</section>
+<section id="statistics">
+<h2>Statistics<a class="headerlink" href="#statistics" title="Link to this heading"></a></h2>
+<p>All dynamic-module extension types emit the following statistics in the shared <code class="docutils literal notranslate"><span class="pre">dynamic_modules.</span></code> namespace.
+These stats track failures encountered while loading the extension’s configuration. Each one is tagged with
+<code class="docutils literal notranslate"><span class="pre">config_name</span></code>, set to the configured name of the dynamic-module extension instance — for example the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-field-extensions-filters-http-dynamic-modules-v3-dynamicmodulefilter-filter-name"><span class="std std-ref">filter_name</span></a>
+for the HTTP filter, <code class="docutils literal notranslate"><span class="pre">transport_socket_name</span></code> for the transport socket, <code class="docutils literal notranslate"><span class="pre">lb_policy_name</span></code> for the
+load-balancing policy, <code class="docutils literal notranslate"><span class="pre">tracer_name</span></code> for the tracer or <code class="docutils literal notranslate"><span class="pre">cluster_name</span></code> for the cluster
+(<code class="docutils literal notranslate"><span class="pre">default</span></code> if the extension has no per-instance name, as for the UDP listener filter).</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>module_load_error</p></td>
+<td><p>Counter</p></td>
+<td><p>Total dynamic modules that could not be loaded (missing or invalid module source, <code class="docutils literal notranslate"><span class="pre">dlopen</span></code> failure, by-name lookup miss, or a required ABI symbol could not be resolved).</p></td>
+</tr>
+<tr class="row-odd"><td><p>config_init_error</p></td>
+<td><p>Counter</p></td>
+<td><p>Total configurations that failed to initialize after the module loaded successfully (the module rejected or failed to parse the supplied configuration).</p></td>
+</tr>
+<tr class="row-even"><td><p>remote_fetch_error</p></td>
+<td><p>Counter</p></td>
+<td><p>Total failures fetching or loading a remote module source, including rejected cache misses when <code class="docutils literal notranslate"><span class="pre">nack_on_cache_miss</span></code> is set. Only the HTTP filter supports remote module sources.</p></td>
+</tr>
+<tr class="row-odd"><td><p>per_route_config_error</p></td>
+<td><p>Counter</p></td>
+<td><p>Total per-route configurations that failed to load or initialize. Only emitted by the HTTP filter.</p></td>
+</tr>
+</tbody>
+</table>
+<p>In addition to the counters above, a module may define its own custom metrics. These are emitted
+under the configurable <a class="reference internal" href="../../../api-v3/extensions/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-field-extensions-dynamic-modules-v3-dynamicmoduleconfig-metrics-namespace"><span class="std std-ref">metrics_namespace</span></a>
+(<code class="docutils literal notranslate"><span class="pre">dynamicmodulescustom</span></code> by default), separately from the <code class="docutils literal notranslate"><span class="pre">dynamic_modules.</span></code> namespace above.</p>
+</section>
+<section id="logging">
+<h2>Logging<a class="headerlink" href="#logging" title="Link to this heading"></a></h2>
+<p>When a dynamic module cannot be loaded, Envoy emits an error log on the <code class="docutils literal notranslate"><span class="pre">dynamic_modules</span></code> logger
+with the form <code class="docutils literal notranslate"><span class="pre">Unable</span> <span class="pre">to</span> <span class="pre">load</span> <span class="pre">dynamic</span> <span class="pre">module</span> <span class="pre">&lt;module&gt;:</span> <span class="pre">&lt;reason&gt;</span></code>. This is logged from the module
+loader itself, so it is emitted for every extension type, including extension points that have no
+factory context and therefore cannot increment the <code class="docutils literal notranslate"><span class="pre">module_load_error</span></code> counter. It is also the
+only signal when a module referenced from the bootstrap configuration fails to load, because Envoy
+exits before its statistics can be scraped.</p>
+</section>
+<section id="secrets">
+<h2>Secrets<a class="headerlink" href="#secrets" title="Link to this heading"></a></h2>
+<p>An HTTP filter module can subscribe to <a class="reference internal" href="../../../api-v3/extensions/transport_sockets/tls/v3/secret.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-genericsecret"><span class="std std-ref">generic secrets</span></a>
+rather than carrying credentials in its own configuration, so that secrets stay out of the module
+configuration and are rotated by Envoy.</p>
+<p>A subscription is created while the filter configuration is being loaded, and is identified by a
+name plus an optional <a class="reference internal" href="../../../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSource</span></a>, serialized
+as JSON, that the module passes to Envoy:</p>
+<ul class="simple">
+<li><p>Without a config source, the name refers to a secret in <a class="reference internal" href="../../../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-staticresources-secrets"><span class="std std-ref">static_resources.secrets</span></a>.</p></li>
+<li><p>With a config source, the name is the resource requested over <a class="reference internal" href="../../../configuration/security/secret.html#config-secret-discovery-service"><span class="std std-ref">SDS</span></a>.
+Identical subscriptions are shared across filters, and the value the module reads is updated
+whenever the SDS server pushes a new version. On the downstream HTTP filter chain the subscription
+also participates in initialization, so the listener does not start serving until the secret has
+been delivered.</p></li>
+</ul>
+<p>Reading a secret returns the value for the current worker thread, so a rotation is transparent to
+the module. The returned bytes are owned by Envoy and are only valid for the duration of the event
+hook, so a module that needs to retain a secret must copy it.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="wasm.html" class="btn btn-neutral float-left" title="Wasm" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../life_of_a_request.html" class="btn btn-neutral float-right" title="Life of a Request" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Dynamic modules</a><ul>
+<li><a class="reference internal" href="#compatibility">Compatibility</a></li>
+<li><a class="reference internal" href="#module-discovery">Module discovery</a></li>
+<li><a class="reference internal" href="#safety">Safety</a></li>
+<li><a class="reference internal" href="#error-handling-rust-sdk">Error handling (Rust SDK)</a></li>
+<li><a class="reference internal" href="#getting-started">Getting started</a></li>
+<li><a class="reference internal" href="#statistics">Statistics</a></li>
+<li><a class="reference internal" href="#logging">Logging</a></li>
+<li><a class="reference internal" href="#secrets">Secrets</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

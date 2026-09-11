@@ -1,0 +1,420 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/thrift_to_metadata/v3/thrift_to_metadata.proto:
+
+Thrift-To-Metadata Filter (proto)
+=================================
+
+.. _extension_envoy.filters.http.thrift_to_metadata:
+
+This extension has the qualified name ``envoy.filters.http.thrift_to_metadata``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata <envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata>`
+
+
+
+
+The Thrift to Metadata filter serves for thrift over HTTP traffic, expecting serialized
+Thrift request and response bodies in the HTTP payload. It extracts *thrift metadata* from the
+HTTP body and put them into the *filter metadata*. This is useful for matching load balancer
+subsets, logging, etc.
+
+Thrift to Metadata :ref:`configuration overview <config_http_filters_thrift_to_metadata>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.KeyValuePair:
+
+extensions.filters.http.thrift_to_metadata.v3.KeyValuePair
+----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.thrift_to_metadata.v3.KeyValuePair proto] <api/envoy/extensions/filters/http/thrift_to_metadata/v3/thrift_to_metadata.proto#L56>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "metadata_namespace": ...,
+    "key": ...,
+    "value": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.KeyValuePair.metadata_namespace:
+
+
+metadata_namespace
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The namespace — if this is empty, the filter's namespace will be used.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.KeyValuePair.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The key to use within the namespace.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.KeyValuePair.value:
+
+
+value
+  (`Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#value>`_) When used for on_present case, if value is non-empty it'll be used instead
+  of the field value.
+
+  When used for on_missing case, a non-empty value must be provided.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.FieldSelector:
+
+extensions.filters.http.thrift_to_metadata.v3.FieldSelector
+-----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.thrift_to_metadata.v3.FieldSelector proto] <api/envoy/extensions/filters/http/thrift_to_metadata/v3/thrift_to_metadata.proto#L70>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "id": ...,
+    "child": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.FieldSelector.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) field name to log
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.FieldSelector.id:
+
+
+id
+  (`int32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) field id to match
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.FieldSelector.child:
+
+
+child
+  (:ref:`extensions.filters.http.thrift_to_metadata.v3.FieldSelector <envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.FieldSelector>`) next node of the field selector
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.Rule:
+
+extensions.filters.http.thrift_to_metadata.v3.Rule
+--------------------------------------------------
+
+
+:repo:`[extensions.filters.http.thrift_to_metadata.v3.Rule proto] <api/envoy/extensions/filters/http/thrift_to_metadata/v3/thrift_to_metadata.proto#L82>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "field": ...,
+    "field_selector": {...},
+    "method_name": ...,
+    "on_present": {...},
+    "on_missing": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field:
+
+
+field
+  (:ref:`extensions.filters.http.thrift_to_metadata.v3.Field <envoy_v3_api_enum_extensions.filters.http.thrift_to_metadata.v3.Field>`) The field to match on.
+  :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
+  takes precedence if both are set.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector:
+
+
+field_selector
+  (:ref:`extensions.filters.http.thrift_to_metadata.v3.FieldSelector <envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.FieldSelector>`) Specifies that a match will be performed on the value of a field in the thrift body.
+  If set, the whole http body will be buffered to extract the field value, which
+  may have performance implications.
+
+  It's a thrift over http version of
+  :ref:`field_selector<envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.field_selector>`.
+
+  See also `payload-to-metadata <https://www.envoyproxy.io/docs/envoy/latest/configuration/other_protocols/thrift_filters/payload_to_metadata_filter>`_
+  for more reference.
+
+  Example:
+
+  .. code-block:: yaml
+
+     method_name: foo
+     field_selector:
+       name: info
+       id: 2
+       child:
+         name: version
+         id: 1
+
+  The above yaml will match on value of ``info.version`` in the below thrift schema as input of
+  :ref:`on_present<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.on_present>` or
+  :ref:`on_missing<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.on_missing>`
+  while we are processing ``foo`` method. This rule won't be applied to ``bar`` method.
+
+  .. code-block:: thrift
+
+     struct Info {
+       1: required string version;
+     }
+     service Server {
+       bool foo(1: i32 id, 2: Info info);
+       bool bar(1: i32 id, 2: Info info);
+     }
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.method_name:
+
+
+method_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If specified, :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
+  will be used to extract the field value *only* on the thrift message with method name.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.on_present:
+
+
+on_present
+  (:ref:`extensions.filters.http.thrift_to_metadata.v3.KeyValuePair <envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.KeyValuePair>`) The key-value pair to set in the *filter metadata* if the field is present
+  in *thrift metadata*.
+
+  If the value in the KeyValuePair is non-empty, it'll be used instead
+  of field value.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.on_missing:
+
+
+on_missing
+  (:ref:`extensions.filters.http.thrift_to_metadata.v3.KeyValuePair <envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.KeyValuePair>`) The key-value pair to set in the *filter metadata* if the field is missing
+  in *thrift metadata*.
+
+  The value in the KeyValuePair must be set, since it'll be used in lieu
+  of the missing field value.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata:
+
+extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata
+--------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata proto] <api/envoy/extensions/filters/http/thrift_to_metadata/v3/thrift_to_metadata.proto#L149>`
+
+The configuration for transforming thrift metadata into filter metadata.
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_rules": [],
+    "response_rules": [],
+    "transport": ...,
+    "protocol": ...,
+    "allow_content_types": [],
+    "allow_empty_content_type": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata.request_rules:
+
+
+request_rules
+  (**repeated** :ref:`extensions.filters.http.thrift_to_metadata.v3.Rule <envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.Rule>`) The list of rules to apply to http request body to extract thrift metadata.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata.response_rules:
+
+
+response_rules
+  (**repeated** :ref:`extensions.filters.http.thrift_to_metadata.v3.Rule <envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.Rule>`) The list of rules to apply to http response body to extract thrift metadata.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata.transport:
+
+
+transport
+  (:ref:`extensions.filters.network.thrift_proxy.v3.TransportType <envoy_v3_api_enum_extensions.filters.network.thrift_proxy.v3.TransportType>`) Supplies the type of transport that the Thrift proxy should use. Defaults to
+  :ref:`AUTO_TRANSPORT<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata.protocol:
+
+
+protocol
+  (:ref:`extensions.filters.network.thrift_proxy.v3.ProtocolType <envoy_v3_api_enum_extensions.filters.network.thrift_proxy.v3.ProtocolType>`) Supplies the type of protocol that the Thrift proxy should use. Defaults to
+  :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`.
+  Note that :ref:`LAX_BINARY<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.LAX_BINARY>`
+  is not distinguished by :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`,
+  which is the same with :ref:`thrift_proxy network filter <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProxy>`.
+  Note that :ref:`TWITTER<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>` is
+  not supported due to deprecation in envoy.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata.allow_content_types:
+
+
+allow_content_types
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Allowed content-type for thrift payload to filter metadata transformation.
+  Default to ``{"application/x-thrift"}``.
+
+  Set ``allow_empty_content_type`` if empty/missing content-type header
+  is allowed.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata.allow_empty_content_type:
+
+
+allow_empty_content_type
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Allowed empty content-type for thrift payload to filter metadata transformation.
+  Default to false.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadataPerRoute:
+
+extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadataPerRoute
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadataPerRoute proto] <api/envoy/extensions/filters/http/thrift_to_metadata/v3/thrift_to_metadata.proto#L185>`
+
+Thrift to metadata configuration on a per-route basis, which overrides the global configuration for
+request rules and responses rules.
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_rules": [],
+    "response_rules": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadataPerRoute.request_rules:
+
+
+request_rules
+  (**repeated** :ref:`extensions.filters.http.thrift_to_metadata.v3.Rule <envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.Rule>`) The list of rules to apply to http request body to extract thrift metadata.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadataPerRoute.response_rules:
+
+
+response_rules
+  (**repeated** :ref:`extensions.filters.http.thrift_to_metadata.v3.Rule <envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.Rule>`) The list of rules to apply to http response body to extract thrift metadata.
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.thrift_to_metadata.v3.Field:
+
+Enum extensions.filters.http.thrift_to_metadata.v3.Field
+--------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.thrift_to_metadata.v3.Field proto] <api/envoy/extensions/filters/http/thrift_to_metadata/v3/thrift_to_metadata.proto#L29>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.thrift_to_metadata.v3.Field.METHOD_NAME:
+
+
+METHOD_NAME
+  *(DEFAULT)* ⁣The Thrift method name, string value.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.thrift_to_metadata.v3.Field.PROTOCOL:
+
+
+PROTOCOL
+  ⁣The Thrift protocol name, string value. Values are "binary", "binary/non-strict", and "compact", with "(auto)" suffix if
+  :ref:`protocol <envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata.protocol>`
+  is set to :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.thrift_to_metadata.v3.Field.TRANSPORT:
+
+
+TRANSPORT
+  ⁣The Thrift transport name, string value. Values are "framed", "header", and "unframed", with "(auto)" suffix if
+  :ref:`transport <envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata.transport>`
+  is set to :ref:`AUTO_TRANSPORT<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.thrift_to_metadata.v3.Field.HEADER_FLAGS:
+
+
+HEADER_FLAGS
+  ⁣The Thrift message type, singed 16-bit integer value.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.thrift_to_metadata.v3.Field.SEQUENCE_ID:
+
+
+SEQUENCE_ID
+  ⁣The Thrift sequence ID, singed 32-bit integer value.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.thrift_to_metadata.v3.Field.MESSAGE_TYPE:
+
+
+MESSAGE_TYPE
+  ⁣The Thrift message type, string value. Values in request are "call" and "oneway", and in response are "reply" and "exception".
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.thrift_to_metadata.v3.Field.REPLY_TYPE:
+
+
+REPLY_TYPE
+  ⁣The Thrift reply type, string value. This is only valid for response rules. Values are "success" and "error".
+
+

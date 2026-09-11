@@ -1,0 +1,99 @@
+.. _envoy_v3_api_file_envoy/extensions/access_loggers/filters/process_ratelimit/v3/process_ratelimit.proto:
+
+ProcessRateLimiter (proto)
+==========================
+
+.. _extension_envoy.access_loggers.extension_filters.process_ratelimit:
+
+This extension has the qualified name ``envoy.access_loggers.extension_filters.process_ratelimit``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.access_loggers.extension_filters <extension_category_envoy.access_loggers.extension_filters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter:
+
+extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter
+-----------------------------------------------------------------------------
+
+
+:repo:`[extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter proto] <api/envoy/extensions/access_loggers/filters/process_ratelimit/v3/process_ratelimit.proto#L19>`
+
+Filters for rate limiting the access log emission using global token buckets per process and shared across all listeners.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter.dynamic_config:
+
+
+dynamic_config
+  (:ref:`extensions.access_loggers.filters.process_ratelimit.v3.DynamicTokenBucket <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.DynamicTokenBucket>`) The dynamic config for the token bucket.
+
+
+
+.. _envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.DynamicTokenBucket:
+
+extensions.access_loggers.filters.process_ratelimit.v3.DynamicTokenBucket
+-------------------------------------------------------------------------
+
+
+:repo:`[extensions.access_loggers.filters.process_ratelimit.v3.DynamicTokenBucket proto] <api/envoy/extensions/access_loggers/filters/process_ratelimit/v3/process_ratelimit.proto#L24>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "resource_name": ...,
+    "config_source": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.access_loggers.filters.process_ratelimit.v3.DynamicTokenBucket.resource_name:
+
+
+resource_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) the key used to find the token bucket in the singleton map.
+
+
+.. _envoy_v3_api_field_extensions.access_loggers.filters.process_ratelimit.v3.DynamicTokenBucket.config_source:
+
+
+config_source
+  (:ref:`config.core.v3.ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`, *REQUIRED*) The configuration source for the :ref:`token_bucket <envoy_v3_api_msg_type.v3.TokenBucket>`.
+  It should stay the same through the process lifetime.
+
+

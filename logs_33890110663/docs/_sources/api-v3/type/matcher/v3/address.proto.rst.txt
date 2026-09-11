@@ -1,0 +1,48 @@
+.. _envoy_v3_api_file_envoy/type/matcher/v3/address.proto:
+
+Address Matcher (proto)
+=======================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.AddressMatcher:
+
+type.matcher.v3.AddressMatcher
+------------------------------
+
+
+:repo:`[type.matcher.v3.AddressMatcher proto] <api/envoy/type/matcher/v3/address.proto#L19>`
+
+Match an IP against a repeated CIDR range. This matcher is intended to be
+used in other matchers, for example in the filter state matcher to match a
+filter state object as an IP.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ranges": [],
+    "invert_match": ...
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.AddressMatcher.ranges:
+
+
+ranges
+  (**repeated** :ref:`.xds.core.v3.CidrRange <envoy_v3_api_msg_.xds.core.v3.CidrRange>`) 
+
+.. _envoy_v3_api_field_type.matcher.v3.AddressMatcher.invert_match:
+
+
+invert_match
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, the match result will be inverted. Defaults to false.
+
+  * If set to false (default), the matcher will return true if the IP matches any of the CIDR ranges.
+  * If set to true, the matcher will return true if the IP does NOT match any of the CIDR ranges.
+
+

@@ -1,0 +1,386 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/mcp_router/v3/mcp_router.proto:
+
+MCP Multiplexer/Demultiplexer (proto)
+=====================================
+
+.. _extension_envoy.filters.http.mcp_router:
+
+This extension has the qualified name ``envoy.filters.http.mcp_router``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.mcp_router.v3.McpRouter <envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.McpRouter>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+Configuration for the MCP Multiplexer/Demultiplexer.
+
+This extension aggregates capabilities, tools and resources of remote MCP servers and presents Envoy
+as a singe MCP server to the client. This allows a unified policy to be applied to multiple remote
+servers and abstracts multiple MCP servers as a single one.
+
+This filter must be a terminal filter in the filter chain and replaces the HTTP router filter.
+
+Not all route level policies are applicable to this filter.
+Specifically the following policies are ignored:
+* :ref:`route <envoy_v3_api_field_config.route.v3.Route.route>`
+* :ref:`redirect <envoy_v3_api_field_config.route.v3.Route.redirect>`
+* :ref:`direct_response <envoy_v3_api_field_config.route.v3.Route.direct_response>`
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.HeaderSource:
+
+extensions.filters.http.mcp_router.v3.HeaderSource
+--------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp_router.v3.HeaderSource proto] <api/envoy/extensions/filters/http/mcp_router/v3/mcp_router.proto#L39>`
+
+Extract identity from a request header.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.HeaderSource.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Header name to extract (e.g., "x-user-identity").
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.DynamicMetadataSource:
+
+extensions.filters.http.mcp_router.v3.DynamicMetadataSource
+-----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp_router.v3.DynamicMetadataSource proto] <api/envoy/extensions/filters/http/mcp_router/v3/mcp_router.proto#L45>`
+
+Extract identity from dynamic metadata (e.g., populated by JWT or ext_authz filter).
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "key": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.DynamicMetadataSource.key:
+
+
+key
+  (:ref:`type.metadata.v3.MetadataKey <envoy_v3_api_msg_type.metadata.v3.MetadataKey>`, *REQUIRED*) The metadata key to retrieve the value from.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.IdentityExtractor:
+
+extensions.filters.http.mcp_router.v3.IdentityExtractor
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp_router.v3.IdentityExtractor proto] <api/envoy/extensions/filters/http/mcp_router/v3/mcp_router.proto#L52>`
+
+Defines how the identity (user/principal) is extracted from the request.
+Exactly one of ``header`` or ``dynamic_metadata`` must be set.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "header": {...},
+    "dynamic_metadata": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.IdentityExtractor.header:
+
+
+header
+  (:ref:`extensions.filters.http.mcp_router.v3.HeaderSource <envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.HeaderSource>`) Extract identity from a request header.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.IdentityExtractor.dynamic_metadata:
+
+
+dynamic_metadata
+  (:ref:`extensions.filters.http.mcp_router.v3.DynamicMetadataSource <envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.DynamicMetadataSource>`) Extract identity from dynamic metadata.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.ValidationPolicy:
+
+extensions.filters.http.mcp_router.v3.ValidationPolicy
+------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp_router.v3.ValidationPolicy proto] <api/envoy/extensions/filters/http/mcp_router/v3/mcp_router.proto#L61>`
+
+Specifies how to handle requests where the identity is missing or mismatched.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "mode": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.ValidationPolicy.mode:
+
+
+mode
+  (:ref:`extensions.filters.http.mcp_router.v3.ValidationPolicy.Mode <envoy_v3_api_enum_extensions.filters.http.mcp_router.v3.ValidationPolicy.Mode>`) 
+
+.. _envoy_v3_api_enum_extensions.filters.http.mcp_router.v3.ValidationPolicy.Mode:
+
+Enum extensions.filters.http.mcp_router.v3.ValidationPolicy.Mode
+----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp_router.v3.ValidationPolicy.Mode proto] <api/envoy/extensions/filters/http/mcp_router/v3/mcp_router.proto#L62>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp_router.v3.ValidationPolicy.Mode.MODE_UNSPECIFIED:
+
+
+MODE_UNSPECIFIED
+  *(DEFAULT)* ⁣Not specified. Defaults to DISABLED behavior.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp_router.v3.ValidationPolicy.Mode.DISABLED:
+
+
+DISABLED
+  ⁣Bind identity on Initialize if present, but do not validate subsequent requests.
+  If extraction fails, the session proceeds anonymously.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.mcp_router.v3.ValidationPolicy.Mode.ENFORCE:
+
+
+ENFORCE
+  ⁣Reject the request (403) if the identity cannot be extracted
+  or if the session identity does not match the request identity.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.SessionIdentity:
+
+extensions.filters.http.mcp_router.v3.SessionIdentity
+-----------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp_router.v3.SessionIdentity proto] <api/envoy/extensions/filters/http/mcp_router/v3/mcp_router.proto#L79>`
+
+Session identity configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "identity": {...},
+    "validation": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.SessionIdentity.identity:
+
+
+identity
+  (:ref:`extensions.filters.http.mcp_router.v3.IdentityExtractor <envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.IdentityExtractor>`, *REQUIRED*) Defines how the identity (user/principal) is extracted from the request.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.SessionIdentity.validation:
+
+
+validation
+  (:ref:`extensions.filters.http.mcp_router.v3.ValidationPolicy <envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.ValidationPolicy>`) Specifies how to handle requests where the subject is missing or invalid.
+  Defaults to DISABLED.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.McpRouter:
+
+extensions.filters.http.mcp_router.v3.McpRouter
+-----------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp_router.v3.McpRouter proto] <api/envoy/extensions/filters/http/mcp_router/v3/mcp_router.proto#L88>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "servers": [],
+    "session_identity": {...},
+    "lazy_initialization": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.McpRouter.servers:
+
+
+servers
+  (**repeated** :ref:`extensions.filters.http.mcp_router.v3.McpRouter.McpBackend <envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.McpRouter.McpBackend>`) A list of remote MCP servers. MCP router aggregates capabilities, tools and resources from remote MCP servers
+  and presents itself as single MCP server to the client. All remote MCP servers are sent the same capabilities
+  that the client presented to Envoy.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.McpRouter.session_identity:
+
+
+session_identity
+  (:ref:`extensions.filters.http.mcp_router.v3.SessionIdentity <envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.SessionIdentity>`) If set, extracts a request "subject" and binds it into the MCP session.
+  If not set, sessions are created without identity binding.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.McpRouter.lazy_initialization:
+
+
+lazy_initialization
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, backend initialization is deferred until the first request that targets each backend.
+  The ``initialize`` response is returned immediately with gateway capabilities and an empty
+  backend session map. Each backend is initialized on-demand when a request first routes to it.
+  This avoids blocking the client ``initialize`` on slow or misbehaving backends.
+  Default is false (eager initialization of all backends during ``initialize``).
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.McpRouter.McpBackend:
+
+extensions.filters.http.mcp_router.v3.McpRouter.McpBackend
+----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp_router.v3.McpRouter.McpBackend proto] <api/envoy/extensions/filters/http/mcp_router/v3/mcp_router.proto#L90>`
+
+Specification of the MCP server.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "mcp_cluster": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.McpRouter.McpBackend.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Unique name for this backend. Used for:
+  - Tool name prefixing (e.g., "time__get_current_time")
+  - Session ID composition
+  - Logging and error messages.
+  Default will be the cluster name if not specified.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.McpRouter.McpBackend.mcp_cluster:
+
+
+mcp_cluster
+  (:ref:`extensions.filters.http.mcp_router.v3.McpRouter.McpCluster <envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.McpRouter.McpCluster>`) Backend target specification.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.mcp_router.v3.McpRouter.McpCluster:
+
+extensions.filters.http.mcp_router.v3.McpRouter.McpCluster
+----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.mcp_router.v3.McpRouter.McpCluster proto] <api/envoy/extensions/filters/http/mcp_router/v3/mcp_router.proto#L103>`
+
+Cluster-based backend configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster": ...,
+    "path": ...,
+    "timeout": {...},
+    "host_rewrite_literal": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.McpRouter.McpCluster.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Cluster name to route requests to.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.McpRouter.McpCluster.path:
+
+
+path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Path to use for MCP requests. Defaults to "/mcp".
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.McpRouter.McpCluster.timeout:
+
+
+timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Request timeout.
+  If not set, uses cluster's timeout configuration.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.mcp_router.v3.McpRouter.McpCluster.host_rewrite_literal:
+
+
+host_rewrite_literal
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates that during forwarding, the host header will be swapped with
+  this value.
+
+
+

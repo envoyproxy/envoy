@@ -1,0 +1,20 @@
+.. _version_history_1.32.5:
+
+1.32.5 (March 26, 2025)
+========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **docker**: Distroless container updated.
+

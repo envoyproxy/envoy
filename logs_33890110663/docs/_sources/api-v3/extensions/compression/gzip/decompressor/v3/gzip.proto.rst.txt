@@ -1,0 +1,83 @@
+.. _envoy_v3_api_file_envoy/extensions/compression/gzip/decompressor/v3/gzip.proto:
+
+Gzip Decompressor (proto)
+=========================
+
+.. _extension_envoy.compression.gzip.decompressor:
+
+This extension has the qualified name ``envoy.compression.gzip.decompressor``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.compression.decompressor <extension_category_envoy.compression.decompressor>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip <envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip:
+
+extensions.compression.gzip.decompressor.v3.Gzip
+------------------------------------------------
+
+
+:repo:`[extensions.compression.gzip.decompressor.v3.Gzip proto] <api/envoy/extensions/compression/gzip/decompressor/v3/gzip.proto#L18>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "window_bits": {...},
+    "chunk_size": {...},
+    "max_inflate_ratio": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.compression.gzip.decompressor.v3.Gzip.window_bits:
+
+
+window_bits
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value from 9 to 15 that represents the base two logarithmic of the decompressor's window size.
+  The decompression window size needs to be equal or larger than the compression window size.
+  The default window size is 15.
+  This is so that the decompressor can decompress a response compressed by a compressor with any compression window size.
+  For more details about this parameter, please refer to `zlib manual <https://www.zlib.net/manual.html>`_ > inflateInit2.
+
+
+.. _envoy_v3_api_field_extensions.compression.gzip.decompressor.v3.Gzip.chunk_size:
+
+
+chunk_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value for zlib's decompressor output buffer. If not set, defaults to 4096.
+  See https://www.zlib.net/manual.html for more details.
+
+
+.. _envoy_v3_api_field_extensions.compression.gzip.decompressor.v3.Gzip.max_inflate_ratio:
+
+
+max_inflate_ratio
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) An upper bound to the number of times the output buffer is allowed to be bigger than the size of
+  the accumulated input. This value is used to prevent decompression bombs. If not set, defaults to 100.
+
+

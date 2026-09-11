@@ -1,0 +1,170 @@
+.. _envoy_v3_api_file_envoy/extensions/load_balancing_policies/load_aware_locality/v3/load_aware_locality.proto:
+
+Load-Aware Locality-Picking Load Balancing Policy (proto)
+=========================================================
+
+.. _extension_envoy.load_balancing_policies.load_aware_locality:
+
+This extension has the qualified name ``envoy.load_balancing_policies.load_aware_locality``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.load_balancing_policies <extension_category_envoy.load_balancing_policies>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality <envoy_v3_api_msg_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality:
+
+extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality
+---------------------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality proto] <api/envoy/extensions/load_balancing_policies/load_aware_locality/v3/load_aware_locality.proto#L24>`
+
+Configuration for the load_aware_locality LB policy which uses ORCA utilization data
+to route traffic between localities based on available headroom.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "endpoint_picking_policy": {...},
+    "weight_update_period": {...},
+    "metric_names_for_computing_utilization": [],
+    "utilization_variance_threshold": {...},
+    "smoothing_time_constant": {...},
+    "remote_probe_fraction": {...},
+    "weight_expiration_period": {...},
+    "enable_oob_load_report": {...},
+    "oob_reporting_period": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality.endpoint_picking_policy:
+
+
+endpoint_picking_policy
+  (:ref:`config.cluster.v3.LoadBalancingPolicy <envoy_v3_api_msg_config.cluster.v3.LoadBalancingPolicy>`, *REQUIRED*) The child LB policy to create for endpoint-picking within each locality.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality.weight_update_period:
+
+
+weight_update_period
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) How frequently ORCA weights and locality utilization are recomputed on the
+  main thread. Must be at least 100ms. Defaults to 1s.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality.metric_names_for_computing_utilization:
+
+
+metric_names_for_computing_utilization
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the metrics used to compute endpoint utilization. For map
+  fields in the ORCA proto, the string will be of the form
+  ``<map_field_name>.<map_key>``. For example, the string
+  ``named_metrics.foo`` will mean to look for the key ``foo`` in the ORCA
+  :ref:`named_metrics <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.named_metrics>`
+  field. Utilization is the max of the values of the metrics specified
+  here, when that max is greater than 0. Otherwise
+  :ref:`application_utilization <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.application_utilization>`
+  is used if greater than 0, with
+  :ref:`cpu_utilization <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.cpu_utilization>`
+  as the final fallback. Disabling the runtime flag
+  ``envoy.reloadable_features.orca_weight_manager_use_named_metrics_first``
+  restores the legacy order, preferring ``application_utilization`` over
+  these metrics.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality.utilization_variance_threshold:
+
+
+utilization_variance_threshold
+  (`DoubleValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#doublevalue>`_) When the local locality's utilization is at most this threshold above the
+  remote average, route 100% of traffic to the local locality. This avoids
+  unnecessary cross-zone routing when utilization is roughly balanced.
+  One-sided: if the local zone is less loaded than remote, all-local routing
+  always applies. Must be in [0, 1]. Defaults to 0.1.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality.smoothing_time_constant:
+
+
+smoothing_time_constant
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) EWMA time constant for per-locality utilization smoothing. The per-tick
+  smoothing factor alpha is derived as ``1 - exp(-weight_update_period /
+  smoothing_time_constant)``, so settling time is consistent regardless of
+  the configured tick rate. Larger values produce more stable weights;
+  smaller values react faster. Must be greater than 0s. Defaults to 5s
+  (~95% settling within ~15s).
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality.remote_probe_fraction:
+
+
+remote_probe_fraction
+  (`DoubleValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#doublevalue>`_) Minimum fraction of traffic sent to non-local localities to keep ORCA
+  data fresh when the local-preference check would otherwise route 100% of
+  traffic to the local locality. The deficit is redistributed across remote
+  localities proportionally to their host count. Must be in [0, 1). Set to
+  0 to disable (safe only when ORCA reports arrive out-of-band, or when
+  cross-zone traffic must be strictly avoided). Defaults to 0.03 (3%).
+
+  Probe fraction is a global value split across all remote localities.
+  At very high remote-locality counts combined with low aggregate request
+  rates, per-host sample intervals can exceed ``weight_expiration_period``.
+  See the architecture overview for the scaling matrix.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality.weight_expiration_period:
+
+
+weight_expiration_period
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Per-host ORCA sample validity window. Hosts that have not reported load
+  metrics within this duration are excluded from their locality's
+  utilization aggregation. The locality's EWMA state continues normally
+  over the remaining reporting hosts. If every host in a locality is
+  stale, the locality falls back to host-count-proportional weighting
+  (the same path used when all localities are overloaded). Set to 0s to
+  disable expiration. Defaults to 3 minutes.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality.enable_oob_load_report:
+
+
+enable_oob_load_report
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Whether to enable out-of-band utilization reporting collection from
+  the endpoints. By default, per-request utilization reporting is used.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality.oob_reporting_period:
+
+
+oob_reporting_period
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Load reporting interval to request from the server. Note that the
+  server may not provide reports as frequently as the client requests.
+  Used only when enable_oob_load_report is true. Default is 10 seconds.
+
+

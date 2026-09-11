@@ -1,0 +1,110 @@
+.. _envoy_v3_api_file_envoy/extensions/tracers/opentelemetry/samplers/v3/dynatrace_sampler.proto:
+
+Dynatrace Sampler config (proto)
+================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig:
+
+extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig proto] <api/envoy/extensions/tracers/opentelemetry/samplers/v3/dynatrace_sampler.proto#L18>`
+
+Configuration for the Dynatrace Sampler extension.
+
+.. _extension_envoy.tracers.opentelemetry.samplers.dynatrace:
+
+This extension has the qualified name ``envoy.tracers.opentelemetry.samplers.dynatrace``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers.opentelemetry.samplers <extension_category_envoy.tracers.opentelemetry.samplers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig <envoy_v3_api_msg_extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "tenant": ...,
+    "cluster_id": ...,
+    "http_service": {...},
+    "root_spans_per_minute": ...
+  }
+
+.. _envoy_v3_api_field_extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig.tenant:
+
+
+tenant
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The Dynatrace tenant.
+
+  The value can be obtained from the Envoy deployment page in Dynatrace.
+
+
+.. _envoy_v3_api_field_extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig.cluster_id:
+
+
+cluster_id
+  (`int32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The id of the Dynatrace cluster id.
+
+  The value can be obtained from the Envoy deployment page in Dynatrace.
+
+
+.. _envoy_v3_api_field_extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig.http_service:
+
+
+http_service
+  (:ref:`config.core.v3.HttpService <envoy_v3_api_msg_config.core.v3.HttpService>`) The HTTP service to fetch the sampler configuration from the Dynatrace API (root spans per minute). For example:
+
+  .. code-block:: yaml
+
+     http_service:
+       http_uri:
+         cluster: dynatrace
+         uri: <tenant>.dev.dynatracelabs.com/api/v2/samplingConfiguration
+         timeout: 10s
+       request_headers_to_add:
+       - header:
+           key : "authorization"
+           value: "Api-Token dt..."
+
+
+
+.. _envoy_v3_api_field_extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig.root_spans_per_minute:
+
+
+root_spans_per_minute
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Default number of root spans per minute, used when the value can't be obtained from the Dynatrace API.
+
+  A default value of ``1000`` is used when:
+
+  - ``root_spans_per_minute`` is unset
+  - ``root_spans_per_minute`` is set to 0
+
+
+

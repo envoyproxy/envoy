@@ -1,0 +1,42 @@
+.. _envoy_v3_api_file_envoy/data/core/v3/tlv_metadata.proto:
+
+Proxy Protocol Filter Typed Metadata (proto)
+============================================
+
+
+PROXY protocol filter typed metadata.
+
+
+
+
+.. _envoy_v3_api_msg_data.core.v3.TlvsMetadata:
+
+data.core.v3.TlvsMetadata
+-------------------------
+
+
+:repo:`[data.core.v3.TlvsMetadata proto] <api/envoy/data/core/v3/tlv_metadata.proto#L15>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "typed_metadata": {...}
+  }
+
+.. _envoy_v3_api_field_data.core.v3.TlvsMetadata.typed_metadata:
+
+
+typed_metadata
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `bytes <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_>) Typed metadata for :ref:`Proxy protocol filter <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol>`, that represents a map of TLVs.
+  Each entry in the map consists of a key which corresponds to a configured
+  :ref:`rule key <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.key>` and a value (TLV value in bytes).
+  :ref:`Proxy protocol filter <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol>`
+  populates both typed and untyped metadata.
+
+
+
+

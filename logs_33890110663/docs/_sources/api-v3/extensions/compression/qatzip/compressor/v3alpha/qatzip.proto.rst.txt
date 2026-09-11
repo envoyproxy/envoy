@@ -1,0 +1,150 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/compression/qatzip/compressor/v3alpha/qatzip.proto:
+
+Qatzip Compressor (proto)
+=========================
+
+.. _extension_envoy.compression.qatzip.compressor:
+
+This extension has the qualified name ``envoy.compression.qatzip.compressor``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.compression.compressor <extension_category_envoy.compression.compressor>`
+
+
+
+
+
+Qatzip :ref:`configuration overview <config_qatzip>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.compression.qatzip.compressor.v3alpha.Qatzip:
+
+extensions.compression.qatzip.compressor.v3alpha.Qatzip
+-------------------------------------------------------
+
+
+:repo:`[extensions.compression.qatzip.compressor.v3alpha.Qatzip proto] <api/contrib/envoy/extensions/compression/qatzip/compressor/v3alpha/qatzip.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "compression_level": {...},
+    "hardware_buffer_size": ...,
+    "input_size_threshold": {...},
+    "stream_buffer_size": {...},
+    "chunk_size": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.compression.qatzip.compressor.v3alpha.Qatzip.compression_level:
+
+
+compression_level
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value from 1 to 9 that controls the main compression speed-density lever.
+  The higher quality, the slower compression. The default value is 1.
+
+
+.. _envoy_v3_api_field_extensions.compression.qatzip.compressor.v3alpha.Qatzip.hardware_buffer_size:
+
+
+hardware_buffer_size
+  (:ref:`extensions.compression.qatzip.compressor.v3alpha.Qatzip.HardwareBufferSize <envoy_v3_api_enum_extensions.compression.qatzip.compressor.v3alpha.Qatzip.HardwareBufferSize>`) A size of qat hardware buffer. This field will be set to "DEFAULT" if not specified.
+
+
+.. _envoy_v3_api_field_extensions.compression.qatzip.compressor.v3alpha.Qatzip.input_size_threshold:
+
+
+input_size_threshold
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Threshold of compression service’s input size for software failover.
+  If the size of input request less than the threshold, qatzip will route the request to software
+  compressor. The default value is 1024. The maximum value is 512*1024.
+
+
+.. _envoy_v3_api_field_extensions.compression.qatzip.compressor.v3alpha.Qatzip.stream_buffer_size:
+
+
+stream_buffer_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) A size of stream buffer. The default value is 128 * 1024. The maximum value is 2*1024*1024 -
+  5*1024
+
+
+.. _envoy_v3_api_field_extensions.compression.qatzip.compressor.v3alpha.Qatzip.chunk_size:
+
+
+chunk_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value for compressor's next output buffer. If not set, defaults to 4096.
+
+
+.. _envoy_v3_api_enum_extensions.compression.qatzip.compressor.v3alpha.Qatzip.HardwareBufferSize:
+
+Enum extensions.compression.qatzip.compressor.v3alpha.Qatzip.HardwareBufferSize
+-------------------------------------------------------------------------------
+
+
+:repo:`[extensions.compression.qatzip.compressor.v3alpha.Qatzip.HardwareBufferSize proto] <api/contrib/envoy/extensions/compression/qatzip/compressor/v3alpha/qatzip.proto#L21>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzip.compressor.v3alpha.Qatzip.HardwareBufferSize.DEFAULT:
+
+
+DEFAULT
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzip.compressor.v3alpha.Qatzip.HardwareBufferSize.SZ_4K:
+
+
+SZ_4K
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzip.compressor.v3alpha.Qatzip.HardwareBufferSize.SZ_8K:
+
+
+SZ_8K
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzip.compressor.v3alpha.Qatzip.HardwareBufferSize.SZ_32K:
+
+
+SZ_32K
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzip.compressor.v3alpha.Qatzip.HardwareBufferSize.SZ_64K:
+
+
+SZ_64K
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzip.compressor.v3alpha.Qatzip.HardwareBufferSize.SZ_128K:
+
+
+SZ_128K
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzip.compressor.v3alpha.Qatzip.HardwareBufferSize.SZ_512K:
+
+
+SZ_512K
+  ⁣
+
+

@@ -1,0 +1,255 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.proto:
+
+Adaptive Concurrency (proto)
+============================
+
+.. _extension_envoy.filters.http.adaptive_concurrency:
+
+This extension has the qualified name ``envoy.filters.http.adaptive_concurrency``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency>`
+
+
+
+Adaptive Concurrency Control :ref:`configuration overview
+<config_http_filters_adaptive_concurrency>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig:
+
+extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig
+------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig proto] <api/envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.proto#L27>`
+
+Configuration parameters for the gradient controller.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "sample_aggregate_percentile": {...},
+    "concurrency_limit_params": {...},
+    "min_rtt_calc_params": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.sample_aggregate_percentile:
+
+
+sample_aggregate_percentile
+  (:ref:`type.v3.Percent <envoy_v3_api_msg_type.v3.Percent>`) The percentile to use when summarizing aggregated samples. Defaults to p50.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.concurrency_limit_params:
+
+
+concurrency_limit_params
+  (:ref:`extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.ConcurrencyLimitCalculationParams <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.ConcurrencyLimitCalculationParams>`, *REQUIRED*) 
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.min_rtt_calc_params:
+
+
+min_rtt_calc_params
+  (:ref:`extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams>`, *REQUIRED*) 
+
+.. _envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.ConcurrencyLimitCalculationParams:
+
+extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.ConcurrencyLimitCalculationParams
+----------------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.ConcurrencyLimitCalculationParams proto] <api/envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.proto#L33>`
+
+Parameters controlling the periodic recalculation of the concurrency limit from sampled request
+latencies.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_concurrency_limit": {...},
+    "concurrency_update_interval": {...},
+    "min_concurrency_limit": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.ConcurrencyLimitCalculationParams.max_concurrency_limit:
+
+
+max_concurrency_limit
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The allowed upper-bound on the calculated concurrency limit. Defaults to 1000.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.ConcurrencyLimitCalculationParams.concurrency_update_interval:
+
+
+concurrency_update_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_, *REQUIRED*) The period of time samples are taken to recalculate the concurrency limit.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.ConcurrencyLimitCalculationParams.min_concurrency_limit:
+
+
+min_concurrency_limit
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The allowed lower-bound on the calculated concurrency limit. If unset, this defaults to
+  :ref:`min_concurrency
+  <envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams.min_concurrency>`
+  to preserve the existing behavior where the same value controls both the minimum calculated
+  limit and the limit used while measuring minRTT.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams:
+
+extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams
+----------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams proto] <api/envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.proto#L57>`
+
+Parameters controlling the periodic minRTT recalculation.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "interval": {...},
+    "fixed_value": {...},
+    "request_count": {...},
+    "jitter": {...},
+    "min_concurrency": {...},
+    "buffer": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams.interval:
+
+
+interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The time interval between recalculating the minimum request round-trip time. Has to be
+  positive. If set to zero, dynamic sampling of the minRTT is disabled.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams.fixed_value:
+
+
+fixed_value
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The fixed value for the minRTT. This value is used when minRTT is not sampled dynamically.
+  If dynamic sampling of the minRTT is disabled, this field must be set.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams.request_count:
+
+
+request_count
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The number of requests to aggregate/sample during the minRTT recalculation window before
+  updating. Defaults to 50.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams.jitter:
+
+
+jitter
+  (:ref:`type.v3.Percent <envoy_v3_api_msg_type.v3.Percent>`) Randomized time delta that will be introduced to the start of the minRTT calculation window.
+  This is represented as a percentage of the interval duration. Defaults to 15%.
+
+  Example: If the interval is 10s and the jitter is 15%, the next window will begin
+  somewhere in the range (10s - 11.5s).
+
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams.min_concurrency:
+
+
+min_concurrency
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The concurrency limit set while measuring the minRTT. Defaults to 3.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams.buffer:
+
+
+buffer
+  (:ref:`type.v3.Percent <envoy_v3_api_msg_type.v3.Percent>`) Amount added to the measured minRTT to add stability to the concurrency limit during natural
+  variability in latency. This is expressed as a percentage of the measured value and can be
+  adjusted to allow more or less tolerance to the sampled latency values.
+
+  Defaults to 25%.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency:
+
+extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency proto] <api/envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.proto#L101>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "gradient_controller_config": {...},
+    "enabled": {...},
+    "concurrency_limit_exceeded_status": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency.gradient_controller_config:
+
+
+gradient_controller_config
+  (:ref:`extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig>`, *REQUIRED*) Gradient concurrency control will be used.
+
+
+  
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency.enabled:
+
+
+enabled
+  (:ref:`config.core.v3.RuntimeFeatureFlag <envoy_v3_api_msg_config.core.v3.RuntimeFeatureFlag>`) If set to false, the adaptive concurrency filter will operate as a pass-through filter. If the
+  message is unspecified, the filter will be enabled.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency.concurrency_limit_exceeded_status:
+
+
+concurrency_limit_exceeded_status
+  (:ref:`type.v3.HttpStatus <envoy_v3_api_msg_type.v3.HttpStatus>`) This field allows for a custom HTTP response status code to the downstream client when
+  the concurrency limit has been exceeded.
+  Defaults to 503 (Service Unavailable).
+
+  .. note::
+    If this is set to < 400, 503 will be used instead.
+
+

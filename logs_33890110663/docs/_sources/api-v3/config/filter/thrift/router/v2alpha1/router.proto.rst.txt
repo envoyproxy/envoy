@@ -1,0 +1,49 @@
+.. _envoy_v3_api_file_envoy/config/filter/thrift/router/v2alpha1/router.proto:
+
+Router (proto)
+==============
+
+.. _extension_envoy.filters.thrift.router:
+
+This extension has the qualified name ``envoy.filters.thrift.router``
+
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.thrift_proxy.filters <extension_category_envoy.thrift_proxy.filters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.router.v3.Router>`
+
+
+
+Thrift router :ref:`configuration overview <config_thrift_filters_router>`.
+
+
+
+
+.. _envoy_v3_api_msg_config.filter.thrift.router.v2alpha1.Router:
+
+config.filter.thrift.router.v2alpha1.Router
+-------------------------------------------
+
+
+:repo:`[config.filter.thrift.router.v2alpha1.Router proto] <api/envoy/config/filter/thrift/router/v2alpha1/router.proto#L16>`
+
+
+
+
+

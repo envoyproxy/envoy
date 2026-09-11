@@ -1,0 +1,65 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.proto:
+
+Alternate Protocols Cache (proto)
+=================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.alternate_protocols_cache.v3.FilterConfig:
+
+extensions.filters.http.alternate_protocols_cache.v3.FilterConfig
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.alternate_protocols_cache.v3.FilterConfig proto] <api/envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.proto#L19>`
+
+Configuration for the alternate protocols cache HTTP filter.
+
+.. _extension_envoy.filters.http.alternate_protocols_cache:
+
+This extension has the qualified name ``envoy.filters.http.alternate_protocols_cache``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig <envoy_v3_api_msg_extensions.filters.http.alternate_protocols_cache.v3.FilterConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "alternate_protocols_cache_options": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.alternate_protocols_cache.v3.FilterConfig.alternate_protocols_cache_options:
+
+
+alternate_protocols_cache_options
+  (:ref:`config.core.v3.AlternateProtocolsCacheOptions <envoy_v3_api_msg_config.core.v3.AlternateProtocolsCacheOptions>`) This field is ignored: the alternate protocols cache filter will use the
+  cache for the cluster the request is routed to.
+
+

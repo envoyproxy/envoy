@@ -1,0 +1,72 @@
+.. _envoy_v3_api_file_envoy/extensions/router/cluster_specifiers/lua/v3/lua.proto:
+
+Lua (proto)
+===========
+
+.. _extension_envoy.router.cluster_specifier_plugin.lua:
+
+This extension has the qualified name ``envoy.router.cluster_specifier_plugin.lua``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.router.cluster_specifier_plugin <extension_category_envoy.router.cluster_specifier_plugin>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.router.cluster_specifiers.lua.v3.LuaConfig <envoy_v3_api_msg_extensions.router.cluster_specifiers.lua.v3.LuaConfig>`
+
+
+
+
+Lua cluster specifier :ref:`configuration reference documentation <config_http_cluster_specifier_lua>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.router.cluster_specifiers.lua.v3.LuaConfig:
+
+extensions.router.cluster_specifiers.lua.v3.LuaConfig
+-----------------------------------------------------
+
+
+:repo:`[extensions.router.cluster_specifiers.lua.v3.LuaConfig proto] <api/envoy/extensions/router/cluster_specifiers/lua/v3/lua.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "source_code": {...},
+    "default_cluster": ...
+  }
+
+.. _envoy_v3_api_field_extensions.router.cluster_specifiers.lua.v3.LuaConfig.source_code:
+
+
+source_code
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`, *REQUIRED*) The lua code that Envoy will execute to select cluster.
+
+
+.. _envoy_v3_api_field_extensions.router.cluster_specifiers.lua.v3.LuaConfig.default_cluster:
+
+
+default_cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Default cluster. It will be used when the lua code execute failure.
+
+

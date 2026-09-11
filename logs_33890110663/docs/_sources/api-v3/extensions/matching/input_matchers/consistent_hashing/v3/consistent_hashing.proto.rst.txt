@@ -1,0 +1,89 @@
+.. _envoy_v3_api_file_envoy/extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.proto:
+
+Consistent hashing matcher (proto)
+==================================
+
+.. _extension_envoy.matching.matchers.consistent_hashing:
+
+This extension has the qualified name ``envoy.matching.matchers.consistent_hashing``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.input_matchers <extension_category_envoy.matching.input_matchers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing <envoy_v3_api_msg_extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing:
+
+extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing
+--------------------------------------------------------------------------
+
+
+:repo:`[extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing proto] <api/envoy/extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.proto#L22>`
+
+The consistent hashing matchers computes a consistent hash from the input and matches if the resulting hash
+is within the configured threshold.
+More specifically, this matcher evaluates to true if hash(input, seed) % modulo >= threshold.
+Note that the consistency of the match result relies on the internal hash function (xxhash) remaining
+unchanged. While this is unlikely to happen intentionally, this could cause inconsistent match results
+between deployments.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "threshold": ...,
+    "modulo": ...,
+    "seed": ...
+  }
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing.threshold:
+
+
+threshold
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The threshold the resulting hash must be over in order for this matcher to evaluate to true.
+  This value must be below the configured modulo value.
+  Setting this to 0 is equivalent to this matcher always matching.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing.modulo:
+
+
+modulo
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The value to use for the modulus in the calculation. This effectively  bounds the hash output,
+  specifying the range of possible values.
+  This value must be above the configured threshold.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing.seed:
+
+
+seed
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional seed passed through the hash function. This allows using additional information when computing
+  the hash value: by changing the seed value, a different partition of matching and non-matching inputs will
+  be created that remains consistent for that seed value.
+
+

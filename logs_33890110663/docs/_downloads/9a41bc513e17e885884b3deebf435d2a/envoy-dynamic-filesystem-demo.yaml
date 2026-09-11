@@ -1,0 +1,16 @@
+node:
+  cluster: test-cluster
+  id: test-id
+
+dynamic_resources:
+  cds_config:
+    path: /var/lib/envoy/cds.yaml
+  lds_config:
+    path: /var/lib/envoy/lds.yaml
+
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 19000

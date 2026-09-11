@@ -1,0 +1,139 @@
+.. _envoy_v3_api_file_envoy/extensions/http/custom_response/local_response_policy/v3/local_response_policy.proto:
+
+Local Response Policy for Custom Response (proto)
+=================================================
+
+.. _extension_envoy.http.custom_response.local_response_policy:
+
+This extension has the qualified name ``envoy.http.custom_response.local_response_policy``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.http.custom_response <extension_category_envoy.http.custom_response>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy <envoy_v3_api_msg_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy:
+
+extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+----------------------------------------------------------------------------
+
+
+:repo:`[extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy proto] <api/envoy/extensions/http/custom_response/local_response_policy/v3/local_response_policy.proto#L27>`
+
+Custom response policy to serve a locally stored response to the
+downstream.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "body": {...},
+    "body_format": {...},
+    "status_code": {...},
+    "response_headers_to_add": [],
+    "preserve_response_code_details": ...,
+    "response_code_details": ...
+  }
+
+.. _envoy_v3_api_field_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy.body:
+
+
+body
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) Optional new local reply body text. It will be used
+  in the ``%LOCAL_REPLY_BODY%`` command operator in the ``body_format``. If unset when
+  ``body_format`` is configured for an existing local reply, the existing body will be used as
+  the formatter input instead.
+
+
+.. _envoy_v3_api_field_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy.body_format:
+
+
+body_format
+  (:ref:`config.core.v3.SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`) Optional body format to be used for this response. If ``body_format`` is  not
+  provided, and ``body`` is, the contents of ``body`` will be used to populate
+  the body of the local reply without formatting.
+
+
+.. _envoy_v3_api_field_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy.status_code:
+
+
+status_code
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The new response status code if specified.
+
+
+.. _envoy_v3_api_field_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy.response_headers_to_add:
+
+
+response_headers_to_add
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) HTTP headers to add to the response. This allows the
+  response policy to append, to add or to override headers of
+  the original response for local body, or the custom response from the
+  remote body, before it is sent to a downstream client.
+
+
+.. _envoy_v3_api_field_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy.preserve_response_code_details:
+
+
+preserve_response_code_details
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set, keep the existing ``response_code_details`` already present on StreamInfo.
+
+
+  Controls what is written to ``stream_info.response_code_details`` when this
+  policy sends its local reply.
+
+  If unset, details are cleared (empty string), matching legacy behavior.
+  Use ``preserve_response_code_details`` to keep the existing value (e.g.
+  ``csrf_origin_mismatch``), or ``response_code_details`` to set an explicit
+  replacement.
+
+
+  Only one of :ref:`preserve_response_code_details <envoy_v3_api_field_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy.preserve_response_code_details>`, :ref:`response_code_details <envoy_v3_api_field_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy.response_code_details>` may be set.
+
+.. _envoy_v3_api_field_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy.response_code_details:
+
+
+response_code_details
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Replace ``response_code_details`` with this value.
+
+
+  Controls what is written to ``stream_info.response_code_details`` when this
+  policy sends its local reply.
+
+  If unset, details are cleared (empty string), matching legacy behavior.
+  Use ``preserve_response_code_details`` to keep the existing value (e.g.
+  ``csrf_origin_mismatch``), or ``response_code_details`` to set an explicit
+  replacement.
+
+
+  Only one of :ref:`preserve_response_code_details <envoy_v3_api_field_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy.preserve_response_code_details>`, :ref:`response_code_details <envoy_v3_api_field_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy.response_code_details>` may be set.
+

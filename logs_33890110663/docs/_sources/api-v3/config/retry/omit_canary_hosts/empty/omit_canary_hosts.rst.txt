@@ -1,0 +1,33 @@
+Omit Canary Hosts
+=================
+
+
+
+
+Omit Canary Hosts :ref:`configuration overview <arch_overview_http_retry_plugins>`.
+
+.. _extension_envoy.retry_host_predicates.omit_canary_hosts:
+
+This extension has the qualified name ``envoy.retry_host_predicates.omit_canary_hosts``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.retry_host_predicates <extension_category_envoy.retry_host_predicates>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.retry.host.omit_canary_hosts.v3.OmitCanaryHostsPredicate <envoy_v3_api_msg_extensions.retry.host.omit_canary_hosts.v3.OmitCanaryHostsPredicate>`
+

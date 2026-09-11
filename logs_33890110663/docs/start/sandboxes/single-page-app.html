@@ -1,0 +1,815 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Single page React app (with OAuth) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Skywalking tracing" href="skywalking.html" />
+    <link rel="prev" title="Route mirroring policies" href="route-mirror.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../start.html">Getting Started</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Sandboxes</a></li>
+      <li class="breadcrumb-item active">Single page React app (with OAuth)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/start/sandboxes/single-page-app.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="single-page-react-app-with-oauth">
+<span id="install-sandboxes-single-page-app"></span><h1>Single page React app (with OAuth)<a class="headerlink" href="#single-page-react-app-with-oauth" title="Link to this heading"></a></h1>
+<aside class="sidebar">
+<p class="sidebar-title">Requirements</p>
+<dl class="simple">
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup"><span class="std std-ref">Sandbox environment</span></a></dt><dd><p>Setup your sandbox environment with Docker and Docker Compose,
+and clone the Envoy repository with Git.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup-curl"><span class="std std-ref">curl</span></a></dt><dd><p>Used to make HTTP requests.</p>
+</dd>
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup-envsubst"><span class="std std-ref">envsubst</span></a></dt><dd><p>Used to interpolate environment vars in templates.</p>
+</dd>
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup-jq"><span class="std std-ref">jq</span></a></dt><dd><p>Used to parse JSON.</p>
+</dd>
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup-mkpasswd"><span class="std std-ref">mkpasswd</span></a></dt><dd><p>Used to generate a ~random HMAC token.</p>
+</dd>
+</dl>
+</aside>
+<p>This sandbox provides an example of building and developing a single page app with Envoy.</p>
+<p>The sandbox covers a number of Envoy’s features, including:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../configuration/listeners/network_filters/direct_response_filter.html#config-network-filters-direct-response"><span class="std std-ref">direct_response</span></a></p></li>
+<li><p><a class="reference internal" href="../../configuration/http/http_filters/oauth2_filter.html#config-http-filters-oauth"><span class="std std-ref">OAuth</span></a></p></li>
+<li><p>Dynamic xDS filesystem updates</p></li>
+<li><p>Websocket proxy</p></li>
+<li><p>Gzip <a class="reference internal" href="../../configuration/http/http_filters/compressor_filter.html#config-http-filters-compressor"><span class="std std-ref">compression</span></a></p></li>
+<li><p>TLS/SNI up/downstream connection/termination</p></li>
+<li><p>Path/host rewrites</p></li>
+</ul>
+<p>The app is built with <a class="reference external" href="https://react.dev/">React</a> using <a class="reference external" href="https://vitejs.dev/">Vite</a> and demonstrates OAuth authentication using
+Envoy’s <a class="reference internal" href="../../configuration/http/http_filters/oauth2_filter.html#config-http-filters-oauth"><span class="std std-ref">OAuth filter</span></a>.</p>
+<p>This covers a scenario where we want OAuth to both authenticate the user and provide credentials
+for further API interactions.</p>
+<p>This is enabled by setting the OAuth configuration
+<a class="reference internal" href="../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-forward-bearer-token"><span class="std std-ref">forward_bearer_token</span></a>
+to <code class="docutils literal notranslate"><span class="pre">true</span></code></p>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/979cba8f510b6978004aa32ad3288897/envoy.yml"><code class="xref download docutils literal notranslate"><span class="pre">envoy.yml</span></code></a></span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">35</span><span class="w">                </span><span class="nt">authorization_endpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:7000/authorize</span>
+<span class="linenos">36</span><span class="w">                </span><span class="nt">redirect_uri</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%REQ(x-forwarded-proto)%://%REQ(:authority)%/authorize&quot;</span>
+<span class="hll"><span class="linenos">37</span><span class="w">                </span><span class="nt">forward_bearer_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span class="linenos">38</span><span class="w">                </span><span class="nt">pass_through_matcher</span><span class="p">:</span>
+<span class="linenos">39</span><span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;:path&quot;</span>
+</pre></div>
+</div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Setting
+<a class="reference internal" href="../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-forward-bearer-token"><span class="std std-ref">forward_bearer_token</span></a>
+means the provided access token will be forwarded to any cluster/upstreams proxied by Envoy for this HTTP filter chain..</p>
+<p>If untrusted upstreams are present, care will need to be taken to remove any sensitive cookies, such as <code class="docutils literal notranslate"><span class="pre">BearerToken</span></code>.</p>
+<p>This can be achieved by setting <a class="reference internal" href="../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-virtualhost-request-headers-to-remove"><span class="std std-ref">request_headers_to_remove</span></a>
+for the affected route.</p>
+</div>
+<p>A dummy “Myhub” backend is provided with a minimal OAuth provider and API for use in the example.</p>
+<p>Setup is provided to <a class="reference internal" href="#install-sandboxes-single-page-app-step-production-build"><span class="std std-ref">build and update the app for production use</span></a>,
+as well as a <a class="reference internal" href="#install-sandboxes-single-page-app-step-login"><span class="std std-ref">development environment</span></a> with
+<a class="reference internal" href="#install-sandboxes-single-page-app-step-reload"><span class="std std-ref">automatic code reloading</span></a>.</p>
+<p>The production and development environments are exposed on ports <code class="docutils literal notranslate"><span class="pre">10000</span></code> and <code class="docutils literal notranslate"><span class="pre">10001</span></code> respectively.</p>
+<p>The Myhub backend can easily be replaced with <a class="reference external" href="https://github.com/">Github</a> or some other OAuth-based upstream service,
+and some <a class="reference internal" href="#install-sandboxes-single-page-app-step-github-oauth"><span class="std std-ref">guidance is provided on how to do this</span></a>.</p>
+<section id="step-1-create-a-local-directory-for-sandbox-customizations">
+<span id="install-sandboxes-single-page-app-step-local"></span><h2>Step 1: Create a <code class="docutils literal notranslate"><span class="pre">.local</span></code> directory for sandbox customizations<a class="headerlink" href="#step-1-create-a-local-directory-for-sandbox-customizations" title="Link to this heading"></a></h2>
+<p>Change to the <code class="docutils literal notranslate"><span class="pre">single-page-app</span></code> directory, and create a directory to store sandbox customizations.</p>
+<p>You can use <code class="docutils literal notranslate"><span class="pre">.local</span></code> which will be ignored by Git:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>mkdir<span class="w"> </span>.local
+</pre></div>
+</div>
+<p>Copy the <code class="docutils literal notranslate"><span class="pre">ui/</span></code> directory to <code class="docutils literal notranslate"><span class="pre">.local</span></code> and set the <code class="docutils literal notranslate"><span class="pre">UI_PATH</span></code>. This will allow customizations without changing committed files.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cp<span class="w"> </span>-a<span class="w"> </span>ui<span class="w"> </span>.local
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">UI_PATH</span><span class="o">=</span>./.local/ui
+</pre></div>
+</div>
+</section>
+<section id="step-2-generate-an-hmac-secret">
+<span id="install-sandboxes-single-page-app-step-hmac"></span><h2>Step 2: Generate an HMAC secret<a class="headerlink" href="#step-2-generate-an-hmac-secret" title="Link to this heading"></a></h2>
+<p>Envoy’s <a class="reference internal" href="../../configuration/http/http_filters/oauth2_filter.html#config-http-filters-oauth"><span class="std std-ref">OAuth filter</span></a> requires an HMAC secret for encoding credentials.</p>
+<p>Copy the default sandbox secrets to the customization directory, and create the required HMAC secret.</p>
+<p>Replace <code class="docutils literal notranslate"><span class="pre">MY_HMAC_SECRET_SEED</span></code> with a phrase of your choosing:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cp<span class="w"> </span>-a<span class="w"> </span>secrets<span class="w"> </span>.local
+<span class="gp">$ </span><span class="nv">HMAC_SECRET</span><span class="o">=</span><span class="k">$(</span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;MY_HMAC_SECRET_SEED&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>mkpasswd<span class="w"> </span>-s<span class="k">)</span>
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span>HMAC_SECRET
+<span class="gp">$ </span>envsubst<span class="w"> </span>&lt;<span class="w"> </span>hmac-secret.tmpl.yml<span class="w"> </span>&gt;<span class="w"> </span>.local/secrets/hmac-secret.yml
+</pre></div>
+</div>
+<p>Export the path to the secrets folder for Docker:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">SECRETS_PATH</span><span class="o">=</span>./.local/secrets
+</pre></div>
+</div>
+</section>
+<section id="step-3-start-the-containers">
+<span id="install-sandboxes-single-page-app-step-start"></span><h2>Step 3: Start the containers<a class="headerlink" href="#step-3-start-the-containers" title="Link to this heading"></a></h2>
+<p>First export <code class="docutils literal notranslate"><span class="pre">UID</span></code> to ensure files created by the containers are created with your user id.</p>
+<p>Then bring up the Docker composition:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">pwd</span>
+<span class="go">examples/single-page-app</span>
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span>UID
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>pull
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>ps
+<span class="go">NAME                          IMAGE                       COMMAND                                                    SERVICE   CREATED         STATUS         PORTS</span>
+<span class="go">---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------</span>
+<span class="go">single-page-app-envoy-1       single-page-app-envoy       &quot;/docker-entrypoint.sh envoy -c /etc/envoy/envoy.yaml ...&quot; envoy     2 minutes ago   Up 2 minutes           0.0.0.0:10000-10001-&gt;10000-10001/tcp, :::10000-10001-&gt;10000-10001/tcp</span>
+<span class="go">single-page-app-myhub-1       single-page-app-myhub       &quot;/opt/myhub/app.py&quot;                                        myhub     2 minutes ago   Up 2 minutes (healthy) 0.0.0.0:7000-&gt;7000/tcp, :::7000-&gt;7000/tcp</span>
+<span class="go">single-page-app-myhub-api-1   single-page-app-myhub-api   &quot;/opt/myhub/app.py&quot;                                        myhub-api 2 minutes ago   Up 2 minutes (healthy)</span>
+<span class="go">single-page-app-ui-1          single-page-app-ui          &quot;/entrypoint.sh dev.sh&quot;                                    ui        2 minutes ago   Up 2 minutes (healthy)</span>
+</pre></div>
+</div>
+</section>
+<section id="step-4-browse-to-the-dev-app-and-login">
+<span id="install-sandboxes-single-page-app-step-login"></span><h2>Step 4: Browse to the dev app and login<a class="headerlink" href="#step-4-browse-to-the-dev-app-and-login" title="Link to this heading"></a></h2>
+<p>The development app should now be available at <a class="reference external" href="http://localhost:10001">http://localhost:10001</a> and provide a login button:</p>
+<img alt="../../_images/spa-login.png" class="align-center" src="../../_images/spa-login.png" />
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The dummy OAuth provider automatically trusts everyone as a hard-coded <code class="docutils literal notranslate"><span class="pre">envoydemo</span></code> user and redirects back to the app.</p>
+<p>In a real world scenario the provider would authenticate and authorize the user before proceeding.</p>
+</div>
+<p>The sandbox is configured with an inverted match on
+<a class="reference internal" href="../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-pass-through-matcher"><span class="std std-ref">pass_through_matcher</span></a>.</p>
+<p>This ignores all paths for OAuth other than:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">/authorize.*</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">/hub.*</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">/login</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">/logout</span></code>.</p></li>
+</ul>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/979cba8f510b6978004aa32ad3288897/envoy.yml"><code class="xref download docutils literal notranslate"><span class="pre">envoy.yml</span></code></a></span><a class="headerlink" href="#id2" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">36</span><span class="w">                </span><span class="nt">redirect_uri</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%REQ(x-forwarded-proto)%://%REQ(:authority)%/authorize&quot;</span>
+<span class="linenos">37</span><span class="w">                </span><span class="nt">forward_bearer_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="hll"><span class="linenos">38</span><span class="w">                </span><span class="nt">pass_through_matcher</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">39</span><span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;:path&quot;</span>
+</span><span class="hll"><span class="linenos">40</span><span class="w">                  </span><span class="nt">string_match</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">41</span><span class="w">                    </span><span class="nt">safe_regex</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">42</span><span class="w">                      </span><span class="nt">regex</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
+</span><span class="hll"><span class="linenos">43</span><span class="w">                        </span><span class="no">^\/(authorize.*|login|logout|hub/user(s/envoydemo/(repos|followers|following))?)$</span>
+</span><span class="hll"><span class="linenos">44</span><span class="w">                  </span><span class="nt">invert_match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span class="linenos">45</span><span class="w">                </span><span class="nt">redirect_path_matcher</span><span class="p">:</span>
+<span class="linenos">46</span><span class="w">                  </span><span class="nt">path</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<p>When a user clicks <code class="docutils literal notranslate"><span class="pre">login</span></code> the app initiates the OAuth flow by calling the <code class="docutils literal notranslate"><span class="pre">/login</span></code> path in Envoy.</p>
+<p>This redirects the user to the OAuth provider for authorization/authentication with a further redirect link:</p>
+<div class="literal-block-wrapper docutils container" id="id3">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/979cba8f510b6978004aa32ad3288897/envoy.yml"><code class="xref download docutils literal notranslate"><span class="pre">envoy.yml</span></code></a></span><a class="headerlink" href="#id3" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">33</span><span class="w">                  </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3s</span>
+<span class="linenos">34</span><span class="w">               </span><span class="w w-Error"> </span><span class="nt">default_expires_in</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">600s</span>
+<span class="hll"><span class="linenos">35</span><span class="w">                </span><span class="nt">authorization_endpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:7000/authorize</span>
+</span><span class="hll"><span class="linenos">36</span><span class="w">                </span><span class="nt">redirect_uri</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%REQ(x-forwarded-proto)%://%REQ(:authority)%/authorize&quot;</span>
+</span><span class="linenos">37</span><span class="w">                </span><span class="nt">forward_bearer_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="linenos">38</span><span class="w">                </span><span class="nt">pass_through_matcher</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<p>On successful authorization/authentication the user is redirected back via this link to the app with the necessary OAuth
+<a class="reference external" href="https://oauth.net/2/grant-types/authorization-code/">authorization code</a> to proceed:</p>
+<div class="literal-block-wrapper docutils container" id="id4">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/979cba8f510b6978004aa32ad3288897/envoy.yml"><code class="xref download docutils literal notranslate"><span class="pre">envoy.yml</span></code></a></span><a class="headerlink" href="#id4" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">43</span><span class="w">                        </span><span class="l l-Scalar l-Scalar-Plain">^\/(authorize.*|login|logout|hub/user(s/envoydemo/(repos|followers|following))?)$</span>
+<span class="linenos">44</span><span class="w">                  </span><span class="l l-Scalar l-Scalar-Plain">invert_match</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="hll"><span class="linenos">45</span><span class="w">               </span><span class="w w-Error"> </span><span class="nt">redirect_path_matcher</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">46</span><span class="w">                  </span><span class="nt">path</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">47</span><span class="w">                    </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/authorize</span>
+</span><span class="linenos">48</span><span class="w">                </span><span class="nt">signout_path</span><span class="p">:</span>
+<span class="linenos">49</span><span class="w">                  </span><span class="nt">path</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<p>Envoy then uses this authorization code with its client secret to confirm authorization and obtain an access token for the user:</p>
+<div class="literal-block-wrapper docutils container" id="id5">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/979cba8f510b6978004aa32ad3288897/envoy.yml"><code class="xref download docutils literal notranslate"><span class="pre">envoy.yml</span></code></a></span><a class="headerlink" href="#id5" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">49</span><span class="w">                  </span><span class="nt">path</span><span class="p">:</span>
+<span class="linenos">50</span><span class="w">                    </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/logout</span>
+<span class="hll"><span class="linenos">51</span><span class="w">               </span><span class="w w-Error"> </span><span class="nt">credentials</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">52</span><span class="w">                  </span><span class="nt">client_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0123456789&quot;</span>
+</span><span class="hll"><span class="linenos">53</span><span class="w">                  </span><span class="nt">token_secret</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">54</span><span class="w">                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">token</span>
+</span><span class="hll"><span class="linenos">55</span><span class="w">                    </span><span class="nt">sds_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">56</span><span class="w">                      </span><span class="nt">path_config_source</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">57</span><span class="w">                        </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/etc/envoy/secrets/myhub-token-secret.yml</span>
+</span><span class="linenos">58</span><span class="w">                  </span><span class="nt">hmac_secret</span><span class="p">:</span>
+<span class="linenos">59</span><span class="w">                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hmac</span>
+<span class="linenos">60</span><span class="w">                    </span><span class="nt">sds_config</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<div class="literal-block-wrapper docutils container" id="id6">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/204d2c773b737432a6ec3a39f317b413/myhub-token-secret.yml"><code class="xref download docutils literal notranslate"><span class="pre">myhub-token-secret.yml</span></code></a></span><a class="headerlink" href="#id6" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">1</span><span class="nt">resources</span><span class="p">:</span>
+<span class="linenos">2</span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret</span>
+<span class="linenos">3</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">token</span>
+<span class="linenos">4</span><span class="w">  </span><span class="nt">generic_secret</span><span class="p">:</span>
+<span class="linenos">5</span><span class="w">    </span><span class="nt">secret</span><span class="p">:</span>
+<span class="hll"><span class="linenos">6</span><span class="w">      </span><span class="nt">inline_string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">VERY_SECRET_KEY</span>
+</span></pre></div>
+</div>
+</div>
+<p>Once logged in, you should be able to make queries to the API using the OAuth credentials:</p>
+<img alt="../../_images/spa-resources.png" class="align-center" src="../../_images/spa-resources.png" />
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Envoy’s OAuth implementation defaults to triggering the OAuth flow for all paths on the endpoint.</p>
+<p>This can readily trigger an OAuth flood as assets are requested, and doom loops when the OAuth flows fail.</p>
+<p>This can be avoided by restricting the paths that are used by the OAuth flow.</p>
+<p>The sandbox example does this by inverting the
+<a class="reference internal" href="../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-pass-through-matcher"><span class="std std-ref">pass_through_matcher</span></a>
+to only match on the required OAuth paths.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>The Myhub OAuth provider does not provide an expiry for issued credentials. Likewise Github may or may
+not depending on configuration. This is valid in terms of the OAuth2 specification.</p>
+<p>If the authorization provider does not include an expiry, Envoy will, by default, fail the authentication.</p>
+<p>This can be resolved by setting
+<a class="reference internal" href="../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-default-expires-in"><span class="std std-ref">default_expires_in</span></a>:</p>
+<div class="literal-block-wrapper docutils container" id="id7">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/979cba8f510b6978004aa32ad3288897/envoy.yml"><code class="xref download docutils literal notranslate"><span class="pre">envoy.yml</span></code></a></span><a class="headerlink" href="#id7" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">32</span><span class="w">                  </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://myhub:7000/authenticate</span>
+<span class="linenos">33</span><span class="w">                  </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3s</span>
+<span class="hll"><span class="linenos">34</span><span class="w">               </span><span class="w w-Error"> </span><span class="nt">default_expires_in</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">600s</span>
+</span><span class="linenos">35</span><span class="w">                </span><span class="nt">authorization_endpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:7000/authorize</span>
+<span class="linenos">36</span><span class="w">                </span><span class="nt">redirect_uri</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%REQ(x-forwarded-proto)%://%REQ(:authority)%/authorize&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="step-5-make-api-queries">
+<span id="install-sandboxes-single-page-app-step-api"></span><h2>Step 5: Make API queries<a class="headerlink" href="#step-5-make-api-queries" title="Link to this heading"></a></h2>
+<p>For the sandbox app,
+<a class="reference internal" href="../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-forward-bearer-token"><span class="std std-ref">forward_bearer_token</span></a>
+is set, and so Envoy also passes the acquired access token back to the user as a cookie:</p>
+<img alt="../../_images/spa-cookies.png" class="align-center" src="../../_images/spa-cookies.png" />
+<p>This cookie is then passed through Envoy in any subsequent requests to the proxied Myhub API:</p>
+<div class="literal-block-wrapper docutils container" id="id8">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/979cba8f510b6978004aa32ad3288897/envoy.yml"><code class="xref download docutils literal notranslate"><span class="pre">envoy.yml</span></code></a></span><a class="headerlink" href="#id8" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">75</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">76</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/hub/&quot;</span>
+<span class="hll"><span class="linenos">77</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">78</span><span class="w">                  </span><span class="nt">host_rewrite_literal</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api.myhub</span>
+</span><span class="hll"><span class="linenos">79</span><span class="w">                  </span><span class="nt">regex_rewrite</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">80</span><span class="w">                    </span><span class="nt">pattern</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">81</span><span class="w">                      </span><span class="nt">regex</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;^/hub/(.*)&#39;</span>
+</span><span class="hll"><span class="linenos">82</span><span class="w">                    </span><span class="nt">substitution</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;/\1&#39;</span>
+</span><span class="hll"><span class="linenos">83</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hub-api</span>
+</span><span class="linenos">84</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">85</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/&quot;</span>
+<span class="linenos">86</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">87</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ui</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="step-6-live-reload-code-changes">
+<span id="install-sandboxes-single-page-app-step-reload"></span><h2>Step 6: Live reload code changes<a class="headerlink" href="#step-6-live-reload-code-changes" title="Link to this heading"></a></h2>
+<p>With your browser open on <a class="reference external" href="http://localhost:10001">http://localhost:10001</a> make some change to the UI.</p>
+<p>For example, you might change the page title:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sed<span class="w"> </span>-i<span class="w"> </span>s/Envoy<span class="se">\ </span>single<span class="se">\ </span>page<span class="se">\ </span>app<span class="se">\ </span>example/DEV<span class="se">\ </span>APP/g<span class="w"> </span>.local/ui/index.html
+</pre></div>
+</div>
+<p>The page should automatically refresh.</p>
+<p>Likewise any changes to the Typescript app components in <code class="docutils literal notranslate"><span class="pre">.local/ui/src/...</span></code> should automatically reload in
+the browser.</p>
+<p>This is enabled in Envoy by allowing the proxied connection to the <a class="reference external" href="https://vitejs.dev/">Vite</a>
+development backend to be “upgraded” to use Websockets:</p>
+<div class="literal-block-wrapper docutils container" id="id9">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/979cba8f510b6978004aa32ad3288897/envoy.yml"><code class="xref download docutils literal notranslate"><span class="pre">envoy.yml</span></code></a></span><a class="headerlink" href="#id9" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">21</span><span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">22</span><span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+<span class="hll"><span class="linenos">23</span><span class="w">          </span><span class="nt">upgrade_configs</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">24</span><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">upgrade_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">websocket</span>
+</span><span class="linenos">25</span><span class="w">          </span><span class="nt">http_filters</span><span class="p">:</span>
+<span class="linenos">26</span><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.oauth2</span>
+</pre></div>
+</div>
+</div>
+<p>You can view the logs for the development server with:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>ui
+<span class="go">single-page-app-ui-1  | Starting (dev.sh) with user: 1000 worker /home/worker</span>
+<span class="go">single-page-app-ui-1  | yarn run v1.22.19</span>
+<span class="go">single-page-app-ui-1  | $ vite --host 0.0.0.0 --port 3000</span>
+<span class="go">single-page-app-ui-1  |</span>
+<span class="go">single-page-app-ui-1  |   VITE v5.0.10  ready in 119 ms</span>
+<span class="go">single-page-app-ui-1  |</span>
+<span class="go">single-page-app-ui-1  |   ➜  Local:   http://localhost:3000/</span>
+<span class="go">single-page-app-ui-1  |   ➜  Network: http://172.30.0.5:3000/</span>
+</pre></div>
+</div>
+<p>You can also use <code class="docutils literal notranslate"><span class="pre">docker</span> <span class="pre">attach</span></code> should you want to interact with the process.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>You can manage the Typescript package using <a class="reference external" href="https://yarnpkg.com/">Yarn</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>ui<span class="w"> </span>yarn
+</pre></div>
+</div>
+</div>
+</section>
+<section id="step-7-log-out-of-the-app">
+<span id="install-sandboxes-single-page-app-step-logout"></span><h2>Step 7: Log out of the app<a class="headerlink" href="#step-7-log-out-of-the-app" title="Link to this heading"></a></h2>
+<p>On signing out, the app makes a request to Envoy’s configured
+<a class="reference internal" href="../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-signout-path"><span class="std std-ref">signout_path</span></a>:</p>
+<div class="literal-block-wrapper docutils container" id="id10">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/979cba8f510b6978004aa32ad3288897/envoy.yml"><code class="xref download docutils literal notranslate"><span class="pre">envoy.yml</span></code></a></span><a class="headerlink" href="#id10" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">46</span><span class="w">                  </span><span class="nt">path</span><span class="p">:</span>
+<span class="linenos">47</span><span class="w">                    </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/authorize</span>
+<span class="hll"><span class="linenos">48</span><span class="w">               </span><span class="w w-Error"> </span><span class="nt">signout_path</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">49</span><span class="w">                  </span><span class="nt">path</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">50</span><span class="w">                    </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/logout</span>
+</span><span class="linenos">51</span><span class="w">                </span><span class="nt">credentials</span><span class="p">:</span>
+<span class="linenos">52</span><span class="w">                  </span><span class="nt">client_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0123456789&quot;</span>
+</pre></div>
+</div>
+</div>
+<p>This clears the cookies and the credentials stored by Envoy before returning the user to the app home page.</p>
+<p>The app also clears any stored data associated with the user session:</p>
+</section>
+<section id="step-8-build-production-assets">
+<span id="install-sandboxes-single-page-app-step-production-build"></span><h2>Step 8: Build production assets<a class="headerlink" href="#step-8-build-production-assets" title="Link to this heading"></a></h2>
+<p>First, create and set a custom <code class="docutils literal notranslate"><span class="pre">xds/</span></code> directory.</p>
+<p>You will need to rebuild Envoy to ensure it sees the correct directory:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>mkdir<span class="w"> </span>.local/production
+<span class="gp">$ </span>cp<span class="w"> </span>-a<span class="w"> </span>xds<span class="w"> </span>.local/production/
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">XDS_PATH</span><span class="o">=</span>./.local/production/xds
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d<span class="w"> </span>envoy
+</pre></div>
+</div>
+<p>You can build the production assets for the app with the following:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>ui<span class="w"> </span>build.sh
+</pre></div>
+</div>
+<p>After building the <a class="reference external" href="https://react.dev/">React</a> app, the sandbox script automatically updates Envoy’s configuration with the
+static routes required to serve the app.</p>
+<p>You can view the generated routes:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>jq<span class="w"> </span><span class="s1">&#39;.resources[0].filter_chains[0].filters[0].typed_config.route_config.virtual_hosts[0].routes&#39;</span><span class="w"> </span>&lt;<span class="w"> </span>.local/production/xds/lds.yml
+</pre></div>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/assets/index-dKz4clFg.js&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;direct_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;body&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/var/www/html/assets/index-dKz4clFg.js&quot;</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;response_headers_to_add&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;header&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Content-Type&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;text/javascript&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/myhub.svg&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;direct_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;body&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/var/www/html/myhub.svg&quot;</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;response_headers_to_add&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;header&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Content-Type&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;image/svg+xml&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;direct_response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;body&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/var/www/html/index.html&quot;</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;response_headers_to_add&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;header&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Content-Type&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;text/html&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This setup configures Envoy to store the necessary files in memory.</p>
+<p>This may be a good fit for the single page app use case, but would not scale well
+for many or large files.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>When you make changes to the javascript/typescript files rebuilding the app creates new routes to the
+compiled assets.</p>
+<p>In this case Envoy will update via xDS and use the newly routed assets.</p>
+<p>If you make changes only to assets that do not get a new route - e.g. <code class="docutils literal notranslate"><span class="pre">index.html</span></code> - you
+should both rebuild the app and restart Envoy after:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>ui<span class="w"> </span>build.sh
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>restart<span class="w"> </span>envoy
+</pre></div>
+</div>
+</div>
+</section>
+<section id="step-9-browse-to-the-production-server">
+<span id="install-sandboxes-single-page-app-step-production-browse"></span><h2>Step 9: Browse to the production server<a class="headerlink" href="#step-9-browse-to-the-production-server" title="Link to this heading"></a></h2>
+<p>You can browse to this server on <a class="reference external" href="https://localhost:10000">https://localhost:10000</a></p>
+<p>Unlike the development endpoint the production endpoint is configured with:</p>
+<ul class="simple">
+<li><p>TLS (self-signed)</p></li>
+<li><p>Gzip compression</p></li>
+<li><p>Statically served assets</p></li>
+</ul>
+</section>
+<section id="step-10-setup-github-oauth-api-access">
+<span id="install-sandboxes-single-page-app-step-github-oauth"></span><h2>Step 10: Setup Github OAuth/API access<a class="headerlink" href="#step-10-setup-github-oauth-api-access" title="Link to this heading"></a></h2>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Setup for <a class="reference external" href="https://github.com/">Github</a> is explained in this sandbox, but it should be easy to adapt these instructions for other providers.</p>
+</div>
+<p>You will need to set up either a <a class="reference external" href="https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps">Github OAuth or full app</a>. The latter provides
+more control and is generally preferable.</p>
+<p>This can be done either at the <a class="reference external" href="https://github.com/settings/developers">user</a> or organization levels:</p>
+<img alt="../../_images/spa-github-oauth.png" class="align-center" src="../../_images/spa-github-oauth.png" />
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When setting up <a class="reference external" href="https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps">Github OAuth</a> you will need to provide the redirect URI</p>
+<p>This must match the configured URI in Envoy</p>
+<p>For the purposes of this example set it to <a class="reference external" href="https://localhost:10000">https://localhost:10000</a>.</p>
+<p>You will need a separate OAuth app for development.</p>
+</div>
+<p>Depending on your use case, you may also want to set up any permissions required for your app.</p>
+<p>Once you have this set up, you will need the <a class="reference external" href="https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#2-users-are-redirected-back-to-your-site-by-github">provided client id and secret</a>.</p>
+</section>
+<section id="step-11-update-envoy-s-configuration-to-use-github">
+<span id="install-sandboxes-single-page-app-step-github-config"></span><h2>Step 11: Update Envoy’s configuration to use Github<a class="headerlink" href="#step-11-update-envoy-s-configuration-to-use-github" title="Link to this heading"></a></h2>
+<p>Add the <a class="reference external" href="https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#2-users-are-redirected-back-to-your-site-by-github">Github provided client secret</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nv">TOKEN_SECRET</span><span class="o">=</span><span class="s2">&quot;GITHUB PROVIDED CLIENT SECRET&quot;</span>
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span>TOKEN_SECRET
+<span class="gp">$ </span>envsubst<span class="w"> </span>&lt;<span class="w"> </span>secrets/token-secret.tmpl.yml<span class="w"> </span>&gt;<span class="w"> </span>.local/secrets/github-token-secret.yml
+</pre></div>
+</div>
+<p>The file created will be available in the container under <code class="docutils literal notranslate"><span class="pre">/etc/envoy/secrets</span></code></p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>The following instructions use <code class="docutils literal notranslate"><span class="pre">sed</span></code>, but you may wish to make the necessary replacements
+using your editor.</p>
+<p>For each configuration there are 2 places to update, one for the development listener and the other for production.</p>
+</div>
+<p>Create a copy of the Envoy config and tell Docker to use it:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cp<span class="w"> </span>-a<span class="w"> </span>envoy.yml<span class="w"> </span>.local/envoy.yml
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">ENVOY_CONFIG</span><span class="o">=</span>.local/envoy.yml
+</pre></div>
+</div>
+<p>For the OAuth configuration in <code class="docutils literal notranslate"><span class="pre">.local/envoy.yml</span></code> set the <a class="reference external" href="https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#2-users-are-redirected-back-to-your-site-by-github">Github provided client secret</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sed<span class="w"> </span>-i<span class="w"> </span>s@client_id:<span class="se">\ \&quot;</span><span class="m">0123456789</span><span class="se">\&quot;</span>@client_id:<span class="se">\ \&quot;</span><span class="nv">$GITHUB_PROVIDED_CLIENT_ID</span><span class="se">\&quot;</span>@g<span class="w"> </span>.local/envoy.yml
+</pre></div>
+</div>
+<p>Replace the
+<a class="reference internal" href="../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-authorization-endpoint"><span class="std std-ref">authorization_endpoint</span></a>
+with <code class="docutils literal notranslate"><span class="pre">https://github.com/login/oauth/authorize</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sed<span class="w"> </span>-i<span class="w"> </span>s@authorization_endpoint:<span class="se">\ </span>http://localhost:7000/authorize@authorization_endpoint:<span class="se">\ </span>https://github.com/login/oauth/authorize@g<span class="w"> </span>.local/envoy.yml
+</pre></div>
+</div>
+<p>Replace the
+<a class="reference internal" href="../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-token-endpoint"><span class="std std-ref">token_endpoint</span></a> &gt;
+<a class="reference internal" href="../../api-v3/config/core/v3/http_uri.proto.html#envoy-v3-api-field-config-core-v3-httpuri-uri"><span class="std std-ref">uri</span></a>
+with <code class="docutils literal notranslate"><span class="pre">https://github.com/login/oauth/access_token</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sed<span class="w"> </span>-i<span class="w"> </span>s@uri:<span class="se">\ </span>http://myhub:7000/authenticate@uri:<span class="se">\ </span>https://github.com/login/oauth/access_token@g<span class="w"> </span>.local/envoy.yml
+</pre></div>
+</div>
+<p>Point the
+<a class="reference internal" href="../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-token-secret"><span class="std std-ref">token_secret</span></a> &gt;
+<a class="reference internal" href="../../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-field-config-core-v3-pathconfigsource-path"><span class="std std-ref">path</span></a>
+to the <code class="docutils literal notranslate"><span class="pre">github-token-secret.yml</span></code> created above:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sed<span class="w"> </span>-i<span class="w"> </span>s@path:<span class="se">\ </span>/etc/envoy/secrets/myhub-token-secret.yml@path:<span class="se">\ </span>/etc/envoy/secrets/github-token-secret.yml@g<span class="w"> </span>.local/envoy.yml
+</pre></div>
+</div>
+<p>Replace the <a class="reference internal" href="../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-weightedcluster-clusterweight-host-rewrite-literal"><span class="std std-ref">host rewrites</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>sed<span class="w"> </span>-i<span class="w"> </span>s@host_rewrite_literal:<span class="se">\ </span>api.myhub@host_rewrite_literal:<span class="se">\ </span>api.github.com@g<span class="w"> </span>.local/envoy.yml
+</pre></div>
+</div>
+<p>Finally add (or replace the <code class="docutils literal notranslate"><span class="pre">myhub*</span></code> clusters with) the <code class="docutils literal notranslate"><span class="pre">github</span></code> and <code class="docutils literal notranslate"><span class="pre">github-api</span></code> clusters
+<a class="reference download internal" download="" href="../../_downloads/15eb50bd907b2b778ac13743cc37b3f8/_github-clusters.yml"><code class="xref download docutils literal notranslate"><span class="pre">Github</span> <span class="pre">configured</span> <span class="pre">clusters</span></code></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cat<span class="w"> </span>_github-clusters.yml<span class="w"> </span>&gt;&gt;<span class="w"> </span>.local/envoy.yml
+</pre></div>
+</div>
+</section>
+<section id="step-12-update-the-app-configuration-to-use-github">
+<h2>Step 12: Update the app configuration to use Github<a class="headerlink" href="#step-12-update-the-app-configuration-to-use-github" title="Link to this heading"></a></h2>
+<p>We need to tell the app the name of the provider.</p>
+<p>Currently providers for Myhub and <a class="reference external" href="https://github.com/">Github</a> are implemented:</p>
+<div class="literal-block-wrapper docutils container" id="id11">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/f70a4ddbe888c10c5209e9dff53dce36/providers.tsx"><code class="xref download docutils literal notranslate"><span class="pre">providers.tsx</span></code></a></span><a class="headerlink" href="#id11" title="Link to this code"></a></div>
+<div class="highlight-typescript notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 7</span><span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">AuthProviders</span><span class="o">:</span><span class="w"> </span><span class="kt">IAuthProviders</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="linenos"> 8</span><span class="w">  </span><span class="s2">&quot;myhub&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="linenos"> 9</span><span class="w">    </span><span class="s2">&quot;name&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Myhub&quot;</span><span class="p">,</span>
+<span class="linenos">10</span><span class="w">    </span><span class="s2">&quot;icon&quot;</span><span class="o">:</span><span class="w"> </span><span class="nx">MyhubIcon</span><span class="p">},</span>
+<span class="linenos">11</span><span class="w">  </span><span class="s2">&quot;github&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="linenos">12</span><span class="w">    </span><span class="s2">&quot;name&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Github&quot;</span><span class="p">,</span>
+<span class="linenos">13</span><span class="w">    </span><span class="s2">&quot;icon&quot;</span><span class="o">:</span><span class="w"> </span><span class="nx">GithubIcon</span><span class="p">}}</span>
+</pre></div>
+</div>
+</div>
+<p>If you followed the above steps, the <a class="reference external" href="https://vitejs.dev/">Vite</a> app environment settings are read from <code class="docutils literal notranslate"><span class="pre">.local/ui/.env*</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;VITE_APP_AUTH_PROVIDER=github&quot;</span><span class="w"> </span>&gt;<span class="w"> </span>.local/ui/.env.local
+</pre></div>
+</div>
+</section>
+<section id="step-13-rebuild-the-app-and-restart-envoy">
+<span id="install-sandboxes-single-page-app-step-github-restart"></span><h2>Step 13: Rebuild the app and restart Envoy<a class="headerlink" href="#step-13-rebuild-the-app-and-restart-envoy" title="Link to this heading"></a></h2>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>ui<span class="w"> </span>build.sh
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d<span class="w"> </span>envoy
+</pre></div>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Note the use of <code class="docutils literal notranslate"><span class="pre">up</span> <span class="pre">--build</span> <span class="pre">-d</span></code> rather than <code class="docutils literal notranslate"><span class="pre">restart</span></code>.</p>
+<p>This is necessary as we have changed <code class="docutils literal notranslate"><span class="pre">envoy.yml</span></code> which is loaded into the container at build time.</p>
+</div>
+<p>Browse to the production server <a class="reference external" href="https://localhost:10000">https://localhost:10000</a></p>
+<p>You can now log in and use the <a class="reference external" href="https://api.github.com/">Github APIs</a>.:</p>
+<img alt="../../_images/spa-login-github.png" class="align-center" src="../../_images/spa-login-github.png" />
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="../../configuration/http/http_filters/oauth2_filter.html#config-http-filters-oauth"><span class="std std-ref">Envoy OAuth filter</span></a></dt><dd><p>Configuration reference for Envoy’s OAuth filter.</p>
+</dd>
+<dt><a class="reference internal" href="../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-file-envoy-extensions-filters-http-oauth2-v3-oauth-proto"><span class="std std-ref">Envoy OAuth filter API</span></a></dt><dd><p>API reference for Envoy’s OAuth filter.</p>
+</dd>
+<dt><a class="reference external" href="https://oauth.net/2/">OAuth2 specification</a></dt><dd><p>OAuth 2.0 is the industry-standard protocol for authorization.</p>
+</dd>
+<dt><a class="reference external" href="https://react.dev/">React</a></dt><dd><p>The library for web and native user interfaces.</p>
+</dd>
+<dt><a class="reference external" href="https://vitejs.dev/">Vite</a></dt><dd><p>Next Generation Frontend Tooling.</p>
+</dd>
+<dt><a class="reference internal" href="../../api-v3/extensions/compression/gzip/compressor/v3/gzip.proto.html#envoy-v3-api-msg-extensions-compression-gzip-compressor-v3-gzip"><span class="std std-ref">Envoy Gzip Compression API</span></a></dt><dd><p>API and configuration reference for Envoy’s gzip compression.</p>
+</dd>
+<dt><a class="reference internal" href="../quick-start/securing.html#start-quick-start-securing"><span class="std std-ref">Securing Envoy quick start guide</span></a></dt><dd><p>Outline of key concepts for securing Envoy.</p>
+</dd>
+<dt><a class="reference external" href="https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps">Github OAuth apps</a></dt><dd><p>Information about setting up <a class="reference external" href="https://github.com/">Github</a> OAuth apps.</p>
+</dd>
+<dt><a class="reference external" href="https://api.github.com/">Github API</a></dt><dd><p>References for <a class="reference external" href="https://github.com/">Github</a>’s APIs.</p>
+</dd>
+</dl>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="route-mirror.html" class="btn btn-neutral float-left" title="Route mirroring policies" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="skywalking.html" class="btn btn-neutral float-right" title="Skywalking tracing" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Single page React app (with OAuth)</a><ul>
+<li><a class="reference internal" href="#step-1-create-a-local-directory-for-sandbox-customizations">Step 1: Create a <code class="docutils literal notranslate"><span class="pre">.local</span></code> directory for sandbox customizations</a></li>
+<li><a class="reference internal" href="#step-2-generate-an-hmac-secret">Step 2: Generate an HMAC secret</a></li>
+<li><a class="reference internal" href="#step-3-start-the-containers">Step 3: Start the containers</a></li>
+<li><a class="reference internal" href="#step-4-browse-to-the-dev-app-and-login">Step 4: Browse to the dev app and login</a></li>
+<li><a class="reference internal" href="#step-5-make-api-queries">Step 5: Make API queries</a></li>
+<li><a class="reference internal" href="#step-6-live-reload-code-changes">Step 6: Live reload code changes</a></li>
+<li><a class="reference internal" href="#step-7-log-out-of-the-app">Step 7: Log out of the app</a></li>
+<li><a class="reference internal" href="#step-8-build-production-assets">Step 8: Build production assets</a></li>
+<li><a class="reference internal" href="#step-9-browse-to-the-production-server">Step 9: Browse to the production server</a></li>
+<li><a class="reference internal" href="#step-10-setup-github-oauth-api-access">Step 10: Setup Github OAuth/API access</a></li>
+<li><a class="reference internal" href="#step-11-update-envoy-s-configuration-to-use-github">Step 11: Update Envoy’s configuration to use Github</a></li>
+<li><a class="reference internal" href="#step-12-update-the-app-configuration-to-use-github">Step 12: Update the app configuration to use Github</a></li>
+<li><a class="reference internal" href="#step-13-rebuild-the-app-and-restart-envoy">Step 13: Rebuild the app and restart Envoy</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

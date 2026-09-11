@@ -1,0 +1,193 @@
+.. _envoy_v3_api_file_envoy/config/route/v3/scoped_route.proto:
+
+HTTP scoped routing configuration (proto)
+=========================================
+
+
+* Routing :ref:`architecture overview <arch_overview_http_routing>`
+
+
+
+
+.. _envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration:
+
+config.route.v3.ScopedRouteConfiguration
+----------------------------------------
+
+
+:repo:`[config.route.v3.ScopedRouteConfiguration proto] <api/envoy/config/route/v3/scoped_route.proto#L83>`
+
+Specifies a routing scope, which associates a
+:ref:`Key<envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration.Key>` to a
+:ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration`.
+The :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` can be obtained dynamically
+via RDS (:ref:`route_configuration_name<envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration_name>`)
+or specified inline (:ref:`route_configuration<envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration>`).
+
+The HTTP connection manager builds up a table consisting of these Key to
+RouteConfiguration mappings, and looks up the RouteConfiguration to use per
+request according to the algorithm specified in the
+:ref:`scope_key_builder<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`
+assigned to the HttpConnectionManager.
+
+For example, with the following configurations (in YAML):
+
+HttpConnectionManager config:
+
+.. code::
+
+  ...
+  scoped_routes:
+    name: foo-scoped-routes
+    scope_key_builder:
+      fragments:
+        - header_value_extractor:
+            name: X-Route-Selector
+            element_separator: ","
+            element:
+              separator: =
+              key: vip
+
+ScopedRouteConfiguration resources (specified statically via
+:ref:`scoped_route_configurations_list<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scoped_route_configurations_list>`
+or obtained dynamically via SRDS):
+
+.. code::
+
+ (1)
+  name: route-scope1
+  route_configuration_name: route-config1
+  key:
+     fragments:
+       - string_key: 172.10.10.20
+
+ (2)
+  name: route-scope2
+  route_configuration_name: route-config2
+  key:
+    fragments:
+      - string_key: 172.20.20.30
+
+A request from a client such as:
+
+.. code::
+
+    GET / HTTP/1.1
+    Host: foo.com
+    X-Route-Selector: vip=172.10.10.20
+
+would result in the routing table defined by the ``route-config1``
+RouteConfiguration being assigned to the HTTP request/stream.
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "on_demand": ...,
+    "name": ...,
+    "route_configuration_name": ...,
+    "route_configuration": {...},
+    "key": {...}
+  }
+
+.. _envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.on_demand:
+
+
+on_demand
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether the RouteConfiguration should be loaded on demand.
+
+
+.. _envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name assigned to the routing scope.
+
+
+.. _envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration_name:
+
+
+route_configuration_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The resource name to use for a :ref:`envoy_v3_api_msg_service.discovery.v3.DiscoveryRequest` to an
+  RDS server to fetch the :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` associated
+  with this scope.
+
+
+.. _envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration:
+
+
+route_configuration
+  (:ref:`config.route.v3.RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`) The :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` associated with the scope.
+
+
+.. _envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.key:
+
+
+key
+  (:ref:`config.route.v3.ScopedRouteConfiguration.Key <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration.Key>`, *REQUIRED*) The key to match against.
+
+
+.. _envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration.Key:
+
+config.route.v3.ScopedRouteConfiguration.Key
+--------------------------------------------
+
+
+:repo:`[config.route.v3.ScopedRouteConfiguration.Key proto] <api/envoy/config/route/v3/scoped_route.proto#L92>`
+
+Specifies a key which is matched against the output of the
+:ref:`scope_key_builder<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`
+specified in the HttpConnectionManager. The matching is done per HTTP
+request and is dependent on the order of the fragments contained in the
+Key.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "fragments": []
+  }
+
+.. _envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.Key.fragments:
+
+
+fragments
+  (**repeated** :ref:`config.route.v3.ScopedRouteConfiguration.Key.Fragment <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration.Key.Fragment>`, *REQUIRED*) The ordered set of fragments to match against. The order must match the
+  fragments in the corresponding
+  :ref:`scope_key_builder<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`.
+
+
+.. _envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration.Key.Fragment:
+
+config.route.v3.ScopedRouteConfiguration.Key.Fragment
+-----------------------------------------------------
+
+
+:repo:`[config.route.v3.ScopedRouteConfiguration.Key.Fragment proto] <api/envoy/config/route/v3/scoped_route.proto#L96>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "string_key": ...
+  }
+
+.. _envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.Key.Fragment.string_key:
+
+
+string_key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) A string to match against.
+
+
+  
+
+
+

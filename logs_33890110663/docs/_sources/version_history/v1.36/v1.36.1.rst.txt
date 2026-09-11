@@ -1,0 +1,21 @@
+.. _version_history_1.36.1:
+
+1.36.1 (October 16, 2025)
+==========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **connection pool**: Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
+  or responses trigger flow control.
+

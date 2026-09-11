@@ -1,0 +1,20 @@
+2026-08-18T18:08:19.8750000Z Requested labels: ubuntu-24.04
+2026-08-18T18:08:19.8750000Z Job defined at: envoyproxy/envoy/.github/workflows/_run.yml@refs/heads/main
+2026-08-18T18:08:19.8750000Z Reusable workflow chain:
+2026-08-18T18:08:19.8750000Z envoyproxy/envoy/.github/workflows/envoy-checks.yml@refs/heads/main (447ae91525105d3bd9c5c9bc3672078d89c6958e)
+2026-08-18T18:08:19.8750000Z -> envoyproxy/envoy/.github/workflows/_check_coverage.yml@refs/heads/main (447ae91525105d3bd9c5c9bc3672078d89c6958e)
+2026-08-18T18:08:19.8750000Z --> envoyproxy/envoy/.github/workflows/_run.yml@refs/heads/main (447ae91525105d3bd9c5c9bc3672078d89c6958e)
+2026-08-18T18:08:19.8750000Z Waiting for a runner to pick up this job...
+2026-08-18T18:08:19.8640000Z Evaluating coverage.if
+2026-08-18T18:08:19.8640000Z Evaluating: (success() && (fromJSON(needs.load.outputs.request).run.check-coverage))
+2026-08-18T18:08:19.8640000Z Expanded: (true && true)
+2026-08-18T18:08:19.8640000Z Result: true
+2026-08-18T18:08:19.8640000Z Evaluating coverage.coverage.if
+2026-08-18T18:08:19.8640000Z Evaluating: success()
+2026-08-18T18:08:19.8640000Z Result: true
+2026-08-18T18:08:19.8640000Z Evaluating coverage.coverage.fuzz_coverage_Fuzz_covera.ci.if
+2026-08-18T18:08:19.8640000Z Evaluating: (success() && (!inputs.skip))
+2026-08-18T18:08:19.8640000Z Expanded: (true && !false)
+2026-08-18T18:08:19.8640000Z Result: true
+2026-08-18T18:15:14.1070000Z Job is about to start running on the hosted runner: GitHub Actions 1067383140
+2026-08-18T18:15:14.1070000Z Job is waiting for a hosted runner to come online.

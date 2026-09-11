@@ -1,0 +1,275 @@
+/* Topbar — logo lockup, version menu, search trigger, actions.
+
+   Everything here is chrome, so nothing takes a semantic ink. The logo keeps
+   its own colours and is the only saturated thing in the frame. */
+
+.envoy-doc-topbar {
+  align-items: center;
+  background: var(--envoy-ground);
+  border-bottom: 1px solid var(--envoy-rule);
+  display: flex;
+  gap: 16px;
+  height: var(--envoy-topbar-height);
+  left: 0;
+  padding: 0 22px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 1000;
+}
+
+/* --- logo lockup --------------------------------------------------------- */
+
+.envoy-doc-logo {
+  align-items: center;
+  display: inline-flex;
+  flex: none;
+  gap: 11px;
+  text-decoration: none;
+}
+
+.envoy-doc-logo img {
+  display: block;
+  height: 24px;
+  max-width: none;
+  width: auto;
+}
+
+.envoy-doc-logo::after {
+  background: var(--envoy-rule-strong);
+  content: "";
+  height: 18px;
+  width: 1px;
+}
+
+.envoy-doc-wordmark {
+  color: var(--envoy-ink-body);
+  font-size: 14px;
+  letter-spacing: 0.01em;
+}
+
+/* The shipped mark has a #492365 wordmark, which is 1.5:1 on the dark ground.
+   A light-wordmark variant is swapped in rather than plating the logo white. */
+
+.envoy-doc-logo .envoy-logo-dark {
+  display: none;
+}
+
+html[data-envoy-theme="dark"] .envoy-doc-logo .envoy-logo-light {
+  display: none;
+}
+
+html[data-envoy-theme="dark"] .envoy-doc-logo .envoy-logo-dark {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-envoy-theme="light"]) .envoy-doc-logo .envoy-logo-light {
+    display: none;
+  }
+
+  html:not([data-envoy-theme="light"]) .envoy-doc-logo .envoy-logo-dark {
+    display: block;
+  }
+}
+
+/* --- version menu -------------------------------------------------------- */
+
+.envoy-version-menu {
+  flex: none;
+  position: relative;
+}
+
+.envoy-version-menu summary {
+  align-items: center;
+  border: 1px solid var(--envoy-rule-strong);
+  border-radius: 4px;
+  color: var(--envoy-ink-body);
+  cursor: pointer;
+  display: flex;
+  font-family: var(--envoy-font-mono);
+  font-size: 11.5px;
+  gap: 7px;
+  list-style: none;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.envoy-version-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.envoy-version-menu summary:hover,
+.envoy-version-menu[open] summary {
+  border-color: var(--envoy-ink);
+  color: var(--envoy-ink);
+}
+
+.envoy-version-tag {
+  background: var(--envoy-ink);
+  border-radius: 2px;
+  color: var(--envoy-ground);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  padding: 0 4px;
+  text-transform: uppercase;
+}
+
+.envoy-version-options {
+  background: var(--envoy-ground);
+  border: 1px solid var(--envoy-rule-strong);
+  border-radius: 6px;
+  box-shadow: var(--envoy-shadow);
+  display: flex;
+  flex-direction: column;
+  left: 0;
+  min-width: 210px;
+  padding: 5px;
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 1100;
+}
+
+.envoy-version-options a {
+  border-radius: 4px;
+  color: var(--envoy-ink-body);
+  font-size: 13.5px;
+  padding: 6px 10px;
+  text-decoration: none;
+}
+
+.envoy-version-options a:hover {
+  background: var(--envoy-surface-2);
+  color: var(--envoy-ink);
+}
+
+.envoy-version-options a[aria-current="true"],
+.envoy-version-current {
+  border-radius: 4px;
+  color: var(--envoy-ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 6px 10px;
+}
+
+/* the version index lives outside this build, so it is set apart */
+.envoy-version-index {
+  border-top: 1px solid var(--envoy-rule);
+  border-radius: 0 0 4px 4px;
+  margin-top: 5px;
+  padding-top: 10px;
+}
+
+/* --- search trigger ------------------------------------------------------ */
+
+.envoy-search-button {
+  align-items: center;
+  background: var(--envoy-ground);
+  border: 1px solid var(--envoy-rule-strong);
+  border-radius: 5px;
+  color: var(--envoy-ink-muted);
+  cursor: pointer;
+  display: flex;
+  flex: 0 1 320px;
+  font-size: 13px;
+  gap: 9px;
+  height: 32px;
+  margin-left: auto;
+  min-width: 0;
+  padding: 0 8px 0 10px;
+  text-align: left;
+}
+
+.envoy-search-button > svg {
+  flex: none;
+}
+
+.envoy-search-button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.envoy-search-button:hover {
+  border-color: var(--envoy-ink);
+  color: var(--envoy-ink-body);
+}
+
+.envoy-search-button kbd {
+  background: transparent;
+  border: 1px solid var(--envoy-rule);
+  border-radius: 3px;
+  color: var(--envoy-ink-muted);
+  font-family: var(--envoy-font-mono);
+  flex: none;
+  font-size: 10.5px;
+  margin-left: auto;
+  padding: 1px 5px;
+}
+
+/* --- actions ------------------------------------------------------------- */
+
+.envoy-doc-actions {
+  align-items: center;
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+
+.envoy-doc-actions a,
+.envoy-doc-actions button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: var(--envoy-ink-body);
+  cursor: pointer;
+  display: inline-flex;
+  gap: 7px;
+  height: 32px;
+  justify-content: center;
+  min-width: 32px;
+  padding: 0 8px;
+  text-decoration: none;
+}
+
+.envoy-doc-actions a:hover,
+.envoy-doc-actions button:hover {
+  background: var(--envoy-surface-2);
+  color: var(--envoy-ink);
+}
+
+.envoy-action-label {
+  font-size: 13.5px;
+}
+
+.envoy-theme-icon-light,
+html[data-envoy-theme="dark"] .envoy-theme-icon-dark {
+  display: none;
+}
+
+html[data-envoy-theme="dark"] .envoy-theme-icon-light {
+  display: inline;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-envoy-theme="light"]) .envoy-theme-icon-dark {
+    display: none;
+  }
+
+  html:not([data-envoy-theme="light"]) .envoy-theme-icon-light {
+    display: inline;
+  }
+}
+
+.envoy-doc-actions .envoy-nav-toggle {
+  display: none;
+}
+
+.envoy-nav-backdrop {
+  background: var(--envoy-scrim);
+  border: 0;
+  inset: 0;
+  position: fixed;
+  z-index: 190;
+}

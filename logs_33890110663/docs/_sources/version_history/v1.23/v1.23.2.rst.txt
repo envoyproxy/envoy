@@ -1,0 +1,21 @@
+.. _version_history_1.23.2:
+
+1.23.2 (October 17, 2022)
+==========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **lua**: fixed a bug causing response headers set by a Lua script to not be sent in the response
+  (https://github.com/envoyproxy/envoy/issues/22401). This bug was introduced in Envoy v1.23.0.
+

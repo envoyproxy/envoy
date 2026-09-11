@@ -1,0 +1,211 @@
+.. _envoy_v3_api_file_envoy/config/common/mutation_rules/v3/mutation_rules.proto:
+
+Header mutation rules (proto)
+=============================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutationRules:
+
+config.common.mutation_rules.v3.HeaderMutationRules
+---------------------------------------------------
+
+
+:repo:`[config.common.mutation_rules.v3.HeaderMutationRules proto] <api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L47>`
+
+The HeaderMutationRules structure specifies what headers may be
+manipulated by a processing filter. This set of rules makes it
+possible to control which modifications a filter may make.
+
+By default, an external processing server may add, modify, or remove
+any header except for an "Envoy internal" header (which is typically
+denoted by an x-envoy prefix) or specific headers that may affect
+further filter processing:
+
+* ``host``
+* ``:authority``
+* ``:scheme``
+* ``:method``
+
+Every attempt to add, change, append, or remove a header will be
+tested against the rules here. Disallowed header mutations will be
+ignored unless ``disallow_is_error`` is set to true.
+
+Attempts to remove headers are further constrained -- regardless of the
+settings, system-defined headers (that start with ``:``) and the ``host``
+header may never be removed.
+
+In addition, a counter will be incremented whenever a mutation is
+rejected. In the ext_proc filter, that counter is named
+``rejected_header_mutations``.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "allow_all_routing": {...},
+    "allow_envoy": {...},
+    "disallow_system": {...},
+    "disallow_all": {...},
+    "allow_expression": {...},
+    "disallow_expression": {...},
+    "disallow_is_error": {...}
+  }
+
+.. _envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutationRules.allow_all_routing:
+
+
+allow_all_routing
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) By default, certain headers that could affect processing of subsequent
+  filters or request routing cannot be modified. These headers are
+  ``host``, ``:authority``, ``:scheme``, and ``:method``. Setting this parameter
+  to true allows these headers to be modified as well.
+
+
+.. _envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutationRules.allow_envoy:
+
+
+allow_envoy
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If true, allow modification of envoy internal headers. By default, these
+  start with ``x-envoy`` but this may be overridden in the ``Bootstrap``
+  configuration using the
+  :ref:`header_prefix <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.header_prefix>`
+  field. Default is false.
+
+
+.. _envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutationRules.disallow_system:
+
+
+disallow_system
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If true, prevent modification of any system header, defined as a header
+  that starts with a ``:`` character, regardless of any other settings.
+  A processing server may still override the ``:status`` of an HTTP response
+  using an ``ImmediateResponse`` message. Default is false.
+
+
+.. _envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutationRules.disallow_all:
+
+
+disallow_all
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If true, prevent modifications of all header values, regardless of any
+  other settings. A processing server may still override the ``:status``
+  of an HTTP response using an ``ImmediateResponse`` message. Default is false.
+
+
+.. _envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutationRules.allow_expression:
+
+
+allow_expression
+  (:ref:`type.matcher.v3.RegexMatcher <envoy_v3_api_msg_type.matcher.v3.RegexMatcher>`) If set, specifically allow any header that matches this regular
+  expression. This overrides all other settings except for
+  ``disallow_expression``.
+
+
+.. _envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutationRules.disallow_expression:
+
+
+disallow_expression
+  (:ref:`type.matcher.v3.RegexMatcher <envoy_v3_api_msg_type.matcher.v3.RegexMatcher>`) If set, specifically disallow any header that matches this regular
+  expression regardless of any other settings.
+
+
+.. _envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutationRules.disallow_is_error:
+
+
+disallow_is_error
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If true, and if the rules in this list cause a header mutation to be
+  disallowed, then the filter using this configuration will terminate the
+  request with a 500 error. In addition, regardless of the setting of this
+  parameter, any attempt to set, add, or modify a disallowed header will
+  cause the ``rejected_header_mutations`` counter to be incremented.
+  Default is false.
+
+
+
+.. _envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation:
+
+config.common.mutation_rules.v3.HeaderMutation
+----------------------------------------------
+
+
+:repo:`[config.common.mutation_rules.v3.HeaderMutation proto] <api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L92>`
+
+The HeaderMutation structure specifies an action that may be taken on HTTP
+headers.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "remove": ...,
+    "append": {...},
+    "remove_on_match": {...}
+  }
+
+.. _envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove:
+
+
+remove
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Remove the specified header if it exists.
+
+
+  
+
+  Precisely one of :ref:`remove <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove>`, :ref:`append <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.append>`, :ref:`remove_on_match <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove_on_match>` must be set.
+
+.. _envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.append:
+
+
+append
+  (:ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) Append new header by the specified HeaderValueOption.
+
+
+  
+
+  Precisely one of :ref:`remove <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove>`, :ref:`append <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.append>`, :ref:`remove_on_match <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove_on_match>` must be set.
+
+.. _envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove_on_match:
+
+
+remove_on_match
+  (:ref:`config.common.mutation_rules.v3.HeaderMutation.RemoveOnMatch <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation.RemoveOnMatch>`) Remove the header if the key matches the specified string matcher.
+
+
+  
+
+  Precisely one of :ref:`remove <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove>`, :ref:`append <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.append>`, :ref:`remove_on_match <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove_on_match>` must be set.
+
+.. _envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation.RemoveOnMatch:
+
+config.common.mutation_rules.v3.HeaderMutation.RemoveOnMatch
+------------------------------------------------------------
+
+
+:repo:`[config.common.mutation_rules.v3.HeaderMutation.RemoveOnMatch proto] <api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L93>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "key_matcher": {...}
+  }
+
+.. _envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.RemoveOnMatch.key_matcher:
+
+
+key_matcher
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`, *REQUIRED*) A string matcher that will be applied to the header key. If the header key
+  matches, the header will be removed.
+
+
+

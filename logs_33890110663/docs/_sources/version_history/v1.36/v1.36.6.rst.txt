@@ -1,0 +1,25 @@
+.. _version_history_1.36.6:
+
+1.36.6 (April 10, 2026)
+========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **docker**: Updates/fixes for release images.
+* **dynamic_modules**: Fixed a bug where dynamic module filter may result in a incomplete body being sent to upstream
+  or downstream when some filters before or after the dynamic module filter in the chain
+  buffered the body and the dynamic module filter did not.
+* **http**: Fixed a bug where the internal redirect logic may hang up a request when the request buffer is
+  overflowed.
+

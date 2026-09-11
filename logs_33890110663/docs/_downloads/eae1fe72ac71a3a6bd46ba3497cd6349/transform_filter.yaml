@@ -1,0 +1,93 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/route/override"
+                route:
+                  host_rewrite_literal: upstream.com
+                  cluster: upstream_com
+                typed_per_filter_config:
+                  transform:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.transform.v3.TransformConfig
+                    request_transformation:
+                      headers_mutations:
+                      - append:
+                          header:
+                            key: "model-header"
+                            value: "%REQUEST_BODY(model)%"
+                          append_action: OVERWRITE_IF_EXISTS_OR_ADD
+              - match:
+                  prefix: "/"
+                route:
+                  host_rewrite_literal: upstream.com
+                  cluster: upstream_com
+          http_filters:
+          - name: transform
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.transform.v3.TransformConfig
+              request_transformation:
+                headers_mutations:
+                - append:
+                    header:
+                      key: "model-header"
+                      value: "%REQUEST_BODY(model)%"
+                    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                body_transformation:
+                  body_format:
+                    json_format:
+                      model: "new-model"
+                  action: MERGE
+              response_transformation:
+                headers_mutations:
+                - append:
+                    header:
+                      key: "prompt-tokens"
+                      value: "%RESPONSE_BODY(usage:prompt_tokens)%"
+                    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                - append:
+                    header:
+                      key: "completion-tokens"
+                      value: "%RESPONSE_BODY(usage:completion_tokens)%"
+                    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: upstream_com
+    type: LOGICAL_DNS
+    # Comment out the following line to test on v6 networks
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: service_upstream_com
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: upstream.com
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: upstream.com

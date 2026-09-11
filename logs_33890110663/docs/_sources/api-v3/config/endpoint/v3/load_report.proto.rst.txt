@@ -1,0 +1,405 @@
+.. _envoy_v3_api_file_envoy/config/endpoint/v3/load_report.proto:
+
+Load Report (proto)
+===================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.endpoint.v3.UpstreamLocalityStats:
+
+config.endpoint.v3.UpstreamLocalityStats
+----------------------------------------
+
+
+:repo:`[config.endpoint.v3.UpstreamLocalityStats proto] <api/envoy/config/endpoint/v3/load_report.proto#L28>`
+
+These are stats Envoy reports to the management server at a frequency defined by
+:ref:`LoadStatsResponse.load_reporting_interval<envoy_v3_api_field_service.load_stats.v3.LoadStatsResponse.load_reporting_interval>`.
+Stats per upstream region/zone and optionally per subzone.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "locality": {...},
+    "total_successful_requests": ...,
+    "total_requests_in_progress": ...,
+    "total_error_requests": ...,
+    "total_issued_requests": ...,
+    "cpu_utilization": {...},
+    "mem_utilization": {...},
+    "application_utilization": {...},
+    "load_metric_stats": [],
+    "upstream_endpoint_stats": []
+  }
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamLocalityStats.locality:
+
+
+locality
+  (:ref:`config.core.v3.Locality <envoy_v3_api_msg_config.core.v3.Locality>`) Name of zone, region and optionally endpoint group these metrics were
+  collected from. Zone and region names could be empty if unknown.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamLocalityStats.total_successful_requests:
+
+
+total_successful_requests
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The total number of requests successfully completed by the endpoints in the
+  locality.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamLocalityStats.total_requests_in_progress:
+
+
+total_requests_in_progress
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The total number of unfinished requests. A request can be an HTTP request
+  or a TCP connection for a TCP connection pool.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamLocalityStats.total_error_requests:
+
+
+total_error_requests
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The total number of requests that failed due to errors at the endpoint,
+  aggregated over all endpoints in the locality.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamLocalityStats.total_issued_requests:
+
+
+total_issued_requests
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The total number of requests that were issued by this Envoy since
+  the last report. This information is aggregated over all the
+  upstream endpoints in the locality. A request can be an HTTP request
+  or a TCP connection for a TCP connection pool.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamLocalityStats.cpu_utilization:
+
+
+cpu_utilization
+  (:ref:`config.endpoint.v3.UnnamedEndpointLoadMetricStats <envoy_v3_api_msg_config.endpoint.v3.UnnamedEndpointLoadMetricStats>`) CPU utilization stats for multi-dimensional load balancing.
+  This typically comes from endpoint metrics reported via ORCA.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamLocalityStats.mem_utilization:
+
+
+mem_utilization
+  (:ref:`config.endpoint.v3.UnnamedEndpointLoadMetricStats <envoy_v3_api_msg_config.endpoint.v3.UnnamedEndpointLoadMetricStats>`) Memory utilization for multi-dimensional load balancing.
+  This typically comes from endpoint metrics reported via ORCA.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamLocalityStats.application_utilization:
+
+
+application_utilization
+  (:ref:`config.endpoint.v3.UnnamedEndpointLoadMetricStats <envoy_v3_api_msg_config.endpoint.v3.UnnamedEndpointLoadMetricStats>`) Blended application-defined utilization for multi-dimensional load balancing.
+  This typically comes from endpoint metrics reported via ORCA.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamLocalityStats.load_metric_stats:
+
+
+load_metric_stats
+  (**repeated** :ref:`config.endpoint.v3.EndpointLoadMetricStats <envoy_v3_api_msg_config.endpoint.v3.EndpointLoadMetricStats>`) Named stats for multi-dimensional load balancing.
+  These typically come from endpoint metrics reported via ORCA.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamLocalityStats.upstream_endpoint_stats:
+
+
+upstream_endpoint_stats
+  (**repeated** :ref:`config.endpoint.v3.UpstreamEndpointStats <envoy_v3_api_msg_config.endpoint.v3.UpstreamEndpointStats>`) Endpoint granularity stats information for this locality. This information
+  is populated if the Server requests it by setting
+  :ref:`LoadStatsResponse.report_endpoint_granularity<envoy_v3_api_field_service.load_stats.v3.LoadStatsResponse.report_endpoint_granularity>`.
+
+
+
+.. _envoy_v3_api_msg_config.endpoint.v3.UpstreamEndpointStats:
+
+config.endpoint.v3.UpstreamEndpointStats
+----------------------------------------
+
+
+:repo:`[config.endpoint.v3.UpstreamEndpointStats proto] <api/envoy/config/endpoint/v3/load_report.proto#L106>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "address": {...},
+    "metadata": {...},
+    "total_successful_requests": ...,
+    "total_requests_in_progress": ...,
+    "total_error_requests": ...,
+    "total_issued_requests": ...,
+    "load_metric_stats": []
+  }
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamEndpointStats.address:
+
+
+address
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) Upstream host address.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamEndpointStats.metadata:
+
+
+metadata
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) Opaque and implementation dependent metadata of the
+  endpoint. Envoy will pass this directly to the management server.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamEndpointStats.total_successful_requests:
+
+
+total_successful_requests
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The total number of requests successfully completed by the endpoints in the
+  locality. These include non-5xx responses for HTTP, where errors
+  originate at the client and the endpoint responded successfully. For gRPC,
+  the grpc-status values are those not covered by total_error_requests below.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamEndpointStats.total_requests_in_progress:
+
+
+total_requests_in_progress
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The total number of unfinished requests for this endpoint.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamEndpointStats.total_error_requests:
+
+
+total_error_requests
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The total number of requests that failed due to errors at the endpoint.
+  For HTTP these are responses with 5xx status codes and for gRPC the
+  grpc-status values:
+
+    - DeadlineExceeded
+    - Unimplemented
+    - Internal
+    - Unavailable
+    - Unknown
+    - DataLoss
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamEndpointStats.total_issued_requests:
+
+
+total_issued_requests
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The total number of requests that were issued to this endpoint
+  since the last report. A single TCP connection, HTTP or gRPC
+  request or stream is counted as one request.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UpstreamEndpointStats.load_metric_stats:
+
+
+load_metric_stats
+  (**repeated** :ref:`config.endpoint.v3.EndpointLoadMetricStats <envoy_v3_api_msg_config.endpoint.v3.EndpointLoadMetricStats>`) Stats for multi-dimensional load balancing.
+
+
+
+.. _envoy_v3_api_msg_config.endpoint.v3.EndpointLoadMetricStats:
+
+config.endpoint.v3.EndpointLoadMetricStats
+------------------------------------------
+
+
+:repo:`[config.endpoint.v3.EndpointLoadMetricStats proto] <api/envoy/config/endpoint/v3/load_report.proto#L147>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "metric_name": ...,
+    "num_requests_finished_with_metric": ...,
+    "total_metric_value": ...
+  }
+
+.. _envoy_v3_api_field_config.endpoint.v3.EndpointLoadMetricStats.metric_name:
+
+
+metric_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Name of the metric; may be empty.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.EndpointLoadMetricStats.num_requests_finished_with_metric:
+
+
+num_requests_finished_with_metric
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Number of calls that finished and included this metric.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.EndpointLoadMetricStats.total_metric_value:
+
+
+total_metric_value
+  (`double <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Sum of metric values across all calls that finished with this metric for
+  load_reporting_interval.
+
+
+
+.. _envoy_v3_api_msg_config.endpoint.v3.UnnamedEndpointLoadMetricStats:
+
+config.endpoint.v3.UnnamedEndpointLoadMetricStats
+-------------------------------------------------
+
+
+:repo:`[config.endpoint.v3.UnnamedEndpointLoadMetricStats proto] <api/envoy/config/endpoint/v3/load_report.proto#L163>`
+
+Same as EndpointLoadMetricStats, except without the metric_name field.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "num_requests_finished_with_metric": ...,
+    "total_metric_value": ...
+  }
+
+.. _envoy_v3_api_field_config.endpoint.v3.UnnamedEndpointLoadMetricStats.num_requests_finished_with_metric:
+
+
+num_requests_finished_with_metric
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Number of calls that finished and included this metric.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.UnnamedEndpointLoadMetricStats.total_metric_value:
+
+
+total_metric_value
+  (`double <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Sum of metric values across all calls that finished with this metric for
+  load_reporting_interval.
+
+
+
+.. _envoy_v3_api_msg_config.endpoint.v3.ClusterStats:
+
+config.endpoint.v3.ClusterStats
+-------------------------------
+
+
+:repo:`[config.endpoint.v3.ClusterStats proto] <api/envoy/config/endpoint/v3/load_report.proto#L176>`
+
+Per cluster load stats. Envoy reports these stats a management server in a
+:ref:`LoadStatsRequest<envoy_v3_api_msg_service.load_stats.v3.LoadStatsRequest>`
+Next ID: 7
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster_name": ...,
+    "cluster_service_name": ...,
+    "upstream_locality_stats": [],
+    "total_dropped_requests": ...,
+    "dropped_requests": [],
+    "load_report_interval": {...}
+  }
+
+.. _envoy_v3_api_field_config.endpoint.v3.ClusterStats.cluster_name:
+
+
+cluster_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the cluster.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.ClusterStats.cluster_service_name:
+
+
+cluster_service_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The eds_cluster_config service_name of the cluster.
+  It's possible that two clusters send the same service_name to EDS,
+  in that case, the management server is supposed to do aggregation on the load reports.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.ClusterStats.upstream_locality_stats:
+
+
+upstream_locality_stats
+  (**repeated** :ref:`config.endpoint.v3.UpstreamLocalityStats <envoy_v3_api_msg_config.endpoint.v3.UpstreamLocalityStats>`, *REQUIRED*) Need at least one.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.ClusterStats.total_dropped_requests:
+
+
+total_dropped_requests
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Cluster-level stats such as total_successful_requests may be computed by
+  summing upstream_locality_stats. In addition, below there are additional
+  cluster-wide stats.
+
+  The total number of dropped requests. This covers requests
+  deliberately dropped by the drop_overload policy and circuit breaking.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.ClusterStats.dropped_requests:
+
+
+dropped_requests
+  (**repeated** :ref:`config.endpoint.v3.ClusterStats.DroppedRequests <envoy_v3_api_msg_config.endpoint.v3.ClusterStats.DroppedRequests>`) Information about deliberately dropped requests for each category specified
+  in the DropOverload policy.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.ClusterStats.load_report_interval:
+
+
+load_report_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Period over which the actual load report occurred. This will be guaranteed to include every
+  request reported. Due to system load and delays between the ``LoadStatsRequest`` sent from Envoy
+  and the ``LoadStatsResponse`` message sent from the management server, this may be longer than
+  the requested load reporting interval in the ``LoadStatsResponse``.
+
+
+.. _envoy_v3_api_msg_config.endpoint.v3.ClusterStats.DroppedRequests:
+
+config.endpoint.v3.ClusterStats.DroppedRequests
+-----------------------------------------------
+
+
+:repo:`[config.endpoint.v3.ClusterStats.DroppedRequests proto] <api/envoy/config/endpoint/v3/load_report.proto#L179>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "category": ...,
+    "dropped_count": ...
+  }
+
+.. _envoy_v3_api_field_config.endpoint.v3.ClusterStats.DroppedRequests.category:
+
+
+category
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Identifier for the policy specifying the drop.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.ClusterStats.DroppedRequests.dropped_count:
+
+
+dropped_count
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Total number of deliberately dropped requests for the category.
+
+
+

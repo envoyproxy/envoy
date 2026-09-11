@@ -1,0 +1,20 @@
+.. _version_history_1.25.6:
+
+1.25.6 (April 27, 2023)
+========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **tls**: Fix build FIPS compliance when using both FIPS mode and Wasm extensions (``--define boringssl=fips`` and ``--define wasm=v8``).
+

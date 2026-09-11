@@ -1,0 +1,125 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/starttls/v3/starttls.proto:
+
+StartTls (proto)
+================
+
+.. _extension_envoy.transport_sockets.starttls:
+
+This extension has the qualified name ``envoy.transport_sockets.starttls``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.transport_sockets.downstream <extension_category_envoy.transport_sockets.downstream>`
+
+  - :ref:`envoy.transport_sockets.upstream <extension_category_envoy.transport_sockets.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig>`
+
+
+
+
+
+StartTls transport socket addresses situations when a protocol starts in clear-text and
+negotiates an in-band switch to TLS. StartTls transport socket is protocol agnostic. In the
+case of downstream StartTls a network filter is required which understands protocol exchange
+and a state machine to signal to the StartTls transport socket when a switch to TLS is
+required. Similarly, upstream StartTls requires the owner of an upstream transport socket to
+manage the state machine necessary to properly coordinate negotiation with the upstream and
+signal to the transport socket when a switch to secure transport is required.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig:
+
+extensions.transport_sockets.starttls.v3.StartTlsConfig
+-------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.starttls.v3.StartTlsConfig proto] <api/envoy/extensions/transport_sockets/starttls/v3/starttls.proto#L31>`
+
+Configuration for a downstream StartTls transport socket.
+StartTls transport socket wraps two sockets:
+* raw_buffer socket which is used at the beginning of the session
+* TLS socket used when a protocol negotiates a switch to encrypted traffic.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cleartext_socket_config": {...},
+    "tls_socket_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.starttls.v3.StartTlsConfig.cleartext_socket_config:
+
+
+cleartext_socket_config
+  (:ref:`extensions.transport_sockets.raw_buffer.v3.RawBuffer <envoy_v3_api_msg_extensions.transport_sockets.raw_buffer.v3.RawBuffer>`) (optional) Configuration for clear-text socket used at the beginning of the session.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.starttls.v3.StartTlsConfig.tls_socket_config:
+
+
+tls_socket_config
+  (:ref:`extensions.transport_sockets.tls.v3.DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`, *REQUIRED*) Configuration for a downstream TLS socket.
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig:
+
+extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig
+---------------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig proto] <api/envoy/extensions/transport_sockets/starttls/v3/starttls.proto#L44>`
+
+Configuration for an upstream StartTls transport socket.
+StartTls transport socket wraps two sockets:
+* raw_buffer socket which is used at the beginning of the session
+* TLS socket used when a protocol negotiates a switch to encrypted traffic.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cleartext_socket_config": {...},
+    "tls_socket_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig.cleartext_socket_config:
+
+
+cleartext_socket_config
+  (:ref:`extensions.transport_sockets.raw_buffer.v3.RawBuffer <envoy_v3_api_msg_extensions.transport_sockets.raw_buffer.v3.RawBuffer>`) (optional) Configuration for clear-text socket used at the beginning of the session.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig.tls_socket_config:
+
+
+tls_socket_config
+  (:ref:`extensions.transport_sockets.tls.v3.UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`, *REQUIRED*) Configuration for an upstream TLS socket.
+
+

@@ -1,0 +1,888 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Role Based Access Control (RBAC) (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="RBAC matchers" href="../matchers.html" />
+    <link rel="prev" title="RBAC" href="../rbac.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../rbac.html">RBAC</a></li>
+      <li class="breadcrumb-item active">Role Based Access Control (RBAC) (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/config/rbac/v3/rbac.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="role-based-access-control-rbac-proto">
+<span id="envoy-v3-api-file-envoy-config-rbac-v3-rbac-proto"></span><h1>Role Based Access Control (RBAC) (proto)<a class="headerlink" href="#role-based-access-control-rbac-proto" title="Link to this heading"></a></h1>
+<section id="config-rbac-v3-rbac">
+<span id="envoy-v3-api-msg-config-rbac-v3-rbac"></span><h2>config.rbac.v3.RBAC<a class="headerlink" href="#config-rbac-v3-rbac" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L88">[config.rbac.v3.RBAC proto]</a></p>
+<p>Role Based Access Control (RBAC) provides service-level and method-level access control for a
+service. Requests are allowed or denied based on the <code class="docutils literal notranslate"><span class="pre">action</span></code> and whether a matching policy is
+found. For instance, if the action is ALLOW and a matching policy is found the request should be
+allowed.</p>
+<p>RBAC can also be used to make access logging decisions by communicating with access loggers
+through dynamic metadata. When the action is LOG and at least one policy matches, the
+<code class="docutils literal notranslate"><span class="pre">access_log_hint</span></code> value in the shared key namespace ‘envoy.common’ is set to <code class="docutils literal notranslate"><span class="pre">true</span></code> indicating
+the request should be logged.</p>
+<p>Here is an example of RBAC configuration. It has two policies:</p>
+<ul class="simple">
+<li><p>Service account <code class="docutils literal notranslate"><span class="pre">cluster.local/ns/default/sa/admin</span></code> has full access to the service, and so
+does “cluster.local/ns/default/sa/superuser”.</p></li>
+<li><p>Any user can read (<code class="docutils literal notranslate"><span class="pre">GET</span></code>) the service at paths with prefix <code class="docutils literal notranslate"><span class="pre">/products</span></code>, so long as the
+destination port is either 80 or 443.</p></li>
+</ul>
+<blockquote>
+<div><div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ALLOW</span>
+<span class="nt">policies</span><span class="p">:</span>
+<span class="w">  </span><span class="s">&quot;service-admin&quot;</span><span class="p p-Indicator">:</span>
+<span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">any</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">principals</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">authenticated</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">principal_name</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;cluster.local/ns/default/sa/admin&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">authenticated</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">principal_name</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;cluster.local/ns/default/sa/superuser&quot;</span>
+<span class="w">  </span><span class="s">&quot;product-viewer&quot;</span><span class="p p-Indicator">:</span>
+<span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">and_rules</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;:method&quot;</span>
+<span class="w">                  </span><span class="nt">string_match</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;GET&quot;</span>
+<span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url_path</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/products&quot;</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">or_rules</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">destination_port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">80</span>
+<span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">destination_port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="w">    </span><span class="nt">principals</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">any</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+</div></blockquote>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;action&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;policies&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-rbac-v3-rbac-action">
+<dt>action</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-config-rbac-v3-rbac-action"><span class="std std-ref">config.rbac.v3.RBAC.Action</span></a>) The action to take if a policy matches. Every action either allows or denies a request,
+and can also carry out action-specific operations.</p>
+<p>Actions:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ALLOW</span></code>: Allows the request if and only if there is a policy that matches
+the request.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DENY</span></code>: Allows the request if and only if there are no policies that
+match the request.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">LOG</span></code>: Allows all requests. If at least one policy matches, the dynamic
+metadata key <code class="docutils literal notranslate"><span class="pre">access_log_hint</span></code> is set to the value <code class="docutils literal notranslate"><span class="pre">true</span></code> under the shared
+key namespace <code class="docutils literal notranslate"><span class="pre">envoy.common</span></code>. If no policies match, it is set to <code class="docutils literal notranslate"><span class="pre">false</span></code>.
+Other actions do not modify this key.</p></li>
+</ul>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-rbac-v3-rbac-policies">
+<dt>policies</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-policy"><span class="std std-ref">config.rbac.v3.Policy</span></a>&gt;) Maps from policy name to policy. A match occurs when at least one policy matches the request.
+The policies are evaluated in lexicographic order of the policy name.</p>
+</dd>
+</dl>
+</section>
+<section id="config-rbac-v3-rbac-auditloggingoptions">
+<span id="envoy-v3-api-msg-config-rbac-v3-rbac-auditloggingoptions"></span><h2>config.rbac.v3.RBAC.AuditLoggingOptions<a class="headerlink" href="#config-rbac-v3-rbac-auditloggingoptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L106">[config.rbac.v3.RBAC.AuditLoggingOptions proto]</a></p>
+</section>
+<section id="enum-config-rbac-v3-rbac-auditloggingoptions-auditcondition">
+<span id="envoy-v3-api-enum-config-rbac-v3-rbac-auditloggingoptions-auditcondition"></span><h2>Enum config.rbac.v3.RBAC.AuditLoggingOptions.AuditCondition<a class="headerlink" href="#enum-config-rbac-v3-rbac-auditloggingoptions-auditcondition" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L108">[config.rbac.v3.RBAC.AuditLoggingOptions.AuditCondition proto]</a></p>
+<p>Deny and allow here refer to RBAC decisions, not actions.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-config-rbac-v3-rbac-auditloggingoptions-auditcondition-none">
+<dt>NONE</dt><dd><p><em>(DEFAULT)</em> ⁣Never audit.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-rbac-v3-rbac-auditloggingoptions-auditcondition-on-deny">
+<dt>ON_DENY</dt><dd><p>⁣Audit when RBAC denies the request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-rbac-v3-rbac-auditloggingoptions-auditcondition-on-allow">
+<dt>ON_ALLOW</dt><dd><p>⁣Audit when RBAC allows the request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-rbac-v3-rbac-auditloggingoptions-auditcondition-on-deny-and-allow">
+<dt>ON_DENY_AND_ALLOW</dt><dd><p>⁣Audit whether RBAC allows or denies the request.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-config-rbac-v3-rbac-action">
+<span id="envoy-v3-api-enum-config-rbac-v3-rbac-action"></span><h2>Enum config.rbac.v3.RBAC.Action<a class="headerlink" href="#enum-config-rbac-v3-rbac-action" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L92">[config.rbac.v3.RBAC.Action proto]</a></p>
+<p>Should we do safe-list or block-list style access control?</p>
+<dl class="simple" id="envoy-v3-api-enum-value-config-rbac-v3-rbac-action-allow">
+<dt>ALLOW</dt><dd><p><em>(DEFAULT)</em> ⁣The policies grant access to principals. The rest are denied. This is safe-list style
+access control. This is the default type.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-rbac-v3-rbac-action-deny">
+<dt>DENY</dt><dd><p>⁣The policies deny access to principals. The rest are allowed. This is block-list style
+access control.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-rbac-v3-rbac-action-log">
+<dt>LOG</dt><dd><p>⁣The policies set the <code class="docutils literal notranslate"><span class="pre">access_log_hint</span></code> dynamic metadata key based on if requests match.
+All requests are allowed.</p>
+</dd>
+</dl>
+</section>
+<section id="config-rbac-v3-policy">
+<span id="envoy-v3-api-msg-config-rbac-v3-policy"></span><h2>config.rbac.v3.Policy<a class="headerlink" href="#config-rbac-v3-policy" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L177">[config.rbac.v3.Policy proto]</a></p>
+<p>Policy specifies a role and the principals that are assigned/denied the role.
+A policy matches if and only if at least one of its permissions match the
+action taking place AND at least one of its principals match the downstream
+AND the condition is true if specified.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;permissions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;principals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;condition&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;cel_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-rbac-v3-policy-permissions">
+<dt>permissions</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-permission"><span class="std std-ref">config.rbac.v3.Permission</span></a>, <em>REQUIRED</em>) Required. The set of permissions that define a role. Each permission is
+matched with OR semantics. To match all actions for this policy, a single
+Permission with the <code class="docutils literal notranslate"><span class="pre">any</span></code> field set to true should be used.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-rbac-v3-policy-principals">
+<dt>principals</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-principal"><span class="std std-ref">config.rbac.v3.Principal</span></a>, <em>REQUIRED</em>) Required. The set of principals that are assigned/denied the role based on
+“action”. Each principal is matched with OR semantics. To match all
+downstreams for this policy, a single Principal with the <code class="docutils literal notranslate"><span class="pre">any</span></code> field set to
+true should be used.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-rbac-v3-policy-condition">
+<dt>condition</dt><dd><p>(.google.api.expr.v1alpha1.Expr) An optional symbolic expression specifying an access control
+<a class="reference internal" href="../../../../intro/arch_overview/security/rbac_filter.html#arch-overview-condition"><span class="std std-ref">condition</span></a>. The condition is combined
+with the permissions and the principals as a clause with AND semantics.
+Only be used when checked_condition is not used.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-rbac-v3-policy-cel-config">
+<dt>cel_config</dt><dd><p>(<a class="reference internal" href="../../core/v3/cel.proto.html#envoy-v3-api-msg-config-core-v3-celexpressionconfig"><span class="std std-ref">config.core.v3.CelExpressionConfig</span></a>) CEL expression configuration that modifies the evaluation behavior of the <code class="docutils literal notranslate"><span class="pre">condition</span></code> field.
+If specified, string conversion, concatenation, and manipulation functions may be enabled
+for the CEL expression. See <a class="reference internal" href="../../core/v3/cel.proto.html#envoy-v3-api-msg-config-core-v3-celexpressionconfig"><span class="std std-ref">CelExpressionConfig</span></a>
+for more details.</p>
+</dd>
+</dl>
+</section>
+<section id="config-rbac-v3-sourcedmetadata">
+<span id="envoy-v3-api-msg-config-rbac-v3-sourcedmetadata"></span><h2>config.rbac.v3.SourcedMetadata<a class="headerlink" href="#config-rbac-v3-sourcedmetadata" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L220">[config.rbac.v3.SourcedMetadata proto]</a></p>
+<p>SourcedMetadata enables matching against metadata from different sources in the request processing
+pipeline. It extends the base MetadataMatcher functionality by allowing specification of where the
+metadata should be sourced from, rather than only matching against dynamic metadata.</p>
+<p>The matcher can be configured to look up metadata from:</p>
+<ul class="simple">
+<li><p>Dynamic metadata: Runtime metadata added by filters during request processing</p></li>
+<li><p>Route metadata: Static metadata configured on the route entry</p></li>
+</ul>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;metadata_matcher&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;metadata_source&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-rbac-v3-sourcedmetadata-metadata-matcher">
+<dt>metadata_matcher</dt><dd><p>(<a class="reference internal" href="../../../type/matcher/v3/metadata.proto.html#envoy-v3-api-msg-type-matcher-v3-metadatamatcher"><span class="std std-ref">type.matcher.v3.MetadataMatcher</span></a>, <em>REQUIRED</em>) Metadata matcher configuration that defines what metadata to match against. This includes the filter name,
+metadata key path, and expected value.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-rbac-v3-sourcedmetadata-metadata-source">
+<dt>metadata_source</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-config-rbac-v3-metadatasource"><span class="std std-ref">config.rbac.v3.MetadataSource</span></a>) Specifies which metadata source should be used for matching. If not set,
+defaults to DYNAMIC (dynamic metadata). Set to ROUTE to match against
+static metadata configured on the route entry.</p>
+</dd>
+</dl>
+</section>
+<section id="config-rbac-v3-permission">
+<span id="envoy-v3-api-msg-config-rbac-v3-permission"></span><h2>config.rbac.v3.Permission<a class="headerlink" href="#config-rbac-v3-permission" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L234">[config.rbac.v3.Permission proto]</a></p>
+<p>Permission defines an action (or actions) that a principal can take.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;and_rules&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;or_rules&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;any&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;header&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;url_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;destination_ip&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;destination_port&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;destination_port_range&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;not_rule&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;requested_server_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;matcher&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;uri_template&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;sourced_metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-and-rules">
+<dt>and_rules</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-permission-set"><span class="std std-ref">config.rbac.v3.Permission.Set</span></a>) A set of rules that all must match in order to define the action.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-or-rules">
+<dt>or_rules</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-permission-set"><span class="std std-ref">config.rbac.v3.Permission.Set</span></a>) A set of rules where at least one must match in order to define the action.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-any">
+<dt>any</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) When any is set, it matches any action.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-header">
+<dt>header</dt><dd><p>(<a class="reference internal" href="../../route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-headermatcher"><span class="std std-ref">config.route.v3.HeaderMatcher</span></a>) A header (or pseudo-header such as <code class="docutils literal notranslate"><span class="pre">:path</span></code> or <code class="docutils literal notranslate"><span class="pre">:method</span></code>) on the incoming HTTP request. Only available
+for HTTP request.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The pseudo-header <code class="docutils literal notranslate"><span class="pre">:path</span></code> includes the query and fragment string. Use the <code class="docutils literal notranslate"><span class="pre">url_path</span></code> field if you
+want to match the URL path without the query and fragment string.</p>
+</div>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-url-path">
+<dt>url_path</dt><dd><p>(<a class="reference internal" href="../../../type/matcher/v3/path.proto.html#envoy-v3-api-msg-type-matcher-v3-pathmatcher"><span class="std std-ref">type.matcher.v3.PathMatcher</span></a>) A URL path on the incoming HTTP request. Only available for HTTP.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-destination-ip">
+<dt>destination_ip</dt><dd><p>(<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-cidrrange"><span class="std std-ref">config.core.v3.CidrRange</span></a>) A CIDR block that describes the destination IP.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-destination-port">
+<dt>destination_port</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) A port number that describes the destination port connecting to.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-destination-port-range">
+<dt>destination_port_range</dt><dd><p>(<a class="reference internal" href="../../../type/v3/range.proto.html#envoy-v3-api-msg-type-v3-int32range"><span class="std std-ref">type.v3.Int32Range</span></a>) A port number range that describes a range of destination ports connecting to.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-metadata">
+<dt>metadata</dt><dd><p>(<a class="reference internal" href="../../../type/matcher/v3/metadata.proto.html#envoy-v3-api-msg-type-matcher-v3-metadatamatcher"><span class="std std-ref">type.matcher.v3.MetadataMatcher</span></a>) Metadata that describes additional information about the action. This field is deprecated; please use
+<a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> instead.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-not-rule">
+<dt>not_rule</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-permission"><span class="std std-ref">config.rbac.v3.Permission</span></a>) Negates matching the provided permission. For instance, if the value of
+<code class="docutils literal notranslate"><span class="pre">not_rule</span></code> would match, this permission would not match. Conversely, if
+the value of <code class="docutils literal notranslate"><span class="pre">not_rule</span></code> would not match, this permission would match.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-requested-server-name">
+<dt>requested_server_name</dt><dd><p>(<a class="reference internal" href="../../../type/matcher/v3/string.proto.html#envoy-v3-api-msg-type-matcher-v3-stringmatcher"><span class="std std-ref">type.matcher.v3.StringMatcher</span></a>) The request server from the client’s connection request. This is typically TLS SNI.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>The behavior of this field may be affected by how Envoy is configured
+as explained below.</p>
+<ul class="simple">
+<li><p>If the <a class="reference internal" href="../../../../configuration/listeners/listener_filters/tls_inspector.html#config-listener-filters-tls-inspector"><span class="std std-ref">TLS Inspector</span></a>
+filter is not added, and if a <code class="docutils literal notranslate"><span class="pre">FilterChainMatch</span></code> is not defined for
+the <a class="reference internal" href="../../listener/v3/listener_components.proto.html#envoy-v3-api-field-config-listener-v3-filterchainmatch-server-names"><span class="std std-ref">server name</span></a>,
+a TLS connection’s requested SNI server name will be treated as if it
+wasn’t present.</p></li>
+<li><p>A <a class="reference internal" href="../../../../intro/arch_overview/listeners/listener_filters.html#arch-overview-listener-filters"><span class="std std-ref">listener filter</span></a> may
+overwrite a connection’s requested server name within Envoy.</p></li>
+</ul>
+</div>
+<p>Please refer to <a class="reference internal" href="../../../../faq/configuration/sni.html#faq-how-to-setup-sni"><span class="std std-ref">this FAQ entry</span></a> to learn how to setup SNI.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-matcher">
+<dt>matcher</dt><dd><p>(<a class="reference internal" href="../../core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Extension for configuring custom matchers for RBAC.</p>
+<div class="admonition tip" id="extension-category-envoy-rbac-matchers">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../extensions/rbac/matchers/upstream_ip_port/v3/upstream_ip_port_matcher.proto.html#extension-envoy-rbac-matchers-upstream-ip-port"><span class="std std-ref">envoy.rbac.matchers.upstream_ip_port</span></a></p></li>
+</ul>
+</div>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-uri-template">
+<dt>uri_template</dt><dd><p>(<a class="reference internal" href="../../core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) URI template path matching.</p>
+<div class="admonition tip" id="extension-category-envoy-path-match">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../extensions/path/match/uri_template/v3/uri_template_match.proto.html#extension-envoy-path-match-uri-template-uri-template-matcher"><span class="std std-ref">envoy.path.match.uri_template.uri_template_matcher</span></a></p></li>
+</ul>
+</div>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata">
+<dt>sourced_metadata</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-sourcedmetadata"><span class="std std-ref">config.rbac.v3.SourcedMetadata</span></a>) Matches against metadata from either dynamic state or route configuration. Preferred over the
+<code class="docutils literal notranslate"><span class="pre">metadata</span></code> field as it provides more flexibility in metadata source selection.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-and-rules"><span class="std std-ref">and_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-or-rules"><span class="std std-ref">or_rules</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-ip"><span class="std std-ref">destination_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port"><span class="std std-ref">destination_port</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-destination-port-range"><span class="std std-ref">destination_port_range</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-not-rule"><span class="std std-ref">not_rule</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-requested-server-name"><span class="std std-ref">requested_server_name</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-matcher"><span class="std std-ref">matcher</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-uri-template"><span class="std std-ref">uri_template</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-permission-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="config-rbac-v3-permission-set">
+<span id="envoy-v3-api-msg-config-rbac-v3-permission-set"></span><h2>config.rbac.v3.Permission.Set<a class="headerlink" href="#config-rbac-v3-permission-set" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L239">[config.rbac.v3.Permission.Set proto]</a></p>
+<p>Used in the <code class="docutils literal notranslate"><span class="pre">and_rules</span></code> and <code class="docutils literal notranslate"><span class="pre">or_rules</span></code> fields in the <code class="docutils literal notranslate"><span class="pre">rule</span></code> oneof. Depending on the context,
+each are applied with the associated behavior.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;rules&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-rbac-v3-permission-set-rules">
+<dt>rules</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-permission"><span class="std std-ref">config.rbac.v3.Permission</span></a>, <em>REQUIRED</em>)</p>
+</dd>
+</dl>
+</section>
+<section id="config-rbac-v3-principal">
+<span id="envoy-v3-api-msg-config-rbac-v3-principal"></span><h2>config.rbac.v3.Principal<a class="headerlink" href="#config-rbac-v3-principal" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L327">[config.rbac.v3.Principal proto]</a></p>
+<p>Principal defines an identity or a group of identities for a downstream
+subject.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;and_ids&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;or_ids&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;any&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;authenticated&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;source_ip&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;direct_remote_ip&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;remote_ip&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;header&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;url_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;filter_state&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;not_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;sourced_metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;custom&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-and-ids">
+<dt>and_ids</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-principal-set"><span class="std std-ref">config.rbac.v3.Principal.Set</span></a>) A set of identifiers that all must match in order to define the downstream.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-or-ids">
+<dt>or_ids</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-principal-set"><span class="std std-ref">config.rbac.v3.Principal.Set</span></a>) A set of identifiers at least one must match in order to define the downstream.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-any">
+<dt>any</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) When any is set, it matches any downstream.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-authenticated">
+<dt>authenticated</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-principal-authenticated"><span class="std std-ref">config.rbac.v3.Principal.Authenticated</span></a>) Authenticated attributes that identify the downstream.
+It is recommended to NOT use this field, but instead use
+<a class="reference internal" href="../../../extensions/rbac/principals/mtls_authenticated/v3/mtls_authenticated.proto.html#envoy-v3-api-msg-extensions-rbac-principals-mtls-authenticated-v3-config"><span class="std std-ref">MTlsAuthenticated</span></a>,
+configured via <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a>,
+which should be used for most use cases due to its improved security.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-source-ip">
+<dt>source_ip</dt><dd><p>(<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-cidrrange"><span class="std std-ref">config.core.v3.CidrRange</span></a>) A CIDR block that describes the downstream IP.
+This address will honor proxy protocol, but will not honor XFF.</p>
+<p>This field is deprecated; either use <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a> for the same
+behavior, or use
+<a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip">
+<dt>direct_remote_ip</dt><dd><p>(<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-cidrrange"><span class="std std-ref">config.core.v3.CidrRange</span></a>) A CIDR block that describes the downstream remote/origin address.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is always the physical peer even if the
+<a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a> is inferred from the
+x-forwarder-for header, the proxy protocol, etc.</p>
+</div>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-remote-ip">
+<dt>remote_ip</dt><dd><p>(<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-cidrrange"><span class="std std-ref">config.core.v3.CidrRange</span></a>) A CIDR block that describes the downstream remote/origin address.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This may not be the physical peer and could be different from the <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>. E.g, if the remote ip is inferred from
+the x-forwarder-for header, the proxy protocol, etc.</p>
+</div>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-header">
+<dt>header</dt><dd><p>(<a class="reference internal" href="../../route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-headermatcher"><span class="std std-ref">config.route.v3.HeaderMatcher</span></a>) A header (or pseudo-header such as <code class="docutils literal notranslate"><span class="pre">:path</span></code> or <code class="docutils literal notranslate"><span class="pre">:method</span></code>) on the incoming HTTP request. Only available
+for HTTP request.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The pseudo-header <code class="docutils literal notranslate"><span class="pre">:path</span></code> includes the query and fragment string. Use the <code class="docutils literal notranslate"><span class="pre">url_path</span></code> field if you
+want to match the URL path without the query and fragment string.</p>
+</div>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-url-path">
+<dt>url_path</dt><dd><p>(<a class="reference internal" href="../../../type/matcher/v3/path.proto.html#envoy-v3-api-msg-type-matcher-v3-pathmatcher"><span class="std std-ref">type.matcher.v3.PathMatcher</span></a>) A URL path on the incoming HTTP request. Only available for HTTP.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-metadata">
+<dt>metadata</dt><dd><p>(<a class="reference internal" href="../../../type/matcher/v3/metadata.proto.html#envoy-v3-api-msg-type-matcher-v3-metadatamatcher"><span class="std std-ref">type.matcher.v3.MetadataMatcher</span></a>) Metadata that describes additional information about the principal. This field is deprecated; please use
+<a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a> instead.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-filter-state">
+<dt>filter_state</dt><dd><p>(<a class="reference internal" href="../../../type/matcher/v3/filter_state.proto.html#envoy-v3-api-msg-type-matcher-v3-filterstatematcher"><span class="std std-ref">type.matcher.v3.FilterStateMatcher</span></a>) Identifies the principal using a filter state object.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-not-id">
+<dt>not_id</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-principal"><span class="std std-ref">config.rbac.v3.Principal</span></a>) Negates matching the provided principal. For instance, if the value of
+<code class="docutils literal notranslate"><span class="pre">not_id</span></code> would match, this principal would not match. Conversely, if the
+value of <code class="docutils literal notranslate"><span class="pre">not_id</span></code> would not match, this principal would match.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata">
+<dt>sourced_metadata</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-sourcedmetadata"><span class="std std-ref">config.rbac.v3.SourcedMetadata</span></a>) Matches against metadata from either dynamic state or route configuration. Preferred over the
+<code class="docutils literal notranslate"><span class="pre">metadata</span></code> field as it provides more flexibility in metadata source selection.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-principal-custom">
+<dt>custom</dt><dd><p>(<a class="reference internal" href="../../core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Extension for configuring custom principals for RBAC.</p>
+<div class="admonition tip" id="extension-category-envoy-rbac-principals">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../extensions/rbac/principals/mtls_authenticated/v3/mtls_authenticated.proto.html#extension-envoy-rbac-principals-mtls-authenticated"><span class="std std-ref">envoy.rbac.principals.mtls_authenticated</span></a></p></li>
+</ul>
+</div>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-and-ids"><span class="std std-ref">and_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-or-ids"><span class="std std-ref">or_ids</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-any"><span class="std std-ref">any</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-authenticated"><span class="std std-ref">authenticated</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-direct-remote-ip"><span class="std std-ref">direct_remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-remote-ip"><span class="std std-ref">remote_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-header"><span class="std std-ref">header</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-url-path"><span class="std std-ref">url_path</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-metadata"><span class="std std-ref">metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-filter-state"><span class="std std-ref">filter_state</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-not-id"><span class="std std-ref">not_id</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-sourced-metadata"><span class="std std-ref">sourced_metadata</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="config-rbac-v3-principal-set">
+<span id="envoy-v3-api-msg-config-rbac-v3-principal-set"></span><h2>config.rbac.v3.Principal.Set<a class="headerlink" href="#config-rbac-v3-principal-set" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L332">[config.rbac.v3.Principal.Set proto]</a></p>
+<p>Used in the <code class="docutils literal notranslate"><span class="pre">and_ids</span></code> and <code class="docutils literal notranslate"><span class="pre">or_ids</span></code> fields in the <code class="docutils literal notranslate"><span class="pre">identifier</span></code> oneof.
+Depending on the context, each are applied with the associated behavior.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;ids&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-rbac-v3-principal-set-ids">
+<dt>ids</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-rbac-v3-principal"><span class="std std-ref">config.rbac.v3.Principal</span></a>, <em>REQUIRED</em>)</p>
+</dd>
+</dl>
+</section>
+<section id="config-rbac-v3-principal-authenticated">
+<span id="envoy-v3-api-msg-config-rbac-v3-principal-authenticated"></span><h2>config.rbac.v3.Principal.Authenticated<a class="headerlink" href="#config-rbac-v3-principal-authenticated" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L344">[config.rbac.v3.Principal.Authenticated proto]</a></p>
+<p>Authentication attributes for a downstream.
+It is recommended to NOT use this type, but instead use
+<a class="reference internal" href="../../../extensions/rbac/principals/mtls_authenticated/v3/mtls_authenticated.proto.html#envoy-v3-api-msg-extensions-rbac-principals-mtls-authenticated-v3-config"><span class="std std-ref">MTlsAuthenticated</span></a>,
+configured via <a class="reference internal" href="#envoy-v3-api-field-config-rbac-v3-principal-custom"><span class="std std-ref">custom</span></a>,
+which should be used for most use cases due to its improved security.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;principal_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-rbac-v3-principal-authenticated-principal-name">
+<dt>principal_name</dt><dd><p>(<a class="reference internal" href="../../../type/matcher/v3/string.proto.html#envoy-v3-api-msg-type-matcher-v3-stringmatcher"><span class="std std-ref">type.matcher.v3.StringMatcher</span></a>) The name of the principal. If set, The URI SAN or DNS SAN in that order
+is used from the certificate, otherwise the subject field is used. If
+unset, it applies to any user that is allowed by the downstream TLS configuration.
+If <a class="reference internal" href="../../../extensions/transport_sockets/tls/v3/tls.proto.html#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-require-client-certificate"><span class="std std-ref">require_client_certificate</span></a>
+is false or <a class="reference internal" href="../../../extensions/transport_sockets/tls/v3/common.proto.html#envoy-v3-api-field-extensions-transport-sockets-tls-v3-certificatevalidationcontext-trust-chain-verification"><span class="std std-ref">trust_chain_verification</span></a>
+is set to <a class="reference internal" href="../../../extensions/transport_sockets/tls/v3/common.proto.html#envoy-v3-api-enum-value-extensions-transport-sockets-tls-v3-certificatevalidationcontext-trustchainverification-accept-untrusted"><span class="std std-ref">ACCEPT_UNTRUSTED</span></a>,
+then no authentication is required.</p>
+</dd>
+</dl>
+</section>
+<section id="config-rbac-v3-action">
+<span id="envoy-v3-api-msg-config-rbac-v3-action"></span><h2>config.rbac.v3.Action<a class="headerlink" href="#config-rbac-v3-action" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L446">[config.rbac.v3.Action proto]</a></p>
+<p>Action defines the result of allowance or denial when a request matches the matcher.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;action&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-rbac-v3-action-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The name indicates the policy name.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-rbac-v3-action-action">
+<dt>action</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-config-rbac-v3-rbac-action"><span class="std std-ref">config.rbac.v3.RBAC.Action</span></a>) The action to take if the matcher matches. Every action either allows or denies a request,
+and can also carry out action-specific operations.</p>
+<p><strong>Actions:</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ALLOW</span></code>: If the request gets matched on ALLOW, it is permitted.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DENY</span></code>: If the request gets matched on DENY, it is not permitted.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">LOG</span></code>: If the request gets matched on LOG, it is permitted. Besides, the
+dynamic metadata key <code class="docutils literal notranslate"><span class="pre">access_log_hint</span></code> under the shared key namespace
+<code class="docutils literal notranslate"><span class="pre">envoy.common</span></code> will be set to the value <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p></li>
+<li><p>If the request cannot get matched, it will fallback to <code class="docutils literal notranslate"><span class="pre">DENY</span></code>.</p></li>
+</ul>
+</div></blockquote>
+<p><strong>Log behavior:</strong></p>
+<blockquote>
+<div><p>If the RBAC matcher contains at least one LOG action, the dynamic
+metadata key <code class="docutils literal notranslate"><span class="pre">access_log_hint</span></code> will be set based on if the request
+get matched on the LOG action.</p>
+</div></blockquote>
+</dd>
+</dl>
+</section>
+<section id="enum-config-rbac-v3-metadatasource">
+<span id="envoy-v3-api-enum-config-rbac-v3-metadatasource"></span><h2>Enum config.rbac.v3.MetadataSource<a class="headerlink" href="#enum-config-rbac-v3-metadatasource" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/rbac/v3/rbac.proto#L31">[config.rbac.v3.MetadataSource proto]</a></p>
+<dl class="simple" id="envoy-v3-api-enum-value-config-rbac-v3-metadatasource-dynamic">
+<dt>DYNAMIC</dt><dd><p><em>(DEFAULT)</em> ⁣Query <a class="reference internal" href="../../../../configuration/advanced/well_known_dynamic_metadata.html#well-known-dynamic-metadata"><span class="std std-ref">dynamic metadata</span></a></p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-rbac-v3-metadatasource-route">
+<dt>ROUTE</dt><dd><p>⁣Query <a class="reference internal" href="../../route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-route-metadata"><span class="std std-ref">route metadata</span></a></p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../rbac.html" class="btn btn-neutral float-left" title="RBAC" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../matchers.html" class="btn btn-neutral float-right" title="RBAC matchers" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Role Based Access Control (RBAC) (proto)</a><ul>
+<li><a class="reference internal" href="#config-rbac-v3-rbac">config.rbac.v3.RBAC</a></li>
+<li><a class="reference internal" href="#config-rbac-v3-rbac-auditloggingoptions">config.rbac.v3.RBAC.AuditLoggingOptions</a></li>
+<li><a class="reference internal" href="#enum-config-rbac-v3-rbac-auditloggingoptions-auditcondition">Enum config.rbac.v3.RBAC.AuditLoggingOptions.AuditCondition</a></li>
+<li><a class="reference internal" href="#enum-config-rbac-v3-rbac-action">Enum config.rbac.v3.RBAC.Action</a></li>
+<li><a class="reference internal" href="#config-rbac-v3-policy">config.rbac.v3.Policy</a></li>
+<li><a class="reference internal" href="#config-rbac-v3-sourcedmetadata">config.rbac.v3.SourcedMetadata</a></li>
+<li><a class="reference internal" href="#config-rbac-v3-permission">config.rbac.v3.Permission</a></li>
+<li><a class="reference internal" href="#config-rbac-v3-permission-set">config.rbac.v3.Permission.Set</a></li>
+<li><a class="reference internal" href="#config-rbac-v3-principal">config.rbac.v3.Principal</a></li>
+<li><a class="reference internal" href="#config-rbac-v3-principal-set">config.rbac.v3.Principal.Set</a></li>
+<li><a class="reference internal" href="#config-rbac-v3-principal-authenticated">config.rbac.v3.Principal.Authenticated</a></li>
+<li><a class="reference internal" href="#config-rbac-v3-action">config.rbac.v3.Action</a></li>
+<li><a class="reference internal" href="#enum-config-rbac-v3-metadatasource">Enum config.rbac.v3.MetadataSource</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

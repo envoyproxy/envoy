@@ -1,0 +1,65 @@
+.. _envoy_v3_api_file_envoy/extensions/load_balancing_policies/wrr_locality/v3/wrr_locality.proto:
+
+Weighted Round Robin Locality-Picking Load Balancing Policy (proto)
+===================================================================
+
+.. _extension_envoy.load_balancing_policies.wrr_locality:
+
+This extension has the qualified name ``envoy.load_balancing_policies.wrr_locality``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.load_balancing_policies <extension_category_envoy.load_balancing_policies>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.load_balancing_policies.wrr_locality.v3.WrrLocality <envoy_v3_api_msg_extensions.load_balancing_policies.wrr_locality.v3.WrrLocality>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.wrr_locality.v3.WrrLocality:
+
+extensions.load_balancing_policies.wrr_locality.v3.WrrLocality
+--------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.wrr_locality.v3.WrrLocality proto] <api/envoy/extensions/load_balancing_policies/wrr_locality/v3/wrr_locality.proto#L20>`
+
+Configuration for the wrr_locality LB policy. See the :ref:`load balancing architecture overview
+<arch_overview_load_balancing_types>` for more information.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "endpoint_picking_policy": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.wrr_locality.v3.WrrLocality.endpoint_picking_policy:
+
+
+endpoint_picking_policy
+  (:ref:`config.cluster.v3.LoadBalancingPolicy <envoy_v3_api_msg_config.cluster.v3.LoadBalancingPolicy>`, *REQUIRED*) The child LB policy to create for endpoint-picking within the chosen locality.
+
+

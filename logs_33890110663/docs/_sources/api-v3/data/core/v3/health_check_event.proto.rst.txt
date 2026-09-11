@@ -1,0 +1,381 @@
+.. _envoy_v3_api_file_envoy/data/core/v3/health_check_event.proto:
+
+Health check logging events (proto)
+===================================
+
+
+:ref:`Health check logging <arch_overview_health_check_logging>`.
+
+
+
+
+.. _envoy_v3_api_msg_data.core.v3.HealthCheckEvent:
+
+data.core.v3.HealthCheckEvent
+-----------------------------
+
+
+:repo:`[data.core.v3.HealthCheckEvent proto] <api/envoy/data/core/v3/health_check_event.proto#L39>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "health_checker_type": ...,
+    "host": {...},
+    "cluster_name": ...,
+    "eject_unhealthy_event": {...},
+    "add_healthy_event": {...},
+    "successful_health_check_event": {...},
+    "health_check_failure_event": {...},
+    "degraded_healthy_host": {...},
+    "no_longer_degraded_host": {...},
+    "timestamp": {...},
+    "metadata": {...},
+    "locality": {...}
+  }
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEvent.health_checker_type:
+
+
+health_checker_type
+  (:ref:`data.core.v3.HealthCheckerType <envoy_v3_api_enum_data.core.v3.HealthCheckerType>`) 
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEvent.host:
+
+
+host
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) 
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEvent.cluster_name:
+
+
+cluster_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) 
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEvent.eject_unhealthy_event:
+
+
+eject_unhealthy_event
+  (:ref:`data.core.v3.HealthCheckEjectUnhealthy <envoy_v3_api_msg_data.core.v3.HealthCheckEjectUnhealthy>`) Host ejection.
+
+
+  
+
+  Precisely one of :ref:`eject_unhealthy_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.eject_unhealthy_event>`, :ref:`add_healthy_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.add_healthy_event>`, :ref:`successful_health_check_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.successful_health_check_event>`, :ref:`health_check_failure_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.health_check_failure_event>`, :ref:`degraded_healthy_host <envoy_v3_api_field_data.core.v3.HealthCheckEvent.degraded_healthy_host>`, :ref:`no_longer_degraded_host <envoy_v3_api_field_data.core.v3.HealthCheckEvent.no_longer_degraded_host>` must be set.
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEvent.add_healthy_event:
+
+
+add_healthy_event
+  (:ref:`data.core.v3.HealthCheckAddHealthy <envoy_v3_api_msg_data.core.v3.HealthCheckAddHealthy>`) Host addition.
+
+
+  
+
+  Precisely one of :ref:`eject_unhealthy_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.eject_unhealthy_event>`, :ref:`add_healthy_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.add_healthy_event>`, :ref:`successful_health_check_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.successful_health_check_event>`, :ref:`health_check_failure_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.health_check_failure_event>`, :ref:`degraded_healthy_host <envoy_v3_api_field_data.core.v3.HealthCheckEvent.degraded_healthy_host>`, :ref:`no_longer_degraded_host <envoy_v3_api_field_data.core.v3.HealthCheckEvent.no_longer_degraded_host>` must be set.
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEvent.successful_health_check_event:
+
+
+successful_health_check_event
+  (:ref:`data.core.v3.HealthCheckSuccessful <envoy_v3_api_msg_data.core.v3.HealthCheckSuccessful>`) A health check was successful. Note: a host will be considered healthy either if it is
+  the first ever health check, or if the healthy threshold is reached. This kind of event
+  indicate that a health check was successful, but does not indicates that the host is
+  considered healthy. A host is considered healthy if HealthCheckAddHealthy kind of event is sent.
+
+
+  
+
+  Precisely one of :ref:`eject_unhealthy_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.eject_unhealthy_event>`, :ref:`add_healthy_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.add_healthy_event>`, :ref:`successful_health_check_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.successful_health_check_event>`, :ref:`health_check_failure_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.health_check_failure_event>`, :ref:`degraded_healthy_host <envoy_v3_api_field_data.core.v3.HealthCheckEvent.degraded_healthy_host>`, :ref:`no_longer_degraded_host <envoy_v3_api_field_data.core.v3.HealthCheckEvent.no_longer_degraded_host>` must be set.
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEvent.health_check_failure_event:
+
+
+health_check_failure_event
+  (:ref:`data.core.v3.HealthCheckFailure <envoy_v3_api_msg_data.core.v3.HealthCheckFailure>`) Host failure.
+
+
+  
+
+  Precisely one of :ref:`eject_unhealthy_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.eject_unhealthy_event>`, :ref:`add_healthy_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.add_healthy_event>`, :ref:`successful_health_check_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.successful_health_check_event>`, :ref:`health_check_failure_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.health_check_failure_event>`, :ref:`degraded_healthy_host <envoy_v3_api_field_data.core.v3.HealthCheckEvent.degraded_healthy_host>`, :ref:`no_longer_degraded_host <envoy_v3_api_field_data.core.v3.HealthCheckEvent.no_longer_degraded_host>` must be set.
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEvent.degraded_healthy_host:
+
+
+degraded_healthy_host
+  (:ref:`data.core.v3.DegradedHealthyHost <envoy_v3_api_msg_data.core.v3.DegradedHealthyHost>`) Healthy host became degraded.
+
+
+  
+
+  Precisely one of :ref:`eject_unhealthy_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.eject_unhealthy_event>`, :ref:`add_healthy_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.add_healthy_event>`, :ref:`successful_health_check_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.successful_health_check_event>`, :ref:`health_check_failure_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.health_check_failure_event>`, :ref:`degraded_healthy_host <envoy_v3_api_field_data.core.v3.HealthCheckEvent.degraded_healthy_host>`, :ref:`no_longer_degraded_host <envoy_v3_api_field_data.core.v3.HealthCheckEvent.no_longer_degraded_host>` must be set.
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEvent.no_longer_degraded_host:
+
+
+no_longer_degraded_host
+  (:ref:`data.core.v3.NoLongerDegradedHost <envoy_v3_api_msg_data.core.v3.NoLongerDegradedHost>`) A degraded host returned to being healthy.
+
+
+  
+
+  Precisely one of :ref:`eject_unhealthy_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.eject_unhealthy_event>`, :ref:`add_healthy_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.add_healthy_event>`, :ref:`successful_health_check_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.successful_health_check_event>`, :ref:`health_check_failure_event <envoy_v3_api_field_data.core.v3.HealthCheckEvent.health_check_failure_event>`, :ref:`degraded_healthy_host <envoy_v3_api_field_data.core.v3.HealthCheckEvent.degraded_healthy_host>`, :ref:`no_longer_degraded_host <envoy_v3_api_field_data.core.v3.HealthCheckEvent.no_longer_degraded_host>` must be set.
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEvent.timestamp:
+
+
+timestamp
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) Timestamp for event.
+
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEvent.metadata:
+
+
+metadata
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Host metadata
+
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEvent.locality:
+
+
+locality
+  (:ref:`config.core.v3.Locality <envoy_v3_api_msg_config.core.v3.Locality>`) Host locality
+
+
+
+.. _envoy_v3_api_msg_data.core.v3.HealthCheckEjectUnhealthy:
+
+data.core.v3.HealthCheckEjectUnhealthy
+--------------------------------------
+
+
+:repo:`[data.core.v3.HealthCheckEjectUnhealthy proto] <api/envoy/data/core/v3/health_check_event.proto#L84>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "failure_type": ...,
+    "http_status_code": ...
+  }
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEjectUnhealthy.failure_type:
+
+
+failure_type
+  (:ref:`data.core.v3.HealthCheckFailureType <envoy_v3_api_enum_data.core.v3.HealthCheckFailureType>`) The type of failure that caused this ejection.
+
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckEjectUnhealthy.http_status_code:
+
+
+http_status_code
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) HTTP status code observed on the response associated with the failure.
+  Only set when the health checker type is HTTP and the failure type is ``ACTIVE``.
+  A value of ``0`` indicates that no HTTP status code was recorded (e.g., network-level failures
+  or non-HTTP health checkers).
+
+
+
+.. _envoy_v3_api_msg_data.core.v3.HealthCheckAddHealthy:
+
+data.core.v3.HealthCheckAddHealthy
+----------------------------------
+
+
+:repo:`[data.core.v3.HealthCheckAddHealthy proto] <api/envoy/data/core/v3/health_check_event.proto#L98>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "first_check": ...
+  }
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckAddHealthy.first_check:
+
+
+first_check
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether this addition is the result of the first ever health check on a host, in which case
+  the configured :ref:`healthy threshold <envoy_v3_api_field_config.core.v3.HealthCheck.healthy_threshold>`
+  is bypassed and the host is immediately added.
+
+
+
+.. _envoy_v3_api_msg_data.core.v3.HealthCheckSuccessful:
+
+data.core.v3.HealthCheckSuccessful
+----------------------------------
+
+
+:repo:`[data.core.v3.HealthCheckSuccessful proto] <api/envoy/data/core/v3/health_check_event.proto#L108>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_data.core.v3.HealthCheckFailure:
+
+data.core.v3.HealthCheckFailure
+-------------------------------
+
+
+:repo:`[data.core.v3.HealthCheckFailure proto] <api/envoy/data/core/v3/health_check_event.proto#L111>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "failure_type": ...,
+    "first_check": ...,
+    "http_status_code": ...
+  }
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckFailure.failure_type:
+
+
+failure_type
+  (:ref:`data.core.v3.HealthCheckFailureType <envoy_v3_api_enum_data.core.v3.HealthCheckFailureType>`) The type of failure that caused this event.
+
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckFailure.first_check:
+
+
+first_check
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether this event is the result of the first ever health check on a host.
+
+
+.. _envoy_v3_api_field_data.core.v3.HealthCheckFailure.http_status_code:
+
+
+http_status_code
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) HTTP status code observed on the response associated with the failure.
+  Only set when the health checker type is HTTP and the failure type is ``ACTIVE``.
+  A value of ``0`` indicates that no HTTP status code was recorded (e.g., network-level failures
+  or non-HTTP health checkers).
+
+
+
+.. _envoy_v3_api_msg_data.core.v3.DegradedHealthyHost:
+
+data.core.v3.DegradedHealthyHost
+--------------------------------
+
+
+:repo:`[data.core.v3.DegradedHealthyHost proto] <api/envoy/data/core/v3/health_check_event.proto#L128>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_data.core.v3.NoLongerDegradedHost:
+
+data.core.v3.NoLongerDegradedHost
+---------------------------------
+
+
+:repo:`[data.core.v3.NoLongerDegradedHost proto] <api/envoy/data/core/v3/health_check_event.proto#L133>`
+
+
+
+
+
+
+.. _envoy_v3_api_enum_data.core.v3.HealthCheckFailureType:
+
+Enum data.core.v3.HealthCheckFailureType
+----------------------------------------
+
+
+:repo:`[data.core.v3.HealthCheckFailureType proto] <api/envoy/data/core/v3/health_check_event.proto#L22>`
+
+
+
+
+.. _envoy_v3_api_enum_value_data.core.v3.HealthCheckFailureType.ACTIVE:
+
+
+ACTIVE
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_data.core.v3.HealthCheckFailureType.PASSIVE:
+
+
+PASSIVE
+  ⁣
+
+.. _envoy_v3_api_enum_value_data.core.v3.HealthCheckFailureType.NETWORK:
+
+
+NETWORK
+  ⁣
+
+.. _envoy_v3_api_enum_value_data.core.v3.HealthCheckFailureType.NETWORK_TIMEOUT:
+
+
+NETWORK_TIMEOUT
+  ⁣
+
+
+.. _envoy_v3_api_enum_data.core.v3.HealthCheckerType:
+
+Enum data.core.v3.HealthCheckerType
+-----------------------------------
+
+
+:repo:`[data.core.v3.HealthCheckerType proto] <api/envoy/data/core/v3/health_check_event.proto#L29>`
+
+
+
+
+.. _envoy_v3_api_enum_value_data.core.v3.HealthCheckerType.HTTP:
+
+
+HTTP
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_data.core.v3.HealthCheckerType.TCP:
+
+
+TCP
+  ⁣
+
+.. _envoy_v3_api_enum_value_data.core.v3.HealthCheckerType.GRPC:
+
+
+GRPC
+  ⁣
+
+.. _envoy_v3_api_enum_value_data.core.v3.HealthCheckerType.REDIS:
+
+
+REDIS
+  ⁣
+
+.. _envoy_v3_api_enum_value_data.core.v3.HealthCheckerType.THRIFT:
+
+
+THRIFT
+  ⁣
+
+.. _envoy_v3_api_enum_value_data.core.v3.HealthCheckerType.DYNAMIC_MODULE:
+
+
+DYNAMIC_MODULE
+  ⁣
+

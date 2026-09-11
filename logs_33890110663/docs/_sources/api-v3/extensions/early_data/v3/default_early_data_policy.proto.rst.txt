@@ -1,0 +1,49 @@
+.. _envoy_v3_api_file_envoy/extensions/early_data/v3/default_early_data_policy.proto:
+
+HTTP request early data policy (proto)
+======================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.early_data.v3.DefaultEarlyDataPolicy:
+
+extensions.early_data.v3.DefaultEarlyDataPolicy
+-----------------------------------------------
+
+
+:repo:`[extensions.early_data.v3.DefaultEarlyDataPolicy proto] <api/envoy/extensions/early_data/v3/default_early_data_policy.proto#L16>`
+
+The default rule to allow/disallow a request to be sent as early data. It's an empty config now. Configuring it will disallow any request to be sent over early data.
+
+.. _extension_envoy.route.early_data_policy.default:
+
+This extension has the qualified name ``envoy.route.early_data_policy.default``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.route.early_data_policy <extension_category_envoy.route.early_data_policy>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.early_data.v3.DefaultEarlyDataPolicy <envoy_v3_api_msg_extensions.early_data.v3.DefaultEarlyDataPolicy>`
+
+
+
+
+

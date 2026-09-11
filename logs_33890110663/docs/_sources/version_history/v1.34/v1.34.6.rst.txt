@@ -1,0 +1,23 @@
+.. _version_history_1.34.6:
+
+1.34.6 (September 2, 2025)
+===========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **dns**: Fixed an UAF in DNS cache that can occur when the Host header is modified between the Dynamic Forwarding and Router
+  filters.
+* **oauth2**: Fixed an issue where cookies prefixed with ``__Secure-`` or ``__Host-`` were not receiving a
+  Secure attribute.
+

@@ -1,0 +1,678 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UDP proxy (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../../../_static/favicon.ico"/>
+      <script src="../../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+    <link rel="next" title="UDP session filters" href="../../../../../config/filter/udp/session.html" />
+    <link rel="prev" title="UDP proxy route configuration (proto)" href="route.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../../../searchindex.js"
+          data-envoy-search-page="../../../../../../search.html"
+          data-envoy-root="../../../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../../config/config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../../config/filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/filter.html">Filters</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/udp/udp.html">UDP listener filters</a></li>
+      <li class="breadcrumb-item active">UDP proxy (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../../_sources/api-v3/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="udp-proxy-proto">
+<span id="envoy-v3-api-file-envoy-extensions-filters-udp-udp-proxy-v3-udp-proxy-proto"></span><h1>UDP proxy (proto)<a class="headerlink" href="#udp-proxy-proto" title="Link to this heading"></a></h1>
+<p id="extension-envoy-filters-udp-listener-udp-proxy">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.filters.udp_listener.udp_proxy</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension is intended to be robust against untrusted downstream traffic. It
+assumes that the upstream is trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension category:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../../config/listener/v3/listener_components.proto.html#extension-category-envoy-filters-udp-listener"><span class="std std-ref">envoy.filters.udp_listener</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig</span></a></p></li>
+</ul>
+</div>
+<p>UDP proxy <a class="reference internal" href="../../../../../../configuration/listeners/udp_filters/udp_proxy.html#config-udp-listener-filters-udp-proxy"><span class="std std-ref">configuration overview</span></a>.</p>
+<section id="extensions-filters-udp-udp-proxy-v3-udpproxyconfig">
+<span id="envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig"></span><h2>extensions.filters.udp.udp_proxy.v3.UdpProxyConfig<a class="headerlink" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L34">[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig proto]</a></p>
+<p>Configuration for the UDP proxy filter.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;stat_prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;matcher&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;idle_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;use_original_src_ip&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;hash_policies&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;upstream_socket_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;use_per_packet_load_balancing&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;access_log&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;proxy_access_log&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;session_filters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;tunneling_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;access_log_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-stat-prefix">
+<dt>stat_prefix</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The stat prefix used when emitting UDP proxy filter stats.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-cluster">
+<dt>cluster</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The upstream cluster to connect to.
+This field is deprecated in favor of
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-matcher"><span class="std std-ref">matcher</span></a>.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-cluster"><span class="std std-ref">cluster</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-matcher"><span class="std std-ref">matcher</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-matcher">
+<dt>matcher</dt><dd><p>(<a class="reference internal" href="../../../../../../xds/type/matcher/v3/matcher.proto.html#envoy-v3-api-msg-xds-type-matcher-v3-matcher"><span class="std std-ref">.xds.type.matcher.v3.Matcher</span></a>) The match tree to use when resolving route actions for incoming requests.
+See <a class="reference internal" href="../../../../../../configuration/listeners/udp_filters/udp_proxy.html#config-udp-listener-filters-udp-proxy-routing"><span class="std std-ref">Routing</span></a> for more information.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the <a class="reference internal" href="../../../../../../intro/arch_overview/security/threat_model.html#arch-overview-threat-model"><span class="std std-ref">threat model</span></a>, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.</p>
+</div>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-cluster"><span class="std std-ref">cluster</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-matcher"><span class="std std-ref">matcher</span></a> must be set.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-idle-timeout">
+<dt>idle_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The idle timeout for sessions. Idle is defined as no datagrams between received or sent by
+the session. The default if not specified is 1 minute.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-use-original-src-ip">
+<dt>use_original_src_ip</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Use the remote downstream IP address as the sender IP address when sending packets to upstream hosts.
+This option requires Envoy to be run with the <code class="docutils literal notranslate"><span class="pre">CAP_NET_ADMIN</span></code> capability on Linux.
+And the IPv6 stack must be enabled on Linux kernel.
+This option does not preserve the remote downstream port.
+If this option is enabled, the IP address of sent datagrams will be changed to the remote downstream IP address.
+This means that Envoy will not receive packets that are sent by upstream hosts because the upstream hosts
+will send the packets with the remote downstream IP address as the destination. All packets will be routed
+to the remote downstream directly if there are route rules on the upstream host side.
+There are two options to return the packets back to the remote downstream.
+The first one is to use DSR (Direct Server Return).
+The other one is to configure routing rules on the upstream hosts to forward
+all packets back to Envoy and configure iptables rules on the host running Envoy to
+forward all packets from upstream hosts to the Envoy process so that Envoy can forward the packets to the downstream.
+If the platform does not support this option, Envoy will raise a configuration error.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-hash-policies">
+<dt>hash_policies</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-hashpolicy"><span class="std std-ref">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy</span></a>) Optional configuration for UDP proxy hash policies. If hash_policies is not set, the hash-based
+load balancing algorithms will select a host randomly. Currently the number of hash policies is
+limited to 1.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-upstream-socket-config">
+<dt>upstream_socket_config</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/udp_socket_config.proto.html#envoy-v3-api-msg-config-core-v3-udpsocketconfig"><span class="std std-ref">config.core.v3.UdpSocketConfig</span></a>) UDP socket configuration for upstream sockets. The default for
+<a class="reference internal" href="../../../../../config/core/v3/udp_socket_config.proto.html#envoy-v3-api-field-config-core-v3-udpsocketconfig-prefer-gro"><span class="std std-ref">prefer_gro</span></a> is true for upstream
+sockets as the assumption is datagrams will be received from a single source.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-use-per-packet-load-balancing">
+<dt>use_per_packet_load_balancing</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Perform per packet load balancing (upstream host selection) on each received data chunk.
+The default if not specified is false, that means each data chunk is forwarded
+to upstream host selected on first chunk receival for that “session” (identified by source IP/port and local IP/port).
+Only one of use_per_packet_load_balancing or session_filters can be used.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-access-log">
+<dt>access_log</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/accesslog/v3/accesslog.proto.html#envoy-v3-api-msg-config-accesslog-v3-accesslog"><span class="std std-ref">config.accesslog.v3.AccessLog</span></a>) Configuration for session access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as <a class="reference internal" href="../../../../../../configuration/advanced/substitution_formatter.html#config-access-log-format-dynamic-metadata"><span class="std std-ref">Dynamic Metadata</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-proxy-access-log">
+<dt>proxy_access_log</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/accesslog/v3/accesslog.proto.html#envoy-v3-api-msg-config-accesslog-v3-accesslog"><span class="std std-ref">config.accesslog.v3.AccessLog</span></a>) Configuration for proxy access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as <a class="reference internal" href="../../../../../../configuration/advanced/substitution_formatter.html#config-access-log-format-dynamic-metadata"><span class="std std-ref">Dynamic Metadata</span></a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-session-filters">
+<dt>session_filters</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-sessionfilter"><span class="std std-ref">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter</span></a>) Optional session filters that will run for each UDP session.
+Only one of use_per_packet_load_balancing or session_filters can be used.</p>
+<div class="admonition tip" id="extension-category-envoy-filters-udp-session">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../session/dynamic_forward_proxy/v3/dynamic_forward_proxy.proto.html#extension-envoy-filters-udp-session-dynamic-forward-proxy"><span class="std std-ref">envoy.filters.udp.session.dynamic_forward_proxy</span></a></p></li>
+<li><p><a class="reference internal" href="../session/ext_authz/v3/ext_authz.proto.html#extension-envoy-filters-udp-session-ext-authz"><span class="std std-ref">envoy.filters.udp.session.ext_authz</span></a></p></li>
+<li><p><a class="reference internal" href="../session/http_capsule/v3/http_capsule.proto.html#extension-envoy-filters-udp-session-http-capsule"><span class="std std-ref">envoy.filters.udp.session.http_capsule</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-tunneling-config">
+<dt>tunneling_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig"><span class="std std-ref">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig</span></a>) If set, this configures UDP tunneling. See <a class="reference external" href="https://www.rfc-editor.org/rfc/rfc9298.html">Proxying UDP in HTTP</a>.
+More information can be found in the UDP Proxy and HTTP upgrade documentation.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-access-log-options">
+<dt>access_log_options</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udpaccesslogoptions"><span class="std std-ref">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions</span></a>) Additional access log options for UDP Proxy.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-udp-udp-proxy-v3-udpproxyconfig-hashpolicy">
+<span id="envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-hashpolicy"></span><h2>extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy<a class="headerlink" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig-hashpolicy" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L40">[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy proto]</a></p>
+<p>Specifies the UDP hash policy.
+The packets can be routed by hash policy.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;source_ip&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-hashpolicy-source-ip">
+<dt>source_ip</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) The source IP will be used to compute the hash used by hash-based load balancing algorithms.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-hashpolicy-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-hashpolicy-key"><span class="std std-ref">key</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-hashpolicy-key">
+<dt>key</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) A given key will be used to compute the hash used by hash-based load balancing algorithms.
+In certain cases there is a need to direct different UDP streams jointly towards the selected set of endpoints.
+A possible use-case is VoIP telephony, where media (RTP) and its corresponding control (RTCP) belong to the same logical session,
+although they travel in separate streams. To ensure that these pair of streams are load-balanced on session level
+(instead of individual stream level), dynamically created listeners can use the same hash key for each stream in the session.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-hashpolicy-source-ip"><span class="std std-ref">source_ip</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-hashpolicy-key"><span class="std std-ref">key</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-udp-udp-proxy-v3-udpproxyconfig-sessionfilter">
+<span id="envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-sessionfilter"></span><h2>extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter<a class="headerlink" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig-sessionfilter" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L57">[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter proto]</a></p>
+<p>Configuration for UDP session filters.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;typed_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;config_discovery&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-sessionfilter-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The name of the filter configuration.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-sessionfilter-typed-config">
+<dt>typed_config</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any">Any</a>) Filter specific configuration which depends on the filter being
+instantiated. See the supported filters for further documentation.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-sessionfilter-typed-config"><span class="std std-ref">typed_config</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-sessionfilter-config-discovery"><span class="std std-ref">config_discovery</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-sessionfilter-config-discovery">
+<dt>config_discovery</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-extensionconfigsource"><span class="std std-ref">config.core.v3.ExtensionConfigSource</span></a>) Configuration source specifier for an extension configuration discovery
+service. In case of a failure and without the default configuration, the
+UDP session will be removed.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-sessionfilter-typed-config"><span class="std std-ref">typed_config</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-sessionfilter-config-discovery"><span class="std std-ref">config_discovery</span></a> may be set.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig">
+<span id="envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig"></span><h2>extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig<a class="headerlink" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L76">[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig proto]</a></p>
+<p>Configuration for tunneling UDP over other transports or application layers.
+Tunneling is currently supported over HTTP/2.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;proxy_host&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;proxy_port&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;target_host&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;default_target_port&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;use_post&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;post_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;retry_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;headers_to_add&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;buffer_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;propagate_response_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;propagate_response_trailers&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-proxy-host">
+<dt>proxy_host</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The hostname to send in the synthesized CONNECT headers to the upstream proxy.
+This field evaluates command operators if set, otherwise returns hostname as is.</p>
+<p>Example: dynamically set hostname using filter state</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tunneling_config</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">proxy_host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%FILTER_STATE(proxy.host.key:PLAIN)%&quot;</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-proxy-port">
+<dt>proxy_port</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Optional port value to add to the HTTP request URI.
+This value can be overridden per-session by setting the required port value for
+the filter state key <code class="docutils literal notranslate"><span class="pre">udp.connect.proxy_port</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-target-host">
+<dt>target_host</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The target host to send in the synthesized CONNECT headers to the upstream proxy.
+This field evaluates command operators if set, otherwise returns hostname as is.</p>
+<p>Example: dynamically set target host using filter state</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tunneling_config</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">target_host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%FILTER_STATE(target.host.key:PLAIN)%&quot;</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-default-target-port">
+<dt>default_target_port</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) The default target port to send in the CONNECT headers to the upstream proxy.
+This value can be overridden per-session by setting the required port value for
+the filter state key <code class="docutils literal notranslate"><span class="pre">udp.connect.target_port</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-use-post">
+<dt>use_post</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Use POST method instead of CONNECT method to tunnel the UDP stream.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If use_post is set, the upstream stream does not comply with the connect-udp RFC, and
+instead it will be a POST request. the path used in the headers will be set from the
+post_path field, and the headers will not contain the target host and target port, as
+required by the connect-udp protocol. This flag should be used carefully.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-post-path">
+<dt>post_path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The path used with POST method. Default path is <code class="docutils literal notranslate"><span class="pre">/</span></code>. If post path is specified and
+use_post field isn’t true, it will be rejected.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-retry-options">
+<dt>retry_options</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-retryoptions"><span class="std std-ref">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions</span></a>) Optional retry options, in case connecting to the upstream failed.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-headers-to-add">
+<dt>headers_to_add</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-headervalueoption"><span class="std std-ref">config.core.v3.HeaderValueOption</span></a>) Additional request headers to upstream proxy. Neither <code class="docutils literal notranslate"><span class="pre">:-prefixed</span></code> pseudo-headers
+nor the Host: header can be overridden. Values of the added headers evaluates command
+operators if they are set in the value template.</p>
+<p>Example: dynamically set a header with the local port</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">headers_to_add</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">original_dst_port</span>
+<span class="w">    </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%DOWNSTREAM_LOCAL_PORT%&quot;</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-buffer-options">
+<dt>buffer_options</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-bufferoptions"><span class="std std-ref">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.BufferOptions</span></a>) If configured, the filter will buffer datagrams in case that it is waiting for the upstream to be
+ready, whether if it is during the connection process or due to upstream buffer watermarks.
+If this field is not configured, there will be no buffering and downstream datagrams that arrive
+while the upstream is not ready will be dropped. In case this field is set but the options
+are not configured, the default values will be applied as described in the <code class="docutils literal notranslate"><span class="pre">BufferOptions</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-propagate-response-headers">
+<dt>propagate_response_headers</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Save the response headers to the downstream info filter state for consumption
+by the session filters. The filter state key is <code class="docutils literal notranslate"><span class="pre">envoy.udp_proxy.propagate_response_headers</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-propagate-response-trailers">
+<dt>propagate_response_trailers</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Save the response trailers to the downstream info filter state for consumption
+by the session filters. The filter state key is <code class="docutils literal notranslate"><span class="pre">envoy.udp_proxy.propagate_response_trailers</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-bufferoptions">
+<span id="envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-bufferoptions"></span><h2>extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.BufferOptions<a class="headerlink" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-bufferoptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L78">[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.BufferOptions proto]</a></p>
+<p>Configuration for UDP datagrams buffering.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;max_buffered_datagrams&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_buffered_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-bufferoptions-max-buffered-datagrams">
+<dt>max_buffered_datagrams</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) If set, the filter will only buffer datagrams up to the requested limit, and will drop
+new UDP datagrams if the buffer contains the max_buffered_datagrams value at the time
+of a new datagram arrival. If not set, the default value is 1024 datagrams.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-bufferoptions-max-buffered-bytes">
+<dt>max_buffered_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value">UInt64Value</a>) If set, the filter will only buffer datagrams up to the requested total buffered bytes limit,
+and will drop new UDP datagrams if the buffer contains the max_buffered_datagrams value
+at the time of a new datagram arrival. If not set, the default value is 16,384 (16KB).</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-retryoptions">
+<span id="envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-retryoptions"></span><h2>extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions<a class="headerlink" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-retryoptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L90">[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;max_connect_attempts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;backoff_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-retryoptions-max-connect-attempts">
+<dt>max_connect_attempts</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The maximum number of unsuccessful connection attempts that will be made before giving up.
+If the parameter is not specified, 1 connection attempt will be made.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-retryoptions-backoff-options">
+<dt>backoff_options</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/backoff.proto.html#envoy-v3-api-msg-config-core-v3-backoffstrategy"><span class="std std-ref">config.core.v3.BackoffStrategy</span></a>) Sets the backoff strategy. If not set, the retries are performed without backoff.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udpaccesslogoptions">
+<span id="envoy-v3-api-msg-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udpaccesslogoptions"></span><h2>extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions<a class="headerlink" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udpaccesslogoptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L182">[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;access_log_flush_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;flush_access_log_on_tunnel_connected&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udpaccesslogoptions-access-log-flush-interval">
+<dt>access_log_flush_interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The interval to flush access log. The UDP proxy will flush only one access log when the session
+is ended by default. If this field is set, the UDP proxy will flush access log periodically with
+the specified interval.
+This field does not require on-tunnel-connected access logging enabled, and the other way around.
+The interval must be at least 1ms.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udpaccesslogoptions-flush-access-log-on-tunnel-connected">
+<dt>flush_access_log_on_tunnel_connected</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to true and UDP tunneling is configured, access log will be flushed when the UDP proxy has successfully
+established a connection tunnel with the upstream. If the connection failed, the access log will not be flushed.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="route.proto.html" class="btn btn-neutral float-left" title="UDP proxy route configuration (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../../../../config/filter/udp/session.html" class="btn btn-neutral float-right" title="UDP session filters" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">UDP proxy (proto)</a><ul>
+<li><a class="reference internal" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig</a></li>
+<li><a class="reference internal" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig-hashpolicy">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy</a></li>
+<li><a class="reference internal" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig-sessionfilter">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter</a></li>
+<li><a class="reference internal" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig</a></li>
+<li><a class="reference internal" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-bufferoptions">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.BufferOptions</a></li>
+<li><a class="reference internal" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udptunnelingconfig-retryoptions">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions</a></li>
+<li><a class="reference internal" href="#extensions-filters-udp-udp-proxy-v3-udpproxyconfig-udpaccesslogoptions">extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

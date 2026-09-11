@@ -1,0 +1,770 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OAuth2 &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="On-demand VHDS, S/RDS and CDS Updates" href="on_demand_updates_filter.html" />
+    <link rel="prev" title="MCP Router" href="mcp_router_filter.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../http.html">HTTP</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../http_conn_man/http_conn_man.html">HTTP connection manager</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="http_filters.html">HTTP filters</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="a2a_filter.html">A2A</a></li>
+<li class="toctree-l4"><a class="reference internal" href="adaptive_concurrency_filter.html">Adaptive Concurrency</a></li>
+<li class="toctree-l4"><a class="reference internal" href="admission_control_filter.html">Admission Control</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aws_eventstream_parser_filter.html">AWS-EventStream-Parser Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ai_protocol_manager_filter.html">AI Protocol Manager</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aws_lambda_filter.html">AWS Lambda</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api_key_auth_filter.html">API key auth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="aws_request_signing_filter.html">AWS Request Signing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="bandwidth_limit_filter.html">Bandwidth limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="bandwidth_share_filter.html">Bandwidth share</a></li>
+<li class="toctree-l4"><a class="reference internal" href="basic_auth_filter.html">Basic Auth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="buffer_filter.html">Buffer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cache_filter.html">Cache filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cache_v2_filter.html">CacheV2 filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cdn_loop_filter.html">CDN-Loop header</a></li>
+<li class="toctree-l4"><a class="reference internal" href="checksum_filter.html">Checksum</a></li>
+<li class="toctree-l4"><a class="reference internal" href="compressor_filter.html">Compressor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="composite_filter.html">Composite Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="connect_grpc_bridge_filter.html">Connect-gRPC Bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cors_filter.html">CORS</a></li>
+<li class="toctree-l4"><a class="reference internal" href="credential_injector_filter.html">Credential injector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="csrf_filter.html">CSRF</a></li>
+<li class="toctree-l4"><a class="reference internal" href="custom_response_filter.html">Custom Response Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="decompressor_filter.html">Decompressor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dynamic_forward_proxy_filter.html">Dynamic forward proxy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dynamodb_filter.html">DynamoDB</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ext_authz_filter.html">External Authorization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ext_proc_filter.html">External Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="fault_filter.html">Fault Injection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="file_server_filter.html">File Server</a></li>
+<li class="toctree-l4"><a class="reference internal" href="file_system_buffer_filter.html">File System Buffer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="filter_chain_filter.html">Filter Chain</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gcp_authn_filter.html">GCP Authentication Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="geoip_filter.html">IP Geolocation Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="golang_filter.html">Golang</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_field_extraction_filter.html">gRPC Field Extraction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_http1_bridge_filter.html">gRPC HTTP/1.1 bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_http1_reverse_bridge_filter.html">gRPC HTTP/1.1 reverse bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_json_reverse_transcoder_filter.html">gRPC-JSON reverse transcoder</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_json_transcoder_filter.html">gRPC-JSON transcoder</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_stats_filter.html">gRPC Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_web_filter.html">gRPC-Web</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_mutation_filter.html">Header Mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="health_check_filter.html">Health check</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_to_metadata_filter.html">Envoy Header-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="ip_tagging_filter.html">IP Tagging</a></li>
+<li class="toctree-l4"><a class="reference internal" href="json_to_metadata_filter.html">Envoy Json-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="jwt_authn_filter.html">JWT Authentication</a></li>
+<li class="toctree-l4"><a class="reference internal" href="kill_request_filter.html">Kill Request</a></li>
+<li class="toctree-l4"><a class="reference internal" href="language_filter.html">Language</a></li>
+<li class="toctree-l4"><a class="reference internal" href="local_rate_limit_filter.html">Local rate limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lua_filter.html">Lua</a></li>
+<li class="toctree-l4"><a class="reference internal" href="mcp_filter.html">Model Context Protocol (MCP)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="mcp_router_filter.html">MCP Router</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">OAuth2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="on_demand_updates_filter.html">On-demand VHDS, S/RDS and CDS Updates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="original_src_filter.html">Original Source</a></li>
+<li class="toctree-l4"><a class="reference internal" href="proto_api_scrubber_filter.html">Proto API Scrubber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="proto_message_extraction_filter.html">Proto Message Extraction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rate_limit_filter.html">Rate limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rate_limit_quota_filter.html">Rate Limit Quota</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rbac_filter.html">Role Based Access Control (RBAC) Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="router_filter.html">Router</a></li>
+<li class="toctree-l4"><a class="reference internal" href="set_filter_state.html">Set-Filter-State HTTP Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="set_metadata_filter.html">Set Metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="body_size_limit_filter.html">Body Size Limit</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sse_to_metadata_filter.html">SSE-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="stateful_session_filter.html">Stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sxg_filter.html">SXG</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tap_filter.html">Tap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="thrift_to_metadata_filter.html">Envoy Thrift-To-Metadata Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="upstream_codec_filter.html">Upstream Codec</a></li>
+<li class="toctree-l4"><a class="reference internal" href="upstream_rbac_filter.html">Upstream Role Based Access Control (RBAC) Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wasm_filter.html">Wasm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="transform_filter.html">Transform</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../caches/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../caches_v2/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../cluster_specifier/cluster_specifier.html">HTTP cluster specifier</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tcp_bridge/tcp_bridge.html">HTTP TCP bridge</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../http.html">HTTP</a></li>
+          <li class="breadcrumb-item"><a href="http_filters.html">HTTP filters</a></li>
+      <li class="breadcrumb-item active">OAuth2</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/http/http_filters/oauth2_filter.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="oauth2">
+<span id="config-http-filters-oauth"></span><h1>OAuth2<a class="headerlink" href="#oauth2" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>This filter should be configured with the type URL <code class="docutils literal notranslate"><span class="pre">type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2</span></code>.</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2"><span class="std std-ref">v3 API reference</span></a></p></li>
+</ul>
+<p>The OAuth2 filter also defines a route-level config message,
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2perroute"><span class="std std-ref">OAuth2PerRoute</span></a>,
+which may be attached to
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-route-typed-per-filter-config"><span class="std std-ref">Route.typed_per_filter_config</span></a>.
+The route-level config carries a complete <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2config"><span class="std std-ref">OAuth2Config</span></a>
+and is intended to replace, not merge with, the filter-level config.</p>
+<p>When using per-route configuration, keep the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-redirect-path-matcher"><span class="std std-ref">redirect_path_matcher</span></a>
+and <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-signout-path"><span class="std std-ref">signout_path</span></a>
+within the same route prefix as the protected resources. If cookie paths are customized, they
+should cover that same prefix so that the callback and signout requests receive the OAuth cookies
+needed to complete the flow. When multiple per-route OAuth2 configurations share the same host,
+customizing <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-cookie-names"><span class="std std-ref">cookie_names</span></a>
+is recommended to avoid overlap between routes.</p>
+<p>The OAuth filter’s flow involves:</p>
+<ul class="simple">
+<li><p>An unauthenticated user arrives at myapp.com, and the oauth filter redirects them to the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-authorization-endpoint"><span class="std std-ref">authorization_endpoint</span></a>
+for login. The <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-client-id"><span class="std std-ref">client_id</span></a>
+and the <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-redirect-uri"><span class="std std-ref">redirect_uri</span></a>
+are sent as query string parameters in this first redirect.</p></li>
+<li><p>After a successful login, the authn server should be configured to redirect the user back to the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-redirect-uri"><span class="std std-ref">redirect_uri</span></a>
+provided in the query string in the first step. In the below code example, we choose <code class="docutils literal notranslate"><span class="pre">/callback</span></code> as the configured match path.
+An “authorization grant” is included in the query string for this second redirect.</p></li>
+<li><p>Using this new grant and the <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-token-secret"><span class="std std-ref">token_secret</span></a>,
+the filter then attempts to retrieve an access token from
+the <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-token-endpoint"><span class="std std-ref">token_endpoint</span></a>. The filter knows it has to do this
+instead of reinitiating another login because the incoming request has a path that matches the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-redirect-path-matcher"><span class="std std-ref">redirect_path_matcher</span></a> criteria.
+When <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-auth-type"><span class="std std-ref">auth_type</span></a> is set to <code class="docutils literal notranslate"><span class="pre">TLS_CLIENT_AUTH</span></code>,
+client authentication is performed with the TLS client certificate (RFC 8705) and
+<code class="docutils literal notranslate"><span class="pre">token_secret</span></code> is not required. The <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-token-endpoint"><span class="std std-ref">token_endpoint</span></a>
+must use a cluster configured with an mTLS transport socket (client certificate and key).</p></li>
+<li><p>Upon receiving an access token, the filter sets cookies so that subseqeuent requests can skip the full
+flow. These cookies are calculated using the
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-hmac-secret"><span class="std std-ref">hmac_secret</span></a>
+to assist in encoding.</p></li>
+<li><p>The filter calls <code class="docutils literal notranslate"><span class="pre">continueDecoding()</span></code> to unblock the filter chain.</p></li>
+<li><p>The filter sets <code class="docutils literal notranslate"><span class="pre">IdToken</span></code> and <code class="docutils literal notranslate"><span class="pre">RefreshToken</span></code> cookies if they are provided by Identity provider along with <code class="docutils literal notranslate"><span class="pre">AccessToken</span></code>. These cookie names
+can be customized by setting <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-cookie-names"><span class="std std-ref">cookie_names</span></a>.</p></li>
+</ul>
+<p>When the authn server validates the client and returns an authorization token back to the OAuth filter,
+no matter what format that token is, if
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-forward-bearer-token"><span class="std std-ref">forward_bearer_token</span></a>
+is set to true the filter will send over a
+cookie named <code class="docutils literal notranslate"><span class="pre">BearerToken</span></code> to the upstream. Additionally, the <code class="docutils literal notranslate"><span class="pre">Authorization</span></code> header will be populated
+with the same value.</p>
+<p>The OAuth filter encodes URLs in query parameters using the
+<a class="reference external" href="https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm">URL encoding algorithm.</a></p>
+<p>When receiving request redirected from the authorization service the Oauth filter decodes URLs from query parameters.
+However the encoded character sequences that represent ASCII control characters or extended ASCII codepoints are not
+decoded. The characters without defined meaning in URL according to <a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc3986">RFC 3986</a>
+are also left undecoded. Specifically the following characters are left in the encoded form:</p>
+<ul class="simple">
+<li><p>Control characters with values less than or equal <code class="docutils literal notranslate"><span class="pre">0x1F</span></code></p></li>
+<li><p>Space (<code class="docutils literal notranslate"><span class="pre">0x20</span></code>)</p></li>
+<li><p>DEL character (<code class="docutils literal notranslate"><span class="pre">0x7F</span></code>)</p></li>
+<li><p>Extended ASCII characters with values greater than or equal <code class="docutils literal notranslate"><span class="pre">0x80</span></code></p></li>
+<li><p>Characters without defined meaning in URL: <code class="docutils literal notranslate"><span class="pre">&quot;&lt;&gt;\^{}|</span></code></p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>By default, OAuth2 filter sets some cookies with the following names:
+<code class="docutils literal notranslate"><span class="pre">BearerToken</span></code>, <code class="docutils literal notranslate"><span class="pre">OauthHMAC</span></code>, and <code class="docutils literal notranslate"><span class="pre">OauthExpires</span></code>. These cookie names can be customized by
+setting
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-cookie-names"><span class="std std-ref">cookie_names</span></a>.</p>
+</div>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>The OAuth2 filter is currently under active development.</p>
+</div>
+<section id="example-configuration">
+<h2>Example configuration<a class="headerlink" href="#example-configuration" title="Link to this heading"></a></h2>
+<p>The following is an example configuring the filter.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">config</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">token_endpoint</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">oauth</span>
+<span class="w">    </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">oauth.com/token</span>
+<span class="w">    </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3s</span>
+<span class="w">  </span><span class="nt">authorization_endpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://oauth.com/oauth/authorize/</span>
+<span class="w">  </span><span class="nt">redirect_uri</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback&quot;</span>
+<span class="w">  </span><span class="nt">redirect_path_matcher</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/callback</span>
+<span class="w">  </span><span class="nt">signout_path</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/signout</span>
+<span class="w">  </span><span class="nt">credentials</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">client_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">    </span><span class="nt">token_secret</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">token</span>
+<span class="w">      </span><span class="nt">sds_config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/etc/envoy/token-secret.yaml&quot;</span>
+<span class="w">    </span><span class="nt">hmac_secret</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hmac</span>
+<span class="w">      </span><span class="nt">sds_config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/etc/envoy/hmac.yaml&quot;</span>
+<span class="w">  </span><span class="c1"># (Optional): defaults to &#39;user&#39; scope if not provided</span>
+<span class="w">  </span><span class="nt">auth_scopes</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openid</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+<span class="w">  </span><span class="c1"># (Optional): set resource parameter for Authorization request</span>
+<span class="w">  </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">oauth2-resource</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://example.com</span>
+</pre></div>
+</div>
+<p>Below is a complete code example of how we employ the filter as one of
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-http-filters"><span class="std std-ref">HttpConnectionManager HTTP filters</span></a></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">static_resources</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">listeners</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">listener_0</span>
+<span class="w">    </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w">        </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<span class="w">        </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10000</span>
+<span class="w">    </span><span class="nt">filter_chains</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filters</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.network.http_connection_manager</span>
+<span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+<span class="w">          </span><span class="nt">http_filters</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.oauth2</span>
+<span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2</span>
+<span class="w">              </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">token_endpoint</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">oauth</span>
+<span class="w">                  </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">oauth.com/token</span>
+<span class="w">                  </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3s</span>
+<span class="w">                </span><span class="nt">authorization_endpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://oauth.com/oauth/authorize/</span>
+<span class="w">                </span><span class="nt">redirect_uri</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback&quot;</span>
+<span class="w">                </span><span class="nt">redirect_path_matcher</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">path</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/callback</span>
+<span class="w">                </span><span class="nt">signout_path</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">path</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/signout</span>
+<span class="w">                </span><span class="nt">credentials</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">client_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">                  </span><span class="nt">token_secret</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">token</span>
+<span class="w">                    </span><span class="nt">sds_config</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/etc/envoy/token-secret.yaml&quot;</span>
+<span class="w">                  </span><span class="nt">hmac_secret</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hmac</span>
+<span class="w">                    </span><span class="nt">sds_config</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/etc/envoy/hmac.yaml&quot;</span>
+<span class="w">                </span><span class="c1"># (Optional): defaults to &#39;user&#39; scope if not provided</span>
+<span class="w">                </span><span class="nt">auth_scopes</span><span class="p">:</span>
+<span class="w">                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user</span>
+<span class="w">                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openid</span>
+<span class="w">                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+<span class="w">                </span><span class="c1"># (Optional): set resource parameter for Authorization request</span>
+<span class="w">                </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w">                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">oauth2-resource</span>
+<span class="w">                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://example.com</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.router</span>
+<span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span>
+<span class="w">          </span><span class="nt">tracing</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+<span class="w">          </span><span class="nt">codec_type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;AUTO&quot;</span>
+<span class="w">          </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress_http</span>
+<span class="w">          </span><span class="nt">route_config</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service</span>
+<span class="w">              </span><span class="nt">domains</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;*&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/&quot;</span>
+<span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service</span>
+<span class="w">                  </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+
+<span class="w">  </span><span class="nt">clusters</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service</span>
+<span class="w">    </span><span class="nt">connect_timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">STATIC</span>
+<span class="w">    </span><span class="nt">lb_policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ROUND_ROBIN</span>
+<span class="w">    </span><span class="nt">load_assignment</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service</span>
+<span class="w">      </span><span class="nt">endpoints</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">lb_endpoints</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">oauth</span>
+<span class="w">    </span><span class="nt">connect_timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LOGICAL_DNS</span>
+<span class="w">    </span><span class="nt">lb_policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ROUND_ROBIN</span>
+<span class="w">    </span><span class="nt">load_assignment</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">oauth</span>
+<span class="w">      </span><span class="nt">endpoints</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">lb_endpoints</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auth.example.com</span>
+<span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="w">    </span><span class="nt">transport_socket</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+<span class="w">      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext</span>
+<span class="w">        </span><span class="nt">sni</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auth.example.com</span>
+</pre></div>
+</div>
+<p>Finally, the following code block illustrates sample contents inside a yaml file containing both credential secrets.
+Both the <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-token-secret"><span class="std std-ref">token_secret</span></a>
+and the <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-hmac-secret"><span class="std std-ref">hmac_secret</span></a>
+can be defined in one shared file.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">static_resources</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">secrets</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">token</span>
+<span class="w">    </span><span class="nt">generic_secret</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">secret</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;Your token secret here&gt;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hmac</span>
+<span class="w">    </span><span class="nt">generic_secret</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">secret</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;Your hmac secret here&gt;</span>
+</pre></div>
+</div>
+<p>The following example shows two independent route prefixes, <code class="docutils literal notranslate"><span class="pre">/foo</span></code> and <code class="docutils literal notranslate"><span class="pre">/bar</span></code>, each with its
+own OAuth2 client settings. The callback path and signout path stay under the same prefix as the
+protected route, the cookie paths are scoped to that prefix, and the cookie names are customized so
+that the two configurations remain independent on the same host:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">http_filters</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.oauth2</span>
+<span class="w">  </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">    </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.router</span>
+<span class="w">  </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">    </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span>
+<span class="nt">route_config</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service</span>
+<span class="w">    </span><span class="nt">domains</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;*&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">routes</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/foo&quot;</span>
+<span class="w">      </span><span class="nt">route</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_service</span>
+<span class="w">      </span><span class="nt">typed_per_filter_config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">envoy.filters.http.oauth2</span><span class="p">:</span>
+<span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2PerRoute</span>
+<span class="w">          </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">token_endpoint</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">google_oauth2</span>
+<span class="w">              </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://oauth2.googleapis.com/token</span>
+<span class="w">              </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3s</span>
+<span class="w">            </span><span class="nt">authorization_endpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://accounts.google.com/o/oauth2/v2/auth</span>
+<span class="w">            </span><span class="nt">redirect_uri</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%REQ(x-forwarded-proto)%://%REQ(:authority)%/foo/callback&quot;</span>
+<span class="w">            </span><span class="nt">redirect_path_matcher</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">path</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/foo/callback</span>
+<span class="w">            </span><span class="nt">signout_path</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">path</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/foo/signout</span>
+<span class="w">            </span><span class="nt">cookie_configs</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">bearer_token_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/foo&quot;</span>
+<span class="w">              </span><span class="nt">oauth_hmac_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/foo&quot;</span>
+<span class="w">              </span><span class="nt">oauth_expires_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/foo&quot;</span>
+<span class="w">              </span><span class="nt">id_token_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/foo&quot;</span>
+<span class="w">              </span><span class="nt">refresh_token_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/foo&quot;</span>
+<span class="w">              </span><span class="nt">oauth_nonce_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/foo&quot;</span>
+<span class="w">              </span><span class="nt">code_verifier_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/foo&quot;</span>
+<span class="w">            </span><span class="nt">credentials</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">client_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">              </span><span class="nt">cookie_names</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">bearer_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FooBearerToken</span>
+<span class="w">                </span><span class="nt">oauth_hmac</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FooOauthHMAC</span>
+<span class="w">                </span><span class="nt">oauth_expires</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FooOauthExpires</span>
+<span class="w">                </span><span class="nt">id_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FooIdToken</span>
+<span class="w">                </span><span class="nt">refresh_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FooRefreshToken</span>
+<span class="w">                </span><span class="nt">oauth_nonce</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FooOauthNonce</span>
+<span class="w">                </span><span class="nt">code_verifier</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FooCodeVerifier</span>
+<span class="w">              </span><span class="nt">token_secret</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo_client_secret</span>
+<span class="w">                </span><span class="nt">sds_config</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/etc/foo-client-secret.yaml&quot;</span>
+<span class="w">              </span><span class="nt">hmac_secret</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hmac</span>
+<span class="w">                </span><span class="nt">sds_config</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/etc/hmac-secret.yaml&quot;</span>
+<span class="w">            </span><span class="nt">auth_scopes</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openid</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/bar&quot;</span>
+<span class="w">      </span><span class="nt">route</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_service</span>
+<span class="w">      </span><span class="nt">typed_per_filter_config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">envoy.filters.http.oauth2</span><span class="p">:</span>
+<span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2PerRoute</span>
+<span class="w">          </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">token_endpoint</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">google_oauth2</span>
+<span class="w">              </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://oauth2.googleapis.com/token</span>
+<span class="w">              </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3s</span>
+<span class="w">            </span><span class="nt">authorization_endpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://accounts.google.com/o/oauth2/v2/auth</span>
+<span class="w">            </span><span class="nt">redirect_uri</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%REQ(x-forwarded-proto)%://%REQ(:authority)%/bar/callback&quot;</span>
+<span class="w">            </span><span class="nt">redirect_path_matcher</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">path</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/bar/callback</span>
+<span class="w">            </span><span class="nt">signout_path</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">path</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/bar/signout</span>
+<span class="w">            </span><span class="nt">cookie_configs</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">bearer_token_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/bar&quot;</span>
+<span class="w">              </span><span class="nt">oauth_hmac_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/bar&quot;</span>
+<span class="w">              </span><span class="nt">oauth_expires_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/bar&quot;</span>
+<span class="w">              </span><span class="nt">id_token_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/bar&quot;</span>
+<span class="w">              </span><span class="nt">refresh_token_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/bar&quot;</span>
+<span class="w">              </span><span class="nt">oauth_nonce_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/bar&quot;</span>
+<span class="w">              </span><span class="nt">code_verifier_cookie_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/bar&quot;</span>
+<span class="w">            </span><span class="nt">credentials</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">client_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bar</span>
+<span class="w">              </span><span class="nt">cookie_names</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">bearer_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BarBearerToken</span>
+<span class="w">                </span><span class="nt">oauth_hmac</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BarOauthHMAC</span>
+<span class="w">                </span><span class="nt">oauth_expires</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BarOauthExpires</span>
+<span class="w">                </span><span class="nt">id_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BarIdToken</span>
+<span class="w">                </span><span class="nt">refresh_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BarRefreshToken</span>
+<span class="w">                </span><span class="nt">oauth_nonce</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BarOauthNonce</span>
+<span class="w">                </span><span class="nt">code_verifier</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BarCodeVerifier</span>
+<span class="w">              </span><span class="nt">token_secret</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bar_client_secret</span>
+<span class="w">                </span><span class="nt">sds_config</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/etc/bar-client-secret.yaml&quot;</span>
+<span class="w">              </span><span class="nt">hmac_secret</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hmac</span>
+<span class="w">                </span><span class="nt">sds_config</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/etc/hmac-secret.yaml&quot;</span>
+<span class="w">            </span><span class="nt">auth_scopes</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openid</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+</pre></div>
+</div>
+</section>
+<section id="notes">
+<h2>Notes<a class="headerlink" href="#notes" title="Link to this heading"></a></h2>
+<p>When enabled, the OAuth filter does not protect against Cross-Site-Request-Forgery attacks on domains with
+cached authentication (in the form of cookies).
+It is recommended to pair this filter with the <a class="reference internal" href="../../../api-v3/extensions/filters/http/csrf/v3/csrf.proto.html#envoy-v3-api-msg-extensions-filters-http-csrf-v3-csrfpolicy"><span class="std std-ref">CSRF Filter</span></a>
+to prevent malicious social engineering.</p>
+<p>The service must be served over HTTPS for this filter to work properly, as the cookies use <code class="docutils literal notranslate"><span class="pre">;secure</span></code>. Without https, your
+<a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-authorization-endpoint"><span class="std std-ref">authorization_endpoint</span></a>
+provider will likely reject the incoming request, and your access cookies will not be cached to bypass future logins.</p>
+<p>The signout path will redirect the current user to ‘/’, and clear all authentication cookies related to
+the HMAC validation. Consequently, the OAuth filter will then restart the full OAuth flow at the root path,
+sending the user to the configured auth endpoint.</p>
+<p><a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-pass-through-matcher"><span class="std std-ref">pass_through_matcher</span></a> provides
+an interface for users to provide specific header matching criteria such that, when applicable, the OAuth flow is entirely skipped.
+When this occurs, the <code class="docutils literal notranslate"><span class="pre">oauth_passthrough</span></code> metric is incremented but <code class="docutils literal notranslate"><span class="pre">success</span></code> is not.</p>
+<p><a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-deny-redirect-matcher"><span class="std std-ref">deny_redirect_matcher</span></a> can be used to specify requests for which
+unauthorized response is returned on token expiration and will not automatically redirect to the authorization endpoint. Token refresh can be still performed
+during those requests by enabling the <a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-use-refresh-token"><span class="std std-ref">use_refresh_token</span></a> flag.
+This behavior can be useful for AJAX requests which cannot handle redirects correctly.</p>
+<p><a class="reference internal" href="../../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-use-refresh-token"><span class="std std-ref">use_refresh_token</span></a> provides
+the possibility to update access token by using a refresh token. If this flag is disabled then after access token expiration the user is redirected to the authorization endpoint to log in again.
+A new access token is obtained using the refresh token without redirecting the user to log in again. This requires the refresh token to be provided by the authorization_endpoint when the user logs in.
+If the attempt to get an access token by using a refresh token fails then the user is redirected to the authorization endpoint.</p>
+<p>Generally, allowlisting is inadvisable from a security standpoint.</p>
+</section>
+<section id="statistics">
+<h2>Statistics<a class="headerlink" href="#statistics" title="Link to this heading"></a></h2>
+<p>The OAuth2 filter outputs statistics in the <code class="docutils literal notranslate"><span class="pre">&lt;stat_prefix&gt;.</span></code> namespace.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>oauth_failure</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that were denied.</p></td>
+</tr>
+<tr class="row-odd"><td><p>oauth_passthrough</p></td>
+<td><p>Counter</p></td>
+<td><p>Total request that matched a passthrough header.</p></td>
+</tr>
+<tr class="row-even"><td><p>oauth_success</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests that were allowed.</p></td>
+</tr>
+<tr class="row-odd"><td><p>oauth_unauthorization_rq</p></td>
+<td><p>Counter</p></td>
+<td><p>Total unauthorized requests.</p></td>
+</tr>
+<tr class="row-even"><td><p>oauth_refreshtoken_success</p></td>
+<td><p>Counter</p></td>
+<td><p>Total successful requests for update access token using by refresh token</p></td>
+</tr>
+<tr class="row-odd"><td><p>oauth_refreshtoken_failure</p></td>
+<td><p>Counter</p></td>
+<td><p>Total failed requests for update access token using by refresh token</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="mcp_router_filter.html" class="btn btn-neutral float-left" title="MCP Router" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="on_demand_updates_filter.html" class="btn btn-neutral float-right" title="On-demand VHDS, S/RDS and CDS Updates" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">OAuth2</a><ul>
+<li><a class="reference internal" href="#example-configuration">Example configuration</a></li>
+<li><a class="reference internal" href="#notes">Notes</a></li>
+<li><a class="reference internal" href="#statistics">Statistics</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

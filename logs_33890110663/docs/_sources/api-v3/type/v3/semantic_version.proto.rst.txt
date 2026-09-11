@@ -1,0 +1,51 @@
+.. _envoy_v3_api_file_envoy/type/v3/semantic_version.proto:
+
+Semantic version (proto)
+========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.v3.SemanticVersion:
+
+type.v3.SemanticVersion
+-----------------------
+
+
+:repo:`[type.v3.SemanticVersion proto] <api/envoy/type/v3/semantic_version.proto#L18>`
+
+Envoy uses SemVer (https://semver.org/). Major/minor versions indicate
+expected behaviors and APIs, the patch version field is used only
+for security fixes and can be generally ignored.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "major_number": ...,
+    "minor_number": ...,
+    "patch": ...
+  }
+
+.. _envoy_v3_api_field_type.v3.SemanticVersion.major_number:
+
+
+major_number
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+
+.. _envoy_v3_api_field_type.v3.SemanticVersion.minor_number:
+
+
+minor_number
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+
+.. _envoy_v3_api_field_type.v3.SemanticVersion.patch:
+
+
+patch
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+

@@ -1,0 +1,114 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/udp/dynamic_modules/v3/dynamic_modules.proto:
+
+Dynamic Modules UDP Listener Filter (proto)
+===========================================
+
+.. _extension_envoy.filters.udp_listener.dynamic_modules:
+
+This extension has the qualified name ``envoy.filters.udp_listener.dynamic_modules``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.udp_listener <extension_category_envoy.filters.udp_listener>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter <envoy_v3_api_msg_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter:
+
+extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter
+------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter proto] <api/envoy/extensions/filters/udp/dynamic_modules/v3/dynamic_modules.proto#L24>`
+
+Configuration for the Dynamic Modules UDP listener filter. This filter allows loading shared object
+files that can be loaded via ``dlopen`` to extend the UDP listener filter chain.
+
+A module can be loaded by multiple UDP listener filters; the module is loaded only once and shared
+across multiple filters.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "filter_name": ...,
+    "filter_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`) Specifies the shared-object level configuration.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter.filter_name:
+
+
+filter_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name for this filter configuration.
+
+  This can be used to distinguish between different filter implementations inside a dynamic
+  module. For example, a module can have completely different filter implementations. When Envoy
+  receives this configuration, it passes the ``filter_name`` to the dynamic module's UDP listener
+  filter config init function together with the ``filter_config``. That way a module can decide
+  which in-module filter implementation to use based on the name at load time.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter.filter_config:
+
+
+filter_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the filter chosen by ``filter_name``.
+
+  This is passed to the module's UDP listener filter initialization function. Together with the
+  ``filter_name``, the module can decide which in-module filter implementation to use and
+  fine-tune the behavior of the filter.
+
+  For example, if a module has two filter implementations, one for echo and one for rate
+  limiting, ``filter_name`` is used to choose either echo or rate limiting. The
+  ``filter_config`` can be used to configure the echo behavior or the rate limiting parameters.
+
+  ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
+  without the wrapper.
+
+  .. code-block:: yaml
+
+   # Passing a string value
+   filter_config:
+     "@type": "type.googleapis.com/google.protobuf.StringValue"
+     value: hello
+
+   # Passing raw bytes
+   filter_config:
+     "@type": "type.googleapis.com/google.protobuf.BytesValue"
+     value: aGVsbG8=  # echo -n "hello" | base64
+
+
+

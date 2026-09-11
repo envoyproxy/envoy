@@ -1,0 +1,66 @@
+.. _envoy_v3_api_file_envoy/extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.proto:
+
+Omit host metadata retry predicate (proto)
+==========================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.retry.host.omit_host_metadata.v3.OmitHostMetadataConfig:
+
+extensions.retry.host.omit_host_metadata.v3.OmitHostMetadataConfig
+------------------------------------------------------------------
+
+
+:repo:`[extensions.retry.host.omit_host_metadata.v3.OmitHostMetadataConfig proto] <api/envoy/extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.proto#L20>`
+
+A retry host predicate that can be used to reject a host based on
+predefined metadata match criteria.
+
+.. _extension_envoy.retry_host_predicates.omit_host_metadata:
+
+This extension has the qualified name ``envoy.retry_host_predicates.omit_host_metadata``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.retry_host_predicates <extension_category_envoy.retry_host_predicates>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.retry.host.omit_host_metadata.v3.OmitHostMetadataConfig <envoy_v3_api_msg_extensions.retry.host.omit_host_metadata.v3.OmitHostMetadataConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "metadata_match": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.retry.host.omit_host_metadata.v3.OmitHostMetadataConfig.metadata_match:
+
+
+metadata_match
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Retry host predicate metadata match criteria. The hosts in
+  the upstream cluster with matching metadata will be omitted while
+  attempting a retry of a failed request. The metadata should be specified
+  under the ``envoy.lb`` key.
+
+

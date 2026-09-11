@@ -1,0 +1,66 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/body_size_limit/v3/body_size_limit.proto:
+
+Body Size Limit (proto)
+=======================
+
+.. _extension_envoy.filters.http.body_size_limit:
+
+This extension has the qualified name ``envoy.filters.http.body_size_limit``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+  - :ref:`envoy.filters.http.upstream <extension_category_envoy.filters.http.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.body_size_limit.v3.BodySizeLimit <envoy_v3_api_msg_extensions.filters.http.body_size_limit.v3.BodySizeLimit>`
+
+
+
+Body Size Limit :ref:`configuration overview <config_http_filters_body_size_limit>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.body_size_limit.v3.BodySizeLimit:
+
+extensions.filters.http.body_size_limit.v3.BodySizeLimit
+--------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.body_size_limit.v3.BodySizeLimit proto] <api/envoy/extensions/filters/http/body_size_limit/v3/body_size_limit.proto#L19>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_request_bytes": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.body_size_limit.v3.BodySizeLimit.max_request_bytes:
+
+
+max_request_bytes
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) The maximum request body size allowed. If the request body exceeds this limit,
+  the filter will return a 413 response.
+
+

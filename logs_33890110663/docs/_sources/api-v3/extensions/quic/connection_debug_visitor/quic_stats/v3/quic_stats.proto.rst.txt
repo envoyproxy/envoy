@@ -1,0 +1,63 @@
+.. _envoy_v3_api_file_envoy/extensions/quic/connection_debug_visitor/quic_stats/v3/quic_stats.proto:
+
+QUIC stats config (proto)
+=========================
+
+.. _extension_envoy.quic.connection_debug_visitor.quic_stats:
+
+This extension has the qualified name ``envoy.quic.connection_debug_visitor.quic_stats``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.quic.connection_debug_visitor <extension_category_envoy.quic.connection_debug_visitor>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.quic.connection_debug_visitor.quic_stats.v3.Config <envoy_v3_api_msg_extensions.quic.connection_debug_visitor.quic_stats.v3.Config>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.quic.connection_debug_visitor.quic_stats.v3.Config:
+
+extensions.quic.connection_debug_visitor.quic_stats.v3.Config
+-------------------------------------------------------------
+
+
+:repo:`[extensions.quic.connection_debug_visitor.quic_stats.v3.Config proto] <api/envoy/extensions/quic/connection_debug_visitor/quic_stats/v3/quic_stats.proto#L19>`
+
+Configuration for a QUIC debug visitor which emits stats from the underlying QUIC transport.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "update_period": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.quic.connection_debug_visitor.quic_stats.v3.Config.update_period:
+
+
+update_period
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Period to update stats while the connection is open. If unset, updates only happen when the
+  connection is closed. Stats are always updated one final time when the connection is closed.
+
+

@@ -1,0 +1,138 @@
+.. _envoy_v3_api_file_envoy/extensions/matching/actions/transform_stat/v3/transform_stat.proto:
+
+Transform Stat actions (proto)
+==============================
+
+.. _extension_envoy.matching.actions.transform_stat:
+
+This extension has the qualified name ``envoy.matching.actions.transform_stat``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.action <extension_category_envoy.matching.action>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat <envoy_v3_api_msg_extensions.matching.actions.transform_stat.v3.TransformStat>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.actions.transform_stat.v3.TransformStat:
+
+extensions.matching.actions.transform_stat.v3.TransformStat
+-----------------------------------------------------------
+
+
+:repo:`[extensions.matching.actions.transform_stat.v3.TransformStat proto] <api/envoy/extensions/matching/actions/transform_stat/v3/transform_stat.proto#L16>`
+
+Transform action for the stat matched by the tag.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "drop_stat": {...},
+    "drop_tag": {...},
+    "update_tag": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.matching.actions.transform_stat.v3.TransformStat.drop_stat:
+
+
+drop_stat
+  (:ref:`extensions.matching.actions.transform_stat.v3.TransformStat.DropStat <envoy_v3_api_msg_extensions.matching.actions.transform_stat.v3.TransformStat.DropStat>`) If set, the stat will be dropped.
+
+
+.. _envoy_v3_api_field_extensions.matching.actions.transform_stat.v3.TransformStat.drop_tag:
+
+
+drop_tag
+  (:ref:`extensions.matching.actions.transform_stat.v3.TransformStat.DropTag <envoy_v3_api_msg_extensions.matching.actions.transform_stat.v3.TransformStat.DropTag>`) If set, the tag ill be dropped.
+  This removes the tag from the stat entirely.
+
+
+.. _envoy_v3_api_field_extensions.matching.actions.transform_stat.v3.TransformStat.update_tag:
+
+
+update_tag
+  (:ref:`extensions.matching.actions.transform_stat.v3.TransformStat.UpdateTag <envoy_v3_api_msg_extensions.matching.actions.transform_stat.v3.TransformStat.UpdateTag>`) If set, the tag will be updated.
+
+
+.. _envoy_v3_api_msg_extensions.matching.actions.transform_stat.v3.TransformStat.DropStat:
+
+extensions.matching.actions.transform_stat.v3.TransformStat.DropStat
+--------------------------------------------------------------------
+
+
+:repo:`[extensions.matching.actions.transform_stat.v3.TransformStat.DropStat proto] <api/envoy/extensions/matching/actions/transform_stat/v3/transform_stat.proto#L18>`
+
+Action that drops the stat.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.actions.transform_stat.v3.TransformStat.DropTag:
+
+extensions.matching.actions.transform_stat.v3.TransformStat.DropTag
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.matching.actions.transform_stat.v3.TransformStat.DropTag proto] <api/envoy/extensions/matching/actions/transform_stat/v3/transform_stat.proto#L24>`
+
+Action that drops the tag.
+This removes the tag from the stat entirely. This is different from updating the
+tag to an empty value, which keeps the tag key with an empty value.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.actions.transform_stat.v3.TransformStat.UpdateTag:
+
+extensions.matching.actions.transform_stat.v3.TransformStat.UpdateTag
+---------------------------------------------------------------------
+
+
+:repo:`[extensions.matching.actions.transform_stat.v3.TransformStat.UpdateTag proto] <api/envoy/extensions/matching/actions/transform_stat/v3/transform_stat.proto#L28>`
+
+Action that updates the tag.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "new_tag_value": ...
+  }
+
+.. _envoy_v3_api_field_extensions.matching.actions.transform_stat.v3.TransformStat.UpdateTag.new_tag_value:
+
+
+new_tag_value
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The new tag value.
+
+
+

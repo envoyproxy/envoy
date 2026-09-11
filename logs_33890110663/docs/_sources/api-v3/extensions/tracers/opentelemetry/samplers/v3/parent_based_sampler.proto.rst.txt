@@ -1,0 +1,92 @@
+.. _envoy_v3_api_file_envoy/extensions/tracers/opentelemetry/samplers/v3/parent_based_sampler.proto:
+
+Parent Based Sampler config (proto)
+===================================
+
+.. _extension_envoy.tracers.opentelemetry.samplers.parent_based:
+
+This extension has the qualified name ``envoy.tracers.opentelemetry.samplers.parent_based``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers.opentelemetry.samplers <extension_category_envoy.tracers.opentelemetry.samplers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.ParentBasedSamplerConfig <envoy_v3_api_msg_extensions.tracers.opentelemetry.samplers.v3.ParentBasedSamplerConfig>`
+
+
+
+Configuration for the "ParentBased" Sampler extension.
+The sampler follows the "ParentBased" implementation from the OpenTelemetry
+SDK specification.
+
+See:
+`ParentBased sampler specification <https://opentelemetry.io/docs/specs/otel/trace/sdk/#parentbased>`_
+
+
+
+
+.. _envoy_v3_api_msg_extensions.tracers.opentelemetry.samplers.v3.ParentBasedSamplerConfig:
+
+extensions.tracers.opentelemetry.samplers.v3.ParentBasedSamplerConfig
+---------------------------------------------------------------------
+
+
+:repo:`[extensions.tracers.opentelemetry.samplers.v3.ParentBasedSamplerConfig proto] <api/envoy/extensions/tracers/opentelemetry/samplers/v3/parent_based_sampler.proto#L23>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "wrapped_sampler": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.tracers.opentelemetry.samplers.v3.ParentBasedSamplerConfig.wrapped_sampler:
+
+
+wrapped_sampler
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Specifies the sampler to be used by this sampler.
+  The configured sampler will be used if the parent trace ID is not passed to Envoy
+
+  required
+
+
+  .. _extension_category_envoy.tracers.opentelemetry.samplers:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.always_on <extension_envoy.tracers.opentelemetry.samplers.always_on>`
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.cel <extension_envoy.tracers.opentelemetry.samplers.cel>`
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.dynatrace <extension_envoy.tracers.opentelemetry.samplers.dynatrace>`
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.parent_based <extension_envoy.tracers.opentelemetry.samplers.parent_based>`
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.trace_id_ratio_based <extension_envoy.tracers.opentelemetry.samplers.trace_id_ratio_based>`
+
+
+
+
+

@@ -1,0 +1,66 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3/config.proto:
+
+Static secret certificate mapper (proto)
+========================================
+
+.. _extension_envoy.tls.certificate_mappers.static_name:
+
+This extension has the qualified name ``envoy.tls.certificate_mappers.static_name``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.tls.certificate_mappers <extension_category_envoy.tls.certificate_mappers>`
+
+  - :ref:`envoy.tls.upstream_certificate_mappers <extension_category_envoy.tls.upstream_certificate_mappers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName:
+
+extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+-----------------------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName proto] <api/envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3/config.proto#L17>`
+
+A mapping to a fixed secret name for all certificates.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name for the secret to use for all connections.
+
+

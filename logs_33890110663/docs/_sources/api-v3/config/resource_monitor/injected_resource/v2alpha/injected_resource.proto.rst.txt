@@ -1,0 +1,64 @@
+.. _envoy_v3_api_file_envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.proto:
+
+Injected resource (proto)
+=========================
+
+.. _extension_envoy.resource_monitors.injected_resource:
+
+This extension has the qualified name ``envoy.resource_monitors.injected_resource``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.resource_monitors <extension_category_envoy.resource_monitors>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.resource_monitors.injected_resource.v3.InjectedResourceConfig <envoy_v3_api_msg_extensions.resource_monitors.injected_resource.v3.InjectedResourceConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig:
+
+config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig
+------------------------------------------------------------------------
+
+
+:repo:`[config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig proto] <api/envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.proto#L20>`
+
+The injected resource monitor allows injecting a synthetic resource pressure into Envoy
+via a text file, which must contain a floating-point number in the range [0..1] representing
+the resource pressure and be updated atomically by a symbolic link swap.
+This is intended primarily for integration tests to force Envoy into an overloaded state.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "filename": ...
+  }
+
+.. _envoy_v3_api_field_config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig.filename:
+
+
+filename
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) 
+

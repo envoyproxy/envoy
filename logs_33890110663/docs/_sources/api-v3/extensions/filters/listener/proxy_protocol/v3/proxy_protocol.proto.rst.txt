@@ -1,0 +1,290 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.proto:
+
+Proxy Protocol Filter (proto)
+=============================
+
+.. _extension_envoy.filters.listener.proxy_protocol:
+
+This extension has the qualified name ``envoy.filters.listener.proxy_protocol``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.listener <extension_category_envoy.filters.listener>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol>`
+
+
+
+PROXY protocol listener filter.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol:
+
+extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
+-----------------------------------------------------------
+
+
+:repo:`[extensions.filters.listener.proxy_protocol.v3.ProxyProtocol proto] <api/envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.proto#L21>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "rules": [],
+    "allow_requests_without_proxy_protocol": ...,
+    "pass_through_tlvs": {...},
+    "disallowed_versions": [],
+    "stat_prefix": ...,
+    "tlv_location": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.rules:
+
+
+rules
+  (**repeated** :ref:`extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.Rule <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.Rule>`) The list of rules to apply to requests.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol:
+
+
+allow_requests_without_proxy_protocol
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Allow requests through that don't use proxy protocol. Defaults to false.
+
+  .. attention::
+
+    This breaks conformance with the specification.
+    Only enable if ALL traffic to the listener comes from a trusted source.
+    For more information on the security implications of this feature, see
+    https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt
+
+  .. attention::
+
+    Requests of 12 or fewer bytes that match the proxy protocol v2 signature
+    and requests of 6 or fewer bytes that match the proxy protocol v1
+    signature will timeout (Envoy is unable to differentiate these requests
+    from incomplete proxy protocol requests).
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.pass_through_tlvs:
+
+
+pass_through_tlvs
+  (:ref:`config.core.v3.ProxyProtocolPassThroughTLVs <envoy_v3_api_msg_config.core.v3.ProxyProtocolPassThroughTLVs>`) This config controls which TLVs can be passed to filter state if it is Proxy Protocol
+  V2 header. If there is no setting for this field, no TLVs will be passed through.
+
+  .. note::
+
+    If this is configured, you likely also want to set
+    :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`,
+    which controls pass-through for the upstream.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.disallowed_versions:
+
+
+disallowed_versions
+  (**repeated** :ref:`config.core.v3.ProxyProtocolConfig.Version <envoy_v3_api_enum_config.core.v3.ProxyProtocolConfig.Version>`) The PROXY protocol versions that won't be matched. Useful to limit the scope and attack surface of the filter.
+
+  When the filter receives PROXY protocol data that is disallowed, it will reject the connection.
+  By default, the filter will match all PROXY protocol versions.
+  See https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details.
+
+  .. attention::
+
+    When used in conjunction with the :ref:`allow_requests_without_proxy_protocol <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>`,
+    the filter will not attempt to match signatures for the disallowed versions.
+    For example, when ``disallowed_versions=V2``, ``allow_requests_without_proxy_protocol=true``,
+    and an incoming request matches the V2 signature, the filter will allow the request through without any modification.
+    The filter treats this request as if it did not have any PROXY protocol information.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The human readable prefix to use when emitting statistics for the filter.
+  If not configured, statistics will be emitted without the prefix segment.
+  See the :ref:`filter's statistics documentation <config_listener_filters_proxy_protocol>` for
+  more information.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.tlv_location:
+
+
+tlv_location
+  (:ref:`extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.TlvLocation <envoy_v3_api_enum_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.TlvLocation>`) Controls where TLV values are stored when rules match. Defaults to DYNAMIC_METADATA.
+
+
+.. _envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair:
+
+extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair
+------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair proto] <api/envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.proto#L34>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "metadata_namespace": ...,
+    "key": ...,
+    "value_string_encoding": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.metadata_namespace:
+
+
+metadata_namespace
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The namespace — if this is empty, the filter's namespace will be used.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The key to use within the namespace.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.value_string_encoding:
+
+
+value_string_encoding
+  (:ref:`extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.ValueStringEncoding <envoy_v3_api_enum_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.ValueStringEncoding>`) The value encoding scheme that is used to encode the TLV value before it is stored in
+  dynamic metadata or filter state. If not set, defaults to ``SANITIZED_UTF8``, which
+  sanitizes the TLV value to a valid UTF-8 string.
+
+  .. note::
+
+    This option only applies to the legacy untyped dynamic metadata and filter state.
+    For the new typed dynamic metadata, the raw TLV value bytes are stored as is and
+    no encoding is applied.
+
+
+.. _envoy_v3_api_enum_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.ValueStringEncoding:
+
+Enum extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.ValueStringEncoding
+-------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.ValueStringEncoding proto] <api/envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.proto#L37>`
+
+Specifies the encoding scheme that is used to encode the TLV value before it is
+stored in dynamic metadata or filter state.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.ValueStringEncoding.UNSPECIFIED:
+
+
+UNSPECIFIED
+  *(DEFAULT)* ⁣Unspecified encoding scheme. Defaults to ``SANITIZED_UTF8``.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.ValueStringEncoding.SANITIZED_UTF8:
+
+
+SANITIZED_UTF8
+  ⁣The TLV value will be sanitized to a valid UTF-8 string before being stored:
+  any invalid UTF-8 sequences will be replaced with the ``!`` character.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.ValueStringEncoding.BASE64:
+
+
+BASE64
+  ⁣The raw TLV value will be encoded as a `Base64 <https://datatracker.ietf.org/doc/html/rfc4648#section-4>`_
+  string (with padding) before being stored. This is useful for binary TLV values that
+  are not valid UTF-8 strings.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.Rule:
+
+extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.Rule
+----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.Rule proto] <api/envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.proto#L70>`
+
+A Rule defines what metadata to apply when a header is present or missing.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "tlv_type": ...,
+    "on_tlv_present": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.Rule.tlv_type:
+
+
+tlv_type
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The type that triggers the rule - required
+  TLV type is defined as uint8_t in proxy protocol. See `the spec
+  <https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt>`_ for details.
+
+
+.. _envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.Rule.on_tlv_present:
+
+
+on_tlv_present
+  (:ref:`extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair>`) If the TLV type is present, apply this metadata KeyValuePair.
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.TlvLocation:
+
+Enum extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.TlvLocation
+----------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.TlvLocation proto] <api/envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.proto#L26>`
+
+Controls where TLV values are stored when rules match.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.TlvLocation.DYNAMIC_METADATA:
+
+
+DYNAMIC_METADATA
+  *(DEFAULT)* ⁣Store TLV values in dynamic metadata.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.TlvLocation.FILTER_STATE:
+
+
+FILTER_STATE
+  ⁣Store TLV values in filter state as a single map-like object.
+
+
+

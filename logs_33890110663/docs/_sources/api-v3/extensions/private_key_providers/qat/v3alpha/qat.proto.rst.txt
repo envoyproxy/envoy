@@ -1,0 +1,77 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/private_key_providers/qat/v3alpha/qat.proto:
+
+`QAT` private key provider (proto)
+==================================
+
+.. _extension_envoy.tls.key_providers.qat:
+
+This extension has the qualified name ``envoy.tls.key_providers.qat``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tls.key_providers <extension_category_envoy.tls.key_providers>`
+
+
+
+
+
+
+
+This message specifies how the private key provider is configured.
+The private key provider provides RSA sign and decrypt operation
+hardware acceleration.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.private_key_providers.qat.v3alpha.QatPrivateKeyMethodConfig:
+
+extensions.private_key_providers.qat.v3alpha.QatPrivateKeyMethodConfig
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.private_key_providers.qat.v3alpha.QatPrivateKeyMethodConfig proto] <api/contrib/envoy/extensions/private_key_providers/qat/v3alpha/qat.proto#L25>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "private_key": {...},
+    "poll_delay": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.private_key_providers.qat.v3alpha.QatPrivateKeyMethodConfig.private_key:
+
+
+private_key
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) Private key to use in the private key provider. If set to inline_bytes or
+  inline_string, the value needs to be the private key in PEM format.
+
+
+.. _envoy_v3_api_field_extensions.private_key_providers.qat.v3alpha.QatPrivateKeyMethodConfig.poll_delay:
+
+
+poll_delay
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_, *REQUIRED*) How long to wait before polling the hardware accelerator after a
+  request has been submitted there. Having a small value leads to
+  quicker answers from the hardware but causes more polling loop
+  spins, leading to potentially larger CPU usage. The duration needs
+  to be set to a value greater than or equal to 1 millisecond.
+
+

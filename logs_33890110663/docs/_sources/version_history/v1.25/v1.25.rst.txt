@@ -1,0 +1,30 @@
+.. _version_history_v1.25:
+
+v1.25
+-----
+
+Latest release:
+  `1.25.11 <https://github.com/envoyproxy/envoy/releases/tag/v1.25.11>`_ (October 16, 2023)
+
+Initial release date:
+  January 18, 2023
+
+
+.. toctree::
+  :titlesonly:
+  :maxdepth: 2
+  :caption: Changelog
+
+  v1.25.11
+  v1.25.10
+  v1.25.9
+  v1.25.8
+  v1.25.7
+  v1.25.6
+  v1.25.5
+  v1.25.4
+  v1.25.3
+  v1.25.2
+  v1.25.1
+  v1.25.0
+

@@ -1,0 +1,125 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/geoip/v3/geoip.proto:
+
+Geoip (proto)
+=============
+
+.. _extension_envoy.filters.network.geoip:
+
+This extension has the qualified name ``envoy.filters.network.geoip``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip <envoy_v3_api_msg_extensions.filters.network.geoip.v3.Geoip>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+Geoip :ref:`configuration overview <config_network_filters_geoip>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.geoip.v3.Geoip:
+
+extensions.filters.network.geoip.v3.Geoip
+-----------------------------------------
+
+
+:repo:`[extensions.filters.network.geoip.v3.Geoip proto] <api/envoy/extensions/filters/network/geoip/v3/geoip.proto#L29>`
+
+The network geolocation filter performs IP geolocation lookups on incoming connections
+and stores the results in the connection's filter state under the well-known key
+``envoy.geoip``. The stored data is a ``GeoipInfo`` object that supports
+serialization for access logging and field-level access.
+
+See :ref:`well known filter state <well_known_filter_state>` for details on accessing
+the geolocation data.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "provider": {...},
+    "client_ip": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The prefix to use when emitting statistics. This is useful when there are multiple
+  listeners configured with geoip filters, allowing stats to be grouped per listener.
+  For example, with ``stat_prefix: "listener_1."``, stats would be emitted as
+  ``listener_1.geoip.total``.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.provider:
+
+
+provider
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`, *REQUIRED*) Geoip driver specific configuration which depends on the driver being instantiated.
+
+
+  .. _extension_category_envoy.geoip_providers:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.geoip_providers.maxmind <extension_envoy.geoip_providers.maxmind>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.client_ip:
+
+
+client_ip
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Configuration for dynamically extracting the client IP address used for geolocation lookups.
+
+  This field accepts the same :ref:`format specifiers <config_access_log_format>` as used for
+  :ref:`HTTP access logging <config_access_log>` to extract the client IP.
+  The formatted result must be a valid IPv4 or IPv6 address string. For example:
+
+  * ``%FILTER_STATE(my.custom.client.ip:PLAIN)%`` - Read from filter state populated by a preceding filter.
+  * ``%DYNAMIC_METADATA(namespace:key)%`` - Read from dynamic metadata.
+  * ``%REQ(X-Forwarded-For)%`` - Extract from request header (if applicable in context).
+
+  If not specified, defaults to the downstream connection's remote address.
+  If specified but the result is empty, ``-``, or not a valid IP address, the filter
+  falls back to the downstream connection's remote address.
+
+  Example reading from filter state:
+
+  .. code-block:: yaml
+
+    client_ip: "%FILTER_STATE(my.custom.client.ip:PLAIN)%"
+
+
+

@@ -19,6 +19,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
         "//source/common/config:utility_lib",
+        "//source/common/formatter:substitution_format_string_lib",
         "@envoy_api//envoy/extensions/transport_sockets/proxy_protocol/v3:pkg_cc_proto",
     ],
 )
@@ -28,6 +29,7 @@ envoy_cc_library(
     srcs = ["proxy_protocol.cc"],
     hdrs = ["proxy_protocol.h"],
     deps = [
+        "//envoy/formatter:substitution_formatter_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",

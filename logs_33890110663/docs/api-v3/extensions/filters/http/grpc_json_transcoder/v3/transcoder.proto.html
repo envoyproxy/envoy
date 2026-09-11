@@ -1,0 +1,682 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gRPC-JSON transcoder (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../../../_static/favicon.ico"/>
+      <script src="../../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+    <link rel="next" title="gRPC statistics (proto)" href="../../grpc_stats/v3/config.proto.html" />
+    <link rel="prev" title="gRPC-JSON reverse transcoder (proto)" href="../../grpc_json_reverse_transcoder/v3/transcoder.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../../../searchindex.js"
+          data-envoy-search-page="../../../../../../search.html"
+          data-envoy-root="../../../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../../config/config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../../config/filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/filter.html">Filters</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/http/http.html">HTTP filters</a></li>
+      <li class="breadcrumb-item active">gRPC-JSON transcoder (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../../_sources/api-v3/extensions/filters/http/grpc_json_transcoder/v3/transcoder.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="grpc-json-transcoder-proto">
+<span id="envoy-v3-api-file-envoy-extensions-filters-http-grpc-json-transcoder-v3-transcoder-proto"></span><h1>gRPC-JSON transcoder (proto)<a class="headerlink" href="#grpc-json-transcoder-proto" title="Link to this heading"></a></h1>
+<p id="extension-envoy-filters-http-grpc-json-transcoder">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.filters.http.grpc_json_transcoder</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension is intended to be robust against untrusted downstream traffic. It
+assumes that the upstream is trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension category:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../filter_chain/v3/filter_chain.proto.html#extension-category-envoy-filters-http"><span class="std std-ref">envoy.filters.http</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder</span></a></p></li>
+</ul>
+</div>
+<p>gRPC-JSON transcoder <a class="reference internal" href="../../../../../../configuration/http/http_filters/grpc_json_transcoder_filter.html#config-http-filters-grpc-json-transcoder"><span class="std std-ref">configuration overview</span></a>.</p>
+<section id="extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder">
+<span id="envoy-v3-api-msg-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder"></span><h2>extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder<a class="headerlink" href="#extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.proto#L29">[extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder proto]</a></p>
+<p>GrpcJsonTranscoder filter configuration.
+The filter itself can be used per route / per virtual host or on the general level. The most
+specific one is being used for a given route. If the list of services is empty - filter
+is considered to be disabled.
+Note that if specifying the filter per route, first the route is matched, and then transcoding
+filter is applied. It matters when specifying the route configuration and paths to match the
+request - for per-route grpc transcoder configs, the original path should be matched, while
+in other cases, the grpc-like path is expected (the one AFTER the filter is applied).</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;proto_descriptor&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;proto_descriptor_bin&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;services&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;print_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;match_incoming_request_route&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;ignored_query_parameters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;auto_mapping&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;ignore_unknown_query_parameters&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;convert_grpc_status&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;url_unescape_spec&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;query_param_unescape_plus&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;match_unregistered_custom_verb&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;request_validation_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;case_insensitive_enum_parsing&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max_request_body_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_response_body_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;capture_unknown_query_parameters&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-proto-descriptor">
+<dt>proto_descriptor</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Supplies the filename of
+<a class="reference internal" href="../../../../../../configuration/http/http_filters/grpc_json_transcoder_filter.html#config-grpc-json-generate-proto-descriptor-set"><span class="std std-ref">the proto descriptor set</span></a> for the gRPC
+services.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-proto-descriptor"><span class="std std-ref">proto_descriptor</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-proto-descriptor-bin"><span class="std std-ref">proto_descriptor_bin</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-proto-descriptor-bin">
+<dt>proto_descriptor_bin</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bytes</a>) Supplies the binary content of
+<a class="reference internal" href="../../../../../../configuration/http/http_filters/grpc_json_transcoder_filter.html#config-grpc-json-generate-proto-descriptor-set"><span class="std std-ref">the proto descriptor set</span></a> for the gRPC
+services.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-proto-descriptor"><span class="std std-ref">proto_descriptor</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-proto-descriptor-bin"><span class="std std-ref">proto_descriptor_bin</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-services">
+<dt>services</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) A list of strings that
+supplies the fully qualified service names (i.e. “package_name.service_name”) that
+the transcoder will translate. If the service name doesn’t exist in <code class="docutils literal notranslate"><span class="pre">proto_descriptor</span></code>,
+Envoy will fail at startup. The <code class="docutils literal notranslate"><span class="pre">proto_descriptor</span></code> may contain more services than
+the service names specified here, but they won’t be translated.</p>
+<p>By default, the filter will pass through requests that do not map to any specified services.
+If the list of services is empty, filter is considered disabled.
+However, this behavior changes if
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-requestvalidationoptions-reject-unknown-method"><span class="std std-ref">reject_unknown_method</span></a>
+is enabled.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-print-options">
+<dt>print_options</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-printoptions"><span class="std std-ref">extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.PrintOptions</span></a>) Control options for response JSON. These options are passed directly to
+<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/cpp/google.protobuf.util.json_util#JsonPrintOptions">JsonPrintOptions</a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-match-incoming-request-route">
+<dt>match_incoming_request_route</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Whether to keep the incoming request route after the outgoing headers have been transformed to
+the match the upstream gRPC service. Note: This means that routes for gRPC services that are
+not transcoded cannot be used in combination with <code class="docutils literal notranslate"><span class="pre">match_incoming_request_route</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-ignored-query-parameters">
+<dt>ignored_query_parameters</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) A list of query parameters to be ignored for transcoding method mapping.
+By default, the transcoder filter will not transcode a request if there are any
+unknown/invalid query parameters.</p>
+<p>Example :</p>
+<div class="highlight-proto notranslate"><div class="highlight"><pre><span></span><span class="kd">service</span><span class="w"> </span><span class="n">Bookstore</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">rpc</span><span class="w"> </span><span class="n">GetShelf</span><span class="p">(</span><span class="n">GetShelfRequest</span><span class="p">)</span><span class="w"> </span><span class="k">returns</span><span class="w"> </span><span class="p">(</span><span class="n">Shelf</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">option</span><span class="w"> </span><span class="p">(</span><span class="n">google.api.http</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="n">get</span><span class="o">:</span><span class="w"> </span><span class="s">&quot;/shelves/{shelf}&quot;</span>
+<span class="w">    </span><span class="p">};</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">message</span><span class="w"> </span><span class="nc">GetShelfRequest</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kt">int64</span><span class="w"> </span><span class="na">shelf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kd">message</span><span class="w"> </span><span class="nc">Shelf</span><span class="w"> </span><span class="p">{}</span>
+</pre></div>
+</div>
+<p>The request <code class="docutils literal notranslate"><span class="pre">/shelves/100?foo=bar</span></code> will not be mapped to <code class="docutils literal notranslate"><span class="pre">GetShelf`</span></code> because variable
+binding for <code class="docutils literal notranslate"><span class="pre">foo</span></code> is not defined. Adding <code class="docutils literal notranslate"><span class="pre">foo</span></code> to <code class="docutils literal notranslate"><span class="pre">ignored_query_parameters</span></code> will allow
+the same request to be mapped to <code class="docutils literal notranslate"><span class="pre">GetShelf</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-auto-mapping">
+<dt>auto_mapping</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Whether to route methods without the <code class="docutils literal notranslate"><span class="pre">google.api.http</span></code> option.</p>
+<p>Example :</p>
+<div class="highlight-proto notranslate"><div class="highlight"><pre><span></span><span class="kn">package</span><span class="w"> </span><span class="nn">bookstore</span><span class="p">;</span>
+
+<span class="kd">service</span><span class="w"> </span><span class="n">Bookstore</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">rpc</span><span class="w"> </span><span class="n">GetShelf</span><span class="p">(</span><span class="n">GetShelfRequest</span><span class="p">)</span><span class="w"> </span><span class="k">returns</span><span class="w"> </span><span class="p">(</span><span class="n">Shelf</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+<span class="p">}</span>
+
+<span class="kd">message</span><span class="w"> </span><span class="nc">GetShelfRequest</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kt">int64</span><span class="w"> </span><span class="na">shelf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kd">message</span><span class="w"> </span><span class="nc">Shelf</span><span class="w"> </span><span class="p">{}</span>
+</pre></div>
+</div>
+<p>The client could <code class="docutils literal notranslate"><span class="pre">post</span></code> a json body <code class="docutils literal notranslate"><span class="pre">{&quot;shelf&quot;:</span> <span class="pre">1234}</span></code> with the path of
+<code class="docutils literal notranslate"><span class="pre">/bookstore.Bookstore/GetShelfRequest</span></code> to call <code class="docutils literal notranslate"><span class="pre">GetShelfRequest</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-ignore-unknown-query-parameters">
+<dt>ignore_unknown_query_parameters</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Whether to ignore query parameters that cannot be mapped to a corresponding
+protobuf field. Use this if you cannot control the query parameters and do
+not know them beforehand. Otherwise use <code class="docutils literal notranslate"><span class="pre">ignored_query_parameters</span></code>.
+Defaults to false.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-convert-grpc-status">
+<dt>convert_grpc_status</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Whether to convert gRPC status headers to JSON.
+When trailer indicates a gRPC error and there was no HTTP body, take <code class="docutils literal notranslate"><span class="pre">google.rpc.Status</span></code>
+from the <code class="docutils literal notranslate"><span class="pre">grpc-status-details-bin</span></code> header and use it as JSON body.
+If there was no such header, make <code class="docutils literal notranslate"><span class="pre">google.rpc.Status</span></code> out of the <code class="docutils literal notranslate"><span class="pre">grpc-status</span></code> and
+<code class="docutils literal notranslate"><span class="pre">grpc-message</span></code> headers.
+The error details types must be present in the <code class="docutils literal notranslate"><span class="pre">proto_descriptor</span></code>.</p>
+<p>For example, if an upstream server replies with headers:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>grpc-status: 5
+grpc-status-details-bin:
+    CAUaMwoqdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUucnBjLlJlcXVlc3RJbmZvEgUKA3ItMQ
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">grpc-status-details-bin</span></code> header contains a base64-encoded protobuf message
+<code class="docutils literal notranslate"><span class="pre">google.rpc.Status</span></code>. It will be transcoded into:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>HTTP/1.1 404 Not Found
+content-type: application/json
+
+{&quot;code&quot;:5,&quot;details&quot;:[{&quot;@type&quot;:&quot;type.googleapis.com/google.rpc.RequestInfo&quot;,&quot;requestId&quot;:&quot;r-1&quot;}]}
+</pre></div>
+</div>
+<p>In order to transcode the message, the <code class="docutils literal notranslate"><span class="pre">google.rpc.RequestInfo</span></code> type from
+the <code class="docutils literal notranslate"><span class="pre">google/rpc/error_details.proto</span></code> should be included in the configured
+<a class="reference internal" href="../../../../../../configuration/http/http_filters/grpc_json_transcoder_filter.html#config-grpc-json-generate-proto-descriptor-set"><span class="std std-ref">proto descriptor set</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-url-unescape-spec">
+<dt>url_unescape_spec</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-urlunescapespec"><span class="std std-ref">extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.UrlUnescapeSpec</span></a>) URL unescaping policy.
+This spec is only applied when extracting variable with multiple segments in the URL path.
+For example, in case of <code class="docutils literal notranslate"><span class="pre">/foo/{x=*}/bar/{y=prefix/*}/{z=**}</span></code> <code class="docutils literal notranslate"><span class="pre">x</span></code> variable is single segment and <code class="docutils literal notranslate"><span class="pre">y</span></code> and <code class="docutils literal notranslate"><span class="pre">z</span></code> are multiple segments.
+For a path with <code class="docutils literal notranslate"><span class="pre">/foo/first/bar/prefix/second/third/fourth</span></code>, <code class="docutils literal notranslate"><span class="pre">x=first</span></code>, <code class="docutils literal notranslate"><span class="pre">y=prefix/second</span></code>, <code class="docutils literal notranslate"><span class="pre">z=third/fourth</span></code>.
+If this setting is not specified, the value defaults to <a class="reference internal" href="#envoy-v3-api-enum-value-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-urlunescapespec-all-characters-except-reserved"><span class="std std-ref">ALL_CHARACTERS_EXCEPT_RESERVED</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-query-param-unescape-plus">
+<dt>query_param_unescape_plus</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If true, unescape ‘+’ to space when extracting variables in query parameters.
+This is to support <a class="reference external" href="https://tools.ietf.org/html/rfc1866#section-8.2.1">HTML 2.0</a></p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-match-unregistered-custom-verb">
+<dt>match_unregistered_custom_verb</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If true, try to match the custom verb even if it is unregistered. By
+default, only match when it is registered.</p>
+<p>According to the http template <a class="reference external" href="https://github.com/googleapis/googleapis/blob/master/google/api/http.proto#L226-L231">syntax</a>,
+the custom verb is <strong>“:” LITERAL</strong> at the end of http template.</p>
+<p>For a request with <code class="docutils literal notranslate"><span class="pre">/foo/bar:baz</span></code> and <code class="docutils literal notranslate"><span class="pre">:baz</span></code> is not registered in any url_template, here is the behavior change
+- if the field is not set, <code class="docutils literal notranslate"><span class="pre">:baz</span></code> will not be treated as custom verb, so it will match <code class="docutils literal notranslate"><span class="pre">/foo/{x=*}</span></code>.
+- if the field is set, <code class="docutils literal notranslate"><span class="pre">:baz</span></code> is treated as custom verb,  so it will NOT match <code class="docutils literal notranslate"><span class="pre">/foo/{x=*}</span></code> since the template doesn’t use any custom verb.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-request-validation-options">
+<dt>request_validation_options</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-requestvalidationoptions"><span class="std std-ref">extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.RequestValidationOptions</span></a>) Configure the behavior when handling requests that cannot be transcoded.</p>
+<p>By default, the transcoder will silently pass through HTTP requests that are malformed.
+This includes requests with unknown query parameters, unregister paths, etc.</p>
+<p>Set these options to enable strict HTTP request validation, resulting in the transcoder rejecting
+such requests with a <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">4xx</span></code>. See each individual option for more details on the validation.
+gRPC requests will still silently pass through without transcoding.</p>
+<p>The benefit is a proper error message to the downstream.
+If the upstream is a gRPC server, it cannot handle the passed-through HTTP requests and will reset
+the TCP connection. The downstream will then
+receive a <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">503</span> <span class="pre">Service</span> <span class="pre">Unavailable</span></code> due to the upstream connection reset.
+This incorrect error message may conflict with other Envoy components, such as retry policies.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-case-insensitive-enum-parsing">
+<dt>case_insensitive_enum_parsing</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Proto enum values are supposed to be in upper cases when used in JSON.
+Set this to true if your JSON request uses non uppercase enum values.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-max-request-body-size">
+<dt>max_request_body_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The maximum size of a request body to be transcoded, in bytes. A body exceeding this size will
+provoke a <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">413</span> <span class="pre">Request</span> <span class="pre">Entity</span> <span class="pre">Too</span> <span class="pre">Large</span></code> response.</p>
+<p>Large values may cause envoy to use a lot of memory if there are many concurrent requests.</p>
+<p>If unset, the current stream buffer size is used.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-max-response-body-size">
+<dt>max_response_body_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The maximum size of a response body to be transcoded, in bytes. A body exceeding this size will
+provoke a <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">500</span> <span class="pre">Internal</span> <span class="pre">Server</span> <span class="pre">Error</span></code> response.</p>
+<p>Large values may cause envoy to use a lot of memory if there are many concurrent requests.</p>
+<p>If unset, the current stream buffer size is used.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-capture-unknown-query-parameters">
+<dt>capture_unknown_query_parameters</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If true, query parameters that cannot be mapped to a corresponding
+protobuf field are captured in an HttpBody extension of UnknownQueryParams.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-printoptions">
+<span id="envoy-v3-api-msg-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-printoptions"></span><h2>extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.PrintOptions<a class="headerlink" href="#extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-printoptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.proto#L50">[extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.PrintOptions proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;add_whitespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;always_print_primitive_fields&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;always_print_enums_as_ints&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;preserve_proto_field_names&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;stream_newline_delimited&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;stream_sse_style_delimited&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-printoptions-add-whitespace">
+<dt>add_whitespace</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Whether to add spaces, line breaks and indentation to make the JSON
+output easy to read. Defaults to false.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-printoptions-always-print-primitive-fields">
+<dt>always_print_primitive_fields</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Whether to always print primitive fields. By default primitive
+fields with default values will be omitted in JSON output. For
+example, an int32 field set to 0 will be omitted. Setting this flag to
+true will override the default behavior and print primitive fields
+regardless of their values. Defaults to false.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-printoptions-always-print-enums-as-ints">
+<dt>always_print_enums_as_ints</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Whether to always print enums as ints. By default they are rendered
+as strings. Defaults to false.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-printoptions-preserve-proto-field-names">
+<dt>preserve_proto_field_names</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Whether to preserve proto field names. By default protobuf will
+generate JSON field names using the <code class="docutils literal notranslate"><span class="pre">json_name</span></code> option, or lower camel case,
+in that order. Setting this flag will preserve the original field names. Defaults to false.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-printoptions-stream-newline-delimited">
+<dt>stream_newline_delimited</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If true, return all streams as newline-delimited JSON messages instead of as a comma-separated array</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-printoptions-stream-sse-style-delimited">
+<dt>stream_sse_style_delimited</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If true, enforces Server-Sent Events (SSE) message framing (<code class="docutils literal notranslate"><span class="pre">data:</span>
+<span class="pre">&lt;message&gt;\n\n</span></code>) and, <code class="docutils literal notranslate"><span class="pre">stream_newline_delimited</span></code> is ignored. If false,
+message framing is determined by <code class="docutils literal notranslate"><span class="pre">stream_newline_delimited</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-requestvalidationoptions">
+<span id="envoy-v3-api-msg-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-requestvalidationoptions"></span><h2>extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.RequestValidationOptions<a class="headerlink" href="#extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-requestvalidationoptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.proto#L83">[extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.RequestValidationOptions proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;reject_unknown_method&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;reject_unknown_query_parameters&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;reject_binding_body_field_collisions&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-requestvalidationoptions-reject-unknown-method">
+<dt>reject_unknown_method</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) By default, a request that cannot be mapped to any specified gRPC
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-services"><span class="std std-ref">services</span></a>
+will pass-through this filter.
+When set to true, the request will be rejected with a <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">404</span> <span class="pre">Not</span> <span class="pre">Found</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-requestvalidationoptions-reject-unknown-query-parameters">
+<dt>reject_unknown_query_parameters</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) By default, a request with query parameters that cannot be mapped to the gRPC request message
+will pass-through this filter.
+When set to true, the request will be rejected with a <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">400</span> <span class="pre">Bad</span> <span class="pre">Request</span></code>.</p>
+<p>The fields
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-ignore-unknown-query-parameters"><span class="std std-ref">ignore_unknown_query_parameters</span></a>,
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-capture-unknown-query-parameters"><span class="std std-ref">capture_unknown_query_parameters</span></a>,
+and
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-ignored-query-parameters"><span class="std std-ref">ignored_query_parameters</span></a>
+have priority over this strict validation behavior.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-requestvalidationoptions-reject-binding-body-field-collisions">
+<dt>reject_binding_body_field_collisions</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) “id: 456” in the body will override “id=123” in the binding.</p>
+<p>If this field is set to true, the request will be rejected if the binding
+value is different from the body value.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-urlunescapespec">
+<span id="envoy-v3-api-enum-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-urlunescapespec"></span><h2>Enum extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.UrlUnescapeSpec<a class="headerlink" href="#enum-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-urlunescapespec" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.proto#L33">[extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.UrlUnescapeSpec proto]</a></p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-urlunescapespec-all-characters-except-reserved">
+<dt>ALL_CHARACTERS_EXCEPT_RESERVED</dt><dd><p><em>(DEFAULT)</em> ⁣URL path parameters will not decode RFC 6570 reserved characters.
+For example, segment <code class="docutils literal notranslate"><span class="pre">%2f%23/%20%2523</span></code> is unescaped to <code class="docutils literal notranslate"><span class="pre">%2f%23/</span> <span class="pre">%23</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-urlunescapespec-all-characters-except-slash">
+<dt>ALL_CHARACTERS_EXCEPT_SLASH</dt><dd><p>⁣URL path parameters will be fully URI-decoded except in
+cases of single segment matches in reserved expansion, where <code class="docutils literal notranslate"><span class="pre">%2F</span></code> will be
+left encoded.
+For example, segment <code class="docutils literal notranslate"><span class="pre">%2f%23/%20%2523</span></code> is unescaped to <code class="docutils literal notranslate"><span class="pre">%2f#/</span> <span class="pre">%23</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-urlunescapespec-all-characters">
+<dt>ALL_CHARACTERS</dt><dd><p>⁣URL path parameters will be fully URI-decoded.
+For example, segment <code class="docutils literal notranslate"><span class="pre">%2f%23/%20%2523</span></code> is unescaped to <code class="docutils literal notranslate"><span class="pre">/#/</span> <span class="pre">%23</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-grpc-json-transcoder-v3-unknownqueryparams">
+<span id="envoy-v3-api-msg-extensions-filters-http-grpc-json-transcoder-v3-unknownqueryparams"></span><h2>extensions.filters.http.grpc_json_transcoder.v3.UnknownQueryParams<a class="headerlink" href="#extensions-filters-http-grpc-json-transcoder-v3-unknownqueryparams" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.proto#L305">[extensions.filters.http.grpc_json_transcoder.v3.UnknownQueryParams proto]</a></p>
+<p><code class="docutils literal notranslate"><span class="pre">UnknownQueryParams</span></code> is added as an extension field in <code class="docutils literal notranslate"><span class="pre">HttpBody</span></code> if
+<code class="docutils literal notranslate"><span class="pre">GrpcJsonTranscoder::capture_unknown_query_parameters</span></code> is true and unknown query
+parameters were present in the request.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-unknownqueryparams-key">
+<dt>key</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-grpc-json-transcoder-v3-unknownqueryparams-values"><span class="std std-ref">extensions.filters.http.grpc_json_transcoder.v3.UnknownQueryParams.Values</span></a>&gt;) A map from unrecognized query parameter keys, to the values associated with those keys.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-grpc-json-transcoder-v3-unknownqueryparams-values">
+<span id="envoy-v3-api-msg-extensions-filters-http-grpc-json-transcoder-v3-unknownqueryparams-values"></span><h2>extensions.filters.http.grpc_json_transcoder.v3.UnknownQueryParams.Values<a class="headerlink" href="#extensions-filters-http-grpc-json-transcoder-v3-unknownqueryparams-values" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.proto#L306">[extensions.filters.http.grpc_json_transcoder.v3.UnknownQueryParams.Values proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;values&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-grpc-json-transcoder-v3-unknownqueryparams-values-values">
+<dt>values</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>)</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../grpc_json_reverse_transcoder/v3/transcoder.proto.html" class="btn btn-neutral float-left" title="gRPC-JSON reverse transcoder (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../grpc_stats/v3/config.proto.html" class="btn btn-neutral float-right" title="gRPC statistics (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">gRPC-JSON transcoder (proto)</a><ul>
+<li><a class="reference internal" href="#extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder">extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-printoptions">extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.PrintOptions</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-requestvalidationoptions">extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.RequestValidationOptions</a></li>
+<li><a class="reference internal" href="#enum-extensions-filters-http-grpc-json-transcoder-v3-grpcjsontranscoder-urlunescapespec">Enum extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.UrlUnescapeSpec</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-grpc-json-transcoder-v3-unknownqueryparams">extensions.filters.http.grpc_json_transcoder.v3.UnknownQueryParams</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-grpc-json-transcoder-v3-unknownqueryparams-values">extensions.filters.http.grpc_json_transcoder.v3.UnknownQueryParams.Values</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,150 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/route.proto:
+
+Rocketmq Proxy Route Configuration (proto)
+==========================================
+
+
+Rocketmq Proxy :ref:`configuration overview <config_network_filters_rocketmq_proxy>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.rocketmq_proxy.v3.RouteConfiguration:
+
+extensions.filters.network.rocketmq_proxy.v3.RouteConfiguration
+---------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.rocketmq_proxy.v3.RouteConfiguration proto] <api/contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/route.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "routes": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.rocketmq_proxy.v3.RouteConfiguration.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of the route configuration.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.rocketmq_proxy.v3.RouteConfiguration.routes:
+
+
+routes
+  (**repeated** :ref:`extensions.filters.network.rocketmq_proxy.v3.Route <envoy_v3_api_msg_extensions.filters.network.rocketmq_proxy.v3.Route>`) The list of routes that will be matched, in order, against incoming requests. The first route
+  that matches will be used.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.rocketmq_proxy.v3.Route:
+
+extensions.filters.network.rocketmq_proxy.v3.Route
+--------------------------------------------------
+
+
+:repo:`[extensions.filters.network.rocketmq_proxy.v3.Route proto] <api/contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/route.proto#L29>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "match": {...},
+    "route": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.rocketmq_proxy.v3.Route.match:
+
+
+match
+  (:ref:`extensions.filters.network.rocketmq_proxy.v3.RouteMatch <envoy_v3_api_msg_extensions.filters.network.rocketmq_proxy.v3.RouteMatch>`, *REQUIRED*) Route matching parameters.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.rocketmq_proxy.v3.Route.route:
+
+
+route
+  (:ref:`extensions.filters.network.rocketmq_proxy.v3.RouteAction <envoy_v3_api_msg_extensions.filters.network.rocketmq_proxy.v3.RouteAction>`, *REQUIRED*) Route request to some upstream cluster.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.rocketmq_proxy.v3.RouteMatch:
+
+extensions.filters.network.rocketmq_proxy.v3.RouteMatch
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.rocketmq_proxy.v3.RouteMatch proto] <api/contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/route.proto#L37>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "topic": {...},
+    "headers": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.rocketmq_proxy.v3.RouteMatch.topic:
+
+
+topic
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`, *REQUIRED*) The name of the topic.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.rocketmq_proxy.v3.RouteMatch.headers:
+
+
+headers
+  (**repeated** :ref:`config.route.v3.HeaderMatcher <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`) Specifies a set of headers that the route should match on. The router will check the request’s
+  headers against all the specified headers in the route config. A match will happen if all the
+  headers in the route are present in the request with the same values (or based on presence if
+  the value field is not in the config).
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.rocketmq_proxy.v3.RouteAction:
+
+extensions.filters.network.rocketmq_proxy.v3.RouteAction
+--------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.rocketmq_proxy.v3.RouteAction proto] <api/contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/route.proto#L48>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster": ...,
+    "metadata_match": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.rocketmq_proxy.v3.RouteAction.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Indicates the upstream cluster to which the request should be routed.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.rocketmq_proxy.v3.RouteAction.metadata_match:
+
+
+metadata_match
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Optional endpoint metadata match criteria used by the subset load balancer.
+
+

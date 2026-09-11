@@ -1,0 +1,1117 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HTTP header manipulation &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="HTTP header sanitizing" href="header_sanitizing.html" />
+    <link rel="prev" title="HTTP/1.1 Header Casing" href="header_casing.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../http.html">HTTP</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="http_conn_man.html">HTTP connection manager</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="route_matching.html">Route matching</a></li>
+<li class="toctree-l4"><a class="reference internal" href="traffic_splitting.html">Traffic Shifting/Splitting</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_casing.html">HTTP/1.1 Header Casing</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">HTTP header manipulation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_sanitizing.html">HTTP header sanitizing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="local_reply.html">Local reply modification</a></li>
+<li class="toctree-l4"><a class="reference internal" href="response_code_details.html">Response Code Details</a></li>
+<li class="toctree-l4"><a class="reference internal" href="stats.html">Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="runtime.html">Runtime</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rds.html">Route discovery service (RDS)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vhds.html">Virtual Host Discovery Service (VHDS)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../http_filters/http_filters.html">HTTP filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../caches/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../caches_v2/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../cluster_specifier/cluster_specifier.html">HTTP cluster specifier</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tcp_bridge/tcp_bridge.html">HTTP TCP bridge</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../http.html">HTTP</a></li>
+          <li class="breadcrumb-item"><a href="http_conn_man.html">HTTP connection manager</a></li>
+      <li class="breadcrumb-item active">HTTP header manipulation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/http/http_conn_man/headers.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="http-header-manipulation">
+<span id="config-http-conn-man-headers"></span><h1>HTTP header manipulation<a class="headerlink" href="#http-header-manipulation" title="Link to this heading"></a></h1>
+<p>The HTTP connection manager manipulates several HTTP headers both during decoding (when the request
+is being received) as well as during encoding (when the response is being sent).</p>
+<nav class="contents local" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#scheme" id="id6">:scheme</a></p></li>
+<li><p><a class="reference internal" href="#path" id="id7">:path</a></p></li>
+<li><p><a class="reference internal" href="#method" id="id8">:method</a></p></li>
+<li><p><a class="reference internal" href="#user-agent" id="id9">user-agent</a></p></li>
+<li><p><a class="reference internal" href="#server" id="id10">server</a></p></li>
+<li><p><a class="reference internal" href="#referer" id="id11">referer</a></p></li>
+<li><p><a class="reference internal" href="#x-client-trace-id" id="id12">x-client-trace-id</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-downstream-service-cluster" id="id13">x-envoy-downstream-service-cluster</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-downstream-service-node" id="id14">x-envoy-downstream-service-node</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-external-address" id="id15">x-envoy-external-address</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-force-trace" id="id16">x-envoy-force-trace</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-internal" id="id17">x-envoy-internal</a></p></li>
+<li><p><a class="reference internal" href="#x-envoy-original-dst-host" id="id18">x-envoy-original-dst-host</a></p></li>
+<li><p><a class="reference internal" href="#x-forwarded-client-cert" id="id19">x-forwarded-client-cert</a></p>
+<ul>
+<li><p><a class="reference internal" href="#text-format" id="id20">Text format</a></p></li>
+<li><p><a class="reference internal" href="#json-format" id="id21">JSON format</a></p></li>
+<li><p><a class="reference internal" href="#format-auto-detection-when-appending" id="id22">Format auto-detection when appending</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#x-forwarded-for" id="id23">x-forwarded-for</a></p></li>
+<li><p><a class="reference internal" href="#x-forwarded-host" id="id24">x-forwarded-host</a></p></li>
+<li><p><a class="reference internal" href="#x-forwarded-port" id="id25">x-forwarded-port</a></p></li>
+<li><p><a class="reference internal" href="#x-forwarded-proto" id="id26">x-forwarded-proto</a></p>
+<ul>
+<li><p><a class="reference internal" href="#inferring-x-forwarded-proto-from-proxy-protocol-destination-port" id="id27">Inferring x-forwarded-proto from PROXY protocol destination port</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#x-envoy-local-overloaded" id="id28">x-envoy-local-overloaded</a></p></li>
+<li><p><a class="reference internal" href="#x-request-id" id="id29">x-request-id</a></p></li>
+<li><p><a class="reference internal" href="#x-ot-span-context" id="id30">x-ot-span-context</a></p></li>
+<li><p><a class="reference internal" href="#x-b3-traceid" id="id31">x-b3-traceid</a></p></li>
+<li><p><a class="reference internal" href="#x-b3-spanid" id="id32">x-b3-spanid</a></p></li>
+<li><p><a class="reference internal" href="#x-b3-parentspanid" id="id33">x-b3-parentspanid</a></p></li>
+<li><p><a class="reference internal" href="#x-b3-sampled" id="id34">x-b3-sampled</a></p></li>
+<li><p><a class="reference internal" href="#x-b3-flags" id="id35">x-b3-flags</a></p></li>
+<li><p><a class="reference internal" href="#b3" id="id36">b3</a></p></li>
+<li><p><a class="reference internal" href="#x-datadog-trace-id" id="id37">x-datadog-trace-id</a></p></li>
+<li><p><a class="reference internal" href="#x-datadog-parent-id" id="id38">x-datadog-parent-id</a></p></li>
+<li><p><a class="reference internal" href="#x-datadog-sampling-priority" id="id39">x-datadog-sampling-priority</a></p></li>
+<li><p><a class="reference internal" href="#sw8" id="id40">sw8</a></p></li>
+<li><p><a class="reference internal" href="#x-amzn-trace-id" id="id41">x-amzn-trace-id</a></p></li>
+<li><p><a class="reference internal" href="#traceparent" id="id42">traceparent</a></p></li>
+<li><p><a class="reference internal" href="#tracestate" id="id43">tracestate</a></p></li>
+<li><p><a class="reference internal" href="#custom-request-response-headers" id="id44">Custom request/response headers</a></p></li>
+</ul>
+</nav>
+<section id="scheme">
+<span id="config-http-conn-man-headers-scheme"></span><h2><a class="toc-backref" href="#id6" role="doc-backlink">:scheme</a><a class="headerlink" href="#scheme" title="Link to this heading"></a></h2>
+<p>Envoy will always set the <code class="docutils literal notranslate"><span class="pre">:scheme</span></code> header while processing a request. It should always be available to filters, and should be forwarded upstream for HTTP/2 and HTTP/3, where <a class="reference internal" href="#config-http-conn-man-headers-x-forwarded-proto"><span class="std std-ref">x-forwarded-proto</span></a> will be sent for HTTP/1.1.</p>
+<p>For HTTP/2, and HTTP/3, incoming <code class="docutils literal notranslate"><span class="pre">:scheme</span></code> headers are trusted and propogated through upstream.
+For HTTP/1, the <code class="docutils literal notranslate"><span class="pre">:scheme</span></code> header will be set
+1) From the absolute URL if present and valid. An invalid (not “http” or “https”) scheme, or an https scheme over an unencrypted connection will result in Envoy rejecting the request. This is the only scheme validation Envoy performs as it avoids a HTTP/1.1-specific privilege escalation attack for edge Envoys <a class="footnote-reference brackets" href="#id3" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> which doesn’t have a comparable vector for HTTP/2 and above <a class="footnote-reference brackets" href="#id4" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a>.
+2) From the value of the <a class="reference internal" href="#config-http-conn-man-headers-x-forwarded-proto"><span class="std std-ref">x-forwarded-proto</span></a> header after sanitization (to valid <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto</span></code> from trusted downstreams, otherwise based on downstream encryption level).</p>
+<p>This default behavior can be overridden via the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-scheme-header-transformation"><span class="std std-ref">scheme_header_transformation</span></a>
+configuration option.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">:scheme</span></code> header will be used by Envoy over <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto</span></code> where the URI scheme is wanted, for example serving content from cache based on the <code class="docutils literal notranslate"><span class="pre">:scheme</span></code> header rather than X-Forwarded-Proto, or setting the scheme of redirects based on the scheme of the original URI. See <a class="reference internal" href="../../../faq/debugging/xfp_vs_scheme.html#why-is-envoy-using-xfp-or-scheme"><span class="std std-ref">Why is Envoy operating on X-Forwarded-Proto instead of :scheme or vice-versa?</span></a> for more details.</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id3" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Edge Envoys often have plaintext HTTP/1.1 listeners. If Envoy trusts absolute URL scheme from fully qualfied URLs, a MiTM can adjust relative URLs to https absolute URLs, and inadvertently cause the Envoy’s upstream to send PII or other sensitive data over what it then believes is a secure connection.</p>
+</aside>
+<aside class="footnote brackets" id="id4" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>Unlike HTTP/1.1, HTTP/2 is in practice always served over TLS via ALPN for edge Envoys. In mesh networks using insecure HTTP/2, if the downstream is not trusted to set scheme, the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-scheme-header-transformation"><span class="std std-ref">scheme_header_transformation</span></a> should be used.</p>
+</aside>
+</aside>
+</section>
+<section id="path">
+<span id="config-http-conn-man-headers-user-agent"></span><h2><a class="toc-backref" href="#id7" role="doc-backlink">:path</a><a class="headerlink" href="#path" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">:path</span></code> header is a pseudo-header populated by Envoy using the value of the path of the HTTP
+request, including query parameters. E.g. an HTTP request of the form <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/docs/thing</span> <span class="pre">HTTP/1.1</span></code>
+would have a <code class="docutils literal notranslate"><span class="pre">:path</span></code> value of <code class="docutils literal notranslate"><span class="pre">/docs/thing</span></code>.</p>
+</section>
+<section id="method">
+<h2><a class="toc-backref" href="#id8" role="doc-backlink">:method</a><a class="headerlink" href="#method" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">:method</span></code> header is a pseudo-header populated by Envoy using the value of the method of the HTTP
+request. E.g. an HTTP request of the form <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/docs/thing</span> <span class="pre">HTTP/1.1</span></code> would have a <code class="docutils literal notranslate"><span class="pre">:method</span></code> value
+of <code class="docutils literal notranslate"><span class="pre">GET</span></code>. Values are in upper-case, e.g. <code class="docutils literal notranslate"><span class="pre">GET</span></code>, <code class="docutils literal notranslate"><span class="pre">PUT</span></code>, <code class="docutils literal notranslate"><span class="pre">POST</span></code>, and <code class="docutils literal notranslate"><span class="pre">DELETE</span></code>. Other possible
+values are described in <cite>HTTP Methods &lt;https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods&gt;</cite>.</p>
+</section>
+<section id="user-agent">
+<h2><a class="toc-backref" href="#id9" role="doc-backlink">user-agent</a><a class="headerlink" href="#user-agent" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">user-agent</span></code> header may be set by the connection manager during decoding if the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-add-user-agent"><span class="std std-ref">add_user_agent</span></a> option is
+enabled. The header is only modified if it is not already set. If the connection manager does set the header, the value
+is determined by the <a class="reference internal" href="../../../operations/cli.html#cmdoption-service-cluster"><code class="xref std std-option docutils literal notranslate"><span class="pre">--service-cluster</span></code></a> command line option.</p>
+</section>
+<section id="server">
+<span id="config-http-conn-man-headers-server"></span><h2><a class="toc-backref" href="#id10" role="doc-backlink">server</a><a class="headerlink" href="#server" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">server</span></code> header will be set during encoding to the value in the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-server-name"><span class="std std-ref">server_name</span></a> option.</p>
+</section>
+<section id="referer">
+<span id="config-http-conn-man-headers-referer"></span><h2><a class="toc-backref" href="#id11" role="doc-backlink">referer</a><a class="headerlink" href="#referer" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">referer</span></code> header will be sanitized during decoding. Multiple URLs, invalid relative URLs
+containing a fragment component, and valid absolute URLs containing userinfo or a fragment component
+will be removed.</p>
+</section>
+<section id="x-client-trace-id">
+<span id="config-http-conn-man-headers-x-client-trace-id"></span><h2><a class="toc-backref" href="#id12" role="doc-backlink">x-client-trace-id</a><a class="headerlink" href="#x-client-trace-id" title="Link to this heading"></a></h2>
+<p>If an external client sets this header, Envoy will join the provided trace ID with the internally
+generated <a class="reference internal" href="#config-http-conn-man-headers-x-request-id"><span class="std std-ref">x-request-id</span></a>. x-client-trace-id needs to be globally
+unique and generating a uuid4 is recommended. If this header is set, it has similar effect to
+<a class="reference internal" href="#config-http-conn-man-headers-x-envoy-force-trace"><span class="std std-ref">x-envoy-force-trace</span></a>. See the <a class="reference internal" href="runtime.html#config-http-conn-man-runtime-client-enabled"><span class="std std-ref">tracing.client_enabled</span></a> runtime configuration setting.</p>
+</section>
+<section id="x-envoy-downstream-service-cluster">
+<span id="config-http-conn-man-headers-downstream-service-cluster"></span><h2><a class="toc-backref" href="#id13" role="doc-backlink">x-envoy-downstream-service-cluster</a><a class="headerlink" href="#x-envoy-downstream-service-cluster" title="Link to this heading"></a></h2>
+<p>Internal services often want to know which service is calling them. This header is cleaned from
+external requests, but for internal requests will contain the service cluster of the caller. Note
+that in the current implementation, this should be considered a hint as it is set by the caller and
+could be easily spoofed by any internal entity. In the future Envoy will support a mutual
+authentication TLS mesh which will make this header fully secure. Like <code class="docutils literal notranslate"><span class="pre">user-agent</span></code>, the value
+is determined by the <a class="reference internal" href="../../../operations/cli.html#cmdoption-service-cluster"><code class="xref std std-option docutils literal notranslate"><span class="pre">--service-cluster</span></code></a> command line option. In order to enable this
+feature you need to set the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-add-user-agent"><span class="std std-ref">user_agent</span></a> option to true.</p>
+</section>
+<section id="x-envoy-downstream-service-node">
+<span id="config-http-conn-man-headers-downstream-service-node"></span><h2><a class="toc-backref" href="#id14" role="doc-backlink">x-envoy-downstream-service-node</a><a class="headerlink" href="#x-envoy-downstream-service-node" title="Link to this heading"></a></h2>
+<p>Internal services may want to know the downstream node request comes from. This header
+is quite similar to <a class="reference internal" href="#config-http-conn-man-headers-downstream-service-cluster"><span class="std std-ref">x-envoy-downstream-service-cluster</span></a>, except the value is taken from
+the  <a class="reference internal" href="../../../operations/cli.html#cmdoption-service-node"><code class="xref std std-option docutils literal notranslate"><span class="pre">--service-node</span></code></a> option.</p>
+</section>
+<section id="x-envoy-external-address">
+<span id="config-http-conn-man-headers-x-envoy-external-address"></span><h2><a class="toc-backref" href="#id15" role="doc-backlink">x-envoy-external-address</a><a class="headerlink" href="#x-envoy-external-address" title="Link to this heading"></a></h2>
+<p>It is a common case where a service wants to perform analytics based on the origin client’s IP
+address. Per the lengthy discussion on <a class="reference internal" href="#config-http-conn-man-headers-x-forwarded-for"><span class="std std-ref">XFF</span></a>,
+this can get quite complicated, so Envoy simplifies this by setting <code class="docutils literal notranslate"><span class="pre">x-envoy-external-address</span></code>
+to the <a class="reference internal" href="#config-http-conn-man-headers-x-forwarded-for-trusted-client-address"><span class="std std-ref">trusted client address</span></a>
+if the request is from an external client. <code class="docutils literal notranslate"><span class="pre">x-envoy-external-address</span></code> is not set or overwritten
+for internal requests. This header can be safely forwarded between internal services for analytics
+purposes without having to deal with the complexities of XFF.</p>
+</section>
+<section id="x-envoy-force-trace">
+<span id="config-http-conn-man-headers-x-envoy-force-trace"></span><h2><a class="toc-backref" href="#id16" role="doc-backlink">x-envoy-force-trace</a><a class="headerlink" href="#x-envoy-force-trace" title="Link to this heading"></a></h2>
+<p>If an internal request sets this header, Envoy will modify the generated
+<a class="reference internal" href="#config-http-conn-man-headers-x-request-id"><span class="std std-ref">x-request-id</span></a> such that it forces traces to be collected.
+This also forces <a class="reference internal" href="#config-http-conn-man-headers-x-request-id"><span class="std std-ref">x-request-id</span></a> to be returned in the response
+headers. If this request ID is then propagated to other hosts, traces will also be collected on
+those hosts which will provide a consistent trace for an entire request flow. See the
+<a class="reference internal" href="runtime.html#config-http-conn-man-runtime-global-enabled"><span class="std std-ref">tracing.global_enabled</span></a> and
+<a class="reference internal" href="runtime.html#config-http-conn-man-runtime-random-sampling"><span class="std std-ref">tracing.random_sampling</span></a> runtime
+configuration settings.</p>
+</section>
+<section id="x-envoy-internal">
+<span id="config-http-conn-man-headers-x-envoy-internal"></span><h2><a class="toc-backref" href="#id17" role="doc-backlink">x-envoy-internal</a><a class="headerlink" href="#x-envoy-internal" title="Link to this heading"></a></h2>
+<p>It is a common case where a service wants to know whether a request is internal origin or not. Envoy
+uses <a class="reference internal" href="#config-http-conn-man-headers-x-forwarded-for"><span class="std std-ref">XFF</span></a> to determine this and then will set
+the header value to <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p>
+<p>This is a convenience to avoid having to parse and understand XFF.</p>
+</section>
+<section id="x-envoy-original-dst-host">
+<span id="config-http-conn-man-headers-x-envoy-original-dst-host"></span><h2><a class="toc-backref" href="#id18" role="doc-backlink">x-envoy-original-dst-host</a><a class="headerlink" href="#x-envoy-original-dst-host" title="Link to this heading"></a></h2>
+<p>The header used to override destination address when using the
+<a class="reference internal" href="../../../intro/arch_overview/upstream/load_balancing/original_dst.html#arch-overview-load-balancing-types-original-destination"><span class="std std-ref">Original Destination</span></a>
+load balancing policy.</p>
+<p>It is ignored, unless the use of it is enabled via
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-originaldstlbconfig-use-http-header"><span class="std std-ref">use_http_header</span></a>.</p>
+</section>
+<section id="x-forwarded-client-cert">
+<span id="config-http-conn-man-headers-x-forwarded-client-cert"></span><h2><a class="toc-backref" href="#id19" role="doc-backlink">x-forwarded-client-cert</a><a class="headerlink" href="#x-forwarded-client-cert" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">x-forwarded-client-cert</span></code> (XFCC) is a proxy header which indicates certificate information of part
+or all of the clients or proxies that a request has flowed through, on its way from the client to the
+server. A proxy may choose to sanitize/append/forward the XFCC header before proxying the request.</p>
+<p>The XFCC header value can be formatted in either text or JSON format, controlled by the
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-setcurrentclientcertdetails-format"><span class="std std-ref">format</span></a>
+option.</p>
+<section id="text-format">
+<span id="config-http-conn-man-headers-x-forwarded-client-cert-text"></span><h3><a class="toc-backref" href="#id20" role="doc-backlink">Text format</a><a class="headerlink" href="#text-format" title="Link to this heading"></a></h3>
+<p>The text format is the default.</p>
+<p>The XFCC header value is a comma (<code class="docutils literal notranslate"><span class="pre">,</span></code>) separated string. Each substring is an XFCC element, which
+holds information added by a single proxy. A proxy can append the current client certificate
+information as an XFCC element, to the end of the request’s XFCC header after a comma.</p>
+<p>Each XFCC element is a semicolon <code class="docutils literal notranslate"><span class="pre">;</span></code> separated string. Each substring is a key-value pair, grouped
+together by an equals (<code class="docutils literal notranslate"><span class="pre">=</span></code>) sign. The keys are case-insensitive, the values are case-sensitive. If
+<code class="docutils literal notranslate"><span class="pre">,</span></code>, <code class="docutils literal notranslate"><span class="pre">;</span></code> or <code class="docutils literal notranslate"><span class="pre">=</span></code> appear in a value, the value should be double-quoted. Double-quotes in the
+value should be replaced by backslash-double-quote (<code class="docutils literal notranslate"><span class="pre">\&quot;</span></code>).</p>
+<p>The following keys are supported:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">By</span></code> The Subject Alternative Name (URI type) of the current proxy’s certificate. The current proxy’s certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Hash</span></code> The SHA 256 digest of the current client certificate.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Cert</span></code> The entire client certificate in URL encoded PEM format.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Chain</span></code> The entire client certificate chain (including the leaf certificate) in URL encoded PEM format. Note that this is not the validated chain; it is the original chain provided by the client which may include certificates not in the validated chain.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Subject</span></code> The Subject field of the current client certificate. The value is always double-quoted.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">URI</span></code> The URI type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DNS</span></code> The DNS type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple DNS type Subject Alternative Names, each will be a separate key-value pair.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Issuer</span></code> The Issuer field of the current client certificate. The value is always double-quoted.</p></li>
+</ol>
+<p>A client certificate may contain multiple Subject Alternative Name types. For details on different Subject Alternative Name types, please refer <a class="reference external" href="https://tools.ietf.org/html/rfc5280#section-4.2.1.6">RFC 5280</a>.</p>
+<p>Some examples of the XFCC header in text format are:</p>
+<ol class="arabic simple">
+<li><p>For one client certificate with only URI type Subject Alternative Name: <code class="docutils literal notranslate"><span class="pre">x-forwarded-client-cert:</span> <span class="pre">By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject=&quot;/C=US/ST=CA/L=San</span> <span class="pre">Francisco/OU=Lyft/CN=Test</span> <span class="pre">Client&quot;;URI=http://testclient.lyft.com</span></code></p></li>
+<li><p>For two client certificates with only URI type Subject Alternative Name: <code class="docutils literal notranslate"><span class="pre">x-forwarded-client-cert:</span> <span class="pre">By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;URI=http://testclient.lyft.com,By=http://backend.lyft.com;Hash=9ba61d6425303443c0748a02dd8de688468ed33be74eee6556d90c0149c1309e;URI=http://frontend.lyft.com</span></code></p></li>
+<li><p>For one client certificate with both URI type and DNS type Subject Alternative Name: <code class="docutils literal notranslate"><span class="pre">x-forwarded-client-cert:</span> <span class="pre">By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject=&quot;/C=US/ST=CA/L=San</span> <span class="pre">Francisco/OU=Lyft/CN=Test</span> <span class="pre">Client&quot;;URI=http://testclient.lyft.com;DNS=lyft.com;DNS=www.lyft.com</span></code></p></li>
+</ol>
+</section>
+<section id="json-format">
+<span id="config-http-conn-man-headers-x-forwarded-client-cert-json"></span><h3><a class="toc-backref" href="#id21" role="doc-backlink">JSON format</a><a class="headerlink" href="#json-format" title="Link to this heading"></a></h3>
+<p>When the JSON format is selected, the XFCC header value is a JSON array of objects. Each object in
+the array represents the certificate information added by a single proxy. The same keys used in the
+text format are available as JSON object fields, but with the following structural differences:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">by</span></code>, <code class="docutils literal notranslate"><span class="pre">uri</span></code>, <code class="docutils literal notranslate"><span class="pre">dns</span></code>, and <code class="docutils literal notranslate"><span class="pre">chain</span></code> are JSON arrays of strings (since they can have multiple values).
+For <code class="docutils literal notranslate"><span class="pre">chain</span></code>, each string is the PEM-encoded representation of a single certificate
+in the peer certificate chain. This is the peer provided chain, not the validated chain.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">hash</span></code>, <code class="docutils literal notranslate"><span class="pre">cert</span></code>, <code class="docutils literal notranslate"><span class="pre">subject</span></code>, and <code class="docutils literal notranslate"><span class="pre">issuer</span></code> are JSON strings.</p></li>
+<li><p>Unlike the text format, <code class="docutils literal notranslate"><span class="pre">cert</span></code> and <code class="docutils literal notranslate"><span class="pre">chain</span></code> PEM values are not URL-encoded; instead,
+special characters (such as newlines in PEM data) are escaped using standard JSON escaping rules.</p></li>
+<li><p>Only fields with non-empty values are included in the JSON object.</p></li>
+<li><p>Values are escaped according to JSON rules (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;</span></code> becomes <code class="docutils literal notranslate"><span class="pre">\&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">\</span></code> becomes <code class="docutils literal notranslate"><span class="pre">\\</span></code>).</p></li>
+</ul>
+<p>An example of the XFCC header in JSON format:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[{</span><span class="nt">&quot;by&quot;</span><span class="p">:[</span><span class="s2">&quot;http://frontend.lyft.com&quot;</span><span class="p">],</span><span class="nt">&quot;hash&quot;</span><span class="p">:</span><span class="s2">&quot;468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688&quot;</span><span class="p">,</span><span class="nt">&quot;subject&quot;</span><span class="p">:</span><span class="s2">&quot;/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client&quot;</span><span class="p">,</span><span class="nt">&quot;uri&quot;</span><span class="p">:[</span><span class="s2">&quot;http://testclient.lyft.com&quot;</span><span class="p">],</span><span class="nt">&quot;dns&quot;</span><span class="p">:[</span><span class="s2">&quot;lyft.com&quot;</span><span class="p">,</span><span class="s2">&quot;www.lyft.com&quot;</span><span class="p">]}]</span>
+</pre></div>
+</div>
+<p>An example with two proxy hops:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[{</span><span class="nt">&quot;by&quot;</span><span class="p">:[</span><span class="s2">&quot;http://frontend.lyft.com&quot;</span><span class="p">],</span><span class="nt">&quot;hash&quot;</span><span class="p">:</span><span class="s2">&quot;468ed33be74eee6556d90c0149c1309e&quot;</span><span class="p">,</span><span class="nt">&quot;uri&quot;</span><span class="p">:[</span><span class="s2">&quot;http://testclient.lyft.com&quot;</span><span class="p">]},{</span><span class="nt">&quot;by&quot;</span><span class="p">:[</span><span class="s2">&quot;http://backend.lyft.com&quot;</span><span class="p">],</span><span class="nt">&quot;hash&quot;</span><span class="p">:</span><span class="s2">&quot;9ba61d6425303443c0748a02dd8de688&quot;</span><span class="p">,</span><span class="nt">&quot;uri&quot;</span><span class="p">:[</span><span class="s2">&quot;http://frontend.lyft.com&quot;</span><span class="p">]}]</span>
+</pre></div>
+</div>
+</section>
+<section id="format-auto-detection-when-appending">
+<h3><a class="toc-backref" href="#id22" role="doc-backlink">Format auto-detection when appending</a><a class="headerlink" href="#format-auto-detection-when-appending" title="Link to this heading"></a></h3>
+<p>When <code class="docutils literal notranslate"><span class="pre">forward_client_cert_details</span></code> is <code class="docutils literal notranslate"><span class="pre">APPEND_FORWARD</span></code> and the request already has an XFCC
+header, the format of the existing header value is auto-detected rather than using the configured
+format. This prevents mixing text and JSON formats in the same header value. The detection is
+heuristic: if the existing value starts with <code class="docutils literal notranslate"><span class="pre">[</span></code> and ends with <code class="docutils literal notranslate"><span class="pre">]</span></code>, it is treated as a JSON
+array and the new entry is appended as a new object within that array. Otherwise, the existing value
+is treated as text and the new entry is appended using the text format with a <code class="docutils literal notranslate"><span class="pre">,</span></code> delimiter.</p>
+<p>The configured format is only used when there is no existing XFCC header value (either because the
+mode is <code class="docutils literal notranslate"><span class="pre">SANITIZE_SET</span></code>, which always replaces the value, or because the mode is <code class="docutils literal notranslate"><span class="pre">APPEND_FORWARD</span></code>
+and no prior XFCC header was present).</p>
+<p>How Envoy processes XFCC is specified by the
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-forward-client-cert-details"><span class="std std-ref">forward_client_cert_details</span></a>,
+the
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-set-current-client-cert-details"><span class="std std-ref">set_current_client_cert_details</span></a>,
+HTTP connection manager options. If <code class="docutils literal notranslate"><span class="pre">forward_client_cert_details</span></code> is unset, the XFCC header will be sanitized by
+default.</p>
+</section>
+</section>
+<section id="x-forwarded-for">
+<span id="config-http-conn-man-headers-x-forwarded-for"></span><h2><a class="toc-backref" href="#id23" role="doc-backlink">x-forwarded-for</a><a class="headerlink" href="#x-forwarded-for" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">x-forwarded-for</span></code> (XFF) is a standard proxy header which indicates the IP addresses that a request has
+flowed through on its way from the client to the server. A compliant proxy will <code class="docutils literal notranslate"><span class="pre">append</span></code> the IP
+address of the nearest client to the XFF list before proxying the request. Some examples of XFF are:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">x-forwarded-for:</span> <span class="pre">50.0.0.1</span></code> (single client)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">x-forwarded-for:</span> <span class="pre">50.0.0.1,</span> <span class="pre">40.0.0.1</span></code> (external proxy hop)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">x-forwarded-for:</span> <span class="pre">50.0.0.1,</span> <span class="pre">10.0.0.1</span></code> (internal proxy hop)</p></li>
+</ol>
+<p>Envoy will only append to XFF when at least one of the following conditions is met:
+1. The <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-use-remote-address"><span class="std std-ref">use_remote_address</span></a>
+HTTP connection manager option is set to true
+2. The <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-skip-xff-append"><span class="std std-ref">skip_xff_append</span></a>
+is set to false.</p>
+<p>This means that if <code class="docutils literal notranslate"><span class="pre">use_remote_address</span></code> is set to false (which is the default) or
+<code class="docutils literal notranslate"><span class="pre">skip_xff_append</span></code> is set to true, the connection manager operates in a transparent mode where it does not
+modify XFF.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>In general, <code class="docutils literal notranslate"><span class="pre">use_remote_address</span></code> should be set to true when Envoy is deployed as an edge
+node (aka a front proxy), whereas it may need to be set to false when Envoy is used as
+an internal service node in a mesh deployment.</p>
+</div>
+<p id="config-http-conn-man-headers-x-forwarded-for-trusted-client-address">The value of <code class="docutils literal notranslate"><span class="pre">use_remote_address</span></code> controls how Envoy determines the <em>trusted client address</em>.
+Given an HTTP request that has traveled through a series of zero or more proxies to reach
+Envoy, the trusted client address is the earliest source IP address that is known to be
+accurate. The source IP address of the immediate downstream node’s connection to Envoy is
+trusted. XFF <em>sometimes</em> can be trusted. Malicious clients can forge XFF, but the last
+address in XFF can be trusted if it was put there by a trusted proxy.</p>
+<p>Alternatively, Envoy supports
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-original-ip-detection-extensions"><span class="std std-ref">extensions</span></a>
+for determining the <em>trusted client address</em> or original IP address.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The use of such extensions cannot be mixed with <code class="docutils literal notranslate"><span class="pre">use_remote_address</span></code> nor <code class="docutils literal notranslate"><span class="pre">xff_num_trusted_hops</span></code>.</p>
+</div>
+<p>Envoy’s default rules for determining the trusted client address (<em>before</em> appending anything
+to XFF) are:</p>
+<ul class="simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">use_remote_address</span></code> is false and an XFF containing at least one IP address is
+present in the request, the trusted client address is the <em>last</em> (rightmost) IP address in XFF.</p></li>
+<li><p>Otherwise, the trusted client address is the source IP address of the immediate downstream
+node’s connection to Envoy.</p></li>
+</ul>
+<p>In an environment where there are one or more trusted proxies in front of an edge
+Envoy instance, the <code class="docutils literal notranslate"><span class="pre">xff_num_trusted_hops</span></code> configuration option can be used to trust
+additional addresses from XFF:</p>
+<ul class="simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">use_remote_address</span></code> is false and <code class="docutils literal notranslate"><span class="pre">xff_num_trusted_hops</span></code> is set to a value <em>N</em> that is
+greater than zero, the trusted client address is the (N+1)th address from the right end of
+XFF. (If the XFF contains fewer than N+1 addresses, Envoy falls back to using the immediate
+downstream connection’s source address as trusted client address.)</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">use_remote_address</span></code> is true and <code class="docutils literal notranslate"><span class="pre">xff_num_trusted_hops</span></code> is set to a value <em>N</em> that is
+greater than zero, the trusted client address is the Nth address from the right end of XFF. (If
+the XFF contains fewer than N addresses, Envoy falls back to using the immediate downstream
+connection’s source address as trusted client address.)</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If the trusted client address should be determined from a list of known CIDRs, use the
+<a class="reference internal" href="../../../api-v3/extensions/http/original_ip_detection/xff/v3/xff.proto.html#envoy-v3-api-msg-extensions-http-original-ip-detection-xff-v3-xffconfig"><span class="std std-ref">xff</span></a> original IP
+detection option instead.</p>
+</div>
+<ul class="simple">
+<li><p>If the remote address is contained by an entry in <code class="docutils literal notranslate"><span class="pre">xff_trusted_cidrs</span></code>, and the <em>last</em>
+(rightmost) entry is also contained by an entry in <code class="docutils literal notranslate"><span class="pre">xff_trusted_cidrs</span></code>, the trusted client
+address is <em>second-last</em> IP address in XFF.</p></li>
+<li><p>If all entries in XFF are contained by an entry in <code class="docutils literal notranslate"><span class="pre">xff_trusted_cidrs</span></code>, the trusted client
+address is the <em>first</em> (leftmost) IP address in XFF.</p></li>
+</ul>
+<p>Envoy uses the trusted client address contents to determine whether a request originated
+externally or internally. This influences whether the
+<a class="reference internal" href="#config-http-conn-man-headers-x-envoy-internal"><span class="std std-ref">x-envoy-internal</span></a> header is set.</p>
+<dl>
+<dt>Example 1: Envoy as edge proxy, without a trusted proxy in front of it</dt><dd><dl>
+<dt>Settings:</dt><dd><div class="line-block">
+<div class="line">use_remote_address = true</div>
+<div class="line">xff_num_trusted_hops = 0</div>
+</div>
+</dd>
+<dt>Request details:</dt><dd><div class="line-block">
+<div class="line">Downstream IP address = 192.0.2.5</div>
+<div class="line">XFF = “203.0.113.128, 203.0.113.10, 203.0.113.1”</div>
+</div>
+</dd>
+<dt>Result:</dt><dd><div class="line-block">
+<div class="line">Trusted client address = 192.0.2.5 (XFF is ignored)</div>
+<div class="line">X-Envoy-External-Address is set to 192.0.2.5</div>
+<div class="line">XFF is changed to “203.0.113.128, 203.0.113.10, 203.0.113.1, 192.0.2.5”</div>
+<div class="line">X-Envoy-Internal is removed (if it was present in the incoming request)</div>
+</div>
+</dd>
+</dl>
+</dd>
+<dt>Example 2: Envoy as internal proxy, with the Envoy edge proxy from Example 1 in front of it</dt><dd><dl>
+<dt>Settings:</dt><dd><div class="line-block">
+<div class="line">use_remote_address = false</div>
+<div class="line">xff_num_trusted_hops = 0</div>
+</div>
+</dd>
+<dt>Request details:</dt><dd><div class="line-block">
+<div class="line">Downstream IP address = 10.11.12.13 (address of the Envoy edge proxy)</div>
+<div class="line">XFF = “203.0.113.128, 203.0.113.10, 203.0.113.1, 192.0.2.5”</div>
+</div>
+</dd>
+<dt>Result:</dt><dd><div class="line-block">
+<div class="line">Trusted client address = 192.0.2.5 (last address in XFF is trusted)</div>
+<div class="line">X-Envoy-External-Address is not modified</div>
+<div class="line">X-Envoy-Internal is removed (if it was present in the incoming request)</div>
+</div>
+</dd>
+</dl>
+</dd>
+<dt>Example 3: Envoy as edge proxy, with two trusted external proxies in front of it</dt><dd><dl>
+<dt>Settings:</dt><dd><div class="line-block">
+<div class="line">use_remote_address = true</div>
+<div class="line">xff_num_trusted_hops = 2</div>
+</div>
+</dd>
+<dt>Request details:</dt><dd><div class="line-block">
+<div class="line">Downstream IP address = 192.0.2.5</div>
+<div class="line">XFF = “203.0.113.128, 203.0.113.10, 203.0.113.1”</div>
+</div>
+</dd>
+<dt>Result:</dt><dd><div class="line-block">
+<div class="line">Trusted client address = 203.0.113.10 (2nd to last address in XFF is trusted)</div>
+<div class="line">X-Envoy-External-Address is set to 203.0.113.10</div>
+<div class="line">XFF is changed to “203.0.113.128, 203.0.113.10, 203.0.113.1, 192.0.2.5”</div>
+<div class="line">X-Envoy-Internal is removed (if it was present in the incoming request)</div>
+</div>
+</dd>
+</dl>
+</dd>
+<dt>Example 4: Envoy as internal proxy, with the edge proxy from Example 3 in front of it</dt><dd><dl>
+<dt>Settings:</dt><dd><div class="line-block">
+<div class="line">use_remote_address = false</div>
+<div class="line">xff_num_trusted_hops = 2</div>
+</div>
+</dd>
+<dt>Request details:</dt><dd><div class="line-block">
+<div class="line">Downstream IP address = 10.11.12.13 (address of the Envoy edge proxy)</div>
+<div class="line">XFF = “203.0.113.128, 203.0.113.10, 203.0.113.1, 192.0.2.5”</div>
+</div>
+</dd>
+<dt>Result:</dt><dd><div class="line-block">
+<div class="line">Trusted client address = 203.0.113.10</div>
+<div class="line">X-Envoy-External-Address is not modified</div>
+<div class="line">X-Envoy-Internal is removed (if it was present in the incoming request)</div>
+</div>
+</dd>
+</dl>
+</dd>
+<dt>Example 5: Envoy as an internal proxy, receiving a request from an internal client</dt><dd><dl>
+<dt>Settings:</dt><dd><div class="line-block">
+<div class="line">use_remote_address = false</div>
+<div class="line">xff_num_trusted_hops = 0</div>
+</div>
+</dd>
+<dt>Request details:</dt><dd><div class="line-block">
+<div class="line">Downstream IP address = 10.20.30.40 (address of the internal client)</div>
+<div class="line">XFF is not present</div>
+</div>
+</dd>
+<dt>Result:</dt><dd><div class="line-block">
+<div class="line">Trusted client address = 10.20.30.40</div>
+<div class="line">X-Envoy-External-Address remains unset</div>
+<div class="line">X-Envoy-Internal is set to “false”</div>
+</div>
+</dd>
+</dl>
+</dd>
+<dt>Example 6: The internal Envoy from Example 5, receiving a request proxied by another Envoy</dt><dd><dl>
+<dt>Settings:</dt><dd><div class="line-block">
+<div class="line">use_remote_address = false</div>
+<div class="line">xff_num_trusted_hops = 0</div>
+</div>
+</dd>
+<dt>Request details:</dt><dd><div class="line-block">
+<div class="line">Downstream IP address = 10.20.30.50 (address of the Envoy instance proxying to this one)</div>
+<div class="line">XFF = “10.20.30.40”</div>
+</div>
+</dd>
+<dt>Result:</dt><dd><div class="line-block">
+<div class="line">Trusted client address = 10.20.30.40</div>
+<div class="line">X-Envoy-External-Address remains unset</div>
+<div class="line">X-Envoy-Internal is set to “true”</div>
+</div>
+</dd>
+</dl>
+</dd>
+<dt>Example 7: Envoy as edge proxy, with one trusted CIDR</dt><dd><dl>
+<dt>Settings:</dt><dd><div class="line-block">
+<div class="line">use_remote_address = false</div>
+<div class="line">xff_trusted_cidrs = 192.0.2.0/24</div>
+</div>
+</dd>
+<dt>Request details:</dt><dd><div class="line-block">
+<div class="line">Downstream IP address = 192.0.2.5</div>
+<div class="line">XFF = “203.0.113.128, 203.0.113.10, 192.0.2.1”</div>
+</div>
+</dd>
+<dt>Result:</dt><dd><div class="line-block">
+<div class="line">Trusted client address = 203.0.113.10</div>
+<div class="line">X-Envoy-External-Address remains unset</div>
+<div class="line">XFF is changed to “203.0.113.128, 203.0.113.10, 192.0.2.1, 192.0.2.5”</div>
+<div class="line">X-Envoy-Internal is removed (if it was present in the incoming request)</div>
+</div>
+</dd>
+</dl>
+</dd>
+<dt>Example 8: Envoy as edge proxy, with two trusted CIDRs</dt><dd><dl>
+<dt>Settings:</dt><dd><div class="line-block">
+<div class="line">use_remote_address = false</div>
+<div class="line">xff_trusted_cidrs = 192.0.2.0/24, 198.51.100.0/24</div>
+</div>
+</dd>
+<dt>Request details:</dt><dd><div class="line-block">
+<div class="line">Downstream IP address = 192.0.2.5</div>
+<div class="line">XFF = “203.0.113.128, 203.0.113.10, 198.51.100.1”</div>
+</div>
+</dd>
+<dt>Result:</dt><dd><div class="line-block">
+<div class="line">Trusted client address = 203.0.113.10</div>
+<div class="line">X-Envoy-External-Address remains unset</div>
+<div class="line">XFF is changed to “203.0.113.128, 203.0.113.10, 198.51.100.1, 192.0.2.5”</div>
+<div class="line">X-Envoy-Internal is removed (if it was present in the incoming request)</div>
+</div>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>A few very important notes about XFF:</p>
+<ol class="arabic simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">use_remote_address</span></code> is set to true, Envoy sets the
+<a class="reference internal" href="#config-http-conn-man-headers-x-envoy-external-address"><span class="std std-ref">x-envoy-external-address</span></a> header to the trusted
+client address.</p></li>
+</ol>
+<ol class="arabic simple" id="config-http-conn-man-headers-x-forwarded-for-internal-origin" start="2">
+<li><p>XFF is what Envoy uses to determine whether a request is internal origin or external origin.
+If <code class="docutils literal notranslate"><span class="pre">use_remote_address</span></code> is set to true, the request is internal if and only if the
+request contains no XFF and the immediate downstream node’s connection to Envoy has
+an internal (RFC1918 or RFC4193) source address. If <code class="docutils literal notranslate"><span class="pre">use_remote_address</span></code> is false, the
+request is internal if and only if XFF contains a single RFC1918 or RFC4193 address.</p>
+<ul class="simple">
+<li><p><strong>NOTE</strong>: If an internal service proxies an external request to another internal service, and
+includes the original XFF header, Envoy will append to it on egress if
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-use-remote-address"><span class="std std-ref">use_remote_address</span></a> is set. This will cause
+the other side to think the request is external. Generally, this is what is intended if XFF is
+being forwarded. If it is not intended, do not forward XFF, and forward
+<a class="reference internal" href="#config-http-conn-man-headers-x-envoy-internal"><span class="std std-ref">x-envoy-internal</span></a> instead.</p></li>
+<li><p><strong>NOTE</strong>: If an internal service call is forwarded to another internal service (preserving XFF),
+Envoy will not consider it internal. This is a known “bug” due to the simplification of how
+XFF is parsed to determine if a request is internal. In this scenario, do not forward XFF and
+allow Envoy to generate a new one with a single internal origin IP.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="x-forwarded-host">
+<span id="config-http-conn-man-headers-x-forwarded-host"></span><h2><a class="toc-backref" href="#id24" role="doc-backlink">x-forwarded-host</a><a class="headerlink" href="#x-forwarded-host" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-forwarded-host</span></code> header is a de-facto standard proxy header which indicates the original
+host requested by the client in the <code class="docutils literal notranslate"><span class="pre">:authority</span></code> (<code class="docutils literal notranslate"><span class="pre">host</span></code> in HTTP1) header. A compliant proxy
+<em>appends</em> the original value of the <code class="docutils literal notranslate"><span class="pre">:authority</span></code> header to <code class="docutils literal notranslate"><span class="pre">x-forwarded-host</span></code> only if the
+<code class="docutils literal notranslate"><span class="pre">:authority</span></code> header is modified.</p>
+<p>Envoy updates the <code class="docutils literal notranslate"><span class="pre">:authority</span></code> header if a host rewrite option (one of
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-host-rewrite-literal"><span class="std std-ref">host_rewrite_literal</span></a>,
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-auto-host-rewrite"><span class="std std-ref">auto_host_rewrite</span></a>,
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-host-rewrite-header"><span class="std std-ref">host_rewrite_header</span></a>, or
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-host-rewrite-path-regex"><span class="std std-ref">host_rewrite_path_regex</span></a>)
+is used and appends its original value to <code class="docutils literal notranslate"><span class="pre">x-forwarded-host</span></code> if
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-append-x-forwarded-host"><span class="std std-ref">append_x_forwarded_host</span></a>
+is set.</p>
+</section>
+<section id="x-forwarded-port">
+<span id="config-http-conn-man-headers-x-forwarded-port"></span><h2><a class="toc-backref" href="#id25" role="doc-backlink">x-forwarded-port</a><a class="headerlink" href="#x-forwarded-port" title="Link to this heading"></a></h2>
+<p>Usually, the <code class="docutils literal notranslate"><span class="pre">x-forwarded-port</span></code> header comes with the <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto</span></code> header for service to
+know the originating destination port of the connection, which is the listener port in Envoy’s side.</p>
+<p>Envoy will append the <code class="docutils literal notranslate"><span class="pre">x-forwarded-port</span></code> header if <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-append-x-forwarded-port"><span class="std std-ref">append_x_forwarded_port</span></a>
+is set to true and the header has not been set.</p>
+<p>Downstream <code class="docutils literal notranslate"><span class="pre">x-forwarded-port</span></code> headers will only be trusted if <code class="docutils literal notranslate"><span class="pre">xff_num_trusted_hops</span></code> is non-zero.
+If <code class="docutils literal notranslate"><span class="pre">xff_num_trusted_hops</span></code> is zero, downstream <code class="docutils literal notranslate"><span class="pre">x-forwarded-port</span></code> headers will be overwritten.</p>
+</section>
+<section id="x-forwarded-proto">
+<span id="config-http-conn-man-headers-x-forwarded-proto"></span><h2><a class="toc-backref" href="#id26" role="doc-backlink">x-forwarded-proto</a><a class="headerlink" href="#x-forwarded-proto" title="Link to this heading"></a></h2>
+<p>It is a common case where a service wants to know what the originating protocol (HTTP or HTTPS) was
+of the connection terminated by front/edge Envoy. <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto</span></code> contains this information. It
+will be set to either <code class="docutils literal notranslate"><span class="pre">http</span></code> or <code class="docutils literal notranslate"><span class="pre">https</span></code>.</p>
+<p>Downstream <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto</span></code> headers will only be trusted if <code class="docutils literal notranslate"><span class="pre">xff_num_trusted_hops</span></code> is non-zero.
+If <code class="docutils literal notranslate"><span class="pre">xff_num_trusted_hops</span></code> is zero, downstream <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto</span></code> headers and <code class="docutils literal notranslate"><span class="pre">:scheme</span></code> headers
+will be set to http or https based on if the downstream connection is TLS or not.</p>
+<p>If the scheme is changed via the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-scheme-header-transformation"><span class="std std-ref">scheme_header_transformation</span></a>
+configuration option, <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto</span></code> will be updated as well.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto</span></code> header will be used by Envoy over <code class="docutils literal notranslate"><span class="pre">:scheme</span></code> where the underlying
+encryption is wanted, for example clearing default ports based on <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto</span></code>. See
+<a class="reference internal" href="../../../faq/debugging/xfp_vs_scheme.html#why-is-envoy-using-xfp-or-scheme"><span class="std std-ref">Why is Envoy operating on X-Forwarded-Proto instead of :scheme or vice-versa?</span></a> for more details.</p>
+<section id="inferring-x-forwarded-proto-from-proxy-protocol-destination-port">
+<h3><a class="toc-backref" href="#id27" role="doc-backlink">Inferring x-forwarded-proto from PROXY protocol destination port</a><a class="headerlink" href="#inferring-x-forwarded-proto-from-proxy-protocol-destination-port" title="Link to this heading"></a></h3>
+<p>When Envoy is deployed behind a Layer 4 load balancer (such as AWS NLB) that terminates TLS and
+forwards traffic using PROXY protocol, Envoy receives unencrypted traffic but needs to know the
+original protocol for correct redirect behavior and routing decisions.</p>
+<p>The <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-forward-proto-config"><span class="std std-ref">forward_proto_config</span></a>
+configuration option allows specifying which destination ports should be treated as HTTPS or HTTP.
+When configured:</p>
+<ol class="arabic simple">
+<li><p>If the connection’s local address was restored from PROXY protocol (indicated by the
+<a class="reference internal" href="../../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">proxy_protocol</span></a> listener filter)</p></li>
+<li><p>And the destination port is in <code class="docutils literal notranslate"><span class="pre">https_destination_ports</span></code>, <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto</span></code> is set to <code class="docutils literal notranslate"><span class="pre">https</span></code></p></li>
+<li><p>Or if the destination port is in <code class="docutils literal notranslate"><span class="pre">http_destination_ports</span></code>, <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto</span></code> is set to <code class="docutils literal notranslate"><span class="pre">http</span></code></p></li>
+</ol>
+<p>If the port is not in either list or the address was not restored from PROXY protocol, the behavior
+falls back to using the current connection’s TLS status.</p>
+<p>Example configuration:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">http_connection_manager</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">forward_proto_config</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">https_destination_ports</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">443</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">8443</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">http_destination_ports</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">80</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">8080</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>This is particularly useful for the following deployment pattern:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Client (HTTPS:443) → L4 Load Balancer (TLS termination) → PROXY protocol → Envoy (HTTP)
+</pre></div>
+</div>
+<p>In this scenario, without this configuration, Envoy would set <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto:</span> <span class="pre">http</span></code> because
+it sees an unencrypted connection. With <code class="docutils literal notranslate"><span class="pre">https_destination_ports</span></code> configured to include 443,
+Envoy correctly sets <code class="docutils literal notranslate"><span class="pre">x-forwarded-proto:</span> <span class="pre">https</span></code> based on the original destination port from the
+PROXY protocol header.</p>
+</section>
+</section>
+<section id="x-envoy-local-overloaded">
+<span id="config-http-conn-man-headers-x-envoy-local-overloaded"></span><h2><a class="toc-backref" href="#id28" role="doc-backlink">x-envoy-local-overloaded</a><a class="headerlink" href="#x-envoy-local-overloaded" title="Link to this heading"></a></h2>
+<p>Envoy will set this header on the downstream response
+if a request was dropped due to <a class="reference internal" href="../../../intro/arch_overview/operations/overload_manager.html#arch-overview-overload-manager"><span class="std std-ref">overload manager</span></a> and
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-append-local-overload"><span class="std std-ref">configuration option</span></a>
+is set to true.</p>
+</section>
+<section id="x-request-id">
+<span id="config-http-conn-man-headers-x-request-id"></span><h2><a class="toc-backref" href="#id29" role="doc-backlink">x-request-id</a><a class="headerlink" href="#x-request-id" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-request-id</span></code> header is used by Envoy to uniquely identify a request as well as perform stable
+access logging and tracing. Envoy will generate an <code class="docutils literal notranslate"><span class="pre">x-request-id</span></code> header for all external origin
+requests (the header is sanitized). It will also generate an <code class="docutils literal notranslate"><span class="pre">x-request-id</span></code> header for internal
+requests that do not already have one. This means that <code class="docutils literal notranslate"><span class="pre">x-request-id</span></code> can and should be propagated
+between client applications in order to have stable IDs across the entire mesh. Due to the out of
+process architecture of Envoy, the header can not be automatically forwarded by Envoy itself. This
+is one of the few areas where a thin client library is needed to perform this duty. How that is done
+is out of scope for this documentation. If <code class="docutils literal notranslate"><span class="pre">x-request-id</span></code> is propagated across all hosts, the
+following features are available:</p>
+<ul class="simple">
+<li><p>Stable <a class="reference internal" href="../../observability/access_log/usage.html#config-access-log"><span class="std std-ref">access logging</span></a> via the
+<a class="reference internal" href="../../../api-v3/config/accesslog/v3/accesslog.proto.html#envoy-v3-api-field-config-accesslog-v3-accesslogfilter-runtime-filter"><span class="std std-ref">v3 API runtime filter</span></a>.</p></li>
+<li><p>Stable tracing when performing random sampling via the <a class="reference internal" href="runtime.html#config-http-conn-man-runtime-random-sampling"><span class="std std-ref">tracing.random_sampling</span></a> runtime setting or via forced tracing using the
+<a class="reference internal" href="#config-http-conn-man-headers-x-envoy-force-trace"><span class="std std-ref">x-envoy-force-trace</span></a> and
+<a class="reference internal" href="#config-http-conn-man-headers-x-client-trace-id"><span class="std std-ref">x-client-trace-id</span></a> headers.</p></li>
+</ul>
+<p>See the architecture overview on
+<a class="reference internal" href="../../../intro/arch_overview/observability/tracing.html#arch-overview-tracing-context-propagation"><span class="std std-ref">context propagation</span></a> for more information.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Three configuration settings control <code class="docutils literal notranslate"><span class="pre">x-request-id</span></code> generation and preservation:</p>
+<dl class="simple">
+<dt><a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-generate-request-id"><span class="std std-ref">generate_request_id</span></a></dt><dd><p>When <code class="docutils literal notranslate"><span class="pre">true</span></code> (the default), Envoy generates a new <code class="docutils literal notranslate"><span class="pre">x-request-id</span></code> for requests that
+do not already have one. When <code class="docutils literal notranslate"><span class="pre">false</span></code>, the entire request ID generation and mutation
+logic is skipped. Disabling this can reduce overhead in high-throughput scenarios where
+request ID tracking is not needed.</p>
+</dd>
+<dt><a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-use-remote-address"><span class="std std-ref">use_remote_address</span></a></dt><dd><p>When <code class="docutils literal notranslate"><span class="pre">true</span></code>, Envoy uses the downstream connection’s remote address to determine whether
+a request is an <em>edge request</em> (i.e., from an external client). For edge requests, Envoy
+replaces any existing <code class="docutils literal notranslate"><span class="pre">x-request-id</span></code> with a newly generated value by default. When
+<code class="docutils literal notranslate"><span class="pre">false</span></code> (the default), requests are never treated as edge requests, so any existing
+<code class="docutils literal notranslate"><span class="pre">x-request-id</span></code> is preserved.</p>
+</dd>
+<dt><a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-preserve-external-request-id"><span class="std std-ref">preserve_external_request_id</span></a></dt><dd><p>When <code class="docutils literal notranslate"><span class="pre">true</span></code>, Envoy keeps an existing <code class="docutils literal notranslate"><span class="pre">x-request-id</span></code> on edge requests rather than
+replacing it. This setting only has an effect when <code class="docutils literal notranslate"><span class="pre">use_remote_address</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code>,
+since edge requests cannot occur otherwise.</p>
+</dd>
+</dl>
+<p>The resulting behavior is:</p>
+<ul class="simple">
+<li><p><strong>No ``x-request-id`` in the request</strong> – Envoy generates a new UUID (if
+<code class="docutils literal notranslate"><span class="pre">generate_request_id</span></code> is enabled).</p></li>
+<li><p><strong>``x-request-id`` present, non-edge request</strong> (<code class="docutils literal notranslate"><span class="pre">use_remote_address</span></code> is <code class="docutils literal notranslate"><span class="pre">false</span></code>, or
+the downstream address is internal) – Envoy preserves the existing value.</p></li>
+<li><p><strong>``x-request-id`` present, edge request, ``preserve_external_request_id`` is ``false``</strong>
+– Envoy replaces the value with a new UUID.</p></li>
+<li><p><strong>``x-request-id`` present, edge request, ``preserve_external_request_id`` is ``true``</strong>
+– Envoy preserves the existing value.</p></li>
+</ul>
+</div>
+</section>
+<section id="x-ot-span-context">
+<span id="config-http-conn-man-headers-x-ot-span-context"></span><h2><a class="toc-backref" href="#id30" role="doc-backlink">x-ot-span-context</a><a class="headerlink" href="#x-ot-span-context" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-ot-span-context</span></code> HTTP header is used by Envoy to establish proper parent-child relationships
+between tracing spans when used with the LightStep tracer.
+For example, an egress span is a child of an ingress
+span (if the ingress span was present). Envoy injects the <code class="docutils literal notranslate"><span class="pre">x-ot-span-context</span></code> header on ingress requests and
+forwards it to the local service. Envoy relies on the application to propagate <code class="docutils literal notranslate"><span class="pre">x-ot-span-context</span></code> on
+the egress call to an upstream. See more on tracing <a class="reference internal" href="../../../intro/arch_overview/observability/tracing.html#arch-overview-tracing"><span class="std std-ref">here</span></a>.</p>
+</section>
+<section id="x-b3-traceid">
+<span id="config-http-conn-man-headers-x-b3-traceid"></span><h2><a class="toc-backref" href="#id31" role="doc-backlink">x-b3-traceid</a><a class="headerlink" href="#x-b3-traceid" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-b3-traceid</span></code> HTTP header is used by the Zipkin tracer in Envoy.
+The TraceId is 64-bit in length and indicates the overall ID of the
+trace. Every span in a trace shares this ID. See more on zipkin tracing
+<a class="reference external" href="https://github.com/openzipkin/b3-propagation">here</a>.</p>
+</section>
+<section id="x-b3-spanid">
+<span id="config-http-conn-man-headers-x-b3-spanid"></span><h2><a class="toc-backref" href="#id32" role="doc-backlink">x-b3-spanid</a><a class="headerlink" href="#x-b3-spanid" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-b3-spanid</span></code> HTTP header is used by the Zipkin tracer in Envoy.
+The SpanId is 64-bit in length and indicates the position of the current
+operation in the trace tree. The value should not be interpreted: it may or
+may not be derived from the value of the TraceId. See more on zipkin tracing
+<a class="reference external" href="https://github.com/openzipkin/b3-propagation">here</a>.</p>
+</section>
+<section id="x-b3-parentspanid">
+<span id="config-http-conn-man-headers-x-b3-parentspanid"></span><h2><a class="toc-backref" href="#id33" role="doc-backlink">x-b3-parentspanid</a><a class="headerlink" href="#x-b3-parentspanid" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-b3-parentspanid</span></code> HTTP header is used by the Zipkin tracer in Envoy.
+The ParentSpanId is 64-bit in length and indicates the position of the
+parent operation in the trace tree. When the span is the root of the trace
+tree, the ParentSpanId is absent. See more on zipkin tracing
+<a class="reference external" href="https://github.com/openzipkin/b3-propagation">here</a>.</p>
+</section>
+<section id="x-b3-sampled">
+<span id="config-http-conn-man-headers-x-b3-sampled"></span><h2><a class="toc-backref" href="#id34" role="doc-backlink">x-b3-sampled</a><a class="headerlink" href="#x-b3-sampled" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-b3-sampled</span></code> HTTP header is used by the Zipkin tracer in Envoy.
+When the Sampled flag is either not specified or set to 1, the span will be reported to the tracing
+system. Once Sampled is set to 0 or 1, the same
+value should be consistently sent downstream. See more on zipkin tracing
+<a class="reference external" href="https://github.com/openzipkin/b3-propagation">here</a>.</p>
+</section>
+<section id="x-b3-flags">
+<span id="config-http-conn-man-headers-x-b3-flags"></span><h2><a class="toc-backref" href="#id35" role="doc-backlink">x-b3-flags</a><a class="headerlink" href="#x-b3-flags" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-b3-flags</span></code> HTTP header is used by the Zipkin tracer in Envoy.
+The encode one or more options. For example, Debug is encoded as
+<code class="docutils literal notranslate"><span class="pre">X-B3-Flags:</span> <span class="pre">1</span></code>. See more on zipkin tracing
+<a class="reference external" href="https://github.com/openzipkin/b3-propagation">here</a>.</p>
+</section>
+<section id="b3">
+<span id="config-http-conn-man-headers-b3"></span><h2><a class="toc-backref" href="#id36" role="doc-backlink">b3</a><a class="headerlink" href="#b3" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">b3</span></code> HTTP header is used by the Zipkin tracer in Envoy.
+Is a more compressed header format. See more on zipkin tracing
+<a class="reference external" href="https://github.com/openzipkin/b3-propagation#single-header">here</a>.</p>
+</section>
+<section id="x-datadog-trace-id">
+<span id="config-http-conn-man-headers-x-datadog-trace-id"></span><h2><a class="toc-backref" href="#id37" role="doc-backlink">x-datadog-trace-id</a><a class="headerlink" href="#x-datadog-trace-id" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-datadog-trace-id</span></code> HTTP header is used by the Datadog tracer in Envoy.
+The 64-bit value represents the ID of the overall trace, and is used to correlate
+the spans.</p>
+</section>
+<section id="x-datadog-parent-id">
+<span id="config-http-conn-man-headers-x-datadog-parent-id"></span><h2><a class="toc-backref" href="#id38" role="doc-backlink">x-datadog-parent-id</a><a class="headerlink" href="#x-datadog-parent-id" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-datadog-parent-id</span></code> HTTP header is used by the Datadog tracer in Envoy.
+The 64-bit value uniquely identifies the span within the trace, and is used to
+create parent-child relationships between spans.</p>
+</section>
+<section id="x-datadog-sampling-priority">
+<span id="config-http-conn-man-headers-x-datadog-sampling-priority"></span><h2><a class="toc-backref" href="#id39" role="doc-backlink">x-datadog-sampling-priority</a><a class="headerlink" href="#x-datadog-sampling-priority" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-datadog-sampling-priority</span></code> HTTP header is used by the Datadog tracer in Envoy.
+The integer value indicates the sampling decision that has been made for this trace.
+A value of 0 indicates that the trace should not be collected, and a value of 1
+requests that spans are sampled and reported.</p>
+</section>
+<section id="sw8">
+<span id="config-http-conn-man-headers-sw8"></span><h2><a class="toc-backref" href="#id40" role="doc-backlink">sw8</a><a class="headerlink" href="#sw8" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">sw8</span></code> HTTP header is used by the SkyWalking tracer in Envoy. It contains the key
+tracing context for the SkyWalking tracer and is used to establish the relationship between
+the tracing spans of downstream and Envoy. See more on SkyWalking tracing
+<a class="reference external" href="https://github.com/apache/skywalking/blob/v8.1.0/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md">here</a>.</p>
+</section>
+<section id="x-amzn-trace-id">
+<span id="config-http-conn-man-headers-x-amzn-trace-id"></span><h2><a class="toc-backref" href="#id41" role="doc-backlink">x-amzn-trace-id</a><a class="headerlink" href="#x-amzn-trace-id" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">x-amzn-trace-id</span></code> HTTP header is used by the AWS X-Ray tracer in Envoy. The trace ID,
+parent ID and sampling decision are added to HTTP requests in the tracing header. See more on AWS X-Ray tracing
+<a class="reference external" href="https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html#xray-concepts-tracingheader">here</a>.</p>
+</section>
+<section id="traceparent">
+<span id="config-http-conn-man-headers-traceparent"></span><h2><a class="toc-backref" href="#id42" role="doc-backlink">traceparent</a><a class="headerlink" href="#traceparent" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">traceparent</span></code> HTTP header is used for W3C trace context propagation. It contains version, trace ID,
+parent ID, and trace flags in a standardized format. This header is supported by the Zipkin tracer when
+<code class="docutils literal notranslate"><span class="pre">trace_context_option</span></code> is set to <code class="docutils literal notranslate"><span class="pre">USE_B3_WITH_W3C_PROPAGATION</span></code>. In this mode, the tracer will extract
+from W3C headers as fallback when B3 headers are not present, and inject both B3 and W3C headers for
+upstream requests. See more on W3C Trace Context <a class="reference external" href="https://www.w3.org/TR/trace-context/#traceparent-header">here</a>.</p>
+</section>
+<section id="tracestate">
+<span id="config-http-conn-man-headers-tracestate"></span><h2><a class="toc-backref" href="#id43" role="doc-backlink">tracestate</a><a class="headerlink" href="#tracestate" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">tracestate</span></code> HTTP header is used for W3C trace context propagation. It carries vendor-specific trace
+identification data as a set of name/value pairs. This header is supported by the Zipkin tracer when
+<code class="docutils literal notranslate"><span class="pre">trace_context_option</span></code> is set to <code class="docutils literal notranslate"><span class="pre">USE_B3_WITH_W3C_PROPAGATION</span></code>. In this mode, the tracer will extract
+from W3C headers as fallback when B3 headers are not present, and inject both B3 and W3C headers for
+upstream requests. See more on W3C Trace Context <a class="reference external" href="https://www.w3.org/TR/trace-context/#tracestate-header">here</a>.</p>
+</section>
+<section id="custom-request-response-headers">
+<span id="config-http-conn-man-headers-custom-request-headers"></span><h2><a class="toc-backref" href="#id44" role="doc-backlink">Custom request/response headers</a><a class="headerlink" href="#custom-request-response-headers" title="Link to this heading"></a></h2>
+<p>Custom request/response headers can be added to a request/response at the weighted cluster,
+route, virtual host, and/or global route configuration level. See the
+<a class="reference internal" href="../../../api-v3/config/route/v3/route.proto.html#envoy-v3-api-msg-config-route-v3-routeconfiguration"><span class="std std-ref">v3</span></a> API documentation.</p>
+<p>Neither <code class="docutils literal notranslate"><span class="pre">:</span></code>-prefixed pseudo-headers nor the Host: header may be modified via this mechanism. The <code class="docutils literal notranslate"><span class="pre">:path</span></code>
+and <code class="docutils literal notranslate"><span class="pre">:authority</span></code> headers may instead be modified via mechanisms such as
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-prefix-rewrite"><span class="std std-ref">prefix_rewrite</span></a>,
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-regex-rewrite"><span class="std std-ref">regex_rewrite</span></a>, and
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-host-rewrite-literal"><span class="std std-ref">host_rewrite</span></a>.</p>
+<p>Headers are appended to requests/responses in the following order: weighted cluster level headers,
+route level headers, virtual host level headers and finally global level headers.</p>
+<p>Envoy supports adding dynamic values to request and response headers. The percent symbol (%) is
+used to delimit variable names.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>If a literal percent symbol (%) is desired in a request/response header, it must be escaped by
+doubling it. For example, to emit a header with the value <code class="docutils literal notranslate"><span class="pre">100%</span></code>, the custom header value in
+the Envoy configuration must be <code class="docutils literal notranslate"><span class="pre">100%%</span></code>.</p>
+</div>
+<p>All HTTP <a class="reference internal" href="../../observability/access_log/usage.html#config-access-log-command-operators"><span class="std std-ref">Command Operators</span></a> used for access logging may
+be specified in custom request/response headers. However, depending where a particular command
+operator is used, the context needed for the operator may not be available and the produced output
+is empty string. For example, the following configuration uses <code class="docutils literal notranslate"><span class="pre">%RESPONSE_CODE%</span></code> operator to
+modify request headers using code from the response.  The output is an empty string, because request
+headers are modified before the request is sent upstream and the response is not received yet.</p>
+<div class="literal-block-wrapper docutils container" id="id5">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/410004abcb1a500996ce39e21648aacd/header_formatters.yaml"><code class="xref download docutils literal notranslate"><span class="pre">header_formatters.yaml</span></code></a></span><a class="headerlink" href="#id5" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">1</span><span class="w">          </span><span class="nt">route_config</span><span class="p">:</span>
+<span class="linenos">2</span><span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_route</span>
+<span class="hll"><span class="linenos">3</span><span class="w">            </span><span class="nt">request_headers_to_add</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">4</span><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">5</span><span class="w">                </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;response-code&quot;</span>
+</span><span class="hll"><span class="linenos">6</span><span class="w">                </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%RESPONSE_CODE%&quot;</span>
+</span></pre></div>
+</div>
+</div>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>The following legacy header formatters are deprecated and will be removed soon.
+The equivalent information can be accessed using indicated substitutes.</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA([&quot;namespace&quot;,</span> <span class="pre">&quot;key&quot;,</span> <span class="pre">...])%</span></code></dt><dd><p>Populates the header with dynamic metadata available in a request
+(e.g.: added by filters like the header-to-metadata filter).</p>
+<p>This works both on request and response headers.</p>
+<p>Use <a class="reference internal" href="../../advanced/substitution_formatter.html#config-access-log-format-dynamic-metadata"><span class="std std-ref">%DYNAMIC_METADATA(namespace:key:…):Z%</span></a> instead.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_METADATA([&quot;namespace&quot;,</span> <span class="pre">&quot;key&quot;,</span> <span class="pre">...])%</span></code></dt><dd><p>Populates the header with <a class="reference internal" href="../../../api-v3/config/endpoint/v3/endpoint_components.proto.html#envoy-v3-api-field-config-endpoint-v3-lbendpoint-metadata"><span class="std std-ref">EDS endpoint metadata</span></a> from the
+upstream host selected by the router. Metadata may be selected from any namespace. In general,
+metadata values may be strings, numbers, booleans, lists, nested structures, or null. Upstream
+metadata values may be selected from nested structs by specifying multiple keys. Otherwise,
+only string, boolean, and numeric values are supported. If the namespace or key(s) are not
+found, or if the selected value is not a supported type, then no header is emitted. The
+namespace and key(s) are specified as a JSON array of strings. Finally, percent symbols in the
+parameters <strong>do not</strong> need to be escaped by doubling them.</p>
+<p>Upstream metadata cannot be added to request headers as the upstream host has not been selected
+when custom request headers are generated.</p>
+<p>Use <a class="reference internal" href="../../advanced/substitution_formatter.html#config-access-log-format-upstream-host-metadata"><span class="std std-ref">%UPSTREAM_METADATA(namespace:key:…):Z%</span></a> instead.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%PER_REQUEST_STATE(reverse.dns.data.name)%</span></code></dt><dd><p>Populates the header with values set on the stream info <code class="docutils literal notranslate"><span class="pre">filterState()</span></code> object. To be
+usable in custom request/response headers, these values must be of type
+<code class="docutils literal notranslate"><span class="pre">Envoy::Router::StringAccessor</span></code>. These values should be named in standard reverse DNS style,
+identifying the organization that created the value and ending in a unique name for the data.</p>
+<p>Use <a class="reference internal" href="../../advanced/substitution_formatter.html#config-access-log-format-filter-state"><span class="std std-ref">%FILTER_STATE(reverse.dns.data.name:PLAIN):Z%</span></a> instead.</p>
+</dd>
+</dl>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="header_casing.html" class="btn btn-neutral float-left" title="HTTP/1.1 Header Casing" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="header_sanitizing.html" class="btn btn-neutral float-right" title="HTTP header sanitizing" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">HTTP header manipulation</a><ul>
+<li><a class="reference internal" href="#scheme">:scheme</a></li>
+<li><a class="reference internal" href="#path">:path</a></li>
+<li><a class="reference internal" href="#method">:method</a></li>
+<li><a class="reference internal" href="#user-agent">user-agent</a></li>
+<li><a class="reference internal" href="#server">server</a></li>
+<li><a class="reference internal" href="#referer">referer</a></li>
+<li><a class="reference internal" href="#x-client-trace-id">x-client-trace-id</a></li>
+<li><a class="reference internal" href="#x-envoy-downstream-service-cluster">x-envoy-downstream-service-cluster</a></li>
+<li><a class="reference internal" href="#x-envoy-downstream-service-node">x-envoy-downstream-service-node</a></li>
+<li><a class="reference internal" href="#x-envoy-external-address">x-envoy-external-address</a></li>
+<li><a class="reference internal" href="#x-envoy-force-trace">x-envoy-force-trace</a></li>
+<li><a class="reference internal" href="#x-envoy-internal">x-envoy-internal</a></li>
+<li><a class="reference internal" href="#x-envoy-original-dst-host">x-envoy-original-dst-host</a></li>
+<li><a class="reference internal" href="#x-forwarded-client-cert">x-forwarded-client-cert</a><ul>
+<li><a class="reference internal" href="#text-format">Text format</a></li>
+<li><a class="reference internal" href="#json-format">JSON format</a></li>
+<li><a class="reference internal" href="#format-auto-detection-when-appending">Format auto-detection when appending</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#x-forwarded-for">x-forwarded-for</a></li>
+<li><a class="reference internal" href="#x-forwarded-host">x-forwarded-host</a></li>
+<li><a class="reference internal" href="#x-forwarded-port">x-forwarded-port</a></li>
+<li><a class="reference internal" href="#x-forwarded-proto">x-forwarded-proto</a><ul>
+<li><a class="reference internal" href="#inferring-x-forwarded-proto-from-proxy-protocol-destination-port">Inferring x-forwarded-proto from PROXY protocol destination port</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#x-envoy-local-overloaded">x-envoy-local-overloaded</a></li>
+<li><a class="reference internal" href="#x-request-id">x-request-id</a></li>
+<li><a class="reference internal" href="#x-ot-span-context">x-ot-span-context</a></li>
+<li><a class="reference internal" href="#x-b3-traceid">x-b3-traceid</a></li>
+<li><a class="reference internal" href="#x-b3-spanid">x-b3-spanid</a></li>
+<li><a class="reference internal" href="#x-b3-parentspanid">x-b3-parentspanid</a></li>
+<li><a class="reference internal" href="#x-b3-sampled">x-b3-sampled</a></li>
+<li><a class="reference internal" href="#x-b3-flags">x-b3-flags</a></li>
+<li><a class="reference internal" href="#b3">b3</a></li>
+<li><a class="reference internal" href="#x-datadog-trace-id">x-datadog-trace-id</a></li>
+<li><a class="reference internal" href="#x-datadog-parent-id">x-datadog-parent-id</a></li>
+<li><a class="reference internal" href="#x-datadog-sampling-priority">x-datadog-sampling-priority</a></li>
+<li><a class="reference internal" href="#sw8">sw8</a></li>
+<li><a class="reference internal" href="#x-amzn-trace-id">x-amzn-trace-id</a></li>
+<li><a class="reference internal" href="#traceparent">traceparent</a></li>
+<li><a class="reference internal" href="#tracestate">tracestate</a></li>
+<li><a class="reference internal" href="#custom-request-response-headers">Custom request/response headers</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

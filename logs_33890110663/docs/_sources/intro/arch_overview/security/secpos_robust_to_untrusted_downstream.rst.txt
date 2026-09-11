@@ -1,0 +1,90 @@
+Extension security: ``robust_to_untrusted_downstream``
+======================================================
+
+* :ref:`envoy.access_loggers.file <extension_envoy.access_loggers.file>`
+* :ref:`envoy.access_loggers.fluentd <extension_envoy.access_loggers.fluentd>` (alpha)
+* :ref:`envoy.access_loggers.http_grpc <extension_envoy.access_loggers.http_grpc>`
+* :ref:`envoy.access_loggers.open_telemetry <extension_envoy.access_loggers.open_telemetry>`
+* :ref:`envoy.access_loggers.stderr <extension_envoy.access_loggers.stderr>`
+* :ref:`envoy.access_loggers.stdout <extension_envoy.access_loggers.stdout>`
+* :ref:`envoy.access_loggers.tcp_grpc <extension_envoy.access_loggers.tcp_grpc>`
+* :ref:`envoy.clusters.dynamic_forward_proxy <extension_envoy.clusters.dynamic_forward_proxy>`
+* :ref:`envoy.compression.brotli.compressor <extension_envoy.compression.brotli.compressor>`
+* :ref:`envoy.compression.brotli.decompressor <extension_envoy.compression.brotli.decompressor>`
+* :ref:`envoy.compression.gzip.compressor <extension_envoy.compression.gzip.compressor>`
+* :ref:`envoy.compression.gzip.decompressor <extension_envoy.compression.gzip.decompressor>`
+* :ref:`envoy.compression.zstd.compressor <extension_envoy.compression.zstd.compressor>`
+* :ref:`envoy.content_parsers.json <extension_envoy.content_parsers.json>` (alpha)
+* :ref:`envoy.filters.http.api_key_auth <extension_envoy.filters.http.api_key_auth>` (alpha)
+* :ref:`envoy.filters.http.aws_eventstream_parser <extension_envoy.filters.http.aws_eventstream_parser>` (alpha)
+* :ref:`envoy.filters.http.basic_auth <extension_envoy.filters.http.basic_auth>` (alpha)
+* :ref:`envoy.filters.http.body_size_limit <extension_envoy.filters.http.body_size_limit>` (alpha)
+* :ref:`envoy.filters.http.buffer <extension_envoy.filters.http.buffer>`
+* :ref:`envoy.filters.http.compressor <extension_envoy.filters.http.compressor>`
+* :ref:`envoy.filters.http.cors <extension_envoy.filters.http.cors>`
+* :ref:`envoy.filters.http.csrf <extension_envoy.filters.http.csrf>`
+* :ref:`envoy.filters.http.dynamic_forward_proxy <extension_envoy.filters.http.dynamic_forward_proxy>`
+* :ref:`envoy.filters.http.fault <extension_envoy.filters.http.fault>`
+* :ref:`envoy.filters.http.grpc_json_transcoder <extension_envoy.filters.http.grpc_json_transcoder>`
+* :ref:`envoy.filters.http.grpc_web <extension_envoy.filters.http.grpc_web>`
+* :ref:`envoy.filters.http.header_to_metadata <extension_envoy.filters.http.header_to_metadata>`
+* :ref:`envoy.filters.http.health_check <extension_envoy.filters.http.health_check>`
+* :ref:`envoy.filters.http.ip_tagging <extension_envoy.filters.http.ip_tagging>`
+* :ref:`envoy.filters.http.json_to_metadata <extension_envoy.filters.http.json_to_metadata>` (alpha)
+* :ref:`envoy.filters.http.jwt_authn <extension_envoy.filters.http.jwt_authn>`
+* :ref:`envoy.filters.http.kill_request <extension_envoy.filters.http.kill_request>`
+* :ref:`envoy.filters.http.lua <extension_envoy.filters.http.lua>`
+* :ref:`envoy.filters.http.oauth2 <extension_envoy.filters.http.oauth2>`
+* :ref:`envoy.filters.http.on_demand <extension_envoy.filters.http.on_demand>`
+* :ref:`envoy.filters.http.original_src <extension_envoy.filters.http.original_src>` (alpha)
+* :ref:`envoy.filters.http.ratelimit <extension_envoy.filters.http.ratelimit>`
+* :ref:`envoy.filters.http.rbac <extension_envoy.filters.http.rbac>`
+* :ref:`envoy.filters.http.sse_to_metadata <extension_envoy.filters.http.sse_to_metadata>` (alpha)
+* :ref:`envoy.filters.http.sxg <extension_envoy.filters.http.sxg>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.http.thrift_to_metadata <extension_envoy.filters.http.thrift_to_metadata>` (alpha)
+* :ref:`envoy.filters.http.upstream_rbac <extension_envoy.filters.http.upstream_rbac>` (alpha)
+* :ref:`envoy.filters.listener.local_ratelimit <extension_envoy.filters.listener.local_ratelimit>`
+* :ref:`envoy.filters.listener.original_src <extension_envoy.filters.listener.original_src>` (alpha)
+* :ref:`envoy.filters.listener.postgres_inspector <extension_envoy.filters.listener.postgres_inspector>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.listener.proxy_protocol <extension_envoy.filters.listener.proxy_protocol>`
+* :ref:`envoy.filters.network.client_ssl_auth <extension_envoy.filters.network.client_ssl_auth>` (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.network.envoy_mobile_http_connection_manager <extension_envoy.filters.network.envoy_mobile_http_connection_manager>`
+* :ref:`envoy.filters.network.ext_authz <extension_envoy.filters.network.ext_authz>`
+* :ref:`envoy.filters.network.http_connection_manager <extension_envoy.filters.network.http_connection_manager>`
+* :ref:`envoy.filters.network.local_ratelimit <extension_envoy.filters.network.local_ratelimit>`
+* :ref:`envoy.filters.network.ratelimit <extension_envoy.filters.network.ratelimit>`
+* :ref:`envoy.filters.network.rbac <extension_envoy.filters.network.rbac>`
+* :ref:`envoy.filters.network.tcp_proxy <extension_envoy.filters.network.tcp_proxy>`
+* :ref:`envoy.filters.udp.dns_filter <extension_envoy.filters.udp.dns_filter>`
+* :ref:`envoy.filters.udp.session.dynamic_forward_proxy <extension_envoy.filters.udp.session.dynamic_forward_proxy>` (alpha)
+* :ref:`envoy.filters.udp.session.ext_authz <extension_envoy.filters.udp.session.ext_authz>` (alpha)
+* :ref:`envoy.filters.udp.session.http_capsule <extension_envoy.filters.udp.session.http_capsule>` (alpha)
+* :ref:`envoy.filters.udp_listener.udp_proxy <extension_envoy.filters.udp_listener.udp_proxy>`
+* :ref:`envoy.health_checkers.grpc <extension_envoy.health_checkers.grpc>`
+* :ref:`envoy.health_checkers.http <extension_envoy.health_checkers.http>`
+* :ref:`envoy.health_checkers.tcp <extension_envoy.health_checkers.tcp>`
+* :ref:`envoy.http.original_ip_detection.custom_header <extension_envoy.http.original_ip_detection.custom_header>`
+* :ref:`envoy.http.original_ip_detection.xff <extension_envoy.http.original_ip_detection.xff>`
+* :ref:`envoy.matching.common_inputs.environment_variable <extension_envoy.matching.common_inputs.environment_variable>`
+* :ref:`envoy.matching.matchers.consistent_hashing <extension_envoy.matching.matchers.consistent_hashing>`
+* :ref:`envoy.quic.crypto_stream.server.quiche <extension_envoy.quic.crypto_stream.server.quiche>`
+* :ref:`envoy.quic.proof_source.filter_chain <extension_envoy.quic.proof_source.filter_chain>`
+* :ref:`envoy.quic.server_preferred_address.datasource <extension_envoy.quic.server_preferred_address.datasource>`
+* :ref:`envoy.quic.server_preferred_address.fixed <extension_envoy.quic.server_preferred_address.fixed>`
+* :ref:`envoy.retry_host_predicates.omit_canary_hosts <extension_envoy.retry_host_predicates.omit_canary_hosts>`
+* :ref:`envoy.retry_host_predicates.omit_host_metadata <extension_envoy.retry_host_predicates.omit_host_metadata>`
+* :ref:`envoy.retry_host_predicates.previous_hosts <extension_envoy.retry_host_predicates.previous_hosts>`
+* :ref:`envoy.retry_priorities.previous_priorities <extension_envoy.retry_priorities.previous_priorities>`
+* :ref:`envoy.route.early_data_policy.default <extension_envoy.route.early_data_policy.default>`
+* :ref:`envoy.tls.key_providers.cryptomb <extension_envoy.tls.key_providers.cryptomb>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.tls.key_providers.kae <extension_envoy.tls.key_providers.kae>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.tls.key_providers.qat <extension_envoy.tls.key_providers.qat>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.tracers.datadog <extension_envoy.tracers.datadog>`
+* :ref:`envoy.tracers.xray <extension_envoy.tracers.xray>`
+* :ref:`envoy.tracers.zipkin <extension_envoy.tracers.zipkin>`
+* :ref:`envoy.upstreams.http.generic <extension_envoy.upstreams.http.generic>`
+* :ref:`envoy.upstreams.http.http <extension_envoy.upstreams.http.http>`
+* :ref:`envoy.upstreams.http.http_protocol_options <extension_envoy.upstreams.http.http_protocol_options>`
+* :ref:`envoy.upstreams.http.tcp <extension_envoy.upstreams.http.tcp>`
+* :ref:`envoy.upstreams.http.udp <extension_envoy.upstreams.http.udp>` (alpha)
+* :ref:`envoy.upstreams.tcp.generic <extension_envoy.upstreams.tcp.generic>`

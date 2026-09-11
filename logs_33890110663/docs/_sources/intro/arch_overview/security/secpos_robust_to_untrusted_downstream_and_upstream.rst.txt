@@ -1,0 +1,70 @@
+Extension security: ``robust_to_untrusted_downstream_and_upstream``
+===================================================================
+
+* :ref:`envoy.bootstrap.internal_listener <extension_envoy.bootstrap.internal_listener>`
+* :ref:`envoy.clusters.dns <extension_envoy.clusters.dns>`
+* :ref:`envoy.clusters.eds <extension_envoy.clusters.eds>`
+* :ref:`envoy.clusters.logical_dns <extension_envoy.clusters.logical_dns>`
+* :ref:`envoy.clusters.original_dst <extension_envoy.clusters.original_dst>`
+* :ref:`envoy.clusters.static <extension_envoy.clusters.static>`
+* :ref:`envoy.clusters.strict_dns <extension_envoy.clusters.strict_dns>`
+* :ref:`envoy.compression.qatzip.compressor <extension_envoy.compression.qatzip.compressor>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.compression.qatzstd.compressor <extension_envoy.compression.qatzstd.compressor>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.filters.http.decompressor <extension_envoy.filters.http.decompressor>`
+* :ref:`envoy.filters.http.ext_authz <extension_envoy.filters.http.ext_authz>`
+* :ref:`envoy.filters.http.ext_proc <extension_envoy.filters.http.ext_proc>`
+* :ref:`envoy.filters.http.router <extension_envoy.filters.http.router>`
+* :ref:`envoy.filters.http.set_metadata <extension_envoy.filters.http.set_metadata>`
+* :ref:`envoy.filters.http.upstream_codec <extension_envoy.filters.http.upstream_codec>`
+* :ref:`envoy.filters.listener.original_dst <extension_envoy.filters.listener.original_dst>`
+* :ref:`envoy.filters.listener.tls_inspector <extension_envoy.filters.listener.tls_inspector>`
+* :ref:`envoy.filters.network.connection_limit <extension_envoy.filters.network.connection_limit>`
+* :ref:`envoy.formatter.cel <extension_envoy.formatter.cel>` (alpha)
+* :ref:`envoy.formatter.file_content <extension_envoy.formatter.file_content>` (alpha)
+* :ref:`envoy.formatter.generic_secret <extension_envoy.formatter.generic_secret>` (alpha)
+* :ref:`envoy.formatter.metadata <extension_envoy.formatter.metadata>` (alpha)
+* :ref:`envoy.formatter.req_without_query <extension_envoy.formatter.req_without_query>` (alpha)
+* :ref:`envoy.health_check.event_sinks.file <extension_envoy.health_check.event_sinks.file>`
+* :ref:`envoy.http.early_header_mutation.header_mutation <extension_envoy.http.early_header_mutation.header_mutation>` (alpha)
+* :ref:`envoy.http.stateful_header_formatters.preserve_case <extension_envoy.http.stateful_header_formatters.preserve_case>`
+* :ref:`envoy.internal_redirect_predicates.allow_listed_routes <extension_envoy.internal_redirect_predicates.allow_listed_routes>`
+* :ref:`envoy.internal_redirect_predicates.filter_state <extension_envoy.internal_redirect_predicates.filter_state>`
+* :ref:`envoy.internal_redirect_predicates.previous_routes <extension_envoy.internal_redirect_predicates.previous_routes>`
+* :ref:`envoy.internal_redirect_predicates.safe_cross_scheme <extension_envoy.internal_redirect_predicates.safe_cross_scheme>`
+* envoy.io_socket.user_space
+* :ref:`envoy.load_balancing_policies.cluster_provided <extension_envoy.load_balancing_policies.cluster_provided>`
+* :ref:`envoy.load_balancing_policies.maglev <extension_envoy.load_balancing_policies.maglev>`
+* :ref:`envoy.load_balancing_policies.random <extension_envoy.load_balancing_policies.random>`
+* :ref:`envoy.load_balancing_policies.ring_hash <extension_envoy.load_balancing_policies.ring_hash>`
+* :ref:`envoy.load_balancing_policies.round_robin <extension_envoy.load_balancing_policies.round_robin>`
+* :ref:`envoy.load_balancing_policies.subset <extension_envoy.load_balancing_policies.subset>`
+* :ref:`envoy.matching.matchers.cel_matcher <extension_envoy.matching.matchers.cel_matcher>`
+* :ref:`envoy.matching.matchers.ip <extension_envoy.matching.matchers.ip>`
+* :ref:`envoy.matching.matchers.runtime_fraction <extension_envoy.matching.matchers.runtime_fraction>`
+* :ref:`envoy.network.dns_resolver.apple <extension_envoy.network.dns_resolver.apple>`
+* :ref:`envoy.network.dns_resolver.cares <extension_envoy.network.dns_resolver.cares>`
+* :ref:`envoy.network.dns_resolver.getaddrinfo <extension_envoy.network.dns_resolver.getaddrinfo>`
+* :ref:`envoy.network.dns_resolver.hickory <extension_envoy.network.dns_resolver.hickory>` (alpha)
+* envoy.path.match.uri_template.uri_template_matcher
+* envoy.path.rewrite.uri_template.uri_template_rewriter
+* :ref:`envoy.queue_policy.fifo <extension_envoy.queue_policy.fifo>` (alpha)
+* :ref:`envoy.quic.connection_debug_visitor.quic_stats <extension_envoy.quic.connection_debug_visitor.quic_stats>`
+* :ref:`envoy.quic.deterministic_connection_id_generator <extension_envoy.quic.deterministic_connection_id_generator>`
+* :ref:`envoy.quic.packet_writer.default <extension_envoy.quic.packet_writer.default>`
+* :ref:`envoy.rbac.principals.mtls_authenticated <extension_envoy.rbac.principals.mtls_authenticated>`
+* :ref:`envoy.regex_engines.google_re2 <extension_envoy.regex_engines.google_re2>`
+* :ref:`envoy.request_id.uuid <extension_envoy.request_id.uuid>`
+* :ref:`envoy.router.cluster_specifier_plugin.lua <extension_envoy.router.cluster_specifier_plugin.lua>` (alpha)
+* :ref:`envoy.router.cluster_specifier_plugin.matcher <extension_envoy.router.cluster_specifier_plugin.matcher>` (alpha)
+* :ref:`envoy.string_matcher.lua <extension_envoy.string_matcher.lua>` (alpha)
+* :ref:`envoy.transport_sockets.alts <extension_envoy.transport_sockets.alts>`
+* :ref:`envoy.transport_sockets.internal_upstream <extension_envoy.transport_sockets.internal_upstream>`
+* :ref:`envoy.transport_sockets.quic <extension_envoy.transport_sockets.quic>`
+* :ref:`envoy.transport_sockets.raw_buffer <extension_envoy.transport_sockets.raw_buffer>`
+* :ref:`envoy.transport_sockets.starttls <extension_envoy.transport_sockets.starttls>`
+* :ref:`envoy.transport_sockets.tcp_stats <extension_envoy.transport_sockets.tcp_stats>`
+* :ref:`envoy.transport_sockets.tls <extension_envoy.transport_sockets.tls>`
+* :ref:`envoy.transport_sockets.upstream_proxy_protocol <extension_envoy.transport_sockets.upstream_proxy_protocol>`
+* :ref:`envoy.udp_packet_writer.default <extension_envoy.udp_packet_writer.default>`
+* :ref:`envoy.udp_packet_writer.gso <extension_envoy.udp_packet_writer.gso>`
+* :ref:`envoy.wasm.runtime.null <extension_envoy.wasm.runtime.null>`

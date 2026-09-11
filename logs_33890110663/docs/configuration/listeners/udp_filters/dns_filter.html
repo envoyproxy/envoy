@@ -1,0 +1,436 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DNS Filter &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Dynamic Modules" href="dynamic_modules.html" />
+    <link rel="prev" title="External authorization" href="session_filters/ext_authz.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../listeners.html">Listeners</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../stats.html">Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../runtime.html">Runtime</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../listener_filters/listener_filters.html">Listener filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../network_filters/network_filters.html">Network filters</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="udp_filters.html">UDP listener filters</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="udp_proxy.html">UDP proxy</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">DNS Filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dynamic_modules.html">Dynamic Modules</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../lds.html">Listener discovery service (LDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../network_namespace_matching.html">Network Namespace Matching</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../http/http.html">HTTP</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../listeners.html">Listeners</a></li>
+          <li class="breadcrumb-item"><a href="udp_filters.html">UDP listener filters</a></li>
+      <li class="breadcrumb-item active">DNS Filter</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/listeners/udp_filters/dns_filter.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dns-filter">
+<span id="config-udp-listener-filters-dns-filter"></span><h1>DNS Filter<a class="headerlink" href="#dns-filter" title="Link to this heading"></a></h1>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>DNS Filter is under active development and should be considered alpha and not production ready.</p>
+</div>
+<ul class="simple">
+<li><p>This filter should be configured with the type URL <code class="docutils literal notranslate"><span class="pre">type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig</span></code>.</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/filters/udp/dns_filter/v3/dns_filter.proto.html#envoy-v3-api-msg-extensions-filters-udp-dns-filter-v3-dnsfilterconfig"><span class="std std-ref">v3 API reference</span></a></p></li>
+</ul>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>The DNS filter allows Envoy to resolve forward DNS queries as an authoritative server for any
+configured domains. The filter’s configuration specifies the names and addresses for which Envoy
+will answer as well as the configuration needed to send queries externally for unknown domains.</p>
+<p>The filter supports local and external DNS resolution. If a lookup for a name does not match a
+statically configured domain, or a provisioned cluster name, Envoy can refer the query to an
+external resolver for an answer. Users have the option of specifying the DNS servers that Envoy
+will use for external resolution. Users can disable external DNS resolution by omitting the
+client configuration object.</p>
+<p>The filter supports <a class="reference internal" href="../../../api-v3/extensions/filters/udp/dns_filter/v3/dns_filter.proto.html#envoy-v3-api-msg-extensions-filters-udp-dns-filter-v3-dnsfilterconfig"><span class="std std-ref">per-filter configuration</span></a>.
+An Example configuration follows that illustrates how the filter can be used.</p>
+</section>
+<section id="example-configuration">
+<h2>Example Configuration<a class="headerlink" href="#example-configuration" title="Link to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">listener_filters</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.udp.dns_filter</span>
+<span class="w">  </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">    </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig&quot;</span>
+<span class="w">    </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;dns_filter_prefix&quot;</span>
+<span class="w">    </span><span class="nt">client_config</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">resolution_timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+<span class="w">      </span><span class="nt">dns_resolution_config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">dns_resolver_options</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">use_tcp_for_dns_lookups</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">          </span><span class="nt">no_default_search_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">        </span><span class="nt">resolvers</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;8.8.8.8&quot;</span>
+<span class="w">            </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">53</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;8.8.4.4&quot;</span>
+<span class="w">            </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">53</span>
+<span class="w">      </span><span class="nt">max_pending_lookups</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">256</span>
+<span class="w">    </span><span class="nt">server_config</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">inline_dns_table</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">virtual_domains</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;www.domain1.com&quot;</span>
+<span class="w">            </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">address_list</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10.0.0.1</span>
+<span class="w">                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10.0.0.2</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;www.domain2.com&quot;</span>
+<span class="w">            </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">address_list</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2001:8a:c1::2800:7</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;www.domain3.com&quot;</span>
+<span class="w">            </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">address_list</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10.0.3.1</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;www.domain4.com&quot;</span>
+<span class="w">            </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_0</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;voip.domain5.com&quot;</span>
+<span class="w">            </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">service_list</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">services</span><span class="p">:</span>
+<span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">service_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;sip&quot;</span>
+<span class="w">                    </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> number</span><span class="p">:</span><span class="w"> </span><span class="nv">6</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<span class="w">                    </span><span class="nt">ttl</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">86400s</span>
+<span class="w">                    </span><span class="nt">targets</span><span class="p">:</span>
+<span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">host_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;primary.voip.domain5.com&quot;</span>
+<span class="w">                      </span><span class="nt">priority</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">                      </span><span class="nt">weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w">                      </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5060</span>
+<span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">host_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;secondary.voip.domain5.com&quot;</span>
+<span class="w">                      </span><span class="nt">priority</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">                      </span><span class="nt">weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
+<span class="w">                      </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5060</span>
+<span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">host_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;backup.voip.domain5.com&quot;</span>
+<span class="w">                      </span><span class="nt">priority</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">                      </span><span class="nt">weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">                      </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5060</span>
+</pre></div>
+</div>
+<p>In this example, Envoy is configured to respond to client queries for five domains. For any
+other query, it will forward upstream to external resolvers. The filter will return an address
+matching the input query type. If the query is for type A records and no A records are configured,
+Envoy will return no addresses and set the response code appropriately. Conversely, if there are
+matching records for the query type, each configured address is returned. This is also true for
+AAAA records. Only A, AAAA, and SRV records are supported. If the filter parses queries for other
+record types, the filter immediately responds indicating that the type is not supported. The
+filter can also redirect a query for a DNS name to the endpoints of a cluster. “www.domain4.com”
+in the configuration demonstrates this. Along with an address list, a cluster name is a valid
+endpoint for a DNS name.</p>
+<p>The DNS filter also supports responding to queries for service records. The records for “domain5.com”
+illustrate the configuration necessary to support responding to SRV records. The target name
+populated in the configuration must be fully qualified domain names, unless the target is a cluster.
+For non-cluster targets, each referenced target name must be defined in the DNS Filter table so that
+Envoy can resolve the target hosts’ IP addresses. For a cluster, Envoy will return an address for
+each cluster endpoint.</p>
+<p>Each service record’s protocol can be defined by a name or number. As configured in the example,
+the filter will successfully respond to SRV record requests for “_sip._tcp.voip.domain5.com”. If a
+numerical value is specified, Envoy will attempt to resolve the number to a name. String values for
+protocols are used as they appear. An underscore is prepended to both the service and protocol to
+adhere to the convention outlined in the RFC.</p>
+</section>
+<section id="case-insensitive-matching">
+<h2>Case-insensitive matching<a class="headerlink" href="#case-insensitive-matching" title="Link to this heading"></a></h2>
+<p>By default the filter matches query names against the configured virtual domains using a
+byte-exact comparison, so a query for <code class="docutils literal notranslate"><span class="pre">GOOGLE.COM</span></code> does not match a configured <code class="docutils literal notranslate"><span class="pre">google.com</span></code>.
+Setting <a class="reference internal" href="../../../api-v3/extensions/filters/udp/dns_filter/v3/dns_filter.proto.html#envoy-v3-api-field-extensions-filters-udp-dns-filter-v3-dnsfilterconfig-case-insensitive"><span class="std std-ref">case_insensitive</span></a> to
+<code class="docutils literal notranslate"><span class="pre">true</span></code> makes matching case-insensitive. The response still echoes the client’s original
+query-name case. Note that when enabled, SRV target names in the answer are lowercased, and two
+virtual domains that differ only by case collapse to a single entry (the first entry wins and
+address lists are merged).</p>
+<p>The filter can also consume its domain configuration from an external DNS table. The same entities
+appearing in the static configuration can be stored as JSON or YAML in a separate file and referenced
+using the <a class="reference internal" href="../../../api-v3/config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-datasource"><span class="std std-ref">external_dns_table DataSource</span></a> directive:</p>
+</section>
+<section id="example-external-dnstable-configuration">
+<h2>Example External DnsTable Configuration<a class="headerlink" href="#example-external-dnstable-configuration" title="Link to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">listener_filters</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.filters.udp.dns_filter&quot;</span>
+<span class="w">  </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">    </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&#39;type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig&#39;</span>
+<span class="w">    </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_prefix&quot;</span>
+<span class="w">    </span><span class="nt">server_config</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">external_dns_table</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/home/ubuntu/configs/dns_table.json&quot;</span>
+</pre></div>
+</div>
+<p>In the file, the table can be defined as follows:</p>
+</section>
+<section id="dnstable-json-configuration">
+<h2>DnsTable JSON Configuration<a class="headerlink" href="#dnstable-json-configuration" title="Link to this heading"></a></h2>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;virtual_domains&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;www.suffix1.com&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;endpoint&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;address_list&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="s2">&quot;10.0.0.1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;10.0.0.2&quot;</span><span class="w"> </span><span class="p">]</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;www.suffix2.com&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;endpoint&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;address_list&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="s2">&quot;2001:8a:c1::2800:7&quot;</span><span class="w"> </span><span class="p">]</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>By utilizing this configuration, the DNS responses can be configured separately from the Envoy
+configuration.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="session_filters/ext_authz.html" class="btn btn-neutral float-left" title="External authorization" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="dynamic_modules.html" class="btn btn-neutral float-right" title="Dynamic Modules" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">DNS Filter</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#example-configuration">Example Configuration</a></li>
+<li><a class="reference internal" href="#case-insensitive-matching">Case-insensitive matching</a></li>
+<li><a class="reference internal" href="#example-external-dnstable-configuration">Example External DnsTable Configuration</a></li>
+<li><a class="reference internal" href="#dnstable-json-configuration">DnsTable JSON Configuration</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

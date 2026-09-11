@@ -1,0 +1,210 @@
+External dependencies: ``api``
+==============================
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `Bazel rules for Buf <https://github.com/bufbuild/rules_buf>`__, `0.5.2 <https://bcr.bazel.build/modules/rules_buf/0.5.2/>`__, 2026-04-30, , `Apache-2.0 <https://github.com/bufbuild/rules_buf/blob/0.5.2/LICENSE>`__
+  `bazel-skylib <https://github.com/bazelbuild/bazel-skylib>`__, `1.9.0 <https://bcr.bazel.build/modules/bazel_skylib/1.9.0/>`__, 2026-07-17, , `Apache-2.0 <https://github.com/bazelbuild/bazel-skylib/blob/1.9.0/LICENSE>`__
+  `Go rules for Bazel <https://github.com/bazelbuild/rules_go>`__, `0.59.0 <https://bcr.bazel.build/modules/rules_go/0.59.0/>`__, 2026-06-04, , `Apache-2.0 <https://github.com/bazelbuild/rules_go/blob/v0.59.0/LICENSE.txt>`__
+  `Google APIs <https://github.com/googleapis/googleapis>`__, `0.0.0-20251003-2193a2bf <https://bcr.bazel.build/modules/googleapis/0.0.0-20251003-2193a2bf/>`__, 2024-09-16, , `Apache-2.0 <https://github.com/googleapis/googleapis/blob/0.0.0-20251003-2193a2bf/LICENSE>`__
+  `Java rules for Bazel <https://github.com/bazelbuild/rules_java/>`__, `9.3.0 <https://bcr.bazel.build/modules/rules_java/9.3.0/>`__, 2026-07-15, , `Apache-2.0 <https://github.com/bazelbuild/rules_java/blob/9.3.0/LICENSE>`__
+  `OpenTelemetry Proto <https://github.com/open-telemetry/opentelemetry-proto>`__, `1.8.0 <https://bcr.bazel.build/modules/opentelemetry-proto/1.8.0/>`__, 2026-07-21, , `Apache-2.0 <https://github.com/open-telemetry/opentelemetry-proto/blob/v1.8.0/LICENSE>`__
+  `Prometheus client model <https://github.com/prometheus/client_model>`__, `0.6.2.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/prometheus-metrics-model/0.6.2.envoy/>`__, 2025-04-11, , `Apache-2.0 <https://github.com/prometheus/client_model/blob/v0.6.2.envoy/LICENSE>`__
+  `Protobuf Rules for Bazel <https://github.com/bazelbuild/rules_proto>`__, `7.1.0 <https://bcr.bazel.build/modules/rules_proto/7.1.0/>`__, 2024-12-18, , `Apache-2.0 <https://github.com/bazelbuild/rules_proto/blob/7.1.0/LICENSE>`__
+  `protoc-gen-validate (PGV) <https://github.com/bufbuild/protoc-gen-validate>`__, `1.3.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/protoc-gen-validate/1.3.0.envoy/>`__, 2026-02-18, , `Apache-2.0 <https://github.com/bufbuild/protoc-gen-validate/blob/v1.3.0.envoy/LICENSE>`__
+  `Shell script rules for Bazel <https://github.com/bazelbuild/rules_shell>`__, `0.8.0 <https://bcr.bazel.build/modules/rules_shell/0.8.0/>`__, 2026-04-15, , `Apache-2.0 <https://github.com/protocolbuffers/rules_shell/blob/0.8.0/LICENSE>`__
+  `xDS API <https://github.com/cncf/xds>`__, `0.0.1-20251110-8bfbf64.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/xds/0.0.1-20251110-8bfbf64.envoy/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/cncf/xds/blob/0.0.1-20251110-8bfbf64.envoy/LICENSE>`__
+  `Zipkin API <https://github.com/openzipkin/zipkin-api>`__, `1.0.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/zipkin-api/1.0.0.envoy/>`__, 2020-11-22, , `Apache-2.0 <https://github.com/openzipkin/zipkin-api/blob/1.0.0.envoy/LICENSE>`__
+
+
+envoy.access_loggers.extension_filters.cel
+------------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.access_loggers.wasm
+-------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.bootstrap.wasm
+--------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.filters.http.ext_proc
+---------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.filters.http.rate_limit_quota
+-----------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.filters.http.rbac
+-----------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.filters.http.upstream_rbac
+--------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.filters.http.wasm
+-----------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.filters.network.ext_proc
+------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.filters.network.rbac
+--------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.filters.network.wasm
+--------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.formatter.cel
+-------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder
+-------------------------------------------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.matching.inputs.cel_data_input
+------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.matching.matchers.cel_matcher
+-----------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.rate_limit_descriptors.expr
+---------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.stat_sinks.wasm
+---------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.tracers.opentelemetry
+---------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+
+
+envoy.tracers.opentelemetry.samplers.cel
+----------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `CEL <https://github.com/google/cel-spec>`__, `0.25.2 <https://bcr.bazel.build/modules/cel-spec/0.25.2/>`__, 2025-11-10, , `Apache-2.0 <https://github.com/google/cel-spec/blob/v0.25.2/LICENSE>`__
+

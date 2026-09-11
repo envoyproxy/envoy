@@ -1,0 +1,13 @@
+.. _version_history_1.15.2:
+
+1.15.2 (September 29, 2020)
+============================
+
+
+
+Changes
+-------
+
+
+* **docs**: fix docs for v1.15.1.
+

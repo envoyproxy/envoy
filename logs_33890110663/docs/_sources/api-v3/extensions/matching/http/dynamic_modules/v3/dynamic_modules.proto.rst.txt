@@ -1,0 +1,144 @@
+.. _envoy_v3_api_file_envoy/extensions/matching/http/dynamic_modules/v3/dynamic_modules.proto:
+
+Dynamic Modules HTTP Match Input (proto)
+========================================
+
+.. _extension_envoy.matching.inputs.dynamic_module_data_input:
+
+This extension has the qualified name ``envoy.matching.inputs.dynamic_module_data_input``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput:
+
+extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput
+-----------------------------------------------------------------------
+
+
+:repo:`[extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput proto] <api/envoy/extensions/matching/http/dynamic_modules/v3/dynamic_modules.proto#L27>`
+
+Configuration for the dynamic modules HTTP match input. This input extracts HTTP request and
+response data from the matching context and makes it available to the dynamic module matcher
+via ABI callbacks during match evaluation.
+
+This data input should be used together with the
+:ref:`dynamic modules input matcher
+<envoy_v3_api_msg_extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher>`.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.DynamicModuleDataInput:
+
+extensions.matching.http.dynamic_modules.v3.DynamicModuleDataInput
+------------------------------------------------------------------
+
+
+:repo:`[extensions.matching.http.dynamic_modules.v3.DynamicModuleDataInput proto] <api/envoy/extensions/matching/http/dynamic_modules/v3/dynamic_modules.proto#L39>`
+
+Configuration for the dynamic modules data input. This input loads a shared object file
+via ``dlopen`` and invokes it during match evaluation to extract a value from the HTTP
+request and response. The extracted value is a string that an exact match map can dispatch on,
+so a module can select one of many matches with a single evaluation.
+
+Unlike :ref:`HttpDynamicModuleMatchInput
+<envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput>`, the
+module produces the value directly rather than pairing with the dynamic modules input matcher.
+
+.. _extension_envoy.matching.inputs.dynamic_module_string_data_input:
+
+This extension has the qualified name ``envoy.matching.inputs.dynamic_module_string_data_input``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.http.dynamic_modules.v3.DynamicModuleDataInput <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.DynamicModuleDataInput>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "input_name": ...,
+    "input_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.matching.http.dynamic_modules.v3.DynamicModuleDataInput.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`, *REQUIRED*) Specifies the shared-object level configuration. This field is required. Remote module sources
+  are not supported for data inputs, so the module must be available locally or by name.
+
+
+.. _envoy_v3_api_field_extensions.matching.http.dynamic_modules.v3.DynamicModuleDataInput.input_name:
+
+
+input_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name for this data input configuration. If not specified, defaults to an empty string.
+
+  This can be used to distinguish between different data input implementations inside a dynamic
+  module. When Envoy receives this configuration, it passes the ``input_name`` to the dynamic
+  module's data input config init function together with the ``input_config``. That way a module
+  can decide which in-module implementation to use based on the name at load time.
+
+
+.. _envoy_v3_api_field_extensions.matching.http.dynamic_modules.v3.DynamicModuleDataInput.input_config:
+
+
+input_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the data input chosen by ``input_name``. If not specified, an empty
+  configuration is passed to the module.
+
+  ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly without
+  the wrapper.
+
+

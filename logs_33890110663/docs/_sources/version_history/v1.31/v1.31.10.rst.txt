@@ -1,0 +1,22 @@
+.. _version_history_1.31.10:
+
+1.31.10 (July 18, 2025)
+========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **dynatrace**: Fixed a division by zero bug in the Dynatrace sampling controller that occurred when ``total_wanted`` was less than
+  ``top_k_size``. The calculation was refactored to avoid the intermediate division that could result in zero.
+* **release**: Container (Ubuntu/distroless) updates, and fixed permissions for distroless config directory.
+

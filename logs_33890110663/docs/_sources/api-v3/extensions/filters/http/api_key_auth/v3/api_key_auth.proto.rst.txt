@@ -1,0 +1,298 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/api_key_auth/v3/api_key_auth.proto:
+
+APIKey Auth (proto)
+===================
+
+.. _extension_envoy.filters.http.api_key_auth:
+
+This extension has the qualified name ``envoy.filters.http.api_key_auth``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuth <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.ApiKeyAuth>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+APIKey Auth :ref:`configuration overview <config_http_filters_api_key_auth>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.ApiKeyAuth:
+
+extensions.filters.http.api_key_auth.v3.ApiKeyAuth
+--------------------------------------------------
+
+
+:repo:`[extensions.filters.http.api_key_auth.v3.ApiKeyAuth proto] <api/envoy/extensions/filters/http/api_key_auth/v3/api_key_auth.proto#L39>`
+
+API Key HTTP authentication.
+
+For example, the following configuration configures the filter to authenticate the clients using
+the API key from the header ``X-API-KEY``. And only the clients with the key ``real-key`` are
+considered as authenticated. The client information is configured to be forwarded
+in the header ``x-client-id``.
+
+.. code-block:: yaml
+
+   credentials:
+   - key: real-key
+     client: user
+   key_sources:
+    - header: "X-API-KEY"
+   forwarding:
+     header: "x-client-id"
+     hide_credentials: false
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "credentials": [],
+    "key_sources": [],
+    "forwarding": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.ApiKeyAuth.credentials:
+
+
+credentials
+  (**repeated** :ref:`extensions.filters.http.api_key_auth.v3.Credential <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.Credential>`) The credentials that are used to authenticate the clients.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.ApiKeyAuth.key_sources:
+
+
+key_sources
+  (**repeated** :ref:`extensions.filters.http.api_key_auth.v3.KeySource <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.KeySource>`) The key sources to fetch the key from the coming request.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.ApiKeyAuth.forwarding:
+
+
+forwarding
+  (:ref:`extensions.filters.http.api_key_auth.v3.Forwarding <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.Forwarding>`) Optional configuration to control what information should be propagated to upstream services.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute:
+
+extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute
+----------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute proto] <api/envoy/extensions/filters/http/api_key_auth/v3/api_key_auth.proto#L51>`
+
+API key auth configuration of per route or per virtual host or per route configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "credentials": [],
+    "key_sources": [],
+    "allowed_clients": [],
+    "forwarding": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute.credentials:
+
+
+credentials
+  (**repeated** :ref:`extensions.filters.http.api_key_auth.v3.Credential <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.Credential>`) The credentials that are used to authenticate the clients. If this field is non-empty, then the
+  credentials in the filter level configuration will be ignored and the credentials in this
+  configuration will be used.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute.key_sources:
+
+
+key_sources
+  (**repeated** :ref:`extensions.filters.http.api_key_auth.v3.KeySource <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.KeySource>`) The key sources to fetch the key from the coming request. If this field is non-empty, then the
+  key sources in the filter level configuration will be ignored and the key sources in this
+  configuration will be used.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute.allowed_clients:
+
+
+allowed_clients
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) A list of clients that are allowed to access the route or vhost. The clients listed here
+  should be subset of the clients listed in the ``credentials`` to provide authorization control
+  after the authentication is successful. If the list is empty, then all authenticated clients
+  are allowed. This provides very limited but simple authorization. If more complex authorization
+  is required, then use the :ref:`HTTP RBAC filter <config_http_filters_rbac>` instead.
+
+  .. note::
+    Setting this field and ``credentials`` at the same configuration entry is not an error but
+    also makes no much sense because they provide similar functionality. Please only use
+    one of them at same configuration entry except for the case that you want to share the same
+    credentials list across multiple routes but still use different allowed clients for each
+    route.
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute.forwarding:
+
+
+forwarding
+  (:ref:`extensions.filters.http.api_key_auth.v3.Forwarding <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.Forwarding>`) Optional configuration to control what information should be propagated to upstream services.
+  If this field is non-empty, then the forwarding information in the filter level configuration
+  will be ignored and the forwarding in this configuration will be used.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.Credential:
+
+extensions.filters.http.api_key_auth.v3.Credential
+--------------------------------------------------
+
+
+:repo:`[extensions.filters.http.api_key_auth.v3.Credential proto] <api/envoy/extensions/filters/http/api_key_auth/v3/api_key_auth.proto#L84>`
+
+Single credential entry that contains the API key and the related client id.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "key": ...,
+    "client": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.Credential.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The value of the unique API key.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.Credential.client:
+
+
+client
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The unique id or identity that used to identify the client or consumer.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.KeySource:
+
+extensions.filters.http.api_key_auth.v3.KeySource
+-------------------------------------------------
+
+
+:repo:`[extensions.filters.http.api_key_auth.v3.KeySource proto] <api/envoy/extensions/filters/http/api_key_auth/v3/api_key_auth.proto#L92>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "header": ...,
+    "query": ...,
+    "cookie": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.KeySource.header:
+
+
+header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The header name to fetch the key. If multiple header values are present, the first one will be
+  used. If the header value starts with 'Bearer ', this prefix will be stripped to get the
+  key value.
+
+  If set, takes precedence over ``query`` and ``cookie``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.KeySource.query:
+
+
+query
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The query parameter name to fetch the key. If multiple query values are present, the first one
+  will be used.
+
+  The field will be used if ``header`` is not set. If set, takes precedence over ``cookie``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.KeySource.cookie:
+
+
+cookie
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The cookie name to fetch the key.
+
+  The field will be used if the ``header`` and ``query`` are not set.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.Forwarding:
+
+extensions.filters.http.api_key_auth.v3.Forwarding
+--------------------------------------------------
+
+
+:repo:`[extensions.filters.http.api_key_auth.v3.Forwarding proto] <api/envoy/extensions/filters/http/api_key_auth/v3/api_key_auth.proto#L116>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "header": ...,
+    "hide_credentials": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.Forwarding.header:
+
+
+header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The header name in which to store the client information. If this field is non-empty,
+  the client string associated with the matched credential will be injected into
+  the request before forwarding upstream.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.api_key_auth.v3.Forwarding.hide_credentials:
+
+
+hide_credentials
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, remove the API key from the request before forwarding upstream.
+
+  This applies to all configured key sources: ``header``, ``query``, and ``cookie``.
+
+

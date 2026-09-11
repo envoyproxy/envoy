@@ -1,0 +1,363 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto:
+
+GCP authentication (proto)
+==========================
+
+.. _extension_envoy.filters.http.gcp_authn:
+
+This extension has the qualified name ``envoy.filters.http.gcp_authn``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig>`
+
+
+
+GCP authentication :ref:`configuration overview <config_http_filters_gcp_authn>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig:
+
+extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig
+---------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig proto] <api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L26>`
+
+Filter configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "http_uri": {...},
+    "retry_policy": {...},
+    "cache_config": {...},
+    "token_header": {...},
+    "token_metadata_key": ...,
+    "cluster": ...,
+    "timeout": {...},
+    "audience": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.http_uri:
+
+
+http_uri
+  (:ref:`config.core.v3.HttpUri <envoy_v3_api_msg_config.core.v3.HttpUri>`) The HTTP URI to fetch tokens from GCE Metadata Server(https://cloud.google.com/compute/docs/metadata/overview).
+  The URL format is "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
+
+  This field is deprecated because it does not match the API surface provided by the google auth libraries.
+  Control planes should not attempt to override the metadata server URI.
+  The cluster and timeout can be configured using the ``cluster`` and ``timeout`` fields instead.
+  For backward compatibility, the cluster and timeout configured in this field will be used
+  if the new ``cluster`` and ``timeout`` fields are not set.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.retry_policy:
+
+
+retry_policy
+  (:ref:`config.core.v3.RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>`) Retry policy for fetching tokens.
+  Not supported by all data planes.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.cache_config:
+
+
+cache_config
+  (:ref:`extensions.filters.http.gcp_authn.v3.TokenCacheConfig <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.TokenCacheConfig>`) Token cache configuration. This field is optional.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.token_header:
+
+
+token_header
+  (:ref:`extensions.filters.http.gcp_authn.v3.TokenHeader <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.TokenHeader>`) Request header location to extract the token. By default (i.e. if this field is not specified), the token
+  is extracted to the Authorization HTTP header, in the format "Authorization: Bearer <token>".
+  If ``token_metadata_key`` is set, this field takes no effect.
+  Not supported by all data planes.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.token_metadata_key:
+
+
+token_metadata_key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional dynamic metadata key to save the token. The metadata uses the filter config name as the namespace.
+  Takes precedence over ``token_header``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Cluster to send traffic to the GCE metadata server. Not supported
+  by all data planes; a data plane may instead have its own mechanism
+  for contacting the metadata server.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.timeout:
+
+
+timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Timeout for fetching the tokens from the GCE metadata server.
+  Not supported by all data planes.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.audience:
+
+
+audience
+  (:ref:`extensions.filters.http.gcp_authn.v3.Audience <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience>`) Defines the authentication service. This field overrides the cluster's typed_filter_metadata definition.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience:
+
+extensions.filters.http.gcp_authn.v3.Audience
+---------------------------------------------
+
+
+:repo:`[extensions.filters.http.gcp_authn.v3.Audience proto] <api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L74>`
+
+Audience is the URL of the receiving service that performs token authentication.
+It will be provided to the filter through cluster's typed_filter_metadata.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "url": ...,
+    "access_token": {...},
+    "bound_jwt": {...},
+    "bound_access_token": {...},
+    "iam_access_token": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.Audience.url:
+
+
+url
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The audience URL, used for fetching unbound JWT token.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.Audience.access_token:
+
+
+access_token
+  (:ref:`extensions.filters.http.gcp_authn.v3.Audience.AccessToken <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience.AccessToken>`) If defined, the filter will fetch unbound Access Token instead of JWT.
+  It takes precedence over ``url``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.Audience.bound_jwt:
+
+
+bound_jwt
+  (:ref:`extensions.filters.http.gcp_authn.v3.Audience.BoundJwt <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience.BoundJwt>`) If defined, the filter will fetch bound JWT token instead of unbound.
+  It takes precedence over ``access_token`` and ``url``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.Audience.bound_access_token:
+
+
+bound_access_token
+  (:ref:`extensions.filters.http.gcp_authn.v3.Audience.BoundAccessToken <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience.BoundAccessToken>`) If defined, the filter will fetch bound Access Token instead of unbound.
+  It takes precedence over ``bound_jwt``, ``access_token`` and ``url``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.Audience.iam_access_token:
+
+
+iam_access_token
+  (:ref:`extensions.filters.http.gcp_authn.v3.Audience.IAMAccessToken <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience.IAMAccessToken>`) If defined, the filter will fetch an access token for a service account.
+  It takes precedence over ``bound_access_token``, ``bound_jwt``, ``access_token``, and ``url``.
+  Requires inlined audience definition in the filter configuration.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience.AccessToken:
+
+extensions.filters.http.gcp_authn.v3.Audience.AccessToken
+---------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.gcp_authn.v3.Audience.AccessToken proto] <api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L75>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience.BoundJwt:
+
+extensions.filters.http.gcp_authn.v3.Audience.BoundJwt
+------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.gcp_authn.v3.Audience.BoundJwt proto] <api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L78>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "url": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.Audience.BoundJwt.url:
+
+
+url
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The audience URL, used for fetching bound JWT token.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience.BoundAccessToken:
+
+extensions.filters.http.gcp_authn.v3.Audience.BoundAccessToken
+--------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.gcp_authn.v3.Audience.BoundAccessToken proto] <api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L83>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience.IAMAccessToken:
+
+extensions.filters.http.gcp_authn.v3.Audience.IAMAccessToken
+------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.gcp_authn.v3.Audience.IAMAccessToken proto] <api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L87>`
+
+Default lifetime is 1h.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "account": ...,
+    "authorization": ...,
+    "scopes": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.Audience.IAMAccessToken.account:
+
+
+account
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) A template string for the account email or unique ID for which the credentials are requested,
+  e.g. ``my-sa-%DYNAMIC_METADATA(my_filter:tenant_project)%@my-project.iam.gserviceaccount.com``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.Audience.IAMAccessToken.authorization:
+
+
+authorization
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) A template string for the authorization header value,
+  e.g. ``Bearer %DYNAMIC_METADATA(gcp_authn:token)%``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.Audience.IAMAccessToken.scopes:
+
+
+scopes
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional custom scopes for the token request.
+  Default scope is https://www.googleapis.com/auth/cloud-platform.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.TokenCacheConfig:
+
+extensions.filters.http.gcp_authn.v3.TokenCacheConfig
+-----------------------------------------------------
+
+
+:repo:`[extensions.filters.http.gcp_authn.v3.TokenCacheConfig proto] <api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L123>`
+
+Token Cache configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cache_size": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.TokenCacheConfig.cache_size:
+
+
+cache_size
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) The number of cache entries. The maximum number of entries is INT64_MAX as it is constrained by underlying cache implementation.
+  Default value 0 (i.e., proto3 defaults) disables the cache by default. Other default values will enable the cache.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.TokenHeader:
+
+extensions.filters.http.gcp_authn.v3.TokenHeader
+------------------------------------------------
+
+
+:repo:`[extensions.filters.http.gcp_authn.v3.TokenHeader proto] <api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L129>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "value_prefix": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.TokenHeader.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The HTTP header's name.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.TokenHeader.value_prefix:
+
+
+value_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The header's prefix. The format is "value_prefix<token>"
+  For example, for "Authorization: Bearer <token>", value_prefix="Bearer " with a space at the
+  end.
+
+

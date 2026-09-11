@@ -1,0 +1,1156 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Redis &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Postgres" href="postgres.html" />
+    <link rel="prev" title="DynamoDB" href="dynamo.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../http/http.html">HTTP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../observability/observability.html">Observability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../security/security.html">Security</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="other_protocols.html">Other protocols</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="grpc.html">gRPC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="mongo.html">MongoDB</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dynamo.html">DynamoDB</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Redis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="postgres.html">Postgres</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced/advanced.html">Advanced</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="other_protocols.html">Other protocols</a></li>
+      <li class="breadcrumb-item active">Redis</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/intro/arch_overview/other_protocols/redis.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="redis">
+<span id="arch-overview-redis"></span><h1>Redis<a class="headerlink" href="#redis" title="Link to this heading"></a></h1>
+<p>Envoy can act as a Redis proxy, partitioning commands among instances in a cluster.
+In this mode, the goals of Envoy are to maintain availability and partition tolerance
+over consistency. This is the key point when comparing Envoy to <a class="reference external" href="https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/">Redis Cluster</a>. Envoy is designed as a best-effort cache,
+meaning that it will not try to reconcile inconsistent data or keep a globally consistent
+view of cluster membership. It also supports routing commands from different workloads to
+different upstream clusters based on their access patterns, eviction, or isolation
+requirements.</p>
+<p>The Redis project offers a thorough reference on partitioning as it relates to Redis. See
+“<a class="reference external" href="https://redis.io/docs/latest/operate/oss_and_stack/management/scaling/">Partitioning: how to split data among multiple Redis instances</a>”.</p>
+<p><strong>Features of Envoy Redis</strong>:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://redis.io/docs/latest/develop/reference/protocol-spec/">Redis protocol</a> codec.</p></li>
+<li><p>Hash-based partitioning.</p></li>
+<li><p>Redis transaction support.</p></li>
+<li><p>Ketama distribution.</p></li>
+<li><p>Detailed command statistics.</p></li>
+<li><p>Active and passive healthchecking.</p></li>
+<li><p>Hash tagging.</p></li>
+<li><p>Prefix routing.</p></li>
+<li><p>Separate downstream client and upstream server authentication.</p></li>
+<li><p>Request mirroring for all requests or write requests only.</p></li>
+<li><p>Control <a class="reference internal" href="../../../api-v3/extensions/filters/network/redis_proxy/v3/redis_proxy.proto.html#envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-read-policy"><span class="std std-ref">read requests routing</span></a>. This only works with Redis Cluster.</p></li>
+</ul>
+<p><strong>Planned future enhancements</strong>:</p>
+<ul class="simple">
+<li><p>Additional timing stats.</p></li>
+<li><p>Circuit breaking.</p></li>
+<li><p>Request collapsing for fragmented commands.</p></li>
+<li><p>Replication.</p></li>
+<li><p>Built-in retry.</p></li>
+<li><p>Tracing.</p></li>
+</ul>
+<section id="configuration">
+<span id="arch-overview-redis-configuration"></span><h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
+<p>For filter configuration details, see the Redis proxy filter
+<a class="reference internal" href="../../../configuration/listeners/network_filters/redis_proxy_filter.html#config-network-filters-redis-proxy"><span class="std std-ref">configuration reference</span></a>.</p>
+<p>The corresponding cluster definition should be configured with
+<a class="reference internal" href="../../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-lb-policy"><span class="std std-ref">ring hash load balancing</span></a>.</p>
+<p>If <a class="reference internal" href="../upstream/health_checking.html#arch-overview-health-checking"><span class="std std-ref">active health checking</span></a> is desired, the
+cluster should be configured with a <a class="reference internal" href="../../../api-v3/config/core/v3/health_check.proto.html#envoy-v3-api-field-config-core-v3-healthcheck-custom-health-check"><span class="std std-ref">custom health check</span></a> which configured as a
+<a class="reference internal" href="../../../configuration/upstream/health_checkers/redis.html#config-health-checkers-redis"><span class="std std-ref">Redis health checker</span></a>.</p>
+<p>If passive healthchecking is desired, also configure
+<a class="reference internal" href="../upstream/outlier.html#arch-overview-outlier-detection"><span class="std std-ref">outlier detection</span></a>.</p>
+<p>For the purposes of passive healthchecking, connect timeouts, command timeouts, and connection
+close map to 5xx. All other responses from Redis are counted as a success.</p>
+</section>
+<section id="redis-cluster-support">
+<span id="arch-overview-redis-cluster-support"></span><h2>Redis Cluster Support<a class="headerlink" href="#redis-cluster-support" title="Link to this heading"></a></h2>
+<p>Envoy offers support for <a class="reference external" href="https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/">Redis Cluster</a>.</p>
+<p>When using Envoy as a sidecar proxy for a Redis Cluster, the service can use a non-cluster Redis client
+implemented in any language to connect to the proxy as if it’s a single node Redis instance.
+The Envoy proxy will keep track of the cluster topology and send commands to the correct Redis node in the
+cluster according to the <a class="reference external" href="https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/">spec</a>. Advance features such as reading
+from replicas can also be added to the Envoy proxy instead of updating Redis clients in each language.</p>
+<p>Envoy proxy tracks the topology of the cluster by sending periodic
+<a class="reference external" href="https://redis.io/commands/cluster-slots">cluster slots</a> commands to a random node in the cluster, and maintains the
+following information:</p>
+<ul class="simple">
+<li><p>List of known nodes.</p></li>
+<li><p>The primaries for each shard.</p></li>
+<li><p>Nodes entering or leaving the cluster.</p></li>
+</ul>
+<p>Envoy proxy supports identification of the nodes via both IP address and hostnames in the <code class="docutils literal notranslate"><span class="pre">cluster</span> <span class="pre">slots</span></code> command response. In case of failure to resolve a primary hostname, Envoy will retry resolution of all nodes periodically until success. Failure to resolve a replica simply skips that replica. On the other hand, if the <a class="reference internal" href="../../../api-v3/extensions/filters/network/redis_proxy/v3/redis_proxy.proto.html#envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-enable-redirection"><span class="std std-ref">enable_redirection</span></a> option is set and a MOVED or ASK response containing a hostname is received Envoy will not automatically do a DNS lookup and instead bubble the error to the client verbatim. To have Envoy do the DNS lookup and follow the redirection, you need to configure the DNS cache option <a class="reference internal" href="../../../api-v3/extensions/filters/network/redis_proxy/v3/redis_proxy.proto.html#envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-dns-cache-config"><span class="std std-ref">dns_cache_config</span></a> under the connection pool settings. For a configuration example on how to enable DNS lookups for redirections, see the filter <a class="reference internal" href="../../../configuration/listeners/network_filters/redis_proxy_filter.html#config-network-filters-redis-proxy"><span class="std std-ref">configuration reference</span></a>.</p>
+<p>For topology configuration details, see the Redis Cluster
+<a class="reference internal" href="../../../api-v3/extensions/clusters/redis/v3/redis_cluster.proto.html#envoy-v3-api-msg-extensions-clusters-redis-v3-redisclusterconfig"><span class="std std-ref">v3 API reference</span></a>.</p>
+<p>Every Redis cluster has its own extra statistics tree rooted at <em>cluster.&lt;name&gt;.redis_cluster.</em> with the following statistics:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>max_upstream_unknown_connections_reached</p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of times that an upstream connection to an unknown host is not created after redirection having reached the connection pool’s max_upstream_unknown_connections limit</p></td>
+</tr>
+<tr class="row-odd"><td><p>upstream_cx_drained</p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of upstream connections drained of active requests before being closed</p></td>
+</tr>
+<tr class="row-even"><td><p>upstream_resp3_hello_failure</p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of upstream <code class="docutils literal notranslate"><span class="pre">HELLO</span> <span class="pre">3</span></code> negotiations that did not result in a successful RESP3 handshake (error reply, wrong reply shape, connection error, or non-3 <code class="docutils literal notranslate"><span class="pre">proto</span></code> field). Incremented only when the listener’s <code class="docutils literal notranslate"><span class="pre">protocol_version</span></code> is <code class="docutils literal notranslate"><span class="pre">RESP3</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>upstream_commands.upstream_rq_time</p></td>
+<td><p>Histogram</p></td>
+<td><p>Histogram of upstream request times for all types of requests</p></td>
+</tr>
+</tbody>
+</table>
+<p id="arch-overview-redis-cluster-command-stats">Per-cluster command statistics can be enabled via the setting <a class="reference internal" href="../../../api-v3/extensions/filters/network/redis_proxy/v3/redis_proxy.proto.html#envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-enable-command-stats"><span class="std std-ref">enable_command_stats</span></a>.:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>upstream_commands.[command].success</p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of successful requests for a specific Redis command</p></td>
+</tr>
+<tr class="row-odd"><td><p>upstream_commands.[command].failure</p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of failed or cancelled requests for a specific Redis command</p></td>
+</tr>
+<tr class="row-even"><td><p>upstream_commands.[command].total</p></td>
+<td><p>Counter</p></td>
+<td><p>Total number of requests for a specific Redis command (sum of success and failure)</p></td>
+</tr>
+<tr class="row-odd"><td><p>upstream_commands.[command].latency</p></td>
+<td><p>Histogram</p></td>
+<td><p>Latency of requests for a specific Redis command</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="transactions">
+<h2>Transactions<a class="headerlink" href="#transactions" title="Link to this heading"></a></h2>
+<p>Transactions (MULTI) are supported. Their use is no different from regular Redis: you start a transaction with MULTI,
+and you execute it with EXEC. Within the transaction, from the list of commands supported by Envoy (see below), only single-key
+commands (e.g. GET, SET), multi-key commands (e.g. DEL, MSET) and transaction commands (e.g. WATCH, UNWATCH, DISCARD, EXEC) are supported.
+Commands configured via <a class="reference internal" href="../../../api-v3/extensions/filters/network/redis_proxy/v3/redis_proxy.proto.html#envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-custom-commands"><span class="std std-ref">custom_commands</span></a> are also supported within
+transactions and are treated as single-key commands.</p>
+<p>When working in Redis Cluster mode, Envoy will relay all the commands in the transaction to the node handling the first
+key-based command in the transaction. If this command is multi-key, it will send it to the server corresponding to the first key
+in the command. It is the user’s responsibility to ensure that all keys in the transaction are mapped to the same hashslot, as
+commands will not be redirected.</p>
+</section>
+<section id="supported-commands">
+<h2>Supported commands<a class="headerlink" href="#supported-commands" title="Link to this heading"></a></h2>
+<p>At the protocol level, pipelines are supported.
+Use pipelining wherever possible for the best performance.</p>
+<p>At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH, PING, ECHO and INFO
+are exceptions, as are HELLO, QUIT, and the CLIENT SETNAME and CLIENT SETINFO subcommands that Envoy handles
+locally. AUTH is processed locally by Envoy if a downstream password has been configured,
+and no other commands will be processed until authentication is successful when a password has been
+configured. If an external authentication provider is set, Envoy will instead send the authentication arguments
+to an external service and act according to the authentication response. If a downstream password is set together
+with external authentication, the validation will be done still externally and the downstream password used for
+upstream authentication. Envoy will transparently issue AUTH commands upon connecting to upstream servers,
+if upstream authentication passwords are configured for the cluster. Envoy responds to PING immediately with PONG.
+Arguments to PING are not allowed. Envoy responds to ECHO immediately with the command argument.
+All other supported commands must contain a key. Supported commands are functionally identical to the
+original Redis command except possibly in failure scenarios.</p>
+<section id="resp-protocol">
+<h3>RESP Protocol<a class="headerlink" href="#resp-protocol" title="Link to this heading"></a></h3>
+<p>Envoy Redis proxy supports RESP2 and RESP3, selected by the listener’s
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/redis_proxy/v3/redis_proxy.proto.html#envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-protocol-version"><span class="std std-ref">RedisProxy.protocol_version</span></a>.
+This single knob governs both downstream connections and every routed upstream conn pool —
+there is no separate per-cluster RESP knob and no implicit floor across clusters.</p>
+<p>The listener pins one RESP version end-to-end rather than translating between them, because
+RESP2 and RESP3 diverge structurally: some replies have no transparent mapping (for example
+<code class="docutils literal notranslate"><span class="pre">ZRANGE</span> <span class="pre">WITHSCORES</span></code> is a flat array under RESP2 but a nested array of pairs under RESP3).
+The proxy therefore does not cross-encode upstream responses — a reply is always emitted
+downstream in the RESP version it arrived in. The exception is cluster-scope aggregate commands such as
+<code class="docutils literal notranslate"><span class="pre">CONFIG</span> <span class="pre">GET</span></code> and <code class="docutils literal notranslate"><span class="pre">KEYS</span></code>, whose per-shard replies are combined into one flat array even when a shard
+answers with a RESP3 Map. Unsolicited RESP3 <code class="docutils literal notranslate"><span class="pre">Push</span></code> frames from upstream
+are dropped rather than forwarded downstream (the proxy routes no Push-producing feature on
+ordinary request/response connections, and forwarding one would desynchronize the reply FIFO).</p>
+<p>For the full <code class="docutils literal notranslate"><span class="pre">HELLO</span> <span class="pre">3</span></code> negotiation, <code class="docutils literal notranslate"><span class="pre">-NOPROTO</span></code> gating of pre-handshake data commands,
+downstream <code class="docutils literal notranslate"><span class="pre">HELLO</span> <span class="pre">N</span> <span class="pre">AUTH</span></code> handling, the locally-synthesized <code class="docutils literal notranslate"><span class="pre">HELLO</span></code> reply, and the
+<code class="docutils literal notranslate"><span class="pre">upstream_resp3_hello_failure</span></code> stat, see the <a class="reference internal" href="../../../configuration/listeners/network_filters/redis_proxy_filter.html#config-network-filters-redis-proxy-protocol-version"><span class="std std-ref">RESP protocol version</span></a> section of the Redis proxy filter
+configuration.</p>
+</section>
+<section id="info-command">
+<h3>INFO command<a class="headerlink" href="#info-command" title="Link to this heading"></a></h3>
+<p>INFO command is handled by Envoy differently it aggregates metrics across all shards and returns consolidated cluster-wide statistics.
+An optional section parameter can be provided to filter the output (e.g., INFO memory).
+INFO.SHARD is an Envoy-specific command introduced for debugging purposes that queries a specific shard by index
+and returns that shard’s complete INFO response (e.g., INFO.SHARD 0 memory).
+Shard numbering starts from 0 and shards are ordered from lowest to highest slot assignment.
+when using INFO.SHARD command, if the provided shard index is invalid, Envoy will return an error.
+when using INFO.SHARD command, via redis-cli, make sure to use –raw flag to get the proper output format.</p>
+<p>For details on each command’s usage see the official
+<a class="reference external" href="https://redis.io/commands">Redis command reference</a>.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 50.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Command</p></th>
+<th class="head"><p>Group</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>AUTH</p></td>
+<td><p>Authentication</p></td>
+</tr>
+<tr class="row-odd"><td><p>CLIENT</p></td>
+<td><p>Connection</p></td>
+</tr>
+<tr class="row-even"><td><p>ECHO</p></td>
+<td><p>Connection</p></td>
+</tr>
+<tr class="row-odd"><td><p>HELLO</p></td>
+<td><p>Connection</p></td>
+</tr>
+<tr class="row-even"><td><p>PING</p></td>
+<td><p>Connection</p></td>
+</tr>
+<tr class="row-odd"><td><p>QUIT</p></td>
+<td><p>Connection</p></td>
+</tr>
+<tr class="row-even"><td><p>DEL</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>DISCARD</p></td>
+<td><p>Transaction</p></td>
+</tr>
+<tr class="row-even"><td><p>DUMP</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>EXEC</p></td>
+<td><p>Transaction</p></td>
+</tr>
+<tr class="row-even"><td><p>EXISTS</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>EXPIRE</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>EXPIREAT</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>KEYS</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>PERSIST</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>PEXPIRE</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>PEXPIREAT</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>PTTL</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>RESTORE</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>SELECT</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>TOUCH</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>TTL</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>TYPE</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>UNLINK</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>COPY</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>RENAME</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>RENAMENX</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>SORT</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>SORT_RO</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>SCRIPT</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>FLUSHALL</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>FLUSHDB</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>SLOWLOG</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>CONFIG</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>CLUSTER INFO</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>CLUSTER SLOTS</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>CLUSTER KEYSLOT</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>CLUSTER NODES</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>CLUSTER SHARDS</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>RANDOMKEY</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>OBJECT</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-odd"><td><p>GEOADD</p></td>
+<td><p>Geo</p></td>
+</tr>
+<tr class="row-even"><td><p>GEODIST</p></td>
+<td><p>Geo</p></td>
+</tr>
+<tr class="row-odd"><td><p>GEOHASH</p></td>
+<td><p>Geo</p></td>
+</tr>
+<tr class="row-even"><td><p>GEOPOS</p></td>
+<td><p>Geo</p></td>
+</tr>
+<tr class="row-odd"><td><p>GEORADIUS_RO</p></td>
+<td><p>Geo</p></td>
+</tr>
+<tr class="row-even"><td><p>GEORADIUSBYMEMBER_RO</p></td>
+<td><p>Geo</p></td>
+</tr>
+<tr class="row-odd"><td><p>GEOSEARCH</p></td>
+<td><p>Geo</p></td>
+</tr>
+<tr class="row-even"><td><p>GEOSEARCHSTORE</p></td>
+<td><p>Geospatial</p></td>
+</tr>
+<tr class="row-odd"><td><p>GEORADIUS</p></td>
+<td><p>Geospatial</p></td>
+</tr>
+<tr class="row-even"><td><p>GEORADIUSBYMEMBER</p></td>
+<td><p>Geospatial</p></td>
+</tr>
+<tr class="row-odd"><td><p>HDEL</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>HEXISTS</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-odd"><td><p>HEXPIRE</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>HEXPIREAT</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-odd"><td><p>HEXPIRETIME</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>HGET</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-odd"><td><p>HGETALL</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>HINCRBY</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-odd"><td><p>HINCRBYFLOAT</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>HKEYS</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-odd"><td><p>HLEN</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>HMGET</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-odd"><td><p>HMSET</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>HPERSIST</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-odd"><td><p>HPEXPIRE</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>HPEXPIREAT</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-odd"><td><p>HPEXPIRETIME</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>HPTTL</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-odd"><td><p>HRANDFIELD</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>HSCAN</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-odd"><td><p>HSET</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>HSETNX</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-odd"><td><p>HSTRLEN</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>HTTL</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-odd"><td><p>HVALS</p></td>
+<td><p>Hash</p></td>
+</tr>
+<tr class="row-even"><td><p>PFADD</p></td>
+<td><p>HyperLogLog</p></td>
+</tr>
+<tr class="row-odd"><td><p>PFCOUNT</p></td>
+<td><p>HyperLogLog</p></td>
+</tr>
+<tr class="row-even"><td><p>PFMERGE</p></td>
+<td><p>HyperLogLog</p></td>
+</tr>
+<tr class="row-odd"><td><p>LINDEX</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-even"><td><p>LINSERT</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-odd"><td><p>LLEN</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-even"><td><p>LPOP</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-odd"><td><p>LPUSH</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-even"><td><p>LPUSHX</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-odd"><td><p>LRANGE</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-even"><td><p>LREM</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-odd"><td><p>LSET</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-even"><td><p>LTRIM</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-odd"><td><p>LPOS</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-even"><td><p>RPOPLPUSH</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-odd"><td><p>MULTI</p></td>
+<td><p>Transaction</p></td>
+</tr>
+<tr class="row-even"><td><p>RPOP</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-odd"><td><p>RPUSH</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-even"><td><p>RPUSHX</p></td>
+<td><p>List</p></td>
+</tr>
+<tr class="row-odd"><td><p>PUBLISH</p></td>
+<td><p>Pubsub</p></td>
+</tr>
+<tr class="row-even"><td><p>EVAL</p></td>
+<td><p>Scripting</p></td>
+</tr>
+<tr class="row-odd"><td><p>EVALSHA</p></td>
+<td><p>Scripting</p></td>
+</tr>
+<tr class="row-even"><td><p>SADD</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>SCARD</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-even"><td><p>SISMEMBER</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>SMEMBERS</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-even"><td><p>SPOP</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>SRANDMEMBER</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-even"><td><p>SREM</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>SCAN</p></td>
+<td><p>Generic</p></td>
+</tr>
+<tr class="row-even"><td><p>SSCAN</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>SDIFF</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-even"><td><p>SDIFFSTORE</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>SINTER</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-even"><td><p>SINTERSTORE</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>SMISMEMBER</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-even"><td><p>SMOVE</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>SUNION</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-even"><td><p>SUNIONSTORE</p></td>
+<td><p>Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>WATCH</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>UNWATCH</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZADD</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZCARD</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZCOUNT</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZINCRBY</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZLEXCOUNT</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZRANGE</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZRANGEBYLEX</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZRANGEBYSCORE</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZRANK</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZREM</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZREMRANGEBYLEX</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZREMRANGEBYRANK</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZREMRANGEBYSCORE</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZREVRANGE</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZREVRANGEBYLEX</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZREVRANGEBYSCORE</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZREVRANK</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZPOPMIN</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZPOPMAX</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZSCAN</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZSCORE</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZDIFF</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZDIFFSTORE</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZINTER</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZINTERSTORE</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZMSCORE</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZRANDMEMBER</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZRANGESTORE</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>ZUNION</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-even"><td><p>ZUNIONSTORE</p></td>
+<td><p>Sorted Set</p></td>
+</tr>
+<tr class="row-odd"><td><p>APPEND</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>BITCOUNT</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>BITFIELD</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>BITFIELD_RO</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>BITPOS</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>DECR</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>DECRBY</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>GET</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>GETBIT</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>GETDEL</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>GETEX</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>GETRANGE</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>GETSET</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>INCR</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>INCRBY</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>INCRBYFLOAT</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>INFO</p></td>
+<td><p>Server</p></td>
+</tr>
+<tr class="row-even"><td><p>INFO.SHARD</p></td>
+<td><p>Server</p></td>
+</tr>
+<tr class="row-odd"><td><p>ROLE</p></td>
+<td><p>Server</p></td>
+</tr>
+<tr class="row-even"><td><p>MGET</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>MSET</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>PSETEX</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>SET</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>SETBIT</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>SETEX</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>SETNX</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>SETRANGE</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>STRLEN</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>MSETNX</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-even"><td><p>SUBSTR</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="row-odd"><td><p>XACK</p></td>
+<td><p>Stream</p></td>
+</tr>
+<tr class="row-even"><td><p>XADD</p></td>
+<td><p>Stream</p></td>
+</tr>
+<tr class="row-odd"><td><p>XAUTOCLAIM</p></td>
+<td><p>Stream</p></td>
+</tr>
+<tr class="row-even"><td><p>XCLAIM</p></td>
+<td><p>Stream</p></td>
+</tr>
+<tr class="row-odd"><td><p>XDEL</p></td>
+<td><p>Stream</p></td>
+</tr>
+<tr class="row-even"><td><p>XLEN</p></td>
+<td><p>Stream</p></td>
+</tr>
+<tr class="row-odd"><td><p>XPENDING</p></td>
+<td><p>Stream</p></td>
+</tr>
+<tr class="row-even"><td><p>XRANGE</p></td>
+<td><p>Stream</p></td>
+</tr>
+<tr class="row-odd"><td><p>XREVRANGE</p></td>
+<td><p>Stream</p></td>
+</tr>
+<tr class="row-even"><td><p>XTRIM</p></td>
+<td><p>Stream</p></td>
+</tr>
+<tr class="row-odd"><td><p>BF.ADD</p></td>
+<td><p>Bloom</p></td>
+</tr>
+<tr class="row-even"><td><p>BF.CARD</p></td>
+<td><p>Bloom</p></td>
+</tr>
+<tr class="row-odd"><td><p>BF.EXISTS</p></td>
+<td><p>Bloom</p></td>
+</tr>
+<tr class="row-even"><td><p>BF.INFO</p></td>
+<td><p>Bloom</p></td>
+</tr>
+<tr class="row-odd"><td><p>BF.INSERT</p></td>
+<td><p>Bloom</p></td>
+</tr>
+<tr class="row-even"><td><p>BF.LOADCHUNK</p></td>
+<td><p>Bloom</p></td>
+</tr>
+<tr class="row-odd"><td><p>BF.MADD</p></td>
+<td><p>Bloom</p></td>
+</tr>
+<tr class="row-even"><td><p>BF.MEXISTS</p></td>
+<td><p>Bloom</p></td>
+</tr>
+<tr class="row-odd"><td><p>BF.RESERVE</p></td>
+<td><p>Bloom</p></td>
+</tr>
+<tr class="row-even"><td><p>BF.SCANDUMP</p></td>
+<td><p>Bloom</p></td>
+</tr>
+<tr class="row-odd"><td><p>BITOP</p></td>
+<td><p>Bitmap</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="failure-modes">
+<h2>Failure modes<a class="headerlink" href="#failure-modes" title="Link to this heading"></a></h2>
+<p>If Redis throws an error, we pass that error along as the response to the command. Envoy treats a
+response from Redis with the error datatype as a normal response and passes it through to the
+caller.</p>
+<p>Envoy can also generate its own errors in response to the client.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 50.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Error</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>no upstream host</p></td>
+<td><p>The ring hash load balancer did not have a healthy host available at the
+ring position chosen for the key.</p></td>
+</tr>
+<tr class="row-odd"><td><p>upstream failure</p></td>
+<td><p>The backend did not respond within the timeout period or closed
+the connection.</p></td>
+</tr>
+<tr class="row-even"><td><p>invalid request</p></td>
+<td><p>Command was rejected by the first stage of the command splitter due to
+datatype or length.</p></td>
+</tr>
+<tr class="row-odd"><td><p>ERR unknown command</p></td>
+<td><p>The command was not recognized by Envoy and therefore cannot be serviced
+because it cannot be hashed to a backend server.</p></td>
+</tr>
+<tr class="row-even"><td><p>finished with n errors</p></td>
+<td><p>Fragmented commands which sum the response (e.g. DEL) will return the
+total number of errors received if any were received.</p></td>
+</tr>
+<tr class="row-odd"><td><p>upstream protocol error</p></td>
+<td><p>A fragmented command received an unexpected datatype or a backend
+responded with a response that not conform to the Redis protocol.</p></td>
+</tr>
+<tr class="row-even"><td><p>wrong number of arguments for command</p></td>
+<td><p>Certain commands check in Envoy that the number of
+arguments is correct.</p></td>
+</tr>
+<tr class="row-odd"><td><p>NOAUTH Authentication required.</p></td>
+<td><p>The command was rejected because a downstream authentication
+password or external authentication have been set and the client has not successfully authenticated.</p></td>
+</tr>
+<tr class="row-even"><td><p>ERR invalid password</p></td>
+<td><p>The authentication command failed due to an invalid password.</p></td>
+</tr>
+<tr class="row-odd"><td><p>ERR &lt;external-message&gt;</p></td>
+<td><p>The authentication command failed on the external auth provider.</p></td>
+</tr>
+<tr class="row-even"><td><p>ERR Client sent AUTH, but no password is set</p></td>
+<td><p>An authentication command was received, but no
+downstream authentication password or external authentication provider have been configured.</p></td>
+</tr>
+<tr class="row-odd"><td><p>ERR invalid cursor</p></td>
+<td><p>The iteration command failed due to an invalid or unrecognized cursor.</p></td>
+</tr>
+</tbody>
+</table>
+<p>In the case of MGET, each individual key that cannot be fetched will generate an error response.
+For example, if we fetch five keys and two of the keys’ backends time out, we would get an error
+response for each in place of the value.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ redis-cli MGET a b c d e
+1) &quot;alpha&quot;
+2) &quot;bravo&quot;
+3) (error) upstream failure
+4) (error) upstream failure
+5) &quot;echo&quot;
+</pre></div>
+</div>
+</section>
+<section id="protocol">
+<h2>Protocol<a class="headerlink" href="#protocol" title="Link to this heading"></a></h2>
+<p>Although <a class="reference external" href="https://redis.io/docs/latest/develop/reference/protocol-spec/">RESP</a> is recommended for production use,
+<a class="reference external" href="https://redis.io/docs/latest/develop/reference/protocol-spec/#inline-commands">inline commands</a> are also supported.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="dynamo.html" class="btn btn-neutral float-left" title="DynamoDB" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="postgres.html" class="btn btn-neutral float-right" title="Postgres" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Redis</a><ul>
+<li><a class="reference internal" href="#configuration">Configuration</a></li>
+<li><a class="reference internal" href="#redis-cluster-support">Redis Cluster Support</a></li>
+<li><a class="reference internal" href="#transactions">Transactions</a></li>
+<li><a class="reference internal" href="#supported-commands">Supported commands</a><ul>
+<li><a class="reference internal" href="#resp-protocol">RESP Protocol</a></li>
+<li><a class="reference internal" href="#info-command">INFO command</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#failure-modes">Failure modes</a></li>
+<li><a class="reference internal" href="#protocol">Protocol</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

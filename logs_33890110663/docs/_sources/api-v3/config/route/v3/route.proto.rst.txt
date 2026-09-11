@@ -1,0 +1,272 @@
+.. _envoy_v3_api_file_envoy/config/route/v3/route.proto:
+
+HTTP route configuration (proto)
+================================
+
+
+* Routing :ref:`architecture overview <arch_overview_http_routing>`
+* HTTP :ref:`router filter <config_http_filters_router>`
+
+
+
+
+.. _envoy_v3_api_msg_config.route.v3.RouteConfiguration:
+
+config.route.v3.RouteConfiguration
+----------------------------------
+
+
+:repo:`[config.route.v3.RouteConfiguration proto] <api/envoy/config/route/v3/route.proto#L26>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "virtual_hosts": [],
+    "vhds": {...},
+    "internal_only_headers": [],
+    "response_headers_to_add": [],
+    "response_headers_to_remove": [],
+    "request_headers_to_add": [],
+    "request_headers_to_remove": [],
+    "most_specific_header_mutations_wins": ...,
+    "validate_clusters": {...},
+    "max_direct_response_body_size_bytes": {...},
+    "cluster_specifier_plugins": [],
+    "request_mirror_policies": [],
+    "ignore_port_in_host_matching": ...,
+    "vhost_header": ...,
+    "ignore_path_parameters_in_path_matching": ...,
+    "typed_per_filter_config": {...},
+    "metadata": {...}
+  }
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of the route configuration. For example, it might match
+  :ref:`route_config_name
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.Rds.route_config_name>` in
+  :ref:`envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.Rds`.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.virtual_hosts:
+
+
+virtual_hosts
+  (**repeated** :ref:`config.route.v3.VirtualHost <envoy_v3_api_msg_config.route.v3.VirtualHost>`) An array of virtual hosts that make up the route table.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.vhds:
+
+
+vhds
+  (:ref:`config.route.v3.Vhds <envoy_v3_api_msg_config.route.v3.Vhds>`) An array of virtual hosts will be dynamically loaded via the VHDS API.
+  Both ``virtual_hosts`` and ``vhds`` fields will be used when present. ``virtual_hosts`` can be used
+  for a base routing table or for infrequently changing virtual hosts. ``vhds`` is used for
+  on-demand discovery of virtual hosts. The contents of these two fields will be merged to
+  generate a routing table for a given RouteConfiguration, with ``vhds`` derived configuration
+  taking precedence.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.internal_only_headers:
+
+
+internal_only_headers
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optionally specifies a list of HTTP headers that the connection manager
+  will consider to be internal only. If they are found on external requests they will be cleaned
+  prior to filter invocation. See :ref:`config_http_conn_man_headers_x-envoy-internal` for more
+  information.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.response_headers_to_add:
+
+
+response_headers_to_add
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) Specifies a list of HTTP headers that should be added to each response that
+  the connection manager encodes. Headers specified at this level are applied
+  after headers from any enclosed :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost` or
+  :ref:`envoy_v3_api_msg_config.route.v3.RouteAction`. For more information, including details on
+  header value syntax, see the documentation on :ref:`custom request headers
+  <config_http_conn_man_headers_custom_request_headers>`.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.response_headers_to_remove:
+
+
+response_headers_to_remove
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies a list of HTTP headers that should be removed from each response
+  that the connection manager encodes.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.request_headers_to_add:
+
+
+request_headers_to_add
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) Specifies a list of HTTP headers that should be added to each request
+  routed by the HTTP connection manager. Headers specified at this level are
+  applied after headers from any enclosed :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost` or
+  :ref:`envoy_v3_api_msg_config.route.v3.RouteAction`. For more information, including details on
+  header value syntax, see the documentation on :ref:`custom request headers
+  <config_http_conn_man_headers_custom_request_headers>`.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.request_headers_to_remove:
+
+
+request_headers_to_remove
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies a list of HTTP headers that should be removed from each request
+  routed by the HTTP connection manager.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.most_specific_header_mutations_wins:
+
+
+most_specific_header_mutations_wins
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Headers mutations at all levels are evaluated, if specified. By default, the order is from most
+  specific (i.e. route entry level) to least specific (i.e. route configuration level). Later header
+  mutations may override earlier mutations.
+  This order can be reversed by setting this field to true. In other words, most specific level mutation
+  is evaluated last.
+
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.validate_clusters:
+
+
+validate_clusters
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) An optional boolean that specifies whether the clusters that the route
+  table refers to will be validated by the cluster manager. If set to true
+  and a route refers to a non-existent cluster, the route table will not
+  load. If set to false and a route refers to a non-existent cluster, the
+  route table will load and the router filter will return a 404 if the route
+  is selected at runtime. This setting defaults to true if the route table
+  is statically defined via the :ref:`route_config
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.route_config>`
+  option. This setting default to false if the route table is loaded dynamically via the
+  :ref:`rds
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.rds>`
+  option. Users may wish to override the default behavior in certain cases (for example when
+  using CDS with a static route table).
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.max_direct_response_body_size_bytes:
+
+
+max_direct_response_body_size_bytes
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The maximum bytes of the response :ref:`direct response body
+  <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` size. If not specified the default
+  is 4096.
+
+  .. warning::
+
+    Envoy currently holds the content of :ref:`direct response body
+    <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` in memory. Be careful setting
+    this to be larger than the default 4KB, since the allocated memory for direct response body
+    is not subject to data plane buffering controls.
+
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins:
+
+
+cluster_specifier_plugins
+  (**repeated** :ref:`config.route.v3.ClusterSpecifierPlugin <envoy_v3_api_msg_config.route.v3.ClusterSpecifierPlugin>`) A list of plugins and their configurations which may be used by a
+  :ref:`cluster specifier plugin name <envoy_v3_api_field_config.route.v3.RouteAction.cluster_specifier_plugin>`
+  within the route. All ``extension.name`` fields in this list must be unique.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.request_mirror_policies:
+
+
+request_mirror_policies
+  (**repeated** :ref:`config.route.v3.RouteAction.RequestMirrorPolicy <envoy_v3_api_msg_config.route.v3.RouteAction.RequestMirrorPolicy>`) Specify a set of default request mirroring policies which apply to all routes under its virtual hosts.
+  Note that policies are not merged, the most specific non-empty one becomes the mirror policies.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.ignore_port_in_host_matching:
+
+
+ignore_port_in_host_matching
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) By default, port in :authority header (if any) is used in host matching.
+  With this option enabled, Envoy will ignore the port number in the :authority header (if any) when picking VirtualHost.
+
+  .. note::
+      This option will not strip the port number (if any) contained in route config
+      :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost`.domains field.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header:
+
+
+vhost_header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Normally, virtual host matching is done using the :authority (or
+  Host: in HTTP < 2) HTTP header. Setting this will instead, use a
+  different HTTP header for this purpose.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.ignore_path_parameters_in_path_matching:
+
+
+ignore_path_parameters_in_path_matching
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Ignore path-parameters in path-matching.
+  Before RFC3986, URI were like(RFC1808): <scheme>://<net_loc>/<path>;<params>?<query>#<fragment>
+  Envoy by default takes ":path" as "<path>;<params>".
+  For users who want to only match path on the "<path>" portion, this option should be true.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.typed_per_filter_config:
+
+
+typed_per_filter_config
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_>) This field can be used to provide RouteConfiguration level per filter config. The key should match the
+  :ref:`filter config name
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
+  See :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>`
+  for details.
+
+
+.. _envoy_v3_api_field_config.route.v3.RouteConfiguration.metadata:
+
+
+metadata
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) The metadata field can be used to provide additional information
+  about the route configuration. It can be used for configuration, stats, and logging.
+  The metadata should go under the filter namespace that will need it.
+  For instance, if the metadata is intended for the Router filter,
+  the filter name should be specified as ``envoy.filters.http.router``.
+
+
+
+
+
+.. _envoy_v3_api_msg_config.route.v3.Vhds:
+
+config.route.v3.Vhds
+--------------------
+
+
+:repo:`[config.route.v3.Vhds proto] <api/envoy/config/route/v3/route.proto#L166>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config_source": {...}
+  }
+
+.. _envoy_v3_api_field_config.route.v3.Vhds.config_source:
+
+
+config_source
+  (:ref:`config.core.v3.ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`, *REQUIRED*) Configuration source specifier for VHDS.
+
+

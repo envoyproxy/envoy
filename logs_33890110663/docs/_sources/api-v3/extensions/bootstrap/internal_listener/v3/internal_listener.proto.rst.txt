@@ -1,0 +1,66 @@
+.. _envoy_v3_api_file_envoy/extensions/bootstrap/internal_listener/v3/internal_listener.proto:
+
+Internal Listener (proto)
+=========================
+
+.. _extension_envoy.bootstrap.internal_listener:
+
+This extension has the qualified name ``envoy.bootstrap.internal_listener``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.bootstrap <extension_category_envoy.bootstrap>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener <envoy_v3_api_msg_extensions.bootstrap.internal_listener.v3.InternalListener>`
+
+
+
+Internal Listener :ref:`overview <config_internal_listener>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.bootstrap.internal_listener.v3.InternalListener:
+
+extensions.bootstrap.internal_listener.v3.InternalListener
+----------------------------------------------------------
+
+
+:repo:`[extensions.bootstrap.internal_listener.v3.InternalListener proto] <api/envoy/extensions/bootstrap/internal_listener/v3/internal_listener.proto#L20>`
+
+Configuration for internal listener.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "buffer_size_kb": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.bootstrap.internal_listener.v3.InternalListener.buffer_size_kb:
+
+
+buffer_size_kb
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The internal listener client connection buffer size in KiB.
+  For example, if ``buffer_size_kb`` is set to 5, then the actual buffer size is
+  5 KiB = 5 * 1024 bytes.
+  If the ``buffer_size_kb`` is not specified, the buffer size is set to 1024 KiB.
+
+

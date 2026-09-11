@@ -1,0 +1,117 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.proto:
+
+MySQL proxy (proto)
+===================
+
+.. _extension_envoy.filters.network.mysql_proxy:
+
+This extension has the qualified name ``envoy.filters.network.mysql_proxy``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+
+
+MySQL Proxy :ref:`configuration overview <config_network_filters_mysql_proxy>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.mysql_proxy.v3.MySQLProxy:
+
+extensions.filters.network.mysql_proxy.v3.MySQLProxy
+----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.mysql_proxy.v3.MySQLProxy proto] <api/contrib/envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.proto#L18>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "downstream_ssl": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.mysql_proxy.v3.MySQLProxy.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The human readable prefix to use when emitting :ref:`statistics
+  <config_network_filters_mysql_proxy_stats>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.mysql_proxy.v3.MySQLProxy.downstream_ssl:
+
+
+downstream_ssl
+  (:ref:`extensions.filters.network.mysql_proxy.v3.MySQLProxy.SSLMode <envoy_v3_api_enum_extensions.filters.network.mysql_proxy.v3.MySQLProxy.SSLMode>`) Controls whether to terminate SSL sessions initiated by downstream clients.
+  If enabled, the filter chain must use
+  :ref:`starttls transport socket <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
+  Defaults to ``DISABLE``.
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.mysql_proxy.v3.MySQLProxy.SSLMode:
+
+Enum extensions.filters.network.mysql_proxy.v3.MySQLProxy.SSLMode
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.mysql_proxy.v3.MySQLProxy.SSLMode proto] <api/contrib/envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.proto#L23>`
+
+Downstream SSL operational modes.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.mysql_proxy.v3.MySQLProxy.SSLMode.DISABLE:
+
+
+DISABLE
+  *(DEFAULT)* ⁣Do not terminate SSL session initiated by a client.
+  The MySQL proxy filter will pass all encrypted and unencrypted packets to the upstream server.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.mysql_proxy.v3.MySQLProxy.SSLMode.REQUIRE:
+
+
+REQUIRE
+  ⁣The MySQL proxy filter will terminate SSL session initiated by a client
+  and close downstream connections that do not initiate SSL.
+  The filter will mediate ``caching_sha2_password`` RSA authentication when
+  the upstream MySQL server requires full authentication over the plaintext connection.
+  The filter chain must use :ref:`starttls transport socket
+  <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.mysql_proxy.v3.MySQLProxy.SSLMode.ALLOW:
+
+
+ALLOW
+  ⁣The MySQL proxy filter will accept downstream client's encryption settings.
+  If the client wants to use clear-text, Envoy will not enforce SSL encryption.
+  If the client wants to use encryption, Envoy will terminate SSL and mediate
+  ``caching_sha2_password`` RSA authentication when needed.
+  The filter chain must use :ref:`starttls transport socket
+  <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
+
+
+

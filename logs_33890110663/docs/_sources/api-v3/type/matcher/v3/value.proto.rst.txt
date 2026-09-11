@@ -1,0 +1,195 @@
+.. _envoy_v3_api_file_envoy/type/matcher/v3/value.proto:
+
+Value matcher (proto)
+=====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.ValueMatcher:
+
+type.matcher.v3.ValueMatcher
+----------------------------
+
+
+:repo:`[type.matcher.v3.ValueMatcher proto] <api/envoy/type/matcher/v3/value.proto#L22>`
+
+Specifies the way to match a Protobuf::Value. Primitive values and ListValue are supported.
+StructValue is not supported and is always not matched.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "null_match": {...},
+    "double_match": {...},
+    "string_match": {...},
+    "bool_match": ...,
+    "present_match": ...,
+    "list_match": {...},
+    "or_match": {...}
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.ValueMatcher.null_match:
+
+
+null_match
+  (:ref:`type.matcher.v3.ValueMatcher.NullMatch <envoy_v3_api_msg_type.matcher.v3.ValueMatcher.NullMatch>`) If specified, a match occurs if and only if the target value is a NullValue.
+
+
+  Specifies how to match a value.
+
+
+  Precisely one of :ref:`null_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.null_match>`, :ref:`double_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.double_match>`, :ref:`string_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.string_match>`, :ref:`bool_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.bool_match>`, :ref:`present_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.present_match>`, :ref:`list_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.list_match>`, :ref:`or_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.or_match>` must be set.
+
+.. _envoy_v3_api_field_type.matcher.v3.ValueMatcher.double_match:
+
+
+double_match
+  (:ref:`type.matcher.v3.DoubleMatcher <envoy_v3_api_msg_type.matcher.v3.DoubleMatcher>`) If specified, a match occurs if and only if the target value is a double value and is
+  matched to this field.
+
+
+  Specifies how to match a value.
+
+
+  Precisely one of :ref:`null_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.null_match>`, :ref:`double_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.double_match>`, :ref:`string_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.string_match>`, :ref:`bool_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.bool_match>`, :ref:`present_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.present_match>`, :ref:`list_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.list_match>`, :ref:`or_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.or_match>` must be set.
+
+.. _envoy_v3_api_field_type.matcher.v3.ValueMatcher.string_match:
+
+
+string_match
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) If specified, a match occurs if and only if the target value is a string value and is
+  matched to this field.
+
+
+  Specifies how to match a value.
+
+
+  Precisely one of :ref:`null_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.null_match>`, :ref:`double_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.double_match>`, :ref:`string_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.string_match>`, :ref:`bool_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.bool_match>`, :ref:`present_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.present_match>`, :ref:`list_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.list_match>`, :ref:`or_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.or_match>` must be set.
+
+.. _envoy_v3_api_field_type.matcher.v3.ValueMatcher.bool_match:
+
+
+bool_match
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If specified, a match occurs if and only if the target value is a bool value and is equal
+  to this field.
+
+
+  Specifies how to match a value.
+
+
+  Precisely one of :ref:`null_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.null_match>`, :ref:`double_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.double_match>`, :ref:`string_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.string_match>`, :ref:`bool_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.bool_match>`, :ref:`present_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.present_match>`, :ref:`list_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.list_match>`, :ref:`or_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.or_match>` must be set.
+
+.. _envoy_v3_api_field_type.matcher.v3.ValueMatcher.present_match:
+
+
+present_match
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If specified, value match will be performed based on whether the path is referring to a
+  valid primitive value in the metadata. If the path is referring to a non-primitive value,
+  the result is always not matched.
+
+
+  Specifies how to match a value.
+
+
+  Precisely one of :ref:`null_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.null_match>`, :ref:`double_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.double_match>`, :ref:`string_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.string_match>`, :ref:`bool_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.bool_match>`, :ref:`present_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.present_match>`, :ref:`list_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.list_match>`, :ref:`or_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.or_match>` must be set.
+
+.. _envoy_v3_api_field_type.matcher.v3.ValueMatcher.list_match:
+
+
+list_match
+  (:ref:`type.matcher.v3.ListMatcher <envoy_v3_api_msg_type.matcher.v3.ListMatcher>`) If specified, a match occurs if and only if the target value is a list value and
+  is matched to this field.
+
+
+  Specifies how to match a value.
+
+
+  Precisely one of :ref:`null_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.null_match>`, :ref:`double_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.double_match>`, :ref:`string_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.string_match>`, :ref:`bool_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.bool_match>`, :ref:`present_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.present_match>`, :ref:`list_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.list_match>`, :ref:`or_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.or_match>` must be set.
+
+.. _envoy_v3_api_field_type.matcher.v3.ValueMatcher.or_match:
+
+
+or_match
+  (:ref:`type.matcher.v3.OrMatcher <envoy_v3_api_msg_type.matcher.v3.OrMatcher>`) If specified, a match occurs if and only if any of the alternatives in the match accept the value.
+
+
+  Specifies how to match a value.
+
+
+  Precisely one of :ref:`null_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.null_match>`, :ref:`double_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.double_match>`, :ref:`string_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.string_match>`, :ref:`bool_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.bool_match>`, :ref:`present_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.present_match>`, :ref:`list_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.list_match>`, :ref:`or_match <envoy_v3_api_field_type.matcher.v3.ValueMatcher.or_match>` must be set.
+
+.. _envoy_v3_api_msg_type.matcher.v3.ValueMatcher.NullMatch:
+
+type.matcher.v3.ValueMatcher.NullMatch
+--------------------------------------
+
+
+:repo:`[type.matcher.v3.ValueMatcher.NullMatch proto] <api/envoy/type/matcher/v3/value.proto#L26>`
+
+NullMatch is an empty message to specify a null value.
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.ListMatcher:
+
+type.matcher.v3.ListMatcher
+---------------------------
+
+
+:repo:`[type.matcher.v3.ListMatcher proto] <api/envoy/type/matcher/v3/value.proto#L65>`
+
+Specifies the way to match a list value.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "one_of": {...}
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.ListMatcher.one_of:
+
+
+one_of
+  (:ref:`type.matcher.v3.ValueMatcher <envoy_v3_api_msg_type.matcher.v3.ValueMatcher>`, *REQUIRED*) If specified, at least one of the values in the list must match the value specified.
+
+
+  
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.OrMatcher:
+
+type.matcher.v3.OrMatcher
+-------------------------
+
+
+:repo:`[type.matcher.v3.OrMatcher proto] <api/envoy/type/matcher/v3/value.proto#L77>`
+
+Specifies a list of alternatives for the match.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "value_matchers": []
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.OrMatcher.value_matchers:
+
+
+value_matchers
+  (**repeated** :ref:`type.matcher.v3.ValueMatcher <envoy_v3_api_msg_type.matcher.v3.ValueMatcher>`, *REQUIRED*) 
+

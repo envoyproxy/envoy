@@ -1,0 +1,50 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/grpc_web/v3/grpc_web.proto:
+
+gRPC Web (proto)
+================
+
+.. _extension_envoy.filters.http.grpc_web:
+
+This extension has the qualified name ``envoy.filters.http.grpc_web``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.grpc_web.v3.GrpcWeb <envoy_v3_api_msg_extensions.filters.http.grpc_web.v3.GrpcWeb>`
+
+
+
+gRPC Web :ref:`configuration overview <config_http_filters_grpc_web>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.grpc_web.v3.GrpcWeb:
+
+extensions.filters.http.grpc_web.v3.GrpcWeb
+-------------------------------------------
+
+
+:repo:`[extensions.filters.http.grpc_web.v3.GrpcWeb proto] <api/envoy/extensions/filters/http/grpc_web/v3/grpc_web.proto#L18>`
+
+gRPC Web filter config.
+
+
+
+

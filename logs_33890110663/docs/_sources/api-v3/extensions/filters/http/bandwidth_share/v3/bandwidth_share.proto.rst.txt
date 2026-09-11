@@ -1,0 +1,273 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/bandwidth_share/v3/bandwidth_share.proto:
+
+Bandwidth share (proto)
+=======================
+
+.. _extension_envoy.filters.http.bandwidth_share:
+
+This extension has the qualified name ``envoy.filters.http.bandwidth_share``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare <envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthShare>`
+
+
+
+Bandwidth share :ref:`configuration overview <config_http_filters_bandwidth_share>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthShare:
+
+extensions.filters.http.bandwidth_share.v3.BandwidthShare
+---------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.bandwidth_share.v3.BandwidthShare proto] <api/envoy/extensions/filters/http/bandwidth_share/v3/bandwidth_share.proto#L24>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_limit": {...},
+    "response_limit": {...},
+    "fill_interval": {...},
+    "enable_response_trailers": ...,
+    "response_trailer_prefix": ...,
+    "tenant_name_selector": {...},
+    "tenant_configs": {...},
+    "default_tenant_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.bandwidth_share.v3.BandwidthShare.request_limit:
+
+
+request_limit
+  (:ref:`extensions.filters.http.bandwidth_share.v3.BandwidthShare.Limit <envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthShare.Limit>`) Configuration for request limiting. If unset, requests are not limited.
+  If ``kbps`` is zero, requests are not limited.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.bandwidth_share.v3.BandwidthShare.response_limit:
+
+
+response_limit
+  (:ref:`extensions.filters.http.bandwidth_share.v3.BandwidthShare.Limit <envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthShare.Limit>`) Configuration for response limiting. If unset, responses are not limited.
+  If ``kbps`` is zero, responses are not limited.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.bandwidth_share.v3.BandwidthShare.fill_interval:
+
+
+fill_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Optional fill interval in milliseconds for the token refills. Defaults to 50ms.
+  It must be at least 20ms to avoid too aggressive refills.
+
+  Lower values will use more CPU and provide smoother bandwidth distribution
+  when the limit is being enforced.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.bandwidth_share.v3.BandwidthShare.enable_response_trailers:
+
+
+enable_response_trailers
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Enable response trailers.
+
+  .. note::
+
+    If set true, the following 4 trailers will be added, prefixed by ``response_trailer_prefix``:
+    * bandwidth-request-delay-ms: delay time in milliseconds added by the limiter.
+    * bandwidth-response-delay-ms: delay time in milliseconds added by the limiter.
+    * bandwidth-request-duration-ms: total duration of receiving and processing the request.
+    * bandwidth-response-duration-ms: total duration of receiving and processing the response.
+
+    If ``response_limit`` is unset or has ``kbps`` of 0, the trailers will not be set.
+
+    If both the request and response delay time is 0, the trailers will not be set.
+
+    Note that the delay time may overlap with other factors such that it may not actually
+    increase the duration by the stated amount - for example, the source data may still be
+    arriving into a buffer during the artificial delay, such that it's possible to fully
+    "catch up" the lost time by reading from that buffer at a later, less-constrained time.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.bandwidth_share.v3.BandwidthShare.response_trailer_prefix:
+
+
+response_trailer_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The prefix for the response trailers. Empty string is a valid prefix.
+
+  If set, ``enable_response_trailers`` must be true.
+
+  For example, if this value is ``x-banana-`` then the trailer keys will be
+  ``x-banana-bandwidth-request-delay-ms``, ``x-banana-bandwidth-response-duration-ms``,
+  etc.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.bandwidth_share.v3.BandwidthShare.tenant_name_selector:
+
+
+tenant_name_selector
+  (:ref:`.xds.type.matcher.v3.Matcher <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`) An optional matcher which returns a string to use as a tenant name.
+
+  If unset, the tenant name will always be the empty string, and all requests will
+  have equal weight when limiting is being enforced.
+
+  If tenant names are set when limiting is being enforced, traffic may be
+  distributed unevenly - for example, assuming all requests want all possible
+  bandwidth, if there are five streams with tenant ``foo`` and two streams with
+  tenant ``bar``, and no custom weights, ``foo`` and ``bar`` will get an equal
+  share of the bandwidth (half), then the requests within each tenant will get
+  an equal share of that tenant's share, i.e. the ``foo`` requests will each
+  get a fifth of the ``foo`` half, a tenth of the total, and the ``bar`` requests
+  will each get half of the ``bar`` half, a quarter of the total.
+
+  An example way this might be used is to have ``tenant_name_selector`` make
+  each source IP address a tenant. Then if one source IP is trying to make 100
+  requests in parallel, and 99 other IPs are making one request each, the
+  total bandwidth distribution (assuming the limit is being exceeded) would
+  be equal per IP, versus with no tenants it would be equal per request and
+  the greedy IP address would be getting 100x more bandwidth than the others.
+
+  Note that if the limit is not consistently exceeded, all available bandwidth
+  is still distributed - so in this case if the 99 other IPs were only using
+  half the available bandwidth total between them, the greedy IP would still
+  be able to get 50x more bandwidth than the rest. In this example the value is
+  clearer - the less greedy tenants get all the bandwidth they want, and
+  only the greedy tenant gets throttled, vs. without tenants all the requests
+  would be throttled equally.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.bandwidth_share.v3.BandwidthShare.tenant_configs:
+
+
+tenant_configs
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.filters.http.bandwidth_share.v3.BandwidthShare.TenantConfig <envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthShare.TenantConfig>`>) A map from tenant names to configurations. If a tenant name is not present
+  in the map, ``default_tenant_config`` is used.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.bandwidth_share.v3.BandwidthShare.default_tenant_config:
+
+
+default_tenant_config
+  (:ref:`extensions.filters.http.bandwidth_share.v3.BandwidthShare.TenantConfig <envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthShare.TenantConfig>`) Optional configuration override for the default tenant. If unset, the
+  default values are used.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthShare.TenantConfig:
+
+extensions.filters.http.bandwidth_share.v3.BandwidthShare.TenantConfig
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.bandwidth_share.v3.BandwidthShare.TenantConfig proto] <api/envoy/extensions/filters/http/bandwidth_share/v3/bandwidth_share.proto#L25>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "weight": ...,
+    "include_stats_tag": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.bandwidth_share.v3.BandwidthShare.TenantConfig.weight:
+
+
+weight
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Weight of the tenant. For example, if two tenants are competing for
+  limited bandwidth, one has weight=3 and the other has weight=1, the
+  contested bandwidth will be distributed 3/4 to the weight=3 tenant
+  and 1/4 to the weight=1 tenant.
+
+  If unset or 0, the default weight of 1 will be used.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.bandwidth_share.v3.BandwidthShare.TenantConfig.include_stats_tag:
+
+
+include_stats_tag
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) True to record stats with ``tenant`` tag set to the tenant name.
+  If false or unset, the stats tag will be empty. It is recommended not
+  to set this to default true if tenant names are dynamically generated
+  from untrusted sources (or otherwise with unlimited scope), to
+  avoid creating unlimited stats cardinality.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthShare.Limit:
+
+extensions.filters.http.bandwidth_share.v3.BandwidthShare.Limit
+---------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.bandwidth_share.v3.BandwidthShare.Limit proto] <api/envoy/extensions/filters/http/bandwidth_share/v3/bandwidth_share.proto#L42>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "bucket_id": ...,
+    "kbps": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.bandwidth_share.v3.BandwidthShare.Limit.bucket_id:
+
+
+bucket_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The unique id of the limiter. Should be set if you want to apply distinct
+  limits on different listeners, or distinct limits for requests and responses.
+  With matching ``bucket_id`` values, multiple listeners can share a single limit
+  (e.g. for https and http listener that share a network bandwidth constraint).
+
+  Also used for the ``bucket_id`` stats tag.
+
+  The empty string is a valid ``bucket_id``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.bandwidth_share.v3.BandwidthShare.Limit.kbps:
+
+
+kbps
+  (:ref:`config.core.v3.RuntimeUInt32 <envoy_v3_api_msg_config.core.v3.RuntimeUInt32>`, *REQUIRED*) The limit supplied in KiB/s.
+
+  .. note::
+    The limit is associated with the ``bucket_id``. If the same ``bucket_id``
+    is used in multiple listeners/routes, it is a config error for the
+    configurations to not be identical. If the configuration is updated
+    dynamically via xds, changing the runtime key, the ``bucket_id`` must
+    also be changed or it is a config error.
+
+  The limit can be updated dynamically via runtime. Setting the limit
+  to zero, or unset, disables the filter.
+
+
+
+
+

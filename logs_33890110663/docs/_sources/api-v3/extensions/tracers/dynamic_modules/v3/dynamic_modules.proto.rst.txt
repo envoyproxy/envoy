@@ -1,0 +1,118 @@
+.. _envoy_v3_api_file_envoy/extensions/tracers/dynamic_modules/v3/dynamic_modules.proto:
+
+Dynamic Modules Tracer (proto)
+==============================
+
+.. _extension_envoy.tracers.dynamic_modules:
+
+This extension has the qualified name ``envoy.tracers.dynamic_modules``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers <extension_category_envoy.tracers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.tracers.dynamic_modules.v3.DynamicModuleTracer <envoy_v3_api_msg_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer:
+
+extensions.tracers.dynamic_modules.v3.DynamicModuleTracer
+---------------------------------------------------------
+
+
+:repo:`[extensions.tracers.dynamic_modules.v3.DynamicModuleTracer proto] <api/envoy/extensions/tracers/dynamic_modules/v3/dynamic_modules.proto#L29>`
+
+Configuration for the Dynamic Modules Tracer. This tracer allows loading shared object
+files via ``dlopen`` to implement custom distributed tracing backends.
+
+A module can be loaded by multiple tracer configurations; the module is loaded only once
+and shared across multiple tracer instances.
+
+The tracer receives trace context from incoming requests and can inject trace context into
+outgoing requests for propagation. It supports the full span lifecycle: creation, tagging,
+logging, child spans, and reporting.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "tracer_name": ...,
+    "tracer_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`, *REQUIRED*) Specifies the shared-object level configuration. This field is required.
+
+
+.. _envoy_v3_api_field_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer.tracer_name:
+
+
+tracer_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name for this tracer configuration. If not specified, defaults to an empty string.
+
+  This can be used to distinguish between different tracer implementations inside a dynamic
+  module. For example, a module can have completely different tracer implementations (e.g.,
+  Zipkin-compatible, OpenTelemetry-compatible). When Envoy receives this configuration, it
+  passes the ``tracer_name`` to the dynamic module's tracer config init function together with
+  the ``tracer_config``. That way a module can decide which in-module tracer implementation to
+  use based on the name at load time.
+
+
+.. _envoy_v3_api_field_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer.tracer_config:
+
+
+tracer_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the tracer chosen by ``tracer_name``. If not specified, an empty
+  configuration is passed to the module.
+
+  This is passed to the module's tracer initialization function. Together with the
+  ``tracer_name``, the module can decide which in-module tracer implementation to use and
+  fine-tune the behavior of the tracer.
+
+  ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
+  without the wrapper.
+
+  .. code-block:: yaml
+
+   # Passing a JSON struct configuration
+   tracer_config:
+     "@type": "type.googleapis.com/google.protobuf.Struct"
+     value:
+       endpoint: "http://tracing-backend:9411/api/v2/spans"
+       sample_rate: 0.1
+
+   # Passing a simple string configuration
+   tracer_config:
+     "@type": "type.googleapis.com/google.protobuf.StringValue"
+     value: "http://tracing-backend:9411"
+
+
+

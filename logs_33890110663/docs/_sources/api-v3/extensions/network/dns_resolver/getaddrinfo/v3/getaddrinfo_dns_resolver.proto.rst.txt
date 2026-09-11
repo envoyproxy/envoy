@@ -1,0 +1,77 @@
+.. _envoy_v3_api_file_envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.proto:
+
+getaddrinfo DNS resolver (proto)
+================================
+
+.. _extension_envoy.network.dns_resolver.getaddrinfo:
+
+This extension has the qualified name ``envoy.network.dns_resolver.getaddrinfo``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.network.dns_resolver <extension_category_envoy.network.dns_resolver>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig:
+
+extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+---------------------------------------------------------------------------
+
+
+:repo:`[extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig proto] <api/envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.proto#L24>`
+
+Configuration for getaddrinfo DNS resolver. This resolver will use the system's getaddrinfo()
+function to resolve hosts.
+
+.. attention::
+
+  Resolutions currently use a hard coded TTL of 60s because the getaddrinfo() API does not
+  provide the actual TTL. Configuration for this can be added in the future if needed.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "num_retries": {...},
+    "num_resolver_threads": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_retries:
+
+
+num_retries
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Specifies the number of retries before the resolver gives up. If not specified, the resolver will
+  retry indefinitely until it succeeds or the DNS query times out.
+
+
+.. _envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_resolver_threads:
+
+
+num_resolver_threads
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Specifies the number of threads used to resolve pending DNS queries. If not specified, one thread is used.
+
+

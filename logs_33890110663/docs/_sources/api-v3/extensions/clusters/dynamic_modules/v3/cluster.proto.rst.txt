@@ -1,0 +1,92 @@
+.. _envoy_v3_api_file_envoy/extensions/clusters/dynamic_modules/v3/cluster.proto:
+
+Dynamic Modules Cluster (proto)
+===============================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.clusters.dynamic_modules.v3.ClusterConfig:
+
+extensions.clusters.dynamic_modules.v3.ClusterConfig
+----------------------------------------------------
+
+
+:repo:`[extensions.clusters.dynamic_modules.v3.ClusterConfig proto] <api/envoy/extensions/clusters/dynamic_modules/v3/cluster.proto#L27>`
+
+Configuration for the dynamic modules cluster.
+
+This cluster type delegates host discovery and load balancing to a dynamic module. The module
+manages hosts via callbacks such as ``envoy_dynamic_module_callback_cluster_add_host`` and
+``envoy_dynamic_module_callback_cluster_remove_host``. The cluster must use
+``lb_policy: CLUSTER_PROVIDED`` since the module provides its own load balancer.
+
+
+.. _extension_envoy.clusters.dynamic_modules:
+
+This extension has the qualified name ``envoy.clusters.dynamic_modules``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.clusters <extension_category_envoy.clusters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig <envoy_v3_api_msg_extensions.clusters.dynamic_modules.v3.ClusterConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "cluster_name": ...,
+    "cluster_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.clusters.dynamic_modules.v3.ClusterConfig.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`, *REQUIRED*) The dynamic module configuration for the cluster.
+
+
+.. _envoy_v3_api_field_extensions.clusters.dynamic_modules.v3.ClusterConfig.cluster_name:
+
+
+cluster_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name to identify the cluster implementation within the module.
+  This is passed to the module's ``envoy_dynamic_module_on_cluster_config_new`` function.
+
+
+.. _envoy_v3_api_field_extensions.clusters.dynamic_modules.v3.ClusterConfig.cluster_config:
+
+
+cluster_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the module's cluster implementation.
+  This is passed to the module's ``envoy_dynamic_module_on_cluster_config_new`` function.
+  The configuration can be any protobuf message. However, it is recommended to use
+  ``google.protobuf.Struct``, ``google.protobuf.StringValue``, or ``google.protobuf.BytesValue``.
+  These types are passed directly as bytes to the module, so the module does not need to have
+  knowledge of protobuf encoding. Otherwise, the serialized bytes of the type are passed.
+  If not specified, an empty configuration is passed.
+
+

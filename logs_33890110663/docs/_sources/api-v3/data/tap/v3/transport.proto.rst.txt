@@ -1,0 +1,315 @@
+.. _envoy_v3_api_file_envoy/data/tap/v3/transport.proto:
+
+Transport tap data (proto)
+==========================
+
+
+Trace format for the tap transport socket extension. This dumps plain text read/write
+sequences on a socket.
+
+
+
+
+.. _envoy_v3_api_msg_data.tap.v3.SocketEvent:
+
+data.tap.v3.SocketEvent
+-----------------------
+
+
+:repo:`[data.tap.v3.SocketEvent proto] <api/envoy/data/tap/v3/transport.proto#L23>`
+
+Event in a socket trace.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "timestamp": {...},
+    "read": {...},
+    "write": {...},
+    "closed": {...},
+    "connection": {...},
+    "seq_num": ...
+  }
+
+.. _envoy_v3_api_field_data.tap.v3.SocketEvent.timestamp:
+
+
+timestamp
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) Timestamp for event.
+
+
+.. _envoy_v3_api_field_data.tap.v3.SocketEvent.read:
+
+
+read
+  (:ref:`data.tap.v3.SocketEvent.Read <envoy_v3_api_msg_data.tap.v3.SocketEvent.Read>`) 
+  Read or write with content as bytes string.
+
+
+  Only one of :ref:`read <envoy_v3_api_field_data.tap.v3.SocketEvent.read>`, :ref:`write <envoy_v3_api_field_data.tap.v3.SocketEvent.write>`, :ref:`closed <envoy_v3_api_field_data.tap.v3.SocketEvent.closed>` may be set.
+
+.. _envoy_v3_api_field_data.tap.v3.SocketEvent.write:
+
+
+write
+  (:ref:`data.tap.v3.SocketEvent.Write <envoy_v3_api_msg_data.tap.v3.SocketEvent.Write>`) 
+  Read or write with content as bytes string.
+
+
+  Only one of :ref:`read <envoy_v3_api_field_data.tap.v3.SocketEvent.read>`, :ref:`write <envoy_v3_api_field_data.tap.v3.SocketEvent.write>`, :ref:`closed <envoy_v3_api_field_data.tap.v3.SocketEvent.closed>` may be set.
+
+.. _envoy_v3_api_field_data.tap.v3.SocketEvent.closed:
+
+
+closed
+  (:ref:`data.tap.v3.SocketEvent.Closed <envoy_v3_api_msg_data.tap.v3.SocketEvent.Closed>`) 
+  Read or write with content as bytes string.
+
+
+  Only one of :ref:`read <envoy_v3_api_field_data.tap.v3.SocketEvent.read>`, :ref:`write <envoy_v3_api_field_data.tap.v3.SocketEvent.write>`, :ref:`closed <envoy_v3_api_field_data.tap.v3.SocketEvent.closed>` may be set.
+
+.. _envoy_v3_api_field_data.tap.v3.SocketEvent.connection:
+
+
+connection
+  (:ref:`data.tap.v3.Connection <envoy_v3_api_msg_data.tap.v3.Connection>`) Connection information per event
+
+
+.. _envoy_v3_api_field_data.tap.v3.SocketEvent.seq_num:
+
+
+seq_num
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Data sequence number
+
+
+.. _envoy_v3_api_msg_data.tap.v3.SocketEvent.Read:
+
+data.tap.v3.SocketEvent.Read
+----------------------------
+
+
+:repo:`[data.tap.v3.SocketEvent.Read proto] <api/envoy/data/tap/v3/transport.proto#L27>`
+
+Data read by Envoy from the transport socket.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "data": {...}
+  }
+
+.. _envoy_v3_api_field_data.tap.v3.SocketEvent.Read.data:
+
+
+data
+  (:ref:`data.tap.v3.Body <envoy_v3_api_msg_data.tap.v3.Body>`) Binary data read.
+
+
+
+.. _envoy_v3_api_msg_data.tap.v3.SocketEvent.Write:
+
+data.tap.v3.SocketEvent.Write
+-----------------------------
+
+
+:repo:`[data.tap.v3.SocketEvent.Write proto] <api/envoy/data/tap/v3/transport.proto#L38>`
+
+Data written by Envoy to the transport socket.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "data": {...},
+    "end_stream": ...
+  }
+
+.. _envoy_v3_api_field_data.tap.v3.SocketEvent.Write.data:
+
+
+data
+  (:ref:`data.tap.v3.Body <envoy_v3_api_msg_data.tap.v3.Body>`) Binary data written.
+
+
+.. _envoy_v3_api_field_data.tap.v3.SocketEvent.Write.end_stream:
+
+
+end_stream
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Stream was half closed after this write.
+
+
+
+.. _envoy_v3_api_msg_data.tap.v3.SocketEvent.Closed:
+
+data.tap.v3.SocketEvent.Closed
+------------------------------
+
+
+:repo:`[data.tap.v3.SocketEvent.Closed proto] <api/envoy/data/tap/v3/transport.proto#L50>`
+
+The connection was closed.
+
+
+
+
+
+
+.. _envoy_v3_api_msg_data.tap.v3.SocketBufferedTrace:
+
+data.tap.v3.SocketBufferedTrace
+-------------------------------
+
+
+:repo:`[data.tap.v3.SocketBufferedTrace proto] <api/envoy/data/tap/v3/transport.proto#L78>`
+
+Sequence of read/write events that constitute a buffered trace on a socket.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "trace_id": ...,
+    "connection": {...},
+    "events": [],
+    "read_truncated": ...,
+    "write_truncated": ...
+  }
+
+.. _envoy_v3_api_field_data.tap.v3.SocketBufferedTrace.trace_id:
+
+
+trace_id
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Trace ID unique to the originating Envoy only. Trace IDs can repeat and should not be used
+  for long term stable uniqueness. Matches connection IDs used in Envoy logs.
+
+
+.. _envoy_v3_api_field_data.tap.v3.SocketBufferedTrace.connection:
+
+
+connection
+  (:ref:`data.tap.v3.Connection <envoy_v3_api_msg_data.tap.v3.Connection>`) Connection properties.
+
+
+.. _envoy_v3_api_field_data.tap.v3.SocketBufferedTrace.events:
+
+
+events
+  (**repeated** :ref:`data.tap.v3.SocketEvent <envoy_v3_api_msg_data.tap.v3.SocketEvent>`) Sequence of observed events.
+
+
+.. _envoy_v3_api_field_data.tap.v3.SocketBufferedTrace.read_truncated:
+
+
+read_truncated
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Set to true if read events were truncated due to the :ref:`max_buffered_rx_bytes
+  <envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_rx_bytes>` setting.
+
+
+.. _envoy_v3_api_field_data.tap.v3.SocketBufferedTrace.write_truncated:
+
+
+write_truncated
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Set to true if write events were truncated due to the :ref:`max_buffered_tx_bytes
+  <envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_tx_bytes>` setting.
+
+
+
+.. _envoy_v3_api_msg_data.tap.v3.SocketEvents:
+
+data.tap.v3.SocketEvents
+------------------------
+
+
+:repo:`[data.tap.v3.SocketEvents proto] <api/envoy/data/tap/v3/transport.proto#L102>`
+
+A message for the sequence of observed events
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "events": []
+  }
+
+.. _envoy_v3_api_field_data.tap.v3.SocketEvents.events:
+
+
+events
+  (**repeated** :ref:`data.tap.v3.SocketEvent <envoy_v3_api_msg_data.tap.v3.SocketEvent>`) 
+
+
+.. _envoy_v3_api_msg_data.tap.v3.SocketStreamedTraceSegment:
+
+data.tap.v3.SocketStreamedTraceSegment
+--------------------------------------
+
+
+:repo:`[data.tap.v3.SocketStreamedTraceSegment proto] <api/envoy/data/tap/v3/transport.proto#L107>`
+
+A streamed socket trace segment. Multiple segments make up a full trace.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "trace_id": ...,
+    "connection": {...},
+    "event": {...},
+    "events": {...}
+  }
+
+.. _envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.trace_id:
+
+
+trace_id
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Trace ID unique to the originating Envoy only. Trace IDs can repeat and should not be used
+  for long term stable uniqueness. Matches connection IDs used in Envoy logs.
+
+
+.. _envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.connection:
+
+
+connection
+  (:ref:`data.tap.v3.Connection <envoy_v3_api_msg_data.tap.v3.Connection>`) Connection properties.
+
+
+  
+
+  Only one of :ref:`connection <envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.connection>`, :ref:`event <envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.event>`, :ref:`events <envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.events>` may be set.
+
+.. _envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.event:
+
+
+event
+  (:ref:`data.tap.v3.SocketEvent <envoy_v3_api_msg_data.tap.v3.SocketEvent>`) Socket event.
+
+
+  
+
+  Only one of :ref:`connection <envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.connection>`, :ref:`event <envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.event>`, :ref:`events <envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.events>` may be set.
+
+.. _envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.events:
+
+
+events
+  (:ref:`data.tap.v3.SocketEvents <envoy_v3_api_msg_data.tap.v3.SocketEvents>`) Sequence of observed events.
+
+
+  
+
+  Only one of :ref:`connection <envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.connection>`, :ref:`event <envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.event>`, :ref:`events <envoy_v3_api_field_data.tap.v3.SocketStreamedTraceSegment.events>` may be set.
+

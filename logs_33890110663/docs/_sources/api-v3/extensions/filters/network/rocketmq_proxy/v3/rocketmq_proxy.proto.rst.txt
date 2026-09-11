@@ -1,0 +1,85 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.proto:
+
+RocketMQ Proxy (proto)
+======================
+
+.. _extension_envoy.filters.network.rocketmq_proxy:
+
+This extension has the qualified name ``envoy.filters.network.rocketmq_proxy``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+
+
+RocketMQ Proxy :ref:`configuration overview <config_network_filters_rocketmq_proxy>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.rocketmq_proxy.v3.RocketmqProxy:
+
+extensions.filters.network.rocketmq_proxy.v3.RocketmqProxy
+----------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.rocketmq_proxy.v3.RocketmqProxy proto] <api/contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.proto#L21>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "route_config": {...},
+    "transient_object_life_span": {...},
+    "develop_mode": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.rocketmq_proxy.v3.RocketmqProxy.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The human readable prefix to use when emitting statistics.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.rocketmq_proxy.v3.RocketmqProxy.route_config:
+
+
+route_config
+  (:ref:`extensions.filters.network.rocketmq_proxy.v3.RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.rocketmq_proxy.v3.RouteConfiguration>`) The route table for the connection manager is specified in this property.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.rocketmq_proxy.v3.RocketmqProxy.transient_object_life_span:
+
+
+transient_object_life_span
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The largest duration transient object expected to live, more than 10s is recommended.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.rocketmq_proxy.v3.RocketmqProxy.develop_mode:
+
+
+develop_mode
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If develop_mode is enabled, this proxy plugin may work without dedicated traffic intercepting
+  facility without considering backward compatibility of exiting RocketMQ client SDK.
+
+

@@ -1,0 +1,163 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/rbac/v3/rbac.proto:
+
+RBAC (proto)
+============
+
+.. _extension_envoy.filters.http.rbac:
+
+This extension has the qualified name ``envoy.filters.http.rbac``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBACPerRoute <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBACPerRoute>`
+
+
+
+Role-Based Access Control :ref:`configuration overview <config_http_filters_rbac>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC:
+
+extensions.filters.http.rbac.v3.RBAC
+------------------------------------
+
+
+:repo:`[extensions.filters.http.rbac.v3.RBAC proto] <api/envoy/extensions/filters/http/rbac/v3/rbac.proto#L24>`
+
+RBAC filter config.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "rules": {...},
+    "rules_stat_prefix": ...,
+    "matcher": {...},
+    "shadow_rules": {...},
+    "shadow_matcher": {...},
+    "shadow_rules_stat_prefix": ...,
+    "track_per_rule_stats": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules:
+
+
+rules
+  (:ref:`config.rbac.v3.RBAC <envoy_v3_api_msg_config.rbac.v3.RBAC>`) The primary RBAC policy which will be applied globally, to all the incoming requests.
+
+  * If absent, no RBAC enforcement occurs.
+  * If set but empty, all requests are denied.
+
+  .. note::
+
+    When both ``rules`` and ``matcher`` are configured, ``rules`` will be ignored.
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix:
+
+
+rules_stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If specified, rules will emit stats with the given prefix.
+  This is useful for distinguishing metrics when multiple RBAC filters are configured.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.matcher:
+
+
+matcher
+  (:ref:`.xds.type.matcher.v3.Matcher <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`) Match tree for evaluating RBAC actions on incoming requests. Requests not matching any matcher will be denied.
+
+  * If absent, no RBAC enforcement occurs.
+  * If set but empty, all requests are denied.
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules:
+
+
+shadow_rules
+  (:ref:`config.rbac.v3.RBAC <envoy_v3_api_msg_config.rbac.v3.RBAC>`) Shadow policy for testing RBAC rules without enforcing them. These rules generate stats and logs but do not deny
+  requests. If absent, no shadow RBAC policy will be applied.
+
+  .. note::
+
+    When both ``shadow_rules`` and ``shadow_matcher`` are configured, ``shadow_rules`` will be ignored.
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_matcher:
+
+
+shadow_matcher
+  (:ref:`.xds.type.matcher.v3.Matcher <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`) If absent, no shadow matcher will be applied.
+  Match tree for testing RBAC rules through stats and logs without enforcing them.
+  If absent, no shadow matching occurs.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules_stat_prefix:
+
+
+shadow_rules_stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If specified, shadow rules will emit stats with the given prefix.
+  This is useful for distinguishing metrics when multiple RBAC filters use shadow rules.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.track_per_rule_stats:
+
+
+track_per_rule_stats
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If ``track_per_rule_stats`` is ``true``, counters will be published for each rule and shadow rule.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBACPerRoute:
+
+extensions.filters.http.rbac.v3.RBACPerRoute
+--------------------------------------------
+
+
+:repo:`[extensions.filters.http.rbac.v3.RBACPerRoute proto] <api/envoy/extensions/filters/http/rbac/v3/rbac.proto#L76>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "rbac": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.rbac.v3.RBACPerRoute.rbac:
+
+
+rbac
+  (:ref:`extensions.filters.http.rbac.v3.RBAC <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC>`) Per-route specific RBAC configuration that overrides the global RBAC configuration.
+  If absent, RBAC policy will be disabled for this route.
+
+

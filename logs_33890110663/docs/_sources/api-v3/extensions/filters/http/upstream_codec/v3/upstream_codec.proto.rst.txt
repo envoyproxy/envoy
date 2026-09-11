@@ -1,0 +1,49 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.proto:
+
+UpstreamCodec (proto)
+=====================
+
+.. _extension_envoy.filters.http.upstream_codec:
+
+This extension has the qualified name ``envoy.filters.http.upstream_codec``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http.upstream <extension_category_envoy.filters.http.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec <envoy_v3_api_msg_extensions.filters.http.upstream_codec.v3.UpstreamCodec>`
+
+
+
+Codec :ref:`configuration overview <config_http_filters_upstream_codec>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.upstream_codec.v3.UpstreamCodec:
+
+extensions.filters.http.upstream_codec.v3.UpstreamCodec
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.upstream_codec.v3.UpstreamCodec proto] <api/envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.proto#L16>`
+
+
+
+
+

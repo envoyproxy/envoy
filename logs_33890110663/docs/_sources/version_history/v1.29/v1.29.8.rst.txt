@@ -1,0 +1,21 @@
+.. _version_history_1.29.8:
+
+1.29.8 (September 14, 2024)
+============================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **dependencies**: Update curl to mitigate CVE-2024-7264.
+* **stateful_session**: Support 0 TTL for proto-encoded cookies, which disables cookie expiration by Envoy.
+

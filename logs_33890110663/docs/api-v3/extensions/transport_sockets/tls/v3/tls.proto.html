@@ -1,0 +1,668 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TLS transport socket (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../../_static/favicon.ico"/>
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" />
+    <link rel="next" title="SPIFFE Certificate Validator (proto)" href="tls_spiffe_validator_config.proto.html" />
+    <link rel="prev" title="Secrets configuration (proto)" href="secret.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../../searchindex.js"
+          data-envoy-search-page="../../../../../search.html"
+          data-envoy-root="../../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../config/config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../config/local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../../config/config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+      <li class="breadcrumb-item active">TLS transport socket (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../_sources/api-v3/extensions/transport_sockets/tls/v3/tls.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="tls-transport-socket-proto">
+<span id="envoy-v3-api-file-envoy-extensions-transport-sockets-tls-v3-tls-proto"></span><h1>TLS transport socket (proto)<a class="headerlink" href="#tls-transport-socket-proto" title="Link to this heading"></a></h1>
+<p id="extension-envoy-transport-sockets-tls">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.transport_sockets.tls</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension is intended to be robust against both untrusted downstream and
+upstream traffic.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension categories:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../config/listener/v3/listener_components.proto.html#extension-category-envoy-transport-sockets-downstream"><span class="std std-ref">envoy.transport_sockets.downstream</span></a></p></li>
+<li><p><a class="reference internal" href="../../../../config/cluster/v3/cluster.proto.html#extension-category-envoy-transport-sockets-upstream"><span class="std std-ref">envoy.transport_sockets.upstream</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-downstreamtlscontext"><span class="std std-ref">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext</span></a></p></li>
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-upstreamtlscontext"><span class="std std-ref">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext</span></a></p></li>
+</ul>
+</div>
+<p>The TLS contexts below provide the transport socket configuration for upstream/downstream TLS.</p>
+<section id="extensions-transport-sockets-tls-v3-upstreamtlscontext">
+<span id="envoy-v3-api-msg-extensions-transport-sockets-tls-v3-upstreamtlscontext"></span><h2>extensions.transport_sockets.tls.v3.UpstreamTlsContext<a class="headerlink" href="#extensions-transport-sockets-tls-v3-upstreamtlscontext" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L28">[extensions.transport_sockets.tls.v3.UpstreamTlsContext proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;common_tls_context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;sni&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;auto_host_sni&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;auto_sni_san_validation&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;allow_renegotiation&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max_session_keys&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;enforce_rsa_key_usage&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-upstreamtlscontext-common-tls-context">
+<dt>common_tls_context</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-commontlscontext"><span class="std std-ref">extensions.transport_sockets.tls.v3.CommonTlsContext</span></a>) Common TLS context settings.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Server certificate verification is not enabled by default. To enable verification, configure
+<a class="reference internal" href="common.proto.html#envoy-v3-api-field-extensions-transport-sockets-tls-v3-certificatevalidationcontext-trusted-ca"><span class="std std-ref">trusted_ca</span></a>.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-upstreamtlscontext-sni">
+<dt>sni</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) SNI string to use when creating TLS backend connections.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-upstreamtlscontext-auto-host-sni">
+<dt>auto_host_sni</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If true, replaces the SNI for the connection with the hostname of the upstream host, if
+the hostname is known due to either a DNS cluster type or the
+<a class="reference internal" href="../../../../config/endpoint/v3/endpoint_components.proto.html#envoy-v3-api-field-config-endpoint-v3-endpoint-hostname"><span class="std std-ref">hostname</span></a> is set on
+the host.</p>
+<p>See <a class="reference internal" href="../../../../../start/quick-start/securing.html#start-quick-start-securing-sni-client"><span class="std std-ref">SNI configuration</span></a> for details on how this
+interacts with other validation options.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-upstreamtlscontext-auto-sni-san-validation">
+<dt>auto_sni_san_validation</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If true, replaces any Subject Alternative Name (SAN) validations with a validation for a DNS SAN matching
+the SNI value sent. The validation uses the actual requested SNI, regardless of how the SNI is configured.</p>
+<p>For common cases where an SNI value is present and the server certificate should include a corresponding SAN,
+this option ensures the SAN is properly validated.</p>
+<p>See the <a class="reference internal" href="../../../../../start/quick-start/securing.html#start-quick-start-securing-validation"><span class="std std-ref">validation configuration</span></a> for how this interacts with
+other validation options.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-upstreamtlscontext-allow-renegotiation">
+<dt>allow_renegotiation</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If true, server-initiated TLS renegotiation will be allowed.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>TLS renegotiation is considered insecure and shouldn’t be used unless absolutely necessary.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-upstreamtlscontext-max-session-keys">
+<dt>max_session_keys</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Maximum number of session keys (Pre-Shared Keys for TLSv1.3+, Session IDs and Session Tickets
+for TLSv1.2 and older) to be stored for session resumption.</p>
+<p>Defaults to 1, setting this to 0 disables session resumption.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-upstreamtlscontext-enforce-rsa-key-usage">
+<dt>enforce_rsa_key_usage</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Controls enforcement of the <code class="docutils literal notranslate"><span class="pre">keyUsage</span></code> extension in peer certificates. If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>,
+the handshake will fail if the <code class="docutils literal notranslate"><span class="pre">keyUsage</span></code> is incompatible with TLS usage.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>This field is deprecated and ignored. Envoy now always enforces the <code class="docutils literal notranslate"><span class="pre">keyUsage</span></code> extension
+in peer certificates, making this option unconfigurable.</p>
+</div>
+</dd>
+</dl>
+</section>
+<section id="extensions-transport-sockets-tls-v3-downstreamtlscontext">
+<span id="envoy-v3-api-msg-extensions-transport-sockets-tls-v3-downstreamtlscontext"></span><h2>extensions.transport_sockets.tls.v3.DownstreamTlsContext<a class="headerlink" href="#extensions-transport-sockets-tls-v3-downstreamtlscontext" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L87">[extensions.transport_sockets.tls.v3.DownstreamTlsContext proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;common_tls_context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;require_client_certificate&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;session_ticket_keys&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;session_ticket_keys_sds_secret_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;disable_stateless_session_resumption&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;disable_stateful_session_resumption&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;session_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;ocsp_staple_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;full_scan_certs_on_sni_mismatch&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;prefer_client_ciphers&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-common-tls-context">
+<dt>common_tls_context</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-commontlscontext"><span class="std std-ref">extensions.transport_sockets.tls.v3.CommonTlsContext</span></a>) Common TLS context settings.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-require-client-certificate">
+<dt>require_client_certificate</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) If specified, Envoy will reject connections without a valid client
+certificate.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-session-ticket-keys">
+<dt>session_ticket_keys</dt><dd><p>(<a class="reference internal" href="common.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-tlssessionticketkeys"><span class="std std-ref">extensions.transport_sockets.tls.v3.TlsSessionTicketKeys</span></a>) TLS session ticket key settings.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-session-ticket-keys"><span class="std std-ref">session_ticket_keys</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-session-ticket-keys-sds-secret-config"><span class="std std-ref">session_ticket_keys_sds_secret_config</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-disable-stateless-session-resumption"><span class="std std-ref">disable_stateless_session_resumption</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-session-ticket-keys-sds-secret-config">
+<dt>session_ticket_keys_sds_secret_config</dt><dd><p>(<a class="reference internal" href="secret.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-sdssecretconfig"><span class="std std-ref">extensions.transport_sockets.tls.v3.SdsSecretConfig</span></a>) Config for fetching TLS session ticket keys via SDS API.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-session-ticket-keys"><span class="std std-ref">session_ticket_keys</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-session-ticket-keys-sds-secret-config"><span class="std std-ref">session_ticket_keys_sds_secret_config</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-disable-stateless-session-resumption"><span class="std std-ref">disable_stateless_session_resumption</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-disable-stateless-session-resumption">
+<dt>disable_stateless_session_resumption</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Config for controlling stateless TLS session resumption: setting this to true will cause the TLS
+server to not issue TLS session tickets for the purposes of stateless TLS session resumption.
+If set to false, the TLS server will issue TLS session tickets and encrypt/decrypt them using
+the keys specified through either <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-session-ticket-keys"><span class="std std-ref">session_ticket_keys</span></a>
+or <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-session-ticket-keys-sds-secret-config"><span class="std std-ref">session_ticket_keys_sds_secret_config</span></a>.
+If this config is set to false and no keys are explicitly configured, the TLS server will issue
+TLS session tickets and encrypt/decrypt them using an internally-generated and managed key, with the
+implication that sessions cannot be resumed across hot restarts or on different hosts.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-session-ticket-keys"><span class="std std-ref">session_ticket_keys</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-session-ticket-keys-sds-secret-config"><span class="std std-ref">session_ticket_keys_sds_secret_config</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-disable-stateless-session-resumption"><span class="std std-ref">disable_stateless_session_resumption</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-disable-stateful-session-resumption">
+<dt>disable_stateful_session_resumption</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If <code class="docutils literal notranslate"><span class="pre">true</span></code>, the TLS server will not maintain a session cache of TLS sessions.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This applies only to TLSv1.2 and earlier.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-session-timeout">
+<dt>session_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Maximum lifetime of TLS sessions. If specified, <code class="docutils literal notranslate"><span class="pre">session_timeout</span></code> will change the maximum lifetime
+of the TLS session.</p>
+<p>This serves as a hint for the <a class="reference external" href="https://tools.ietf.org/html/rfc5077#section-5.6">TLS session ticket lifetime (for TLSv1.2)</a>.
+Only whole seconds are considered; fractional seconds are ignored.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-ocsp-staple-policy">
+<dt>ocsp_staple_policy</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-transport-sockets-tls-v3-downstreamtlscontext-ocspstaplepolicy"><span class="std std-ref">extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy</span></a>) Configuration for handling certificates without an OCSP response or with expired responses.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">LENIENT_STAPLING</span></code></p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-full-scan-certs-on-sni-mismatch">
+<dt>full_scan_certs_on_sni_mismatch</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Multiple certificates are allowed in Downstream transport socket to serve different SNI.
+This option controls the behavior when no matching certificate is found for the received SNI value,
+or no SNI value was sent. If enabled, all certificates will be evaluated for a match for non-SNI criteria
+such as key type and OCSP settings. If disabled, the first provided certificate will be used.
+Defaults to <code class="docutils literal notranslate"><span class="pre">false</span></code>. See more details in <a class="reference internal" href="../../../../../intro/arch_overview/security/ssl.html#arch-overview-ssl-cert-select"><span class="std std-ref">Multiple TLS certificates</span></a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-prefer-client-ciphers">
+<dt>prefer_client_ciphers</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If <code class="docutils literal notranslate"><span class="pre">true</span></code>, the downstream client’s preferred cipher is used during the handshake. If <code class="docutils literal notranslate"><span class="pre">false</span></code>, Envoy
+uses its preferred cipher.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This has no effect when using TLSv1_3.</p>
+</div>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-transport-sockets-tls-v3-downstreamtlscontext-ocspstaplepolicy">
+<span id="envoy-v3-api-enum-extensions-transport-sockets-tls-v3-downstreamtlscontext-ocspstaplepolicy"></span><h2>Enum extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy<a class="headerlink" href="#enum-extensions-transport-sockets-tls-v3-downstreamtlscontext-ocspstaplepolicy" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L91">[extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy proto]</a></p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-transport-sockets-tls-v3-downstreamtlscontext-ocspstaplepolicy-lenient-stapling">
+<dt>LENIENT_STAPLING</dt><dd><p><em>(DEFAULT)</em> ⁣OCSP responses are optional. If absent or expired, the certificate is used without stapling.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-transport-sockets-tls-v3-downstreamtlscontext-ocspstaplepolicy-strict-stapling">
+<dt>STRICT_STAPLING</dt><dd><p>⁣OCSP responses are optional. If absent, the certificate is used without stapling. If present but expired,
+the certificate is not used for subsequent connections. Connections are rejected if no suitable certificate
+is found.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-transport-sockets-tls-v3-downstreamtlscontext-ocspstaplepolicy-must-staple">
+<dt>MUST_STAPLE</dt><dd><p>⁣OCSP responses are required. Connections fail if a certificate lacks a valid OCSP response. Expired responses
+prevent certificate use in new connections, and connections are rejected if no suitable certificate is available.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-transport-sockets-tls-v3-tlskeylog">
+<span id="envoy-v3-api-msg-extensions-transport-sockets-tls-v3-tlskeylog"></span><h2>extensions.transport_sockets.tls.v3.TlsKeyLog<a class="headerlink" href="#extensions-transport-sockets-tls-v3-tlskeylog" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L174">[extensions.transport_sockets.tls.v3.TlsKeyLog proto]</a></p>
+<p>TLS key log configuration.
+The key log file format is “format used by NSS for its SSLKEYLOGFILE debugging output” (text taken from openssl man page)</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;local_address_range&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;remote_address_range&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-tlskeylog-path">
+<dt>path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) Path to save the TLS key log.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-tlskeylog-local-address-range">
+<dt>local_address_range</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../config/core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-cidrrange"><span class="std std-ref">config.core.v3.CidrRange</span></a>) Local IP address ranges to filter connections for TLS key logging. If not set, matches any local IP address.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-tlskeylog-remote-address-range">
+<dt>remote_address_range</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../config/core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-cidrrange"><span class="std std-ref">config.core.v3.CidrRange</span></a>) Remote IP address ranges to filter connections for TLS key logging. If not set, matches any remote IP address.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-transport-sockets-tls-v3-commontlscontext">
+<span id="envoy-v3-api-msg-extensions-transport-sockets-tls-v3-commontlscontext"></span><h2>extensions.transport_sockets.tls.v3.CommonTlsContext<a class="headerlink" href="#extensions-transport-sockets-tls-v3-commontlscontext" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L187">[extensions.transport_sockets.tls.v3.CommonTlsContext proto]</a></p>
+<p>TLS context shared by both client and server TLS contexts.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;tls_params&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;tls_certificates&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;tls_certificate_sds_secret_configs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;custom_tls_certificate_selector&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;validation_context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;validation_context_sds_secret_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;combined_validation_context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;alpn_protocols&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;custom_handshaker&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;key_log&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-tls-params">
+<dt>tls_params</dt><dd><p>(<a class="reference internal" href="common.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-tlsparameters"><span class="std std-ref">extensions.transport_sockets.tls.v3.TlsParameters</span></a>) TLS protocol versions, cipher suites etc.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-tls-certificates">
+<dt>tls_certificates</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="common.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-tlscertificate"><span class="std std-ref">extensions.transport_sockets.tls.v3.TlsCertificate</span></a>) Only a single TLS certificate is supported in client contexts unless
+<code class="docutils literal notranslate"><span class="pre">custom_tls_certificate_selector</span></code> is explicitly defined with <code class="docutils literal notranslate"><span class="pre">max_session_keys</span></code> set to 0. In server contexts,
+<a class="reference internal" href="../../../../../intro/arch_overview/security/ssl.html#arch-overview-ssl-cert-select"><span class="std std-ref">Multiple TLS certificates</span></a> can be associated with the
+same context to allow both RSA and ECDSA certificates and support SNI-based selection.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">tls_certificate_provider_instance</span></code> is set, this field is ignored.
+If this field is set, <code class="docutils literal notranslate"><span class="pre">tls_certificate_sds_secret_configs</span></code> is ignored.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-tls-certificate-sds-secret-configs">
+<dt>tls_certificate_sds_secret_configs</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="secret.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-sdssecretconfig"><span class="std std-ref">extensions.transport_sockets.tls.v3.SdsSecretConfig</span></a>) Configs for fetching TLS certificates via SDS API. Note SDS API allows certificates to be
+fetched/refreshed over the network asynchronously with respect to the TLS handshake.</p>
+<p>The same number and types of certificates as <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-tls-certificates"><span class="std std-ref">tls_certificates</span></a>
+are valid in the certificates fetched through this setting.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">tls_certificates</span></code> or <code class="docutils literal notranslate"><span class="pre">tls_certificate_provider_instance</span></code> are set, this field
+is ignored.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-custom-tls-certificate-selector">
+<dt>custom_tls_certificate_selector</dt><dd><p>(<a class="reference internal" href="../../../../config/core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Custom TLS certificate selector.</p>
+<p>For the downstream TLS socket, select a TLS certificate based on TLS client hello. If empty,
+defaults to native TLS certificate selection behavior: DNS SANs or Subject Common Name in TLS
+certificates is extracted as server name pattern to match SNI.</p>
+<p>For the upstream TLS socket, select a TLS certificate based on TLS server hello and the
+transport socket options.</p>
+<div class="admonition tip" id="extension-category-envoy-tls-certificate-selectors">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../cert_selectors/on_demand_secret/v3/config.proto.html#extension-envoy-tls-certificate-selectors-on-demand-secret"><span class="std std-ref">envoy.tls.certificate_selectors.on_demand_secret</span></a></p></li>
+</ul>
+</div>
+<div class="admonition tip" id="extension-category-envoy-tls-upstream-certificate-selectors">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../cert_selectors/on_demand_secret/v3/config.proto.html#extension-envoy-tls-certificate-selectors-on-demand-secret"><span class="std std-ref">envoy.tls.certificate_selectors.on_demand_secret</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-validation-context">
+<dt>validation_context</dt><dd><p>(<a class="reference internal" href="common.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-certificatevalidationcontext"><span class="std std-ref">extensions.transport_sockets.tls.v3.CertificateValidationContext</span></a>) How to validate peer certificates.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-validation-context"><span class="std std-ref">validation_context</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-validation-context-sds-secret-config"><span class="std std-ref">validation_context_sds_secret_config</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-combined-validation-context"><span class="std std-ref">combined_validation_context</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-validation-context-sds-secret-config">
+<dt>validation_context_sds_secret_config</dt><dd><p>(<a class="reference internal" href="secret.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-sdssecretconfig"><span class="std std-ref">extensions.transport_sockets.tls.v3.SdsSecretConfig</span></a>) Config for fetching validation context via SDS API. Note SDS API allows certificates to be
+fetched/refreshed over the network asynchronously with respect to the TLS handshake.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-validation-context"><span class="std std-ref">validation_context</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-validation-context-sds-secret-config"><span class="std std-ref">validation_context_sds_secret_config</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-combined-validation-context"><span class="std std-ref">combined_validation_context</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-combined-validation-context">
+<dt>combined_validation_context</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-commontlscontext-combinedcertificatevalidationcontext"><span class="std std-ref">extensions.transport_sockets.tls.v3.CommonTlsContext.CombinedCertificateValidationContext</span></a>) Combines the default <code class="docutils literal notranslate"><span class="pre">CertificateValidationContext</span></code> with the SDS-provided dynamic context for certificate
+validation.</p>
+<p>When the SDS server returns a dynamic <code class="docutils literal notranslate"><span class="pre">CertificateValidationContext</span></code>, it is merged
+with the default context using <code class="docutils literal notranslate"><span class="pre">Message::MergeFrom()</span></code>. The merging rules are as follows:</p>
+<ul class="simple">
+<li><p><strong>Singular Fields:</strong> Dynamic fields override the default singular fields.</p></li>
+<li><p><strong>Repeated Fields:</strong> Dynamic repeated fields are concatenated with the default repeated fields.</p></li>
+<li><p><strong>Boolean Fields:</strong> Boolean fields are combined using a logical OR operation.</p></li>
+</ul>
+<p>The resulting <code class="docutils literal notranslate"><span class="pre">CertificateValidationContext</span></code> is used to perform certificate validation.</p>
+<p>Only one of <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-validation-context"><span class="std std-ref">validation_context</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-validation-context-sds-secret-config"><span class="std std-ref">validation_context_sds_secret_config</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-combined-validation-context"><span class="std std-ref">combined_validation_context</span></a> may be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-alpn-protocols">
+<dt>alpn_protocols</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Supplies the list of ALPN protocols that the listener should expose. In
+practice this is likely to be set to one of two values (see the
+<a class="reference internal" href="../../../filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-codec-type"><span class="std std-ref">codec_type</span></a>
+parameter in the HTTP connection manager for more information):</p>
+<ul class="simple">
+<li><p>“h2,http/1.1” If the listener is going to support both HTTP/2 and HTTP/1.1.</p></li>
+<li><p>“http/1.1” If the listener is only going to support HTTP/1.1.</p></li>
+</ul>
+<p>There is no default for this parameter. If empty, Envoy will not expose ALPN.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-custom-handshaker">
+<dt>custom_handshaker</dt><dd><p>(<a class="reference internal" href="../../../../config/core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Custom TLS handshaker. If empty, defaults to native TLS handshaking
+behavior.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-key-log">
+<dt>key_log</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-tlskeylog"><span class="std std-ref">extensions.transport_sockets.tls.v3.TlsKeyLog</span></a>) TLS key log configuration</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-transport-sockets-tls-v3-commontlscontext-combinedcertificatevalidationcontext">
+<span id="envoy-v3-api-msg-extensions-transport-sockets-tls-v3-commontlscontext-combinedcertificatevalidationcontext"></span><h2>extensions.transport_sockets.tls.v3.CommonTlsContext.CombinedCertificateValidationContext<a class="headerlink" href="#extensions-transport-sockets-tls-v3-commontlscontext-combinedcertificatevalidationcontext" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L241">[extensions.transport_sockets.tls.v3.CommonTlsContext.CombinedCertificateValidationContext proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;default_validation_context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;validation_context_sds_secret_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-combinedcertificatevalidationcontext-default-validation-context">
+<dt>default_validation_context</dt><dd><p>(<a class="reference internal" href="common.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-certificatevalidationcontext"><span class="std std-ref">extensions.transport_sockets.tls.v3.CertificateValidationContext</span></a>, <em>REQUIRED</em>) How to validate peer certificates.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-transport-sockets-tls-v3-commontlscontext-combinedcertificatevalidationcontext-validation-context-sds-secret-config">
+<dt>validation_context_sds_secret_config</dt><dd><p>(<a class="reference internal" href="secret.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-sdssecretconfig"><span class="std std-ref">extensions.transport_sockets.tls.v3.SdsSecretConfig</span></a>, <em>REQUIRED</em>) Config for fetching validation context via SDS API. Note SDS API allows certificates to be
+fetched/refreshed over the network asynchronously with respect to the TLS handshake.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="secret.proto.html" class="btn btn-neutral float-left" title="Secrets configuration (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="tls_spiffe_validator_config.proto.html" class="btn btn-neutral float-right" title="SPIFFE Certificate Validator (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">TLS transport socket (proto)</a><ul>
+<li><a class="reference internal" href="#extensions-transport-sockets-tls-v3-upstreamtlscontext">extensions.transport_sockets.tls.v3.UpstreamTlsContext</a></li>
+<li><a class="reference internal" href="#extensions-transport-sockets-tls-v3-downstreamtlscontext">extensions.transport_sockets.tls.v3.DownstreamTlsContext</a></li>
+<li><a class="reference internal" href="#enum-extensions-transport-sockets-tls-v3-downstreamtlscontext-ocspstaplepolicy">Enum extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy</a></li>
+<li><a class="reference internal" href="#extensions-transport-sockets-tls-v3-tlskeylog">extensions.transport_sockets.tls.v3.TlsKeyLog</a></li>
+<li><a class="reference internal" href="#extensions-transport-sockets-tls-v3-commontlscontext">extensions.transport_sockets.tls.v3.CommonTlsContext</a></li>
+<li><a class="reference internal" href="#extensions-transport-sockets-tls-v3-commontlscontext-combinedcertificatevalidationcontext">extensions.transport_sockets.tls.v3.CommonTlsContext.CombinedCertificateValidationContext</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

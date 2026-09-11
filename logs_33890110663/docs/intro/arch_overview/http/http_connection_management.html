@@ -1,0 +1,584 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HTTP connection management &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="HTTP filters" href="http_filters.html" />
+    <link rel="prev" title="HTTP" href="http.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="http.html">HTTP</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">HTTP connection management</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http_filters.html">HTTP filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http_routing.html">HTTP routing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="upgrades.html">HTTP upgrades</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http_proxy.html">HTTP dynamic forward proxy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http3.html">HTTP/3 overview</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../observability/observability.html">Observability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../security/security.html">Security</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced/advanced.html">Advanced</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="http.html">HTTP</a></li>
+      <li class="breadcrumb-item active">HTTP connection management</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/intro/arch_overview/http/http_connection_management.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="http-connection-management">
+<span id="arch-overview-http-conn-man"></span><h1>HTTP connection management<a class="headerlink" href="#http-connection-management" title="Link to this heading"></a></h1>
+<p>HTTP is such a critical component of modern service oriented architectures that Envoy implements a
+large amount of HTTP specific functionality. Envoy has a built in network level filter called the
+<a class="reference internal" href="../../../configuration/http/http_conn_man/http_conn_man.html#config-http-conn-man"><span class="std std-ref">HTTP connection manager</span></a>.</p>
+<p>This filter translates raw bytes into HTTP level messages and events (e.g., headers received,
+body data received, trailers received, etc.).</p>
+<p>It also handles functionality common to all HTTP connections and requests such as
+<a class="reference internal" href="../observability/access_logging.html#arch-overview-access-logs"><span class="std std-ref">access logging</span></a>, <a class="reference internal" href="../observability/tracing.html#arch-overview-tracing"><span class="std std-ref">request ID generation and tracing</span></a>,
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers"><span class="std std-ref">request/response header manipulation</span></a>, <a class="reference internal" href="http_routing.html#arch-overview-http-routing"><span class="std std-ref">route table</span></a> management, and <a class="reference internal" href="../../../configuration/http/http_conn_man/stats.html#config-http-conn-man-stats"><span class="std std-ref">statistics</span></a>.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>See the HTTP connection manager <a class="reference internal" href="../../../configuration/http/http_conn_man/http_conn_man.html#config-http-conn-man"><span class="std std-ref">configuration</span></a> and
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-file-envoy-extensions-filters-network-http-connection-manager-v3-http-connection-manager-proto"><span class="std std-ref">protobuf</span></a>
+sections for reference documentation.</p>
+</div>
+<section id="http-protocols">
+<span id="arch-overview-http-protocols"></span><h2>HTTP protocols<a class="headerlink" href="#http-protocols" title="Link to this heading"></a></h2>
+<p>Envoy’s HTTP connection manager has native support for <strong>HTTP/1.1</strong>, <strong>HTTP/2</strong> and <strong>HTTP/3</strong>, including <strong>WebSockets</strong>.</p>
+<p>Envoy’s HTTP support was designed to first and foremost be an HTTP/2 multiplexing proxy. Internally, HTTP/2 terminology
+is used to describe system components. For example, an HTTP request and response take place on a “stream”.</p>
+<p>A codec API is used to translate from different wire protocols into a protocol agnostic form for streams, requests, responses, etc.</p>
+<p>In the case of HTTP/1.1, the codec translates the serial/pipelining capabilities of the protocol into something
+that looks like HTTP/2 to higher layers. This means that the majority of the code does not need to
+understand whether a stream originated on an HTTP/1.1, HTTP/2, or HTTP/3 connection.</p>
+</section>
+<section id="http-lifecycle">
+<h2>HTTP lifecycle<a class="headerlink" href="#http-lifecycle" title="Link to this heading"></a></h2>
+<p>Proxying of the request begins when the downstream HTTP codec has successfully decoded request header map.</p>
+<p>The point at which the proxying completes and the stream is destroyed depends on the upstream protocol and
+whether independent half close is enabled.</p>
+<p>If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3 protocols the stream
+is destroyed after both request and response are complete i.e. reach their respective end-of-stream,
+by receiving trailers or the header/body with end-stream set in both directions AND response has
+success (2xx) status code.</p>
+<p>For HTTP/1 upstream protocol or if independent half-close is disabled the stream is destroyed when the response
+is complete and reaches its end-of-stream, i.e. when trailers or the response header/body with
+end-stream set are received, even if the request has not yet completed. If the request was incomplete at response
+completion, the stream is reset.</p>
+<p>Note that proxying can stop early when an error or timeout occurred or when a peer reset HTTP/2 or HTTP/3 stream.</p>
+</section>
+<section id="http-header-sanitizing">
+<h2>HTTP header sanitizing<a class="headerlink" href="#http-header-sanitizing" title="Link to this heading"></a></h2>
+<p>The HTTP connection manager performs various <a class="reference internal" href="../../../configuration/http/http_conn_man/header_sanitizing.html#config-http-conn-man-header-sanitizing"><span class="std std-ref">header sanitizing</span></a> actions for security reasons.</p>
+</section>
+<section id="route-table-configuration">
+<h2>Route table configuration<a class="headerlink" href="#route-table-configuration" title="Link to this heading"></a></h2>
+<p>Each <a class="reference internal" href="../../../configuration/http/http_conn_man/http_conn_man.html#config-http-conn-man"><span class="std std-ref">HTTP connection manager filter</span></a> has an associated <a class="reference internal" href="http_routing.html#arch-overview-http-routing"><span class="std std-ref">route
+table</span></a>, which can be specified in one of two ways:</p>
+<ul class="simple">
+<li><p>Statically.</p></li>
+<li><p>Dynamically via the <a class="reference internal" href="../../../configuration/http/http_conn_man/rds.html#config-http-conn-man-rds"><span class="std std-ref">RDS API</span></a>.</p></li>
+</ul>
+</section>
+<section id="retry-plugin-configuration">
+<span id="arch-overview-http-retry-plugins"></span><h2>Retry plugin configuration<a class="headerlink" href="#retry-plugin-configuration" title="Link to this heading"></a></h2>
+<p>Normally during retries, host selection follows the same process as the original request. Retry plugins
+can be used to modify this behavior, and they fall into two categories:</p>
+<dl>
+<dt><a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-retry-host-predicate"><span class="std std-ref">Host Predicates</span></a></dt><dd><p>These predicates can be used to “reject” a host, which will cause host selection to be reattempted.
+Any number of these predicates can be specified, and <strong>the host will be rejected if any of the predicates reject the host</strong>.</p>
+<p>Envoy supports the following built-in host predicates:</p>
+<dl class="simple">
+<dt><a class="reference internal" href="../../../api-v3/extensions/retry/host/previous_hosts/v3/previous_hosts.proto.html#envoy-v3-api-file-envoy-extensions-retry-host-previous-hosts-v3-previous-hosts-proto"><span class="std std-ref">PreviousHostsPredicate</span></a></dt><dd><p>This will keep track of previously attempted hosts, and rejects hosts that have already been attempted.</p>
+</dd>
+<dt><a class="reference internal" href="../../../api-v3/extensions/retry/host/omit_canary_hosts/v3/omit_canary_hosts.proto.html#envoy-v3-api-file-envoy-extensions-retry-host-omit-canary-hosts-v3-omit-canary-hosts-proto"><span class="std std-ref">OmitCanaryHostsPredicate</span></a></dt><dd><p>This will reject any host that is a marked as canary host.
+Hosts are marked by setting <code class="docutils literal notranslate"><span class="pre">canary:</span> <span class="pre">true</span></code> for the <code class="docutils literal notranslate"><span class="pre">envoy.lb</span></code> filter in the endpoint’s filter metadata.
+See <a class="reference internal" href="../../../api-v3/config/endpoint/v3/endpoint_components.proto.html#envoy-v3-api-msg-config-endpoint-v3-lbendpoint"><span class="std std-ref">LbEndpoint</span></a> for more details.</p>
+</dd>
+<dt><a class="reference internal" href="../../../api-v3/extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.proto.html#envoy-v3-api-file-envoy-extensions-retry-host-omit-host-metadata-v3-omit-host-metadata-config-proto"><span class="std std-ref">OmitHostMetadataConfig</span></a></dt><dd><p>This will reject any host based on predefined metadata match criteria.
+See the configuration example below for more details.</p>
+</dd>
+</dl>
+</dd>
+<dt><a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-retry-priority"><span class="std std-ref">Priority Predicates</span></a></dt><dd><p>These predicates can
+be used to adjust the priority load used when selecting a priority for a retry attempt. <strong>Only one priority
+predicate may be specified</strong>.</p>
+<p>Envoy supports the following built-in priority predicates:</p>
+<dl class="simple">
+<dt><a class="reference internal" href="../../../api-v3/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.proto.html#envoy-v3-api-file-envoy-extensions-retry-priority-previous-priorities-v3-previous-priorities-config-proto"><span class="std std-ref">PreviousPrioritiesConfig</span></a></dt><dd><p>This will keep track of previously attempted priorities, and adjust the priority
+load such that other priorities will be targeted in subsequent retry attempts.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>Host selection will continue until either the configured predicates accept the host or a configurable
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-host-selection-retry-max-attempts"><span class="std std-ref">max attempts</span></a> has been reached.</p>
+<p>These plugins can be combined to affect both host selection and priority load. Envoy can also be extended
+with custom retry plugins similar to how custom filters can be added.</p>
+<section id="retry-configuration-examples">
+<h3>Retry configuration examples<a class="headerlink" href="#retry-configuration-examples" title="Link to this heading"></a></h3>
+<section id="previoushostspredicate">
+<h4><code class="docutils literal notranslate"><span class="pre">PreviousHostsPredicate</span></code><a class="headerlink" href="#previoushostspredicate" title="Link to this heading"></a></h4>
+<p>For example, to configure retries to prefer hosts that haven’t been attempted already, the built-in
+<a class="reference internal" href="../../../api-v3/extensions/retry/host/previous_hosts/v3/previous_hosts.proto.html#envoy-v3-api-file-envoy-extensions-retry-host-previous-hosts-v3-previous-hosts-proto"><span class="std std-ref">PreviousHostsPredicate</span></a>
+can be used:</p>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/26839fd8ace62acc309681d35dab6fdd/retry-previous-hosts.yaml"><code class="xref download docutils literal notranslate"><span class="pre">retry-previous-hosts.yaml</span></code></a></span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">24</span><span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="linenos">25</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">26</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/&quot;</span>
+<span class="linenos">27</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">28</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_0</span>
+<span class="hll"><span class="linenos">29</span><span class="w">                  </span><span class="nt">retry_policy</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">30</span><span class="w">                    </span><span class="nt">retry_host_predicate</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">31</span><span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.retry_host_predicates.previous_hosts</span>
+</span><span class="hll"><span class="linenos">32</span><span class="w">                      </span><span class="nt">typed_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">33</span><span class="w">                        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.retry.host.previous_hosts.v3.PreviousHostsPredicate</span>
+</span><span class="hll"><span class="linenos">34</span><span class="w">                    </span><span class="nt">host_selection_retry_max_attempts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+</span><span class="linenos">35</span>
+<span class="linenos">36</span><span class="w"> </span><span class="w w-Error"> </span><span class="nt">clusters</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<p>This will reject hosts previously attempted, retrying host selection a maximum of 3 times. The bound
+on attempts is necessary in order to deal with scenarios in which finding an acceptable host is either
+impossible (no hosts satisfy the predicate) or very unlikely (the only suitable host has a very low
+relative weight).</p>
+</section>
+<section id="omithostmetadataconfig">
+<h4><code class="docutils literal notranslate"><span class="pre">OmitHostMetadataConfig</span></code><a class="headerlink" href="#omithostmetadataconfig" title="Link to this heading"></a></h4>
+<p>To reject a host based on its metadata,
+<a class="reference internal" href="../../../api-v3/extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.proto.html#envoy-v3-api-file-envoy-extensions-retry-host-omit-host-metadata-v3-omit-host-metadata-config-proto"><span class="std std-ref">OmitHostMetadataConfig</span></a>
+can be used:</p>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/7068c28039f68b3d0e83199a72d7c98b/retry-omit-host-metadata.yaml"><code class="xref download docutils literal notranslate"><span class="pre">retry-omit-host-metadata.yaml</span></code></a></span><a class="headerlink" href="#id2" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">24</span><span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="linenos">25</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">26</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/&quot;</span>
+<span class="linenos">27</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">28</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_0</span>
+<span class="hll"><span class="linenos">29</span><span class="w">                  </span><span class="nt">retry_policy</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">30</span><span class="w">                    </span><span class="nt">retry_host_predicate</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">31</span><span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.retry_host_predicates.omit_host_metadata</span>
+</span><span class="hll"><span class="linenos">32</span><span class="w">                      </span><span class="nt">typed_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">33</span><span class="w">                        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.retry.host.omit_host_metadata.v3.OmitHostMetadataConfig</span>
+</span><span class="hll"><span class="linenos">34</span><span class="w">                        </span><span class="nt">metadata_match</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">35</span><span class="w">                          </span><span class="nt">filter_metadata</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">36</span><span class="w">                            </span><span class="nt">envoy.lb</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">37</span><span class="w">                              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">value</span>
+</span><span class="linenos">38</span>
+<span class="linenos">39</span><span class="w"> </span><span class="w w-Error"> </span><span class="nt">clusters</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<p>This will reject any host with matching (key, value) in its metadata.</p>
+</section>
+<section id="previousprioritiesconfig">
+<h4><code class="docutils literal notranslate"><span class="pre">PreviousPrioritiesConfig</span></code><a class="headerlink" href="#previousprioritiesconfig" title="Link to this heading"></a></h4>
+<p>To configure retries to attempt other priorities during retries, the built-in
+<a class="reference internal" href="../../../api-v3/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.proto.html#envoy-v3-api-file-envoy-extensions-retry-priority-previous-priorities-v3-previous-priorities-config-proto"><span class="std std-ref">PreviousPrioritiesConfig</span></a>
+can be used.</p>
+<div class="literal-block-wrapper docutils container" id="id3">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/b3ac02aa3ae16683880f1e6bb48df66d/retry-previous-priorities.yaml"><code class="xref download docutils literal notranslate"><span class="pre">retry-previous-priorities.yaml</span></code></a></span><a class="headerlink" href="#id3" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">24</span><span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="linenos">25</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">26</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/&quot;</span>
+<span class="linenos">27</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">28</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_0</span>
+<span class="hll"><span class="linenos">29</span><span class="w">                  </span><span class="nt">retry_policy</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">30</span><span class="w">                    </span><span class="nt">retry_priority</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">31</span><span class="w">                      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.retry_priorities.previous_priorities</span>
+</span><span class="hll"><span class="linenos">32</span><span class="w">                      </span><span class="nt">typed_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">33</span><span class="w">                        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig</span>
+</span><span class="hll"><span class="linenos">34</span><span class="w">                        </span><span class="nt">update_frequency</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</span><span class="linenos">35</span>
+<span class="linenos">36</span><span class="w"> </span><span class="w w-Error"> </span><span class="nt">clusters</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<p>This will target priorities in subsequent retry attempts that haven’t been already used. The
+<a class="reference internal" href="../../../api-v3/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.proto.html#envoy-v3-api-field-extensions-retry-priority-previous-priorities-v3-previousprioritiesconfig-update-frequency"><span class="std std-ref">update_frequency</span></a>
+parameter decides how often the priority load should be recalculated.</p>
+</section>
+<section id="combined-retry-policy">
+<h4>Combined retry policy<a class="headerlink" href="#combined-retry-policy" title="Link to this heading"></a></h4>
+<p>These plugins can be combined, which will exclude both previously attempted hosts as well as
+previously attempted priorities.</p>
+<div class="literal-block-wrapper docutils container" id="id4">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/118b46ea90fdbc43ca1844285666eb57/retry-combined-hosts-priorities.yaml"><code class="xref download docutils literal notranslate"><span class="pre">retry-combined-hosts-priorities.yaml</span></code></a></span><a class="headerlink" href="#id4" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">24</span><span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="linenos">25</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">26</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/&quot;</span>
+<span class="linenos">27</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">28</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster_0</span>
+<span class="hll"><span class="linenos">29</span><span class="w">                  </span><span class="nt">retry_policy</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">30</span><span class="w">                    </span><span class="nt">retry_host_predicate</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">31</span><span class="w">                    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.retry_host_predicates.previous_hosts</span>
+</span><span class="hll"><span class="linenos">32</span><span class="w">                      </span><span class="nt">typed_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">33</span><span class="w">                        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.retry.host.previous_hosts.v3.PreviousHostsPredicate</span>
+</span><span class="hll"><span class="linenos">34</span><span class="w">                    </span><span class="nt">host_selection_retry_max_attempts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+</span><span class="hll"><span class="linenos">35</span><span class="w">                    </span><span class="nt">retry_priority</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">36</span><span class="w">                      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.retry_priorities.previous_priorities</span>
+</span><span class="hll"><span class="linenos">37</span><span class="w">                      </span><span class="nt">typed_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">38</span><span class="w">                        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig</span>
+</span><span class="hll"><span class="linenos">39</span><span class="w">                        </span><span class="nt">update_frequency</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</span><span class="linenos">40</span>
+<span class="linenos">41</span><span class="w"> </span><span class="w w-Error"> </span><span class="nt">clusters</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+</section>
+<section id="internal-redirects">
+<span id="arch-overview-internal-redirects"></span><h2>Internal redirects<a class="headerlink" href="#internal-redirects" title="Link to this heading"></a></h2>
+<p>Envoy supports handling 3xx redirects internally, that is capturing a configurable 3xx redirect
+response, synthesizing a new request, sending it to the upstream specified by the new route match,
+and returning the redirected response as the response to the original request. The headers and body
+of the original request will be sent in the redirect to the new location. Trailers are not yet
+supported.</p>
+<p>Internal redirects are configured via the <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-internal-redirect-policy"><span class="std std-ref">internal_redirect_policy</span></a> field in route configuration.
+When redirect handling is on, any 3xx response from upstream, that matches
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-internalredirectpolicy-redirect-response-codes"><span class="std std-ref">redirect_response_codes</span></a>
+is subject to the redirect being handled by Envoy.</p>
+<p>If Envoy is configured to internally redirect HTTP <code class="docutils literal notranslate"><span class="pre">303</span></code> and receives an HTTP <code class="docutils literal notranslate"><span class="pre">303</span></code> response, it will
+dispatch the redirect with a bodiless HTTP <code class="docutils literal notranslate"><span class="pre">GET</span></code> if the original request was not a <code class="docutils literal notranslate"><span class="pre">GET</span></code> or <code class="docutils literal notranslate"><span class="pre">HEAD</span></code>
+request. Otherwise, Envoy will preserve the original HTTP method. For more information, see <a class="reference external" href="https://tools.ietf.org/html/rfc7231#section-6.4.4">RFC
+7231 Section 6.4.4</a>.</p>
+<p>For a redirect to be handled successfully it <strong>must</strong> pass the following checks:</p>
+<ol class="arabic simple">
+<li><p>Have a response code matching one of <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-internalredirectpolicy-redirect-response-codes"><span class="std std-ref">redirect_response_codes</span></a>, which is
+either <code class="docutils literal notranslate"><span class="pre">302</span></code> (by default), or a set of 3xx codes (<code class="docutils literal notranslate"><span class="pre">301</span></code>, <code class="docutils literal notranslate"><span class="pre">302</span></code>, <code class="docutils literal notranslate"><span class="pre">303</span></code>, <code class="docutils literal notranslate"><span class="pre">307</span></code>, <code class="docutils literal notranslate"><span class="pre">308</span></code>).</p></li>
+<li><p>Have a <code class="docutils literal notranslate"><span class="pre">location</span></code> header with a valid, fully qualified URL.</p></li>
+<li><p>The request must have been fully processed by Envoy.</p></li>
+<li><p>The request must be smaller than the <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-route-per-request-buffer-limit-bytes"><span class="std std-ref">per_request_buffer_limit_bytes</span></a> limit.</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-internalredirectpolicy-allow-cross-scheme-redirect"><span class="std std-ref">allow_cross_scheme_redirect</span></a> is <code class="docutils literal notranslate"><span class="pre">true</span></code> (default to <code class="docutils literal notranslate"><span class="pre">false</span></code>),
+or the scheme of the downstream request and the <code class="docutils literal notranslate"><span class="pre">location</span></code> header are the same.</p></li>
+<li><p>The number of previously handled internal redirect within a given downstream request does not
+exceed <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-internalredirectpolicy-max-internal-redirects"><span class="std std-ref">max_internal_redirects</span></a>
+of the route that the request or redirected request is hitting.</p></li>
+<li><p>All <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-internalredirectpolicy-predicates"><span class="std std-ref">predicates</span></a> accept
+the target route.</p></li>
+</ol>
+<p>Any failure will result in the redirect being passed downstream instead.</p>
+<p>Since a redirected request may be bounced between different routes, any route in the chain of redirects that …</p>
+<ul class="simple">
+<li><p>does not have internal redirect enabled</p></li>
+<li><p><em>or,</em> has a <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-internalredirectpolicy-max-internal-redirects"><span class="std std-ref">max_internal_redirects</span></a>
+smaller or equal to the redirect chain length when the redirect chain hits it</p></li>
+<li><p><em>or,</em> is disallowed by any of the <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-internalredirectpolicy-predicates"><span class="std std-ref">predicates</span></a></p></li>
+</ul>
+<p>... will cause the redirect to be passed downstream.</p>
+<p>Two predicates can be used to create a DAG that defines the redirect chain, the <a class="reference internal" href="../../../api-v3/extensions/internal_redirect/previous_routes/v3/previous_routes_config.proto.html#envoy-v3-api-msg-extensions-internal-redirect-previous-routes-v3-previousroutesconfig"><span class="std std-ref">previous_routes</span></a> predicate, and
+the <a class="reference internal" href="../../../api-v3/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.proto.html#envoy-v3-api-msg-extensions-internal-redirect-allow-listed-routes-v3-allowlistedroutesconfig"><span class="std std-ref">allow_listed_routes</span></a>.
+Specifically, the <a class="reference internal" href="../../../api-v3/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.proto.html#envoy-v3-api-msg-extensions-internal-redirect-allow-listed-routes-v3-allowlistedroutesconfig"><span class="std std-ref">allow_listed_routes</span></a> predicate
+defines edges of individual node in the DAG and the <a class="reference internal" href="../../../api-v3/extensions/internal_redirect/previous_routes/v3/previous_routes_config.proto.html#envoy-v3-api-msg-extensions-internal-redirect-previous-routes-v3-previousroutesconfig"><span class="std std-ref">previous_routes</span></a> predicate defines
+“visited” state of the edges, so that loop can be avoided if so desired.</p>
+<p>A third predicate <a class="reference internal" href="../../../api-v3/extensions/internal_redirect/safe_cross_scheme/v3/safe_cross_scheme_config.proto.html#envoy-v3-api-msg-extensions-internal-redirect-safe-cross-scheme-v3-safecrossschemeconfig"><span class="std std-ref">safe_cross_scheme</span></a>
+can be used to prevent HTTP -&gt; HTTPS redirect.</p>
+<p>A fourth predicate <a class="reference internal" href="../../../api-v3/extensions/internal_redirect/filter_state/v3/filter_state_config.proto.html#envoy-v3-api-msg-extensions-internal-redirect-filter-state-v3-filterstateconfig"><span class="std std-ref">filter_state</span></a>
+can be used to gate the redirect on a filter state value set earlier in the request by another
+filter, allowing a per-request decision about whether an internal redirect is followed.</p>
+<p>Once the redirect has passed these checks, the request headers which were shipped to the original
+upstream will be modified by:</p>
+<ol class="arabic simple">
+<li><p>Putting the fully qualified original request URL in the <code class="docutils literal notranslate"><span class="pre">x-envoy-original-url</span></code> header.</p></li>
+<li><p>Replacing the <code class="docutils literal notranslate"><span class="pre">Authority</span></code>/<code class="docutils literal notranslate"><span class="pre">Host</span></code>, <code class="docutils literal notranslate"><span class="pre">Scheme</span></code>, and <code class="docutils literal notranslate"><span class="pre">Path</span></code> headers with the values from the <code class="docutils literal notranslate"><span class="pre">Location</span></code> header.</p></li>
+<li><p>Copying any headers listed in
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-internalredirectpolicy-response-headers-to-copy"><span class="std std-ref">response_headers_to_copy</span></a>
+from the redirect response into the headers that will be used in the
+subsequent request.</p></li>
+</ol>
+<p>The altered request headers will then have a new route selected, be sent through a new filter chain,
+and then shipped upstream with all of the normal Envoy request sanitization taking place.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Note that HTTP connection manager sanitization such as clearing untrusted headers will only be
+applied once. Per-route header modifications will be applied on both the original route and the
+second route, even if they are the same, so be careful configuring header modification rules to
+avoid duplicating undesired header values.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Note that no downstream filters will see the response that triggers the internal redirect. If there is a need
+to pass data between the redirect response and the followup request, see
+<a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-internalredirectpolicy-response-headers-to-copy"><span class="std std-ref">response_headers_to_copy</span></a>.</p>
+</div>
+<p>A sample redirect flow might look like this:</p>
+<ol class="arabic simple">
+<li><p>Client sends a <code class="docutils literal notranslate"><span class="pre">GET</span></code> request for <a class="reference external" href="http://foo.com/bar">http://foo.com/bar</a>.</p></li>
+<li><p>Upstream 1 sends a <code class="docutils literal notranslate"><span class="pre">302</span></code> with  <code class="docutils literal notranslate"><span class="pre">location:</span> <span class="pre">http://baz.com/eep</span></code>.</p></li>
+<li><p>Envoy is configured to allow redirects on the original route, and sends a new <code class="docutils literal notranslate"><span class="pre">GET</span></code> request to
+Upstream 2, to fetch <a class="reference external" href="http://baz.com/eep">http://baz.com/eep</a> with the additional request header
+<code class="docutils literal notranslate"><span class="pre">x-envoy-original-url:</span> <span class="pre">http://foo.com/bar</span></code>.</p></li>
+<li><p>Envoy proxies the response data for <a class="reference external" href="http://baz.com/eep">http://baz.com/eep</a> to the client as the response to the original
+request.</p></li>
+</ol>
+</section>
+<section id="timeouts">
+<h2>Timeouts<a class="headerlink" href="#timeouts" title="Link to this heading"></a></h2>
+<p>Various configurable timeouts apply to an HTTP connection and its constituent streams. Please see
+<a class="reference internal" href="../../../faq/configuration/timeouts.html#faq-configuration-timeouts"><span class="std std-ref">this FAQ entry</span></a> for an overview of important timeout
+configuration.</p>
+</section>
+<section id="http-header-map-settings">
+<span id="arch-overview-http-header-map-settings"></span><h2>HTTP header map settings<a class="headerlink" href="#http-header-map-settings" title="Link to this heading"></a></h2>
+<p>Envoy maintains the insertion order of headers (and pseudo headers that begin with <code class="docutils literal notranslate"><span class="pre">:</span></code>) in the
+HTTP header map using a linked list data-structure, which is very fast when the number of headers
+is small.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="http.html" class="btn btn-neutral float-left" title="HTTP" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="http_filters.html" class="btn btn-neutral float-right" title="HTTP filters" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">HTTP connection management</a><ul>
+<li><a class="reference internal" href="#http-protocols">HTTP protocols</a></li>
+<li><a class="reference internal" href="#http-lifecycle">HTTP lifecycle</a></li>
+<li><a class="reference internal" href="#http-header-sanitizing">HTTP header sanitizing</a></li>
+<li><a class="reference internal" href="#route-table-configuration">Route table configuration</a></li>
+<li><a class="reference internal" href="#retry-plugin-configuration">Retry plugin configuration</a><ul>
+<li><a class="reference internal" href="#retry-configuration-examples">Retry configuration examples</a><ul>
+<li><a class="reference internal" href="#previoushostspredicate"><code class="docutils literal notranslate"><span class="pre">PreviousHostsPredicate</span></code></a></li>
+<li><a class="reference internal" href="#omithostmetadataconfig"><code class="docutils literal notranslate"><span class="pre">OmitHostMetadataConfig</span></code></a></li>
+<li><a class="reference internal" href="#previousprioritiesconfig"><code class="docutils literal notranslate"><span class="pre">PreviousPrioritiesConfig</span></code></a></li>
+<li><a class="reference internal" href="#combined-retry-policy">Combined retry policy</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#internal-redirects">Internal redirects</a></li>
+<li><a class="reference internal" href="#timeouts">Timeouts</a></li>
+<li><a class="reference internal" href="#http-header-map-settings">HTTP header map settings</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

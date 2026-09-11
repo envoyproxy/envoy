@@ -1,0 +1,22 @@
+.. _version_history_1.31.9:
+
+1.31.9 (July 9, 2025)
+======================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **eds**: Fixed crash when creating an EDS cluster with invalid configuration.
+* **http3**: Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.
+* **release**: Container (Ubuntu) updates to resolve glibc vulnerabilities.
+

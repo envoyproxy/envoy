@@ -1,0 +1,64 @@
+.. _envoy_v3_api_file_envoy/config/upstream/local_address_selector/v3/default_local_address_selector.proto:
+
+Default Local Address Selector (proto)
+======================================
+
+.. _extension_envoy.upstream.local_address_selector.default_local_address_selector:
+
+This extension has the qualified name ``envoy.upstream.local_address_selector.default_local_address_selector``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.upstream.local_address_selector <extension_category_envoy.upstream.local_address_selector>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.config.upstream.local_address_selector.v3.DefaultLocalAddressSelector <envoy_v3_api_msg_config.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.upstream.local_address_selector.v3.DefaultLocalAddressSelector:
+
+config.upstream.local_address_selector.v3.DefaultLocalAddressSelector
+---------------------------------------------------------------------
+
+
+:repo:`[config.upstream.local_address_selector.v3.DefaultLocalAddressSelector proto] <api/envoy/config/upstream/local_address_selector/v3/default_local_address_selector.proto#L29>`
+
+Default implementation of a local address selector. This implementation is
+used if :ref:`local_address_selector
+<envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>` is not
+specified.
+This implementation supports the specification of only one address in
+:ref:`extra_source_addresses
+<envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses>` which
+is appended to the address specified in the
+:ref:`source_address <envoy_v3_api_field_config.core.v3.BindConfig.source_address>`
+field. The extra address should have a different IP version than the address in the
+``source_address`` field. The address which has the same IP
+version with the target host's address IP version will be used as bind address.
+If there is no same IP version address found, the address in the ``source_address`` field will
+be returned.
+
+
+
+

@@ -1,0 +1,601 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1.30.0 (April 16, 2024) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="v1.29" href="../v1.29/v1.29.html" />
+    <link rel="prev" title="1.30.1 (April 18, 2024)" href="v1.30.1.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../version_history.html">Version history</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../v1.40/v1.40.0.html">1.40.0 (Pending)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.39/v1.39.html">v1.39: 1.39.1 (August 27, 2026)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.38/v1.38.html">v1.38: 1.38.4 (August 26, 2026)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.37/v1.37.html">v1.37: 1.37.6 (August 26, 2026)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.36/v1.36.html">v1.36: 1.36.10 (August 26, 2026)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.35/v1.35.html">v1.35: 1.35.13 (June 23, 2026)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.34/v1.34.html">v1.34: 1.34.14 (April 10, 2026)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.33/v1.33.html">v1.33: 1.33.14 (December 9, 2025)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.32/v1.32.html">v1.32: 1.32.13 (October 13, 2025)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.31/v1.31.html">v1.31: 1.31.10 (July 18, 2025)</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="v1.30.html">v1.30: 1.30.11 (March 25, 2025)</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="v1.30.11.html">1.30.11 (March 25, 2025)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="v1.30.10.html">1.30.10 (March 20, 2025)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="v1.30.9.html">1.30.9 (December 18, 2024)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="v1.30.8.html">1.30.8 (November 29, 2024)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="v1.30.7.html">1.30.7 (October 29, 2024)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="v1.30.6.html">1.30.6 (September 19, 2024)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="v1.30.5.html">1.30.5 (September 14, 2024)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="v1.30.4.html">1.30.4 (June 30, 2024)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="v1.30.3.html">1.30.3 (June 26, 2024)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="v1.30.2.html">1.30.2 (June 5, 2024)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="v1.30.1.html">1.30.1 (April 18, 2024)</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">1.30.0 (April 16, 2024)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.29/v1.29.html">v1.29: 1.29.12 (December 18, 2024)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.28/v1.28.html">v1.28: 1.28.7 (September 19, 2024)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.27/v1.27.html">v1.27: 1.27.7 (June 28, 2024)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.26/v1.26.html">v1.26: 1.26.8 (April 4, 2024)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.25/v1.25.html">v1.25: 1.25.11 (October 16, 2023)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.24/v1.24.html">v1.24: 1.24.11 (October 10, 2023)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.23/v1.23.html">v1.23: 1.23.12 (July 25, 2023)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.22/v1.22.html">v1.22: 1.22.11 (April 11, 2023)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.21/v1.21.html">v1.21: 1.21.6 (November 28, 2022)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.20/v1.20.html">v1.20: 1.20.7 (July 21, 2022)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.19/v1.19.html">v1.19: 1.19.5 (June 9, 2022)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.18/v1.18.html">v1.18: 1.18.6 (February 22, 2022)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.17/v1.17.html">v1.17: 1.17.4 (August 24, 2021)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.16/v1.16.html">v1.16: 1.16.5 (August 24, 2021)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.15/v1.15.html">v1.15: 1.15.5 (May 11, 2021)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.14/v1.14.html">v1.14: 1.14.7 (April 15, 2020)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.13/v1.13.html">v1.13: 1.13.8 (January 15, 2021)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.12/v1.12.html">v1.12: 1.12.7 (September 29, 2020)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.11/v1.11.html">v1.11: 1.11.2 (October 8, 2019)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.10/v1.10.html">v1.10: 1.10.0 (April 5, 2019)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.9/v1.9.html">v1.9: 1.9.1 (April 2, 2019)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.8/v1.8.html">v1.8: 1.8.0 (October 4, 2018)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.7/v1.7.html">v1.7: 1.7.1 (August 3, 2018)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.6/v1.6.html">v1.6: 1.6.0 (March 20, 2018)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.5/v1.5.html">v1.5: 1.5.0 (December 4, 2017)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.4/v1.4.html">v1.4: 1.4.0 (August 24, 2017)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.3/v1.3.html">v1.3: 1.3.0 (May 17, 2017)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.2/v1.2.html">v1.2: 1.2.0 (March 7, 2017)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.1/v1.1.html">v1.1: 1.1.0 (November 30, 2016)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.0/v1.0.html">v1.0: 1.0.0 (September 12, 2016)</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../version_history.html">Version history</a></li>
+          <li class="breadcrumb-item"><a href="v1.30.html">v1.30</a></li>
+      <li class="breadcrumb-item active">1.30.0 (April 16, 2024)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/version_history/v1.30/v1.30.0.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="april-16-2024">
+<span id="version-history-1-30-0"></span><h1>1.30.0 (April 16, 2024)<a class="headerlink" href="#april-16-2024" title="Link to this heading"></a></h1>
+<section id="incompatible-behavior-changes">
+<h2>Incompatible behavior changes<a class="headerlink" href="#incompatible-behavior-changes" title="Link to this heading"></a></h2>
+<p><em>Changes that are expected to cause an incompatibility if applicable;
+deployment changes are likely required</em></p>
+<ul class="simple">
+<li><p><strong>http</strong>: Remove the hop by hop TE header from downstream request headers if it’s not set to <code class="docutils literal notranslate"><span class="pre">trailers</span></code>, else keep it. This change can be
+temporarily reverted by setting <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.sanitize_te</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
+<li><p><strong>http2</strong>: Changes the default value of <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.http2_use_oghttp2</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>. This changes the codec used for HTTP/2
+requests and responses. A number of users have reported issues with Oghttp2 including issue
+<a class="reference external" href="https://github.com/envoyproxy/envoy/issues/32611">#32611</a> and issue <a class="reference external" href="https://github.com/envoyproxy/envoy/issues/32401">#32401</a>.
+This behavior can be reverted by setting the feature to <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p></li>
+<li><p><strong>stats</strong>: The runtime flag <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.enable_include_histograms</span></code> is now enabled by default.
+This causes the <code class="docutils literal notranslate"><span class="pre">includeHistogram()</span></code> method on <code class="docutils literal notranslate"><span class="pre">Stats::SinkPredicates</span></code> to filter histograms to
+be flushed to stat sinks.</p></li>
+</ul>
+</section>
+<section id="minor-behavior-changes">
+<h2>Minor behavior changes<a class="headerlink" href="#minor-behavior-changes" title="Link to this heading"></a></h2>
+<p><em>Changes that may cause incompatibilities for some users, but should
+not for most</em></p>
+<ul class="simple">
+<li><p><strong>adaptive-concurrency/stats</strong>: Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).</p></li>
+<li><p><strong>aws</strong>: AWS region string is now retrieved from environment and profile consistently within <code class="docutils literal notranslate"><span class="pre">aws_request_signer</span></code> and
+<code class="docutils literal notranslate"><span class="pre">grpc_credentials</span></code>/<code class="docutils literal notranslate"><span class="pre">aws_iam</span></code> extensions. Region field in <code class="docutils literal notranslate"><span class="pre">aws_request_signer</span></code> is now optional, explicitly configured
+xDS region will take preference. <code class="docutils literal notranslate"><span class="pre">aws_request_signer</span></code> documentation now reflects the region chain.</p></li>
+<li><p><strong>config-parsing/http-cache</strong>: <code class="docutils literal notranslate"><span class="pre">envoy.restart_features.use_fast_protobuf_hash</span></code> was flipped to <code class="docutils literal notranslate"><span class="pre">true</span></code> by default.
+The expectation is that this will improve performance of the hash operation by 2x to 10x,
+and reduce config update time by 10-25%. This change will also cause a one-time cache flush
+for <code class="docutils literal notranslate"><span class="pre">file_system_http_cache</span></code>.</p></li>
+<li><p><strong>dns</strong>: Allowing <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto.html#envoy-v3-api-field-extensions-common-dynamic-forward-proxy-v3-dnscacheconfig-dns-min-refresh-rate" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">dns_min_refresh_rate</span></a>
+to go as low as 1s.</p></li>
+<li><p><strong>dns</strong>: Fixing a bug in the <code class="docutils literal notranslate"><span class="pre">getaddrinfo</span></code> resolver where it did not reresolve on <code class="docutils literal notranslate"><span class="pre">EAI_AGAIN</span></code>. This behavioral change can be temporarily
+reverted by setting <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.dns_reresolve_on_eai_again</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
+<li><p><strong>golang</strong>: Change <code class="docutils literal notranslate"><span class="pre">RegisterHttpFilterConfigFactoryAndParser</span></code> to <code class="docutils literal notranslate"><span class="pre">RegisterHttpFilterFactoryAndConfigParser</span></code>.</p></li>
+<li><p><strong>golang</strong>: Not implicitly clearing route cache in <code class="docutils literal notranslate"><span class="pre">HeaderMap.Set</span></code>, introduce a new API <code class="docutils literal notranslate"><span class="pre">ClearRouteCache</span></code> to do it.</p></li>
+<li><p><strong>http</strong>: Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
+previously used HTTP/1 parser).</p></li>
+<li><p><strong>http</strong>: When the HTTP <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> request method is enabled using <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-routeaction-upgradeconfig" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">RouteAction.UpgradeConfig</span></a>, <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> requests will now be
+proxied to the upstream, unless the <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-upgradeconfig-connect-config" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">connect_config</span></a> field is also
+set. (Previously Envoy would terminate <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> requests even when the <code class="docutils literal notranslate"><span class="pre">connect_config</span></code> field
+was unset.) The updated behavior should now be consistent with the existing documentation. This
+change can be reverted by setting
+<code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.http_route_connect_proxy_by_default</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
+<li><p><strong>http2</strong>: Simplifies integration with the codec by removing translation between nghttp2 callbacks and <code class="docutils literal notranslate"><span class="pre">Http2VisitorInterface</span></code> events.
+Guarded by <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.http2_skip_callback_visitor</span></code>.</p></li>
+<li><p><strong>http3</strong>: Disables recvmmsg (multi-message) for reading packets from a client QUIC UDP socket, if GRO
+is not set or not supported. recvmsg will be used instead. This behavior change can be
+reverted by setting <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.disallow_quic_client_udp_mmsg</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
+<li><p><strong>http3</strong>: Make GRO (Generic Receive Offload) for reading packets from a client QUIC UDP socket configurable. See
+<a class="reference external" href="https://www.kernel.org/doc/html/next/networking/segmentation-offloads.html">https://www.kernel.org/doc/html/next/networking/segmentation-offloads.html</a> for a description of
+GRO. This behavior change can be enabled by setting
+<code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.prefer_quic_client_udp_gro</span></code> to <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p></li>
+<li><p><strong>lua</strong>: Previously, tracing spans generated by <code class="docutils literal notranslate"><span class="pre">httpCall</span></code> were always sampled by default.
+Now, the default sampling decision of an <code class="docutils literal notranslate"><span class="pre">httpCall</span></code> span is inherited from the parent span,
+so that no “orphaned” sampled span associated with the <code class="docutils literal notranslate"><span class="pre">httpCall</span></code> is emitted. The default
+remains overridable with the <code class="docutils literal notranslate"><span class="pre">trace_sampled</span></code> option.</p></li>
+<li><p><strong>proxy_status</strong>: Add more conversion in the proxy status utility. It can be disabled by the runtime guard
+<code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.proxy_status_mapping_more_core_response_flags</span></code>.</p></li>
+<li><p><strong>quic</strong>: <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/config/listener/v3/quic_config.proto.html#envoy-v3-api-field-config-listener-v3-quicprotocoloptions-server-preferred-address-config" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">Server preferred address</span></a> is
+now sent to non-QUICHE QUIC clients when configured. This behavior can be disabled with runtime flag
+<code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients</span></code>.</p></li>
+<li><p><strong>quic</strong>: Make each upstream connection to read as many as 32 packets in each event loop. This feature can be disabled by setting
+<code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.quic_upstream_reads_fixed_number_packets</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
+<li><p><strong>quic</strong>: Port migration is default turned off. QUIC client connections will no longer attempt to migrate to a new port when connections
+is degrading. Can be manually turned on via
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-quicprotocoloptions-num-timeouts-to-trigger-port-migration" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">port_migration</span></a>.</p></li>
+<li><p><strong>sockets</strong>: Failure to create an upstream socket should now result in clean connection failure rather than failing a release assert. This behavior
+can be temporarily reverted by setting runtime feature <code class="docutils literal notranslate"><span class="pre">envoy.restart_features_.allow_client_socket_creation_failure</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
+<li><p><strong>stats</strong>: <code class="docutils literal notranslate"><span class="pre">thread_local_cluster_manager.worker_0.*</span></code> metrics are now parsed to use the
+<code class="docutils literal notranslate"><span class="pre">worker_id</span></code> tag like other metrics with <code class="docutils literal notranslate"><span class="pre">worker_id</span></code> do, when
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/config/metrics/v3/stats.proto.html#envoy-v3-api-field-config-metrics-v3-statsconfig-use-all-default-tags" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">use_all_default_tags</span></a> is <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p></li>
+<li><p><strong>upstream</strong>: Upstream now excludes hosts set to <code class="docutils literal notranslate"><span class="pre">DRAINING</span></code> state via EDS from load balancing and panic routing
+threshold calculation. This feature can be disabled by setting
+<code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.exclude_host_in_eds_status_draining</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
+<li><p><strong>xds</strong>: Delta SDS removals will no longer result in a “Missing SDS resources” NACK
+and instead will be ignored.</p></li>
+</ul>
+</section>
+<section id="bug-fixes">
+<h2>Bug fixes<a class="headerlink" href="#bug-fixes" title="Link to this heading"></a></h2>
+<p><em>Changes expected to improve the state of the world and are unlikely
+to have negative effects</em></p>
+<ul class="simple">
+<li><p><strong>admin</strong>: Fixed a bug where the <code class="docutils literal notranslate"><span class="pre">config_dump</span></code> and <code class="docutils literal notranslate"><span class="pre">init_dump</span></code> admin endpoint would return an empty response when called with empty
+query parameters (e.g. <code class="docutils literal notranslate"><span class="pre">/config_dump?resource=&amp;mask=&amp;name_regex=</span></code>).</p></li>
+<li><p><strong>admin</strong>: Removing the ECDS config entry from the config dump when it does not exist (or has expired).</p></li>
+<li><p><strong>deps</strong>: Updated QUICHE dependencies to incorporate fixes for <a class="reference external" href="https://github.com/envoyproxy/envoy/issues/32401">#32401</a>.</p></li>
+<li><p><strong>eds-caching</strong>: Fixing an issue where EDS caching is used (protected by the <code class="docutils literal notranslate"><span class="pre">envoy.restart_features.use_eds_cache_for_ads</span></code>
+runtime flag that is <code class="docutils literal notranslate"><span class="pre">false</span></code> by default), when multiple clusters use the same EDS resource, and that cached EDS
+resource is used.</p></li>
+<li><p><strong>geoip</strong>: Switch to use <code class="docutils literal notranslate"><span class="pre">StopAllIterationAndWatermark</span></code> instead of <code class="docutils literal notranslate"><span class="pre">StopIteration</span></code> in GeoIP filter to fix an issue where large
+POST request body may get corrupted when GeoIP is enabled.</p></li>
+<li><p><strong>http</strong>: Fixed crash when HTTP request idle and per try timeouts occurs within backoff interval.</p></li>
+<li><p><strong>http2</strong>: Update nghttp2 to resolve <a class="reference external" href="https://github.com/envoyproxy/envoy/security/advisories/GHSA-j654-3ccm-vfmm">CVE-2024-30255</a>.</p></li>
+<li><p><strong>http3/upstream</strong>: Fixing a bug with HTTP/3 upstream using a non-threadsafe cache cross-thread. Bumping HTTP/3 support down
+to alpha as the severity of this bug indicates it is both not in use and not GA quality code.</p></li>
+<li><p><strong>jwt_authn</strong>: Added
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-max-lifetime" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">max_lifetime</span></a> and
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-require-expiration" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">require_expiration</span></a>
+to limit the maximum remaining lifetime of a token from a <code class="docutils literal notranslate"><span class="pre">JwtProvider</span></code> and implement restrictions for JWT-SVIDs.</p></li>
+<li><p><strong>jwt_authn</strong>: Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.</p></li>
+<li><p><strong>load_balancing</strong>: Added randomization in host load-balancing initialization. This helps desynchronizing Envoys across
+a fleet by randomizing the scheduler starting point. This can be temporarily reverted by setting runtime guard
+<code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.edf_lb_host_scheduler_init_fix</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
+<li><p><strong>load_balancing</strong>: Added randomization in locality load-balancing initialization. This helps desynchronizing Envoys across
+a fleet by randomizing the scheduler starting point. This can be temporarily reverted by setting runtime guard
+<code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.edf_lb_locality_scheduler_init_fix</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
+<li><p><strong>oauth</strong>: The refresh and access tokens are not expired simultaneously so the access token can be updated using
+the refresh token. The expiration time of the refresh token is taken from the exp claim of jwt by default.
+If the claim is ommited in the jwt then <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-default-refresh-token-expires-in" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">default_refresh_token_expires_in</span></a>
+specifies the lifetime of the refresh token. The default value is <code class="docutils literal notranslate"><span class="pre">604800</span></code> seconds (a week).</p></li>
+<li><p><strong>oauth</strong>: When performing a token refresh and forwarding tokens upstream, replace existing token cookies rather than appending as
+another Cookie header.</p></li>
+<li><p><strong>prefix_matcher_tree</strong>: Fixed issue in matcher prefix tree lookup.
+The lookup did not function correctly when the prefix tree had overlapping prefixes.
+For example: with prefixes <code class="docutils literal notranslate"><span class="pre">/foo</span></code> and <code class="docutils literal notranslate"><span class="pre">/foo/bar</span></code>, it would have incorrectly said no prefix match for <code class="docutils literal notranslate"><span class="pre">/foo/</span></code>.</p></li>
+<li><p><strong>proxy_protocol</strong>: Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+received in a proxy protocol header. Connections will instead be dropped/reset.</p></li>
+<li><p><strong>proxy_protocol</strong>: Fixed a bug where TLVs with non-utf8 characters were inserted as protobuf values into filter metadata circumventing
+ext_authz checks when <code class="docutils literal notranslate"><span class="pre">failure_mode_allow</span></code> is set to <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p></li>
+<li><p><strong>proxy_protocol</strong>: Fixed a crash when Envoy is configured for <code class="docutils literal notranslate"><span class="pre">PROXY</span></code> protocol on both a listener and cluster, and the listener receives
+a <code class="docutils literal notranslate"><span class="pre">PROXY</span></code> protocol header with address type <code class="docutils literal notranslate"><span class="pre">LOCAL</span></code> (typically used for health checks).</p></li>
+<li><p><strong>quic</strong>: Added support for QUIC listeners to echo incoming ECN marks to the peer. Currently disabled. When changes are complete and this is
+enabled, it can be disabled by setting runtime flag <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.quic_receive_ecn</span></code> to false.</p></li>
+<li><p><strong>quic</strong>: Fixed crash bug with QUIC upstream + X.509v1 certificates.</p></li>
+<li><p><strong>router</strong>: Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happens. This is
+controlled by <code class="docutils literal notranslate"><span class="pre">envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request</span></code>.</p></li>
+<li><p><strong>stateful_session</strong>: Support 0 TTL for proto-encoded cookies, which disables cookie expiration by Envoy.</p></li>
+<li><p><strong>tcp/udp/tunneling</strong>: fixed a bug where second HTTP response headers received would cause Envoy to crash in cases where
+<code class="docutils literal notranslate"><span class="pre">propagate_response_headers</span></code> and retry configurations are enabled at the same time, and an upstream
+request is retried multiple times.</p></li>
+<li><p><strong>tcp_proxy</strong>: When tunneling TCP over HTTP, closed the downstream connection (for writing only) when upstream trailers are read
+to support half close semantics during TCP tunneling.
+This behavioral change can be temporarily reverted by setting runtime guard
+<code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
+<li><p><strong>tls</strong>: Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
+<code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_IP_SAN%</span></code>.</p></li>
+<li><p><strong>tracers</strong>: use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.</p></li>
+<li><p><strong>tracing</strong>: Dynatrace resource detector: Only log warning message when no enrichment attributes are found.</p></li>
+<li><p><strong>tracing</strong>: Prevent Envoy from crashing at start up when the OpenTelemetry environment resource detector cannot detect any attributes.</p></li>
+<li><p><strong>url matching</strong>: Fixed excessive CPU utilization when using regex URL template matcher.</p></li>
+<li><p><strong>xds</strong>: Reject xDS configurations where the rate-limit’s <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-field-config-core-v3-ratelimitsettings-fill-rate" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">fill_rate</span></a>
+is set to <code class="docutils literal notranslate"><span class="pre">Infinity</span></code> or <code class="docutils literal notranslate"><span class="pre">NaN</span></code>.</p></li>
+</ul>
+</section>
+<section id="removed-config-or-runtime">
+<h2>Removed config or runtime<a class="headerlink" href="#removed-config-or-runtime" title="Link to this heading"></a></h2>
+<p><em>Normally occurs at the end of the</em> <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/version_history/version_history.html#deprecated" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">deprecation period</span></a></p>
+<ul class="simple">
+<li><p><strong>active_health_check</strong>: Removed <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update</span></code> runtime flag and legacy code paths.</p></li>
+<li><p><strong>aws</strong>: Removed <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.enable_aws_credentials_file</span></code> runtime flag and legacy code paths.</p></li>
+<li><p><strong>http</strong>: Removed <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.allow_absolute_url_with_mixed_scheme</span></code> runtime flag and legacy code paths.</p></li>
+<li><p><strong>http</strong>: Removed <code class="docutils literal notranslate"><span class="pre">envoy_reloadable_features_append_xfh_idempotent</span></code> runtime flag and legacy code paths.</p></li>
+<li><p><strong>http1</strong>: Removed <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers</span></code> runtime flag and legacy code paths.</p></li>
+<li><p><strong>overload_manager</strong>: removed <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.overload_manager_error_unknown_action</span></code> and legacy code paths.</p></li>
+<li><p><strong>resource_monitors</strong>: removed <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.count_unused_mapped_pages_as_free</span></code> runtime flag  and legacy code paths.</p></li>
+<li><p><strong>upstream</strong>: removed <code class="docutils literal notranslate"><span class="pre">envoy_reloadable_features_initialize_upstream_filters</span></code> and legacy code paths.</p></li>
+</ul>
+</section>
+<section id="new-features">
+<h2>New features<a class="headerlink" href="#new-features" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>access_log</strong>: Added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/configuration/observability/access_log/usage.html#config-access-log-format-common-duration" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">%COMMON_DURATION%</span></a> to access log format to log the duration of the request.
+The start time point, end time point and duration precision can be configured in this new command.</p></li>
+<li><p><strong>access_log</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/configuration/observability/access_log/usage.html#config-access-log-format-upstream-connection-id" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">%UPSTREAM_CONNECTION_ID%</span></a> for the upstream connection
+identifier.</p></li>
+<li><p><strong>access_loggers</strong>: Added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/access_loggers/fluentd/v3/fluentd.proto.html#envoy-v3-api-msg-extensions-access-loggers-fluentd-v3-fluentdaccesslogconfig" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">Fluentd access logger</span></a>
+to support flushing access logs in <a class="reference external" href="https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1">Fluentd format</a>.</p></li>
+<li><p><strong>access_loggers</strong>: Added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/access_loggers/fluentd/v3/fluentd.proto.html#envoy-v3-api-msg-extensions-access-loggers-fluentd-v3-fluentdaccesslogconfig-retryoptions" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">retry options</span></a> to Fluentd Access Logger to
+support upstream reconnect options, backoff intervals.</p></li>
+<li><p><strong>admin</strong>: The <code class="docutils literal notranslate"><span class="pre">/stats/prometheus</span></code> endpoint can now emit Prometheus <code class="docutils literal notranslate"><span class="pre">summary</span></code> metric types by explicitly setting the
+<code class="docutils literal notranslate"><span class="pre">histogram_buckets</span></code> query parameter to <code class="docutils literal notranslate"><span class="pre">summary</span></code>.</p></li>
+<li><p><strong>aws</strong>: Update credential_provider utility to support EKS Pod Identity provided via token file.</p></li>
+<li><p><strong>aws_lambda</strong>: Added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/aws_lambda/v3/aws_lambda.proto.html#envoy-v3-api-field-extensions-filters-http-aws-lambda-v3-config-host-rewrite" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">host_rewrite</span></a> config to be used
+during signature.</p></li>
+<li><p><strong>aws_lambda</strong>: The <code class="docutils literal notranslate"><span class="pre">aws_lambda</span></code> filter now supports the
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/aws_lambda/v3/aws_lambda.proto.html#envoy-v3-api-field-extensions-filters-http-aws-lambda-v3-config-credentials-profile" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">credentials_profile</span></a> parameter.
+This enables choosing different credential profiles for each filter instance.</p></li>
+<li><p><strong>aws_lambda</strong>: Update <code class="docutils literal notranslate"><span class="pre">aws_lambda</span></code> filter to support use as an upstream HTTP filter. This allows successful calculation of
+signatures after the forwarding stage has completed, particularly if the path element is modified.</p></li>
+<li><p><strong>aws_request_signing</strong>: Update <code class="docutils literal notranslate"><span class="pre">aws_request_signing</span></code> filter to support optionally sending the aws signature in query parameters rather than headers,
+by specifying the <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/aws_request_signing/v3/aws_request_signing.proto.html#envoy-v3-api-field-extensions-filters-http-aws-request-signing-v3-awsrequestsigning-query-string" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">query_string</span></a>
+configuration section.</p></li>
+<li><p><strong>aws_request_signing</strong>: Update <code class="docutils literal notranslate"><span class="pre">aws_request_signing</span></code> filter to support use as an upstream HTTP filter. This allows successful calculation of
+signatures after the forwarding stage has completed, particularly if the path element is modified.</p></li>
+<li><p><strong>basic_auth</strong>: Added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/basic_auth/v3/basic_auth.proto.html#envoy-v3-api-field-extensions-filters-http-basic-auth-v3-basicauth-forward-username-header" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">forward_username_header</span></a>
+config to forward the username to the backend.</p></li>
+<li><p><strong>composite</strong>: Convert composite fiter into dual filter so it can be installed in the upstream filter chain.</p></li>
+<li><p><strong>compression</strong>: Added Qatzstd <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/compression/qatzstd/compressor/v3alpha/qatzstd.proto.html#envoy-v3-api-msg-extensions-compression-qatzstd-compressor-v3alpha-qatzstd" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">compressor</span></a>.</p></li>
+<li><p><strong>cors</strong>: Added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/cors/v3/cors.proto.html#envoy-v3-api-field-extensions-filters-http-cors-v3-corspolicy-forward-not-matching-preflights" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">configuration option</span></a>
+to return local response when CORS preflight’s origin does not match allowed origin.</p></li>
+<li><p><strong>ext_authz</strong>: Added support for populating the <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/service/auth/v3/attribute_context.proto.html#envoy-v3-api-field-service-auth-v3-attributecontext-tls-session" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">tls_session</span></a>
+check request attribute for network ext_authz by setting <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/configuration/listeners/network_filters/ext_authz_filter.html#config-network-filters-ext-authz" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">include_tls_session</span></a> to <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p></li>
+<li><p><strong>ext_authz</strong>: The proto field <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/service/auth/v3/attribute_context.proto.html#envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-headers" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">headers</span></a>’s
+value type is string.  Thus, it is unable to support non-utf8 characters in header values.
+To support header values with non-utf8 characters, a new boolean field was added to the
+ext_authz config <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/ext_authz/v3/ext_authz.proto.html#envoy-v3-api-field-extensions-filters-http-ext-authz-v3-extauthz-encode-raw-headers" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">encode_raw_headers</span></a>.
+When this is set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, the new field in
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/service/auth/v3/attribute_context.proto.html#envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-header-map" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">HttpRequest.header_map</span></a> (specifically
+<code class="docutils literal notranslate"><span class="pre">header_map.headers.raw_value</span></code>) gets populated with the raw values instead of <code class="docutils literal notranslate"><span class="pre">headers</span></code>,
+which normally contains UTF-8 sanitized header values. Also, since the new field is not a map,
+headers with the same key are not combined into a single comma-separated header.</p></li>
+<li><p><strong>ext_proc</strong>: Added
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocoverrides-grpc-initial-metadata" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">grpc_initial_metadata</span></a>
+config API to allow extending inherited metadata from
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-grpc-service" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">ExternalProcessor.grpc_service</span></a>
+and
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-extprocoverrides-grpc-service" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">ExtProcOverrides.grpc_service</span></a>
+with the new or updated values.</p></li>
+<li><p><strong>ext_proc</strong>: added
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-metadata-options" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">metadata_options</span></a>
+config API to enable sending and receiving metadata from/to the external processing server. Both typed and untyped dynamic
+metadata may be sent to the server. If
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-metadataoptions-receiving-namespaces" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">receiving_namespaces</span></a>
+is defined, returned metadata may be written to the specified allowed namespaces.</p></li>
+<li><p><strong>ext_proc</strong>: implemented
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-request-attributes" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">request_attributes</span></a>
+and
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-field-extensions-filters-http-ext-proc-v3-externalprocessor-response-attributes" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">response_attributes</span></a>
+config APIs to enable sending and receiving attributes to/from the external processing server.</p></li>
+<li><p><strong>ext_proc</strong>: made the <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/ext_proc/v3/ext_proc.proto.html#envoy-v3-api-msg-extensions-filters-http-ext-proc-v3-externalprocessor" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">ExternalProcessor</span></a> work as an upstream filter.</p></li>
+<li><p><strong>filters</strong>: Added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/basic_auth/v3/basic_auth.proto.html#envoy-v3-api-msg-extensions-filters-http-basic-auth-v3-basicauthperroute" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">per-route configuration support to the Basic Auth filter</span></a>.</p></li>
+<li><p><strong>filters</strong>: Added the <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/credential_injector/v3/credential_injector.proto.html#envoy-v3-api-msg-extensions-filters-http-credential-injector-v3-credentialinjector" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">credential injector filter</span></a>,
+which can be used to inject credentials into the HTTP headers.</p></li>
+<li><p><strong>formatters</strong>: Added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/access_loggers/fluentd/v3/fluentd.proto.html#envoy-v3-api-field-extensions-access-loggers-fluentd-v3-fluentdaccesslogconfig-formatters" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">formatters</span></a>
+to Fluentd access logger to allow adding extension commands when formatter access logs.</p></li>
+<li><p><strong>grpc</strong>: Added maximum gRPC message size that is allowed to be received in Envoy gRPC. If a message over this limit is received,
+the gRPC stream is terminated with the <code class="docutils literal notranslate"><span class="pre">RESOURCE_EXHAUSTED</span></code> error. This limit is applied to individual messages in the
+streaming response and not the total size of streaming response. Defaults to 0, which means unlimited.</p></li>
+<li><p><strong>grpc reverse bridge</strong>: Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter
+to preserve HTTP 1.1 responses.  This behavioral change can be temporarily reverted by setting runtime guard
+<code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
+<li><p><strong>health_checks</strong>: added a <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/config/core/v3/health_check.proto.html#envoy-v3-api-field-config-core-v3-healthcheck-always-log-health-check-success" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">configuration option</span></a> that enables
+health check logs on each successful health check.</p></li>
+<li><p><strong>hot_restart</strong>: Added new command-line flag <a class="reference internal" href="../../operations/cli.html#cmdoption-skip-hot-restart-on-no-parent"><code class="xref std std-option docutils literal notranslate"><span class="pre">--skip-hot-restart-on-no-parent</span></code></a>.</p></li>
+<li><p><strong>http</strong>: Added DownstreamRemoteReset to CoreResponseFlag, and it is set when stream is remote reset.</p></li>
+<li><p><strong>http3</strong>: Added experimental support for sending and receiving HTTP/3 <code class="docutils literal notranslate"><span class="pre">METADATA</span></code> frames.</p></li>
+<li><p><strong>jwt_authn</strong>: Added
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/jwt_authn/v3/config.proto.html#envoy-v3-api-field-extensions-filters-http-jwt-authn-v3-jwtprovider-subjects" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">subjects</span></a> to allow restrictions
+of subjects a <code class="docutils literal notranslate"><span class="pre">JwtProvider</span></code> can assert.</p></li>
+<li><p><strong>load shed point</strong>: Added load shed point <code class="docutils literal notranslate"><span class="pre">envoy.load_shed_points.http_downstream_filter_check</span></code> that makes load shed check availabe in HTTP decoder
+filters, and right now it is only available in router. It will send local reply directly when Envoy is under pressure,
+typically memory.</p></li>
+<li><p><strong>load_shed_point</strong>: Added load shed point <code class="docutils literal notranslate"><span class="pre">envoy.load_shed_points.hcm_ondata_creating_codec</span></code> that closes connections before creating codec if
+Envoy is under pressure, typically memory.</p></li>
+<li><p><strong>lua</strong>: Added a new <code class="docutils literal notranslate"><span class="pre">connectionStreamInfo()</span></code> which could be used to access the streamInfo object on the connection. This addition
+is helpful in scenarios requiring the retrieval of dynamic metadata from network filters, such as the Proxy Protocol, etc.</p></li>
+<li><p><strong>match_delegate</strong>: Convert match_delegate fiter into dual filter so it can be installed in the upstream filter chain.</p></li>
+<li><p><strong>monitoring</strong>: Add <code class="docutils literal notranslate"><span class="pre">Envoy::ExecutionContext</span></code>, which is notified by <code class="docutils literal notranslate"><span class="pre">ScopeTrackerScopeState</span></code>’s constructor and destructor. This feature is
+disabled by default, it can be enabled by runtime feature flag <code class="docutils literal notranslate"><span class="pre">envoy.restart_features.enable_execution_context</span></code>. For more details,
+please see <a class="reference external" href="https://github.com/envoyproxy/envoy/issues/32012">https://github.com/envoyproxy/envoy/issues/32012</a>.</p></li>
+<li><p><strong>oauth</strong>: <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-deny-redirect-matcher" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">deny_redirect_matcher</span></a>
+to support disabling authorization redirects for specific requests, e.g. AJAX requests.</p></li>
+<li><p><strong>opentelemetry/grpc/access_log</strong>: Added support to configure trace ID in OpenTelemetry logs.</p></li>
+<li><p><strong>overload</strong>: added a <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-append-local-overload" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">configuration option</span></a> to add
+<code class="docutils literal notranslate"><span class="pre">x-envoy-local-overloaded</span></code> header when Overload Manager is triggered.</p></li>
+<li><p><strong>proxy_protocol</strong>: Added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.proto.html#envoy-v3-api-field-extensions-filters-listener-proxy-protocol-v3-proxyprotocol-disallowed-versions" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">disallowed_versions</span></a>
+to enforce the filter only matches specific PROXY protocol versions.</p></li>
+<li><p><strong>proxy_protocol</strong>: Added new statistics to the proxy protocol filter to track connections found/disallowed/errored by PROXY protocol version.</p></li>
+<li><p><strong>quic</strong>: Added QUIC protocol option <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/config/listener/v3/quic_config.proto.html#envoy-v3-api-field-config-listener-v3-quicprotocoloptions-send-disable-active-migration" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">send_disable_active_migration</span></a> to make the server send clients a transport
+parameter to discourage client endpoints from active migration.</p></li>
+<li><p><strong>quic</strong>: Added support for QUIC listeners to <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/intro/arch_overview/security/ssl.html#arch-overview-ssl-cert-select" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">choose certificates based on SNI</span></a> and load certificates
+from formats other than PEM, such as <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/transport_sockets/tls/v3/common.proto.html#envoy-v3-api-field-extensions-transport-sockets-tls-v3-tlscertificate-pkcs12" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">pkcs12</span></a>.
+This behavior can be disabled with runtime flag <code class="docutils literal notranslate"><span class="pre">envoy.restart_features.quic_handle_certs_with_shared_tls_code</span></code>.</p></li>
+<li><p><strong>rbac</strong>: Added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/http/rbac/v3/rbac.proto.html#envoy-v3-api-field-extensions-filters-http-rbac-v3-rbac-rules-stat-prefix" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">rules_stat_prefix</span></a>
+to allow adding custom prefix to the stats emitted by rules.</p></li>
+<li><p><strong>rbac</strong>: Added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/config/rbac/v3/rbac.proto.html#envoy-v3-api-field-config-rbac-v3-permission-uri-template" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">uri_template</span></a> which uses existing
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/path/match/uri_template/v3/uri_template_match.proto.html#envoy-v3-api-msg-extensions-path-match-uri-template-v3-uritemplatematchconfig" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">UriTemplateMatchConfig</span></a>
+to allow use of glob patterns for URI path matching in RBAC.</p></li>
+<li><p><strong>rbac</strong>: Added additional statistics for rules and shadow rules to the RBAC HTTP filter.</p></li>
+<li><p><strong>redis</strong>: Added support for the <code class="docutils literal notranslate"><span class="pre">ECHO</span></code> command.</p></li>
+<li><p><strong>string matcher</strong>: Added an <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/type/matcher/v3/string.proto.html#envoy-v3-api-field-type-matcher-v3-stringmatcher-custom" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">extension point for custom string matcher implementations</span></a>.
+An implementation for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/string_matcher/lua/v3/lua.proto.html#envoy-v3-api-msg-extensions-string-matcher-lua-v3-lua" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">running a Lua script</span></a> is included.</p></li>
+<li><p><strong>tcp_proxy</strong>: added an option to dynamically set a per downstream connection idle timeout period object under the key
+<code class="docutils literal notranslate"><span class="pre">envoy.tcp_proxy.per_connection_idle_timeout_ms</span></code>. If this filter state value exists, it will override the idle timeout
+specified in the filter configuration and the default idle timeout.</p></li>
+<li><p><strong>tracing</strong>: Added User-Agent header to OTLP trace exporters according to the OpenTelemetry specification.</p></li>
+<li><p><strong>tracing</strong>: Added support for variant span attribute type for the OpenTelemetry tracer.</p></li>
+<li><p><strong>tracing</strong>: Added support to configure a Dynatrace sampler for the OpenTelemetry tracer.</p></li>
+<li><p><strong>tracing</strong>: Datadog: span attributes and trace sampling can be configured remotely.</p></li>
+<li><p><strong>tracing</strong>: Dynatrace sampler fetches configuration from Dynatrace API.</p></li>
+<li><p><strong>upstream</strong>: Added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/load_balancing_policies/least_request/v3/least_request.proto.html#envoy-v3-api-msg-extensions-load-balancing-policies-least-request-v3-leastrequest" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">selection_method</span></a>
+option to the least request load balancer. If set to <code class="docutils literal notranslate"><span class="pre">FULL_SCAN</span></code>,
+Envoy will select the host with the fewest active requests from the entire host set rather than
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/load_balancing_policies/least_request/v3/least_request.proto.html#envoy-v3-api-msg-extensions-load-balancing-policies-least-request-v3-leastrequest" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">choice_count</span></a>
+random choices.</p></li>
+<li><p><strong>wasm</strong>: added <code class="docutils literal notranslate"><span class="pre">verify_signature</span></code> foreign function to verify cryptographic signatures.</p></li>
+</ul>
+</section>
+<section id="deprecated">
+<h2>Deprecated<a class="headerlink" href="#deprecated" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>listener</strong>: deprecated runtime key <code class="docutils literal notranslate"><span class="pre">overload.global_downstream_max_connections</span></code> in favor of <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/resource_monitors/downstream_connections/v3/downstream_connections.proto.html#envoy-v3-api-msg-extensions-resource-monitors-downstream-connections-v3-downstreamconnectionsconfig" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">downstream connections monitor</span></a>.</p></li>
+<li><p><strong>tracing</strong>: deprecated <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/config/trace/v3/zipkin.proto.html#envoy-v3-api-field-config-trace-v3-zipkinconfig-split-spans-for-request" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">split_spans_for_request</span></a>
+in favor of <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.30.11/api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-tracing-spawn-upstream-span" title="(in envoy vtag-v1.30.11)"><span class="xref std std-ref">spawn_upstream_span</span></a>.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="v1.30.1.html" class="btn btn-neutral float-left" title="1.30.1 (April 18, 2024)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../v1.29/v1.29.html" class="btn btn-neutral float-right" title="v1.29" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">1.30.0 (April 16, 2024)</a><ul>
+<li><a class="reference internal" href="#incompatible-behavior-changes">Incompatible behavior changes</a></li>
+<li><a class="reference internal" href="#minor-behavior-changes">Minor behavior changes</a></li>
+<li><a class="reference internal" href="#bug-fixes">Bug fixes</a></li>
+<li><a class="reference internal" href="#removed-config-or-runtime">Removed config or runtime</a></li>
+<li><a class="reference internal" href="#new-features">New features</a></li>
+<li><a class="reference internal" href="#deprecated">Deprecated</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

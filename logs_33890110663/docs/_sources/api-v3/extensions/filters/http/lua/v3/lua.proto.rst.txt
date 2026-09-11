@@ -1,0 +1,307 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/lua/v3/lua.proto:
+
+Lua (proto)
+===========
+
+.. _extension_envoy.filters.http.lua:
+
+This extension has the qualified name ``envoy.filters.http.lua``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+  - :ref:`envoy.filters.http.upstream <extension_category_envoy.filters.http.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>`
+
+
+
+Lua :ref:`configuration overview <config_http_filters_lua>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua:
+
+extensions.filters.http.lua.v3.Lua
+----------------------------------
+
+
+:repo:`[extensions.filters.http.lua.v3.Lua proto] <api/envoy/extensions/filters/http/lua/v3/lua.proto#L25>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "inline_code": ...,
+    "source_codes": {...},
+    "default_source_code": {...},
+    "stat_prefix": ...,
+    "clear_route_cache": {...},
+    "filter_context": {...},
+    "package_paths": [],
+    "package_cpaths": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code:
+
+
+inline_code
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The Lua code that Envoy will execute. This can be a very small script that
+  further loads code from disk if desired. Note that if JSON configuration is used, the code must
+  be properly escaped. YAML configuration may be easier to read since YAML supports multi-line
+  strings so complex scripts can be easily expressed inline in the configuration.
+
+  This field is deprecated. Please use
+  :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`.
+  Only one of :ref:`inline_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`
+  or :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`
+  can be set for the Lua filter.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes:
+
+
+source_codes
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`>) Map of named Lua source codes that can be referenced in :ref:`LuaPerRoute
+  <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>`. The Lua source codes can be
+  loaded from inline string or local files.
+
+  Example:
+
+  .. code-block:: yaml
+
+    source_codes:
+      hello.lua:
+        inline_string: |
+          function envoy_on_response(response_handle)
+            -- Do something.
+          end
+      world.lua:
+        filename: /etc/lua/world.lua
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code:
+
+
+default_source_code
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) The default Lua code that Envoy will execute. If no per route config is provided
+  for the request, this Lua code will be applied.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional additional prefix to use when emitting statistics. By default
+  metrics are emitted in *.lua.* namespace. If multiple lua filters are
+  configured in a filter chain, the stats from each filter instance can
+  be emitted using custom stat prefix to distinguish emitted
+  statistics. For example:
+
+  .. code-block:: yaml
+
+    http_filters:
+      - name: envoy.filters.http.lua
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+          stat_prefix: foo_script # This emits lua.foo_script.errors etc.
+      - name: envoy.filters.http.lua
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+          stat_prefix: bar_script # This emits lua.bar_script.errors etc.
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.clear_route_cache:
+
+
+clear_route_cache
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If set to true, the Lua filter will clear the route cache automatically if the request
+  headers are modified by the Lua script. If set to false, the Lua filter will not clear the
+  route cache automatically.
+  Default is true for backward compatibility.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.filter_context:
+
+
+filter_context
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) Optional filter context for the Lua script, accessed the same way as the per-route
+  :ref:`filter_context
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.filter_context>`, via
+  ``handle:filterContext()``. This is the context a request gets when it has no
+  ``LuaPerRoute`` configuration, or when the one it has does not set ``filter_context``.
+
+  A ``LuaPerRoute`` which does set ``filter_context`` replaces this value rather than merging
+  into it, so a route which sets an empty ``filter_context`` sees an empty context rather than
+  this one. Only the most specific ``LuaPerRoute`` is consulted: a ``filter_context`` on a less
+  specific one, such as a virtual host when the route has its own ``LuaPerRoute``, is not
+  reached, and this value is used instead.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_paths:
+
+
+package_paths
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Additional patterns for the Lua ``package.path`` of every VM this filter creates, so that a
+  script can ``require`` modules from locations the interpreter does not search on its own.
+  Each entry is one Lua path pattern; the entries are joined with ``;`` in the order given and
+  placed ahead of the interpreter's built-in default path, which is kept.
+
+  .. code-block:: yaml
+
+    package_paths:
+    - /etc/envoy/lua/?.lua
+    - /etc/envoy/lua/?/init.lua
+
+  The patterns are in place before any configured code runs, including the run that validates
+  the configuration, so a ``require`` at the top level of a script whose module cannot be found
+  is rejected as a configuration error rather than failing per request.
+
+  Each worker builds its own VM and runs the script again to do so, after the configuration has
+  been accepted, so the files a script requires must stay readable for as long as the process
+  runs and not only while the configuration is loaded.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_cpaths:
+
+
+package_cpaths
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) As :ref:`package_paths
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_paths>`, but for
+  ``package.cpath``, i.e. modules which are loadable C libraries rather than Lua source, for
+  example ``/etc/envoy/lua/?.so``.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute:
+
+extensions.filters.http.lua.v3.LuaPerRoute
+------------------------------------------
+
+
+:repo:`[extensions.filters.http.lua.v3.LuaPerRoute proto] <api/envoy/extensions/filters/http/lua/v3/lua.proto#L132>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "disabled": ...,
+    "name": ...,
+    "source_code": {...},
+    "filter_context": {...},
+    "package_paths": [],
+    "package_cpaths": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.disabled:
+
+
+disabled
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Disable the Lua filter for this particular vhost or route. If disabled is specified in
+  multiple per-filter-configs, the most specific one will be used.
+
+
+  
+
+  Only one of :ref:`disabled <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.disabled>`, :ref:`name <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`, :ref:`source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) A name of a Lua source code stored in
+  :ref:`Lua.source_codes <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
+
+
+  
+
+  Only one of :ref:`disabled <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.disabled>`, :ref:`name <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`, :ref:`source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code:
+
+
+source_code
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) A configured per-route Lua source code that can be served by RDS or provided inline.
+
+
+  
+
+  Only one of :ref:`disabled <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.disabled>`, :ref:`name <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`, :ref:`source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.filter_context:
+
+
+filter_context
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) Optional filter context for Lua script. This could be used to pass configuration
+  to Lua script. The Lua script can access the filter context using ``handle:filterContext()``.
+  For example:
+
+  .. code-block:: lua
+
+    function envoy_on_request(request_handle)
+      local filter_context = request_handle:filterContext()
+      local filter_context_value = filter_context:get("key")
+      -- Do something with filter_context_value.
+    end
+
+  This replaces the filter-level :ref:`filter_context
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.filter_context>` rather than merging
+  into it.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.package_paths:
+
+
+package_paths
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Additional patterns for the Lua ``package.path`` of the VM built from this route's
+  :ref:`source_code
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>`, with the same
+  meaning as the filter-level :ref:`package_paths
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_paths>`.
+
+  This route's inline source code gets its own VM, which is why it needs its own patterns: the
+  filter-level ones are not visible to it. Setting these has no effect when this route selects a
+  script by :ref:`name
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`, or configures no script
+  at all, since that VM belongs to the filter and carries the filter-level patterns.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.package_cpaths:
+
+
+package_cpaths
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) As :ref:`package_paths
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.package_paths>`, but for
+  ``package.cpath``.
+
+

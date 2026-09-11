@@ -1,0 +1,222 @@
+.. _envoy_v3_api_file_envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.proto:
+
+OAuth2 Credential (proto)
+=========================
+
+.. _extension_envoy.http.injected_credentials.oauth2:
+
+This extension has the qualified name ``envoy.http.injected_credentials.oauth2``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.http.injected_credentials <extension_category_envoy.http.injected_credentials>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2 <envoy_v3_api_msg_extensions.http.injected_credentials.oauth2.v3.OAuth2>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.http.injected_credentials.oauth2.v3.OAuth2:
+
+extensions.http.injected_credentials.oauth2.v3.OAuth2
+-----------------------------------------------------
+
+
+:repo:`[extensions.http.injected_credentials.oauth2.v3.OAuth2 proto] <api/envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.proto#L29>`
+
+OAuth2 extension can be used to retrieve an OAuth2 access token from an authorization server and inject it into the
+proxied requests.
+Currently, only the Client Credentials Grant flow is supported.
+The access token will be injected into the request headers using the ``Authorization`` header as a bearer token.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "token_endpoint": {...},
+    "scopes": [],
+    "client_credentials": {...},
+    "token_fetch_retry_interval": {...},
+    "endpoint_params": []
+  }
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.token_endpoint:
+
+
+token_endpoint
+  (:ref:`config.core.v3.HttpUri <envoy_v3_api_msg_config.core.v3.HttpUri>`, *REQUIRED*) Endpoint on the authorization server to retrieve the access token from.
+  Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-3.2>`__ for details.
+
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.scopes:
+
+
+scopes
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional list of OAuth scopes to be claimed in the authorization request.
+  Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-4.4.2>`__ for details.
+
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.client_credentials:
+
+
+client_credentials
+  (:ref:`extensions.http.injected_credentials.oauth2.v3.OAuth2.ClientCredentials <envoy_v3_api_msg_extensions.http.injected_credentials.oauth2.v3.OAuth2.ClientCredentials>`, *REQUIRED*) Client Credentials Grant.
+  Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-4.4>`__ for details.
+
+
+  
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.token_fetch_retry_interval:
+
+
+token_fetch_retry_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The interval between two successive retries to fetch token from Identity Provider. Default is 2 secs.
+  The interval must be at least 1 second.
+
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.endpoint_params:
+
+
+endpoint_params
+  (**repeated** :ref:`extensions.http.injected_credentials.oauth2.v3.OAuth2.EndpointParameter <envoy_v3_api_msg_extensions.http.injected_credentials.oauth2.v3.OAuth2.EndpointParameter>`) Optional list of additional parameters to send to the token endpoint.
+  These parameters will be URL-encoded and included in the token request body.
+
+
+.. _envoy_v3_api_msg_extensions.http.injected_credentials.oauth2.v3.OAuth2.ClientCredentials:
+
+extensions.http.injected_credentials.oauth2.v3.OAuth2.ClientCredentials
+-----------------------------------------------------------------------
+
+
+:repo:`[extensions.http.injected_credentials.oauth2.v3.OAuth2.ClientCredentials proto] <api/envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.proto#L41>`
+
+Credentials to authenticate client to the authorization server.
+Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-2.3>`__ for details.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "client_id": ...,
+    "client_secret": {...},
+    "auth_type": ...
+  }
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.ClientCredentials.client_id:
+
+
+client_id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Client ID.
+  Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1>`__ for details.
+
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.ClientCredentials.client_secret:
+
+
+client_secret
+  (:ref:`extensions.transport_sockets.tls.v3.SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>`, *REQUIRED*) Client secret.
+  Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1>`__ for details.
+
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.ClientCredentials.auth_type:
+
+
+auth_type
+  (:ref:`extensions.http.injected_credentials.oauth2.v3.OAuth2.AuthType <envoy_v3_api_enum_extensions.http.injected_credentials.oauth2.v3.OAuth2.AuthType>`) The method to use when sending credentials to the authorization server.
+  Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1>`__ for details.
+
+
+
+.. _envoy_v3_api_msg_extensions.http.injected_credentials.oauth2.v3.OAuth2.EndpointParameter:
+
+extensions.http.injected_credentials.oauth2.v3.OAuth2.EndpointParameter
+-----------------------------------------------------------------------
+
+
+:repo:`[extensions.http.injected_credentials.oauth2.v3.OAuth2.EndpointParameter proto] <api/envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.proto#L59>`
+
+Optional additional parameters to include in the token endpoint request body.
+These parameters will be URL-encoded and added to the request body along with the standard OAuth2 parameters.
+Refer to your authorization server's documentation for supported parameters.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "value": ...
+  }
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.EndpointParameter.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Parameter name.
+
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.EndpointParameter.value:
+
+
+value
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Parameter value.
+
+
+
+.. _envoy_v3_api_enum_extensions.http.injected_credentials.oauth2.v3.OAuth2.AuthType:
+
+Enum extensions.http.injected_credentials.oauth2.v3.OAuth2.AuthType
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.http.injected_credentials.oauth2.v3.OAuth2.AuthType proto] <api/envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.proto#L30>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.http.injected_credentials.oauth2.v3.OAuth2.AuthType.BASIC_AUTH:
+
+
+BASIC_AUTH
+  *(DEFAULT)* ⁣The ``client_id`` and ``client_secret`` will be sent using HTTP Basic authentication scheme.
+
+
+.. _envoy_v3_api_enum_value_extensions.http.injected_credentials.oauth2.v3.OAuth2.AuthType.URL_ENCODED_BODY:
+
+
+URL_ENCODED_BODY
+  ⁣The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
+  This type should only be used when Auth server does not support Basic authentication.
+
+
+

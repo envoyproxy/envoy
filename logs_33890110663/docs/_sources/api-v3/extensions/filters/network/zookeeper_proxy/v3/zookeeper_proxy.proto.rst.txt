@@ -1,0 +1,346 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.proto:
+
+ZooKeeper proxy (proto)
+=======================
+
+.. _extension_envoy.filters.network.zookeeper_proxy:
+
+This extension has the qualified name ``envoy.filters.network.zookeeper_proxy``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy <envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy>`
+
+
+
+ZooKeeper Proxy :ref:`configuration overview <config_network_filters_zookeeper_proxy>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy:
+
+extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy
+------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy proto] <api/envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.proto#L22>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "max_packet_bytes": {...},
+    "enable_latency_threshold_metrics": ...,
+    "default_latency_threshold": {...},
+    "latency_threshold_overrides": [],
+    "enable_per_opcode_request_bytes_metrics": ...,
+    "enable_per_opcode_response_bytes_metrics": ...,
+    "enable_per_opcode_decoder_error_metrics": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The human readable prefix to use when emitting :ref:`statistics
+  <config_network_filters_zookeeper_proxy_stats>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.max_packet_bytes:
+
+
+max_packet_bytes
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Messages — requests, responses and events — that are bigger than this value will
+  be ignored. If it is not set, the default value is 1Mb.
+
+  The value here should match the jute.maxbuffer property in your cluster configuration:
+
+  https://zookeeper.apache.org/doc/r3.4.10/zookeeperAdmin.html#Unsafe+Options
+
+  if that is set. If it isn't, ZooKeeper's default is also 1Mb.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_latency_threshold_metrics:
+
+
+enable_latency_threshold_metrics
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether to emit latency threshold metrics. If not set, it defaults to false.
+  If false, setting ``default_latency_threshold`` and ``latency_threshold_overrides`` will not have effect.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.default_latency_threshold:
+
+
+default_latency_threshold
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The default latency threshold to decide the fast/slow responses and emit metrics (used for error budget calculation).
+
+  https://sre.google/workbook/implementing-slos/
+
+  If it is not set, the default value is 100 milliseconds.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.latency_threshold_overrides:
+
+
+latency_threshold_overrides
+  (**repeated** :ref:`extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride <envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride>`) List of latency threshold overrides for opcodes.
+  If the threshold override of one opcode is not set, it will fallback to the default latency
+  threshold.
+  Specifying latency threshold overrides multiple times for one opcode is not allowed.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_request_bytes_metrics:
+
+
+enable_per_opcode_request_bytes_metrics
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether to emit per opcode request bytes metrics. If not set, it defaults to false.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_response_bytes_metrics:
+
+
+enable_per_opcode_response_bytes_metrics
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether to emit per opcode response bytes metrics. If not set, it defaults to false.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics:
+
+
+enable_per_opcode_decoder_error_metrics
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether to emit per opcode decoder error metrics. If not set, it defaults to false.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride:
+
+extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride proto] <api/envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.proto#L72>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "opcode": ...,
+    "threshold": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.opcode:
+
+
+opcode
+  (:ref:`extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode <envoy_v3_api_enum_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode>`) The ZooKeeper opcodes. Can be found as part of the ZooKeeper source code:
+
+  https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/ZooDefs.java
+
+
+
+.. _envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.threshold:
+
+
+threshold
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_, *REQUIRED*) The latency threshold override of certain opcode.
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode:
+
+Enum extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode
+----------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode proto] <api/envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.proto#L73>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.Connect:
+
+
+Connect
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.Create:
+
+
+Create
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.Delete:
+
+
+Delete
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.Exists:
+
+
+Exists
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.GetData:
+
+
+GetData
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.SetData:
+
+
+SetData
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.GetAcl:
+
+
+GetAcl
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.SetAcl:
+
+
+SetAcl
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.GetChildren:
+
+
+GetChildren
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.Sync:
+
+
+Sync
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.Ping:
+
+
+Ping
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.GetChildren2:
+
+
+GetChildren2
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.Check:
+
+
+Check
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.Multi:
+
+
+Multi
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.Create2:
+
+
+Create2
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.Reconfig:
+
+
+Reconfig
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.CheckWatches:
+
+
+CheckWatches
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.RemoveWatches:
+
+
+RemoveWatches
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.CreateContainer:
+
+
+CreateContainer
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.CreateTtl:
+
+
+CreateTtl
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.Close:
+
+
+Close
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.SetAuth:
+
+
+SetAuth
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.SetWatches:
+
+
+SetWatches
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.GetEphemerals:
+
+
+GetEphemerals
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.GetAllChildrenNumber:
+
+
+GetAllChildrenNumber
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.SetWatches2:
+
+
+SetWatches2
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode.AddWatch:
+
+
+AddWatch
+  ⁣
+
+

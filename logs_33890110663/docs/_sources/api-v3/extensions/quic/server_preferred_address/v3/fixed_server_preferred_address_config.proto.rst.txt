@@ -1,0 +1,143 @@
+.. _envoy_v3_api_file_envoy/extensions/quic/server_preferred_address/v3/fixed_server_preferred_address_config.proto:
+
+QUIC fixed server preferred address config (proto)
+==================================================
+
+.. _extension_envoy.quic.server_preferred_address.fixed:
+
+This extension has the qualified name ``envoy.quic.server_preferred_address.fixed``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.quic.server_preferred_address <extension_category_envoy.quic.server_preferred_address>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig <envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig:
+
+extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig
+-----------------------------------------------------------------------------
+
+
+:repo:`[extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig proto] <api/envoy/extensions/quic/server_preferred_address/v3/fixed_server_preferred_address_config.proto#L18>`
+
+Configuration for FixedServerPreferredAddressConfig.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ipv4_address": ...,
+    "ipv4_config": {...},
+    "ipv6_address": ...,
+    "ipv6_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.ipv4_address:
+
+
+ipv4_address
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) String representation of IPv4 address, i.e. "127.0.0.2".
+  If not specified, none will be configured.
+
+
+.. _envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.ipv4_config:
+
+
+ipv4_config
+  (:ref:`extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig <envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig>`) The IPv4 address to advertise to clients for Server Preferred Address.
+  This field takes precedence over
+  :ref:`ipv4_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.ipv4_address>`.
+
+
+.. _envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.ipv6_address:
+
+
+ipv6_address
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) String representation of IPv6 address, i.e. "::1".
+  If not specified, none will be configured.
+
+
+.. _envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.ipv6_config:
+
+
+ipv6_config
+  (:ref:`extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig <envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig>`) The IPv6 address to advertise to clients for Server Preferred Address.
+  This field takes precedence over
+  :ref:`ipv6_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.ipv6_address>`.
+
+
+.. _envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig:
+
+extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig
+-------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig proto] <api/envoy/extensions/quic/server_preferred_address/v3/fixed_server_preferred_address_config.proto#L20>`
+
+Addresses for server preferred address for a single address family (IPv4 or IPv6).
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "address": {...},
+    "dnat_address": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig.address:
+
+
+address
+  (:ref:`config.core.v3.SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`) The server preferred address sent to clients.
+
+  .. note::
+
+    Envoy currently requires all packets for a QUIC connection to arrive on the same port. Therefore, unless a
+    :ref:`dnat_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig.dnat_address>`
+    is explicitly configured, the port specified here must be set to zero. In such cases, Envoy will automatically
+    use the listener's port.
+
+
+
+.. _envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig.dnat_address:
+
+
+dnat_address
+  (:ref:`config.core.v3.SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`) If a DNAT exists between the client and Envoy, this is the address where Envoy will observe incoming server
+  preferred address packets. If unspecified, Envoy assumes there is no DNAT, and packets will be sent directly
+  to the address advertised to clients as the server preferred address.
+
+  .. note::
+
+    Envoy currently requires all packets for a QUIC connection to arrive on the same port. Consequently, the
+    port for this address must be set to zero, with Envoy defaulting to the listener's port instead.
+
+
+
+

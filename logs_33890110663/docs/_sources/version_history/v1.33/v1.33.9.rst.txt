@@ -1,0 +1,20 @@
+.. _version_history_1.33.9:
+
+1.33.9 (September 5, 2025)
+===========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **release**: Fix distroless image to ensure nonroot.
+

@@ -1,0 +1,83 @@
+.. _envoy_v3_api_file_envoy/service/metrics/v3/metrics_service.proto:
+
+Metrics service (proto)
+=======================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_service.metrics.v3.StreamMetricsResponse:
+
+service.metrics.v3.StreamMetricsResponse
+----------------------------------------
+
+
+:repo:`[service.metrics.v3.StreamMetricsResponse proto] <api/envoy/service/metrics/v3/metrics_service.proto#L29>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_service.metrics.v3.StreamMetricsMessage:
+
+service.metrics.v3.StreamMetricsMessage
+---------------------------------------
+
+
+:repo:`[service.metrics.v3.StreamMetricsMessage proto] <api/envoy/service/metrics/v3/metrics_service.proto#L34>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "identifier": {...},
+    "envoy_metrics": []
+  }
+
+.. _envoy_v3_api_field_service.metrics.v3.StreamMetricsMessage.identifier:
+
+
+identifier
+  (:ref:`service.metrics.v3.StreamMetricsMessage.Identifier <envoy_v3_api_msg_service.metrics.v3.StreamMetricsMessage.Identifier>`) Identifier data effectively is a structured metadata. As a performance optimization this will
+  only be sent in the first message on the stream.
+
+
+.. _envoy_v3_api_field_service.metrics.v3.StreamMetricsMessage.envoy_metrics:
+
+
+envoy_metrics
+  (**repeated** .io.prometheus.client.MetricFamily) A list of metric entries
+
+
+.. _envoy_v3_api_msg_service.metrics.v3.StreamMetricsMessage.Identifier:
+
+service.metrics.v3.StreamMetricsMessage.Identifier
+--------------------------------------------------
+
+
+:repo:`[service.metrics.v3.StreamMetricsMessage.Identifier proto] <api/envoy/service/metrics/v3/metrics_service.proto#L38>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "node": {...}
+  }
+
+.. _envoy_v3_api_field_service.metrics.v3.StreamMetricsMessage.Identifier.node:
+
+
+node
+  (:ref:`config.core.v3.Node <envoy_v3_api_msg_config.core.v3.Node>`, *REQUIRED*) The node sending metrics over the stream.
+
+
+

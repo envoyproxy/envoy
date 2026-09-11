@@ -1,0 +1,396 @@
+.. _envoy_v3_api_file_envoy/config/endpoint/v3/endpoint_components.proto:
+
+Endpoints (proto)
+=================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.endpoint.v3.Endpoint:
+
+config.endpoint.v3.Endpoint
+---------------------------
+
+
+:repo:`[config.endpoint.v3.Endpoint proto] <api/envoy/config/endpoint/v3/endpoint_components.proto#L28>`
+
+Upstream host identifier.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "address": {...},
+    "health_check_config": {...},
+    "hostname": ...,
+    "additional_addresses": [],
+    "observability_name": ...
+  }
+
+.. _envoy_v3_api_field_config.endpoint.v3.Endpoint.address:
+
+
+address
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) The upstream host address.
+
+  .. attention::
+
+    The form of host address depends on the given cluster type. For STATIC or EDS,
+    it is expected to be a direct IP address (or something resolvable by the
+    specified :ref:`resolver <envoy_v3_api_field_config.core.v3.SocketAddress.resolver_name>`
+    in the Address). For LOGICAL or STRICT DNS, it is expected to be hostname,
+    and will be resolved via DNS.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.Endpoint.health_check_config:
+
+
+health_check_config
+  (:ref:`config.endpoint.v3.Endpoint.HealthCheckConfig <envoy_v3_api_msg_config.endpoint.v3.Endpoint.HealthCheckConfig>`) The optional health check configuration is used as configuration for the
+  health checker to contact the health checked host.
+
+  .. attention::
+
+    This takes into effect only for upstream clusters with
+    :ref:`active health checking <arch_overview_health_checking>` enabled.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname:
+
+
+hostname
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The hostname associated with this endpoint. This hostname is not used for routing or address
+  resolution. If provided, it will be associated with the endpoint, and can be used for features
+  that require a hostname, like
+  :ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.Endpoint.additional_addresses:
+
+
+additional_addresses
+  (**repeated** :ref:`config.endpoint.v3.Endpoint.AdditionalAddress <envoy_v3_api_msg_config.endpoint.v3.Endpoint.AdditionalAddress>`) An ordered list of addresses that together with ``address`` comprise the
+  list of addresses for an endpoint. The address given in the ``address`` is
+  prepended to this list. It is assumed that the list must already be
+  sorted by preference order of the addresses. This will only be supported
+  for STATIC and EDS clusters.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.Endpoint.observability_name:
+
+
+observability_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional alternative stat name for this endpoint. If not specified, the main address will be used
+  as the stat name and be extracted as ``envoy.endpoint_address`` tag value in generated stats.
+  If specified, the ``observability_name`` here will be used to replace the main address.
+
+  .. note::
+
+    This field is ignored for logical DNS host implementation..
+
+  This is useful when there are duplicate addresses in the cluster, for example when multiple
+  endpoints share the same address but have different hostnames or metadata.
+  In this case, the observability name can be used to differentiate between these endpoints in
+  stats and logs.
+
+
+.. _envoy_v3_api_msg_config.endpoint.v3.Endpoint.HealthCheckConfig:
+
+config.endpoint.v3.Endpoint.HealthCheckConfig
+---------------------------------------------
+
+
+:repo:`[config.endpoint.v3.Endpoint.HealthCheckConfig proto] <api/envoy/config/endpoint/v3/endpoint_components.proto#L32>`
+
+The optional health check configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "port_value": ...,
+    "hostname": ...,
+    "address": {...},
+    "disable_active_health_check": ...
+  }
+
+.. _envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.port_value:
+
+
+port_value
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional alternative health check port value.
+
+  By default the health check address port of an upstream host is the same
+  as the host's serving address port. This provides an alternative health
+  check port. Setting this with a non-zero value allows an upstream host
+  to have different health check address port.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname:
+
+
+hostname
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) By default, the host header for L7 health checks is controlled by cluster level configuration
+  (see: :ref:`host <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.host>` and
+  :ref:`authority <envoy_v3_api_field_config.core.v3.HealthCheck.GrpcHealthCheck.authority>`). Setting this
+  to a non-empty value allows overriding the cluster level configuration for a specific
+  endpoint.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.address:
+
+
+address
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) Optional alternative health check host address.
+
+  .. attention::
+
+    The form of the health check host address is expected to be a direct IP address.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.disable_active_health_check:
+
+
+disable_active_health_check
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional flag to control if perform active health check for this endpoint.
+  Active health check is enabled by default if there is a health checker.
+
+
+
+.. _envoy_v3_api_msg_config.endpoint.v3.Endpoint.AdditionalAddress:
+
+config.endpoint.v3.Endpoint.AdditionalAddress
+---------------------------------------------
+
+
+:repo:`[config.endpoint.v3.Endpoint.AdditionalAddress proto] <api/envoy/config/endpoint/v3/endpoint_components.proto#L63>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "address": {...}
+  }
+
+.. _envoy_v3_api_field_config.endpoint.v3.Endpoint.AdditionalAddress.address:
+
+
+address
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) Additional address that is associated with the endpoint.
+
+
+
+
+.. _envoy_v3_api_msg_config.endpoint.v3.LbEndpoint:
+
+config.endpoint.v3.LbEndpoint
+-----------------------------
+
+
+:repo:`[config.endpoint.v3.LbEndpoint proto] <api/envoy/config/endpoint/v3/endpoint_components.proto#L118>`
+
+An Endpoint that Envoy can route traffic to.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "endpoint": {...},
+    "health_status": ...,
+    "metadata": {...},
+    "load_balancing_weight": {...}
+  }
+
+.. _envoy_v3_api_field_config.endpoint.v3.LbEndpoint.endpoint:
+
+
+endpoint
+  (:ref:`config.endpoint.v3.Endpoint <envoy_v3_api_msg_config.endpoint.v3.Endpoint>`) 
+  Upstream host identifier or a named reference.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.LbEndpoint.health_status:
+
+
+health_status
+  (:ref:`config.core.v3.HealthStatus <envoy_v3_api_enum_config.core.v3.HealthStatus>`) Optional health status when known and supplied by EDS server.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata:
+
+
+metadata
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) The endpoint metadata specifies values that may be used by the load
+  balancer to select endpoints in a cluster for a given request. The filter
+  name should be specified as ``envoy.lb``. An example boolean key-value pair
+  is ``canary``, providing the optional canary status of the upstream host.
+  This may be matched against in a route's
+  :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` metadata_match field
+  to subset the endpoints considered in cluster load balancing.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.LbEndpoint.load_balancing_weight:
+
+
+load_balancing_weight
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The optional load balancing weight of the upstream host; at least 1.
+  Envoy uses the load balancing weight in some of the built in load
+  balancers. The load balancing weight for an endpoint is divided by the sum
+  of the weights of all endpoints in the endpoint's locality to produce a
+  percentage of traffic for the endpoint. This percentage is then further
+  weighted by the endpoint's locality's load balancing weight from
+  LocalityLbEndpoints. If unspecified, will be treated as 1. The sum
+  of the weights of all endpoints in the endpoint's locality must not
+  exceed uint32_t maximal value (4294967295).
+
+
+
+
+
+.. _envoy_v3_api_msg_config.endpoint.v3.LedsClusterLocalityConfig:
+
+config.endpoint.v3.LedsClusterLocalityConfig
+--------------------------------------------
+
+
+:repo:`[config.endpoint.v3.LedsClusterLocalityConfig proto] <api/envoy/config/endpoint/v3/endpoint_components.proto#L160>`
+
+A configuration for an LEDS collection.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "leds_config": {...},
+    "leds_collection_name": ...
+  }
+
+.. _envoy_v3_api_field_config.endpoint.v3.LedsClusterLocalityConfig.leds_config:
+
+
+leds_config
+  (:ref:`config.core.v3.ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`) Configuration for the source of LEDS updates for a Locality.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.LedsClusterLocalityConfig.leds_collection_name:
+
+
+leds_collection_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of the LbEndpoint collection resource.
+
+  If the name ends in ``/*``, it indicates an LbEndpoint glob collection,
+  which is supported only in the xDS incremental protocol variants.
+  Otherwise, it indicates an LbEndpointCollection list collection.
+
+  Envoy currently supports only glob collections.
+
+
+
+.. _envoy_v3_api_msg_config.endpoint.v3.LocalityLbEndpoints:
+
+config.endpoint.v3.LocalityLbEndpoints
+--------------------------------------
+
+
+:repo:`[config.endpoint.v3.LocalityLbEndpoints proto] <api/envoy/config/endpoint/v3/endpoint_components.proto#L178>`
+
+A group of endpoints belonging to a Locality.
+One can have multiple LocalityLbEndpoints for a locality, but only if
+they have different priorities.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "locality": {...},
+    "metadata": {...},
+    "lb_endpoints": [],
+    "leds_cluster_locality_config": {...},
+    "load_balancing_weight": {...},
+    "priority": ...
+  }
+
+.. _envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.locality:
+
+
+locality
+  (:ref:`config.core.v3.Locality <envoy_v3_api_msg_config.core.v3.Locality>`) Identifies location of where the upstream hosts run.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata:
+
+
+metadata
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Metadata to provide additional information about the locality endpoints in aggregate.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.lb_endpoints:
+
+
+lb_endpoints
+  (**repeated** :ref:`config.endpoint.v3.LbEndpoint <envoy_v3_api_msg_config.endpoint.v3.LbEndpoint>`) The group of endpoints belonging to the locality specified.
+  This is ignored if :ref:`leds_cluster_locality_config
+  <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.leds_cluster_locality_config>` is set.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.leds_cluster_locality_config:
+
+
+leds_cluster_locality_config
+  (:ref:`config.endpoint.v3.LedsClusterLocalityConfig <envoy_v3_api_msg_config.endpoint.v3.LedsClusterLocalityConfig>`) LEDS Configuration for the current locality.
+  If this is set, the :ref:`lb_endpoints
+  <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.lb_endpoints>`
+  field is ignored.
+
+
+  
+
+.. _envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.load_balancing_weight:
+
+
+load_balancing_weight
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Optional: Per priority/region/zone/sub_zone weight; at least 1. The load
+  balancing weight for a locality is divided by the sum of the weights of all
+  localities  at the same priority level to produce the effective percentage
+  of traffic for the locality. The sum of the weights of all localities at
+  the same priority level must not exceed uint32_t maximal value (4294967295).
+
+  Locality weights are only considered when :ref:`locality weighted load
+  balancing <arch_overview_load_balancing_locality_weighted_lb>` is
+  configured. These weights are ignored otherwise. If no weights are
+  specified when locality weighted load balancing is enabled, the locality is
+  assigned no load.
+
+
+.. _envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.priority:
+
+
+priority
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional: the priority for this LocalityLbEndpoints. If unspecified this will
+  default to the highest priority (0).
+
+  Under usual circumstances, Envoy will only select endpoints for the highest
+  priority (0). In the event that enough endpoints for a particular priority are
+  unavailable/unhealthy, Envoy will fail over to selecting endpoints for the
+  next highest priority group. Read more at :ref:`priority levels <arch_overview_load_balancing_priority_levels>`.
+
+  Priorities should range from 0 (highest) to N (lowest) without skipping.
+
+
+
+

@@ -1,0 +1,530 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Envoy admin interface &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Securing Envoy" href="securing.html" />
+    <link rel="prev" title="Configuration: Dynamic from control plane" href="configuration-dynamic-control-plane.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../start.html">Getting Started</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../install.html">Installing Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Quick start</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="run-envoy.html">Run Envoy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration-static.html">Configuration: Static</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration-dynamic-filesystem.html">Configuration: Dynamic from filesystem</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration-dynamic-control-plane.html">Configuration: Dynamic from control plane</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Envoy admin interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="securing.html">Securing Envoy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="next-steps.html">Next steps</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../sandboxes/index.html">Sandboxes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../docker.html">Using the Envoy Docker Image</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../building.html">Building</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../start.html">Getting Started</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Quick start</a></li>
+      <li class="breadcrumb-item active">Envoy admin interface</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/start/quick-start/admin.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="envoy-admin-interface">
+<span id="start-quick-start-admin"></span><h1>Envoy admin interface<a class="headerlink" href="#envoy-admin-interface" title="Link to this heading"></a></h1>
+<p>The optional admin interface provided by Envoy allows you to view configuration and statistics, change the
+behaviour of the server, and tap traffic according to specific filter rules.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This guide provides configuration information, and some basic examples of using a couple of the admin
+endpoints.</p>
+<p>See the <a class="reference internal" href="../../operations/admin.html#operations-admin-interface"><span class="std std-ref">admin docs</span></a> for information on all of the available endpoints.</p>
+</div>
+<div class="admonition-requirements admonition">
+<p class="admonition-title">Requirements</p>
+<p>Some of the examples below make use of the <a class="reference external" href="https://stedolan.github.io/jq/">jq</a> tool to parse the output
+from the admin server.</p>
+</div>
+<section id="admin">
+<span id="start-quick-start-admin-config"></span><h2><code class="docutils literal notranslate"><span class="pre">admin</span></code><a class="headerlink" href="#admin" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-msg-config-bootstrap-v3-admin"><span class="std std-ref">admin message</span></a> is required to enable and configure
+the administration server.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">address</span></code> key specifies the listening <a class="reference internal" href="../../api-v3/config/core/v3/address.proto.html#envoy-v3-api-file-envoy-config-core-v3-address-proto"><span class="std std-ref">address</span></a>
+which in this example configuration is <code class="docutils literal notranslate"><span class="pre">127.0.0.1:9901</span></code>.</p>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/14a202fddcf5488c3ec006dccbf75aef/admin-interface.yaml"><code class="xref download docutils literal notranslate"><span class="pre">admin-interface.yaml</span></code></a></span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">admin</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="hll"><span class="w">      </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+</span><span class="hll"><span class="w">      </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9901</span>
+</span></pre></div>
+</div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The Envoy admin endpoint can expose private information about the running service, allows modification
+of runtime settings and can also be used to shut the server down.</p>
+<p>As the endpoint is not authenticated it is essential that you limit access to it.</p>
+<p>You may wish to restrict the network address the admin server listens to in your own deployment as part
+of your strategy to limit access to this endpoint.</p>
+</div>
+<p>You can also restrict which admin endpoints are exposed using
+<a class="reference internal" href="../../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-admin-allow-paths"><span class="std std-ref">allow_paths</span></a>.
+This is useful when the admin listener is used for limited purposes, such as a readiness probe.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">prefix</span></code> matchers for endpoints that are commonly queried with parameters (for example
+<code class="docutils literal notranslate"><span class="pre">/stats?filter=...</span></code>).</p>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/14a202fddcf5488c3ec006dccbf75aef/admin-interface.yaml"><code class="xref download docutils literal notranslate"><span class="pre">admin-interface.yaml</span></code></a></span><a class="headerlink" href="#id2" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">admin</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w">      </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<span class="w">      </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9901</span>
+<span class="hll"><span class="w">  </span><span class="nt">allow_paths</span><span class="p">:</span>
+</span><span class="hll"><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ready</span>
+</span><span class="hll"><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/stats</span>
+</span><span class="w">  </span><span class="nt">profile_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/tmp/envoy.prof</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="stat-prefix">
+<h2><code class="docutils literal notranslate"><span class="pre">stat_prefix</span></code><a class="headerlink" href="#stat-prefix" title="Link to this heading"></a></h2>
+<p>The Envoy
+<a class="reference internal" href="../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-msg-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager"><span class="std std-ref">HttpConnectionManager</span></a>
+must be configured with
+<a class="reference internal" href="../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-stat-prefix"><span class="std std-ref">stat_prefix</span></a>.</p>
+<p>This provides a key that can be filtered when querying the stats interface
+<a class="reference internal" href="#start-quick-start-admin-stats"><span class="std std-ref">as shown below</span></a></p>
+<p>In the <a class="reference download internal" download="" href="../../_downloads/92dcb9714fb6bc288d042029b34c0de4/envoy-demo.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy-demo.yaml</span></code></a> the listener is configured with the
+<a class="reference internal" href="../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-stat-prefix"><span class="std std-ref">stat_prefix</span></a>
+of <code class="docutils literal notranslate"><span class="pre">ingress_http</span></code>.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="nt">static_resources</span><span class="p">:</span>
+<span class="linenos"> 2</span>
+<span class="linenos"> 3</span><span class="w">  </span><span class="nt">listeners</span><span class="p">:</span>
+<span class="linenos"> 4</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">listener_0</span>
+<span class="linenos"> 5</span><span class="w">    </span><span class="nt">address</span><span class="p">:</span>
+<span class="linenos"> 6</span><span class="w">      </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="linenos"> 7</span><span class="w">        </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0.0.0</span>
+<span class="linenos"> 8</span><span class="w">        </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10000</span>
+<span class="linenos"> 9</span><span class="w">    </span><span class="nt">filter_chains</span><span class="p">:</span>
+<span class="linenos">10</span><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filters</span><span class="p">:</span>
+<span class="linenos">11</span><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.network.http_connection_manager</span>
+<span class="linenos">12</span><span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="hll"><span class="linenos">13</span><span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+</span><span class="hll"><span class="linenos">14</span><span class="w">          </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress_http</span>
+</span><span class="linenos">15</span><span class="w">          </span><span class="nt">access_log</span><span class="p">:</span>
+<span class="linenos">16</span><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.access_loggers.stdout</span>
+<span class="linenos">17</span><span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">18</span><span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog</span>
+<span class="linenos">19</span><span class="w">          </span><span class="nt">http_filters</span><span class="p">:</span>
+<span class="linenos">20</span><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.router</span>
+<span class="linenos">21</span><span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">22</span><span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span>
+<span class="linenos">23</span><span class="w">          </span><span class="nt">route_config</span><span class="p">:</span>
+<span class="linenos">24</span><span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_route</span>
+<span class="linenos">25</span><span class="w">            </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="linenos">26</span><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_service</span>
+<span class="linenos">27</span><span class="w">              </span><span class="nt">domains</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;*&quot;</span><span class="p p-Indicator">]</span>
+<span class="linenos">28</span><span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="linenos">29</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+</pre></div>
+</div>
+</section>
+<section id="admin-endpoints-config-dump">
+<span id="start-quick-start-admin-config-dump"></span><h2>Admin endpoints: <code class="docutils literal notranslate"><span class="pre">config_dump</span></code><a class="headerlink" href="#admin-endpoints-config-dump" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../../operations/admin.html#operations-admin-interface-config-dump"><span class="std std-ref">config_dump</span></a> endpoint returns Envoy’s runtime
+configuration in <code class="docutils literal notranslate"><span class="pre">json</span></code> format.</p>
+<p>The following command allows you to see the types of configuration available:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:9901/config_dump<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">&#39;.configs[] | .[&quot;@type&quot;]&#39;</span>
+<span class="go">type.googleapis.com/envoy.admin.v3.BootstrapConfigDump</span>
+<span class="go">type.googleapis.com/envoy.admin.v3.ClustersConfigDump</span>
+<span class="go">type.googleapis.com/envoy.admin.v3.ListenersConfigDump</span>
+<span class="go">type.googleapis.com/envoy.admin.v3.ScopedRoutesConfigDump</span>
+<span class="go">type.googleapis.com/envoy.admin.v3.RoutesConfigDump</span>
+<span class="go">type.googleapis.com/envoy.admin.v3.SecretsConfigDump</span>
+</pre></div>
+</div>
+<p>To view the <a class="reference internal" href="../../api-v3/config/core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-socketaddress"><span class="std std-ref">socket_address</span></a> of the first
+<a class="reference internal" href="../../api-v3/admin/v3/config_dump_shared.proto.html#envoy-v3-api-field-admin-v3-listenersconfigdump-dynamic-listeners"><span class="std std-ref">dynamic_listener</span></a> currently configured,
+you could:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:9901/config_dump?resource<span class="o">=</span>dynamic_listeners<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.configs[0].active_state.listener.address&#39;</span>
+<span class="go">{</span>
+<span class="go">  &quot;socket_address&quot;: {</span>
+<span class="go">    &quot;address&quot;: &quot;0.0.0.0&quot;,</span>
+<span class="go">    &quot;port_value&quot;: 10000</span>
+<span class="go">  }</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See the reference section for <a class="reference internal" href="../../operations/admin.html#operations-admin-interface-config-dump"><span class="std std-ref">config_dump</span></a> for further information
+on available parameters and responses.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Enabling the <a class="reference internal" href="../../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-admin"><span class="std std-ref">admin</span></a> interface with
+dynamic configuration can be particularly useful as it allows you to use the
+<a class="reference internal" href="#start-quick-start-admin-config-dump"><span class="std std-ref">config_dump</span></a> endpoint to see how Envoy is configured at
+a particular point in time.</p>
+</div>
+</section>
+<section id="admin-endpoints-stats">
+<span id="start-quick-start-admin-stats"></span><h2>Admin endpoints: <code class="docutils literal notranslate"><span class="pre">stats</span></code><a class="headerlink" href="#admin-endpoints-stats" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../../operations/stats_overview.html#operations-stats"><span class="std std-ref">admin stats</span></a> endpoint allows you to retrieve runtime information about Envoy.</p>
+<p>The stats are provided as <code class="docutils literal notranslate"><span class="pre">key:</span> <span class="pre">value</span></code> pairs, where the keys use a hierarchical dotted notation,
+and the values are one of <code class="docutils literal notranslate"><span class="pre">counter</span></code>, <code class="docutils literal notranslate"><span class="pre">histogram</span></code> or <code class="docutils literal notranslate"><span class="pre">gauge</span></code> types.</p>
+<p>To see the top-level categories of stats available, you can:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:9901/stats<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d.<span class="w"> </span>-f1<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span><span class="p">|</span><span class="w"> </span>uniq
+<span class="go">cluster</span>
+<span class="go">cluster_manager</span>
+<span class="go">filesystem</span>
+<span class="go">http</span>
+<span class="go">http1</span>
+<span class="go">listener</span>
+<span class="go">listener_manager</span>
+<span class="go">main_thread</span>
+<span class="go">runtime</span>
+<span class="go">server</span>
+<span class="go">vhost</span>
+<span class="go">workers</span>
+</pre></div>
+</div>
+<p>The stats endpoint accepts a <a class="reference internal" href="../../operations/admin.html#operations-admin-interface-stats"><span class="std std-ref">filter</span></a> argument, which
+is evaluated as a regular expression:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:9901/stats?filter<span class="o">=</span><span class="s1">&#39;^http\.ingress_http&#39;</span>
+<span class="go">http.ingress_http.downstream_cx_active: 0</span>
+<span class="go">http.ingress_http.downstream_cx_delayed_close_timeout: 0</span>
+<span class="go">http.ingress_http.downstream_cx_destroy: 3</span>
+<span class="go">http.ingress_http.downstream_cx_destroy_active_rq: 0</span>
+<span class="go">http.ingress_http.downstream_cx_destroy_local: 0</span>
+<span class="go">http.ingress_http.downstream_cx_destroy_local_active_rq: 0</span>
+<span class="go">http.ingress_http.downstream_cx_destroy_remote: 3</span>
+<span class="go">http.ingress_http.downstream_cx_destroy_remote_active_rq: 0</span>
+<span class="go">http.ingress_http.downstream_cx_drain_close: 0</span>
+<span class="go">http.ingress_http.downstream_cx_http1_active: 0</span>
+<span class="go">http.ingress_http.downstream_cx_http1_total: 3</span>
+<span class="go">http.ingress_http.downstream_cx_http2_active: 0</span>
+<span class="go">http.ingress_http.downstream_cx_http2_total: 0</span>
+<span class="go">http.ingress_http.downstream_cx_http3_active: 0</span>
+<span class="go">http.ingress_http.downstream_cx_http3_total: 0</span>
+<span class="go">http.ingress_http.downstream_cx_idle_timeout: 0</span>
+<span class="go">http.ingress_http.downstream_cx_max_duration_reached: 0</span>
+<span class="go">http.ingress_http.downstream_cx_overload_disable_keepalive: 0</span>
+<span class="go">http.ingress_http.downstream_cx_protocol_error: 0</span>
+<span class="go">http.ingress_http.downstream_cx_rx_bytes_buffered: 0</span>
+<span class="go">http.ingress_http.downstream_cx_rx_bytes_total: 250</span>
+<span class="go">http.ingress_http.downstream_cx_ssl_active: 0</span>
+<span class="go">http.ingress_http.downstream_cx_ssl_total: 0</span>
+<span class="go">http.ingress_http.downstream_cx_total: 3</span>
+<span class="go">http.ingress_http.downstream_cx_tx_bytes_buffered: 0</span>
+<span class="go">http.ingress_http.downstream_cx_tx_bytes_total: 1117</span>
+<span class="go">http.ingress_http.downstream_cx_upgrades_active: 0</span>
+<span class="go">http.ingress_http.downstream_cx_upgrades_total: 0</span>
+<span class="go">http.ingress_http.downstream_flow_control_paused_reading_total: 0</span>
+<span class="go">http.ingress_http.downstream_flow_control_resumed_reading_total: 0</span>
+<span class="go">http.ingress_http.downstream_rq_1xx: 0</span>
+<span class="go">http.ingress_http.downstream_rq_2xx: 3</span>
+<span class="go">http.ingress_http.downstream_rq_3xx: 0</span>
+<span class="go">http.ingress_http.downstream_rq_4xx: 0</span>
+<span class="go">http.ingress_http.downstream_rq_5xx: 0</span>
+<span class="go">http.ingress_http.downstream_rq_active: 0</span>
+<span class="go">http.ingress_http.downstream_rq_completed: 3</span>
+<span class="go">http.ingress_http.downstream_rq_http1_total: 3</span>
+<span class="go">http.ingress_http.downstream_rq_http2_total: 0</span>
+<span class="go">http.ingress_http.downstream_rq_http3_total: 0</span>
+<span class="go">http.ingress_http.downstream_rq_idle_timeout: 0</span>
+<span class="go">http.ingress_http.downstream_rq_max_duration_reached: 0</span>
+<span class="go">http.ingress_http.downstream_rq_non_relative_path: 0</span>
+<span class="go">http.ingress_http.downstream_rq_overload_close: 0</span>
+<span class="go">http.ingress_http.downstream_rq_response_before_rq_complete: 0</span>
+<span class="go">http.ingress_http.downstream_rq_rx_reset: 0</span>
+<span class="go">http.ingress_http.downstream_rq_timeout: 0</span>
+<span class="go">http.ingress_http.downstream_rq_too_large: 0</span>
+<span class="go">http.ingress_http.downstream_rq_total: 3</span>
+<span class="go">http.ingress_http.downstream_rq_tx_reset: 0</span>
+<span class="go">http.ingress_http.downstream_rq_ws_on_non_ws_route: 0</span>
+<span class="go">http.ingress_http.no_cluster: 0</span>
+<span class="go">http.ingress_http.no_route: 0</span>
+<span class="go">http.ingress_http.passthrough_internal_redirect_bad_location: 0</span>
+<span class="go">http.ingress_http.passthrough_internal_redirect_no_route: 0</span>
+<span class="go">http.ingress_http.passthrough_internal_redirect_predicate: 0</span>
+<span class="go">http.ingress_http.passthrough_internal_redirect_too_many_redirects: 0</span>
+<span class="go">http.ingress_http.passthrough_internal_redirect_unsafe_scheme: 0</span>
+<span class="go">http.ingress_http.rq_direct_response: 0</span>
+<span class="go">http.ingress_http.rq_redirect: 0</span>
+<span class="go">http.ingress_http.rq_reset_after_downstream_response_started: 0</span>
+<span class="go">http.ingress_http.rq_total: 3</span>
+<span class="go">http.ingress_http.rs_too_large: 0</span>
+<span class="go">http.ingress_http.tracing.client_enabled: 0</span>
+<span class="go">http.ingress_http.tracing.health_check: 0</span>
+<span class="go">http.ingress_http.tracing.not_traceable: 0</span>
+<span class="go">http.ingress_http.tracing.random_sampling: 0</span>
+<span class="go">http.ingress_http.tracing.service_forced: 0</span>
+<span class="go">http.ingress_http.downstream_cx_length_ms: P0(nan,2.0) P25(nan,2.075) P50(nan,3.05) P75(nan,17.25) P90(nan,17.7) P95(nan,17.85) P99(nan,17.97) P99.5(nan,17.985) P99.9(nan,17.997) P100(nan,18.0)</span>
+<span class="go">http.ingress_http.downstream_rq_time: P0(nan,1.0) P25(nan,1.075) P50(nan,2.05) P75(nan,16.25) P90(nan,16.7) P95(nan,16.85) P99(nan,16.97) P99.5(nan,16.985) P99.9(nan,16.997) P100(nan,17.0)</span>
+</pre></div>
+</div>
+<p>You can also pass a <a class="reference internal" href="../../operations/admin.html#operations-admin-interface-stats"><span class="std std-ref">format</span></a> argument, for example to return <code class="docutils literal notranslate"><span class="pre">json</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">&quot;http://localhost:9901/stats?filter=http.ingress_http.rq&amp;format=json&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.stats&#39;</span>
+</pre></div>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;http.ingress_http.rq_direct_response&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;http.ingress_http.rq_redirect&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;http.ingress_http.rq_reset_after_downstream_response_started&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;http.ingress_http.rq_total&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</section>
+<section id="envoy-admin-web-ui">
+<h2>Envoy admin web UI<a class="headerlink" href="#envoy-admin-web-ui" title="Link to this heading"></a></h2>
+<p>Envoy also has a web user interface that allows you to view and modify settings and
+statistics.</p>
+<p>Point your browser to <a class="reference external" href="http://localhost:9901">http://localhost:9901</a>.</p>
+<img alt="../../_images/envoy-admin.png" src="../../_images/envoy-admin.png" />
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="configuration-dynamic-control-plane.html" class="btn btn-neutral float-left" title="Configuration: Dynamic from control plane" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="securing.html" class="btn btn-neutral float-right" title="Securing Envoy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Envoy admin interface</a><ul>
+<li><a class="reference internal" href="#admin"><code class="docutils literal notranslate"><span class="pre">admin</span></code></a></li>
+<li><a class="reference internal" href="#stat-prefix"><code class="docutils literal notranslate"><span class="pre">stat_prefix</span></code></a></li>
+<li><a class="reference internal" href="#admin-endpoints-config-dump">Admin endpoints: <code class="docutils literal notranslate"><span class="pre">config_dump</span></code></a></li>
+<li><a class="reference internal" href="#admin-endpoints-stats">Admin endpoints: <code class="docutils literal notranslate"><span class="pre">stats</span></code></a></li>
+<li><a class="reference internal" href="#envoy-admin-web-ui">Envoy admin web UI</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

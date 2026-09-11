@@ -1,0 +1,20 @@
+.. _version_history_1.18.2:
+
+1.18.2 (April 15, 2021)
+========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **code**: fixed more build issues on our path to a glorious release.
+

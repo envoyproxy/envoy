@@ -1,0 +1,20 @@
+.. _version_history_1.30.5:
+
+1.30.5 (September 14, 2024)
+============================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **dependencies**: Update curl to mitigate CVE-2024-7264.
+

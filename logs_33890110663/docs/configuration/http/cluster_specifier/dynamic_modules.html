@@ -1,0 +1,365 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dynamic modules cluster specifier &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Golang cluster specifier" href="golang.html" />
+    <link rel="prev" title="HTTP cluster specifier" href="cluster_specifier.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../http.html">HTTP</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../http_conn_man/http_conn_man.html">HTTP connection manager</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../http_filters/http_filters.html">HTTP filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../caches/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../caches_v2/caches.html">HTTP caches</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="cluster_specifier.html">HTTP cluster specifier</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Dynamic modules cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="golang.html">Golang cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lua.html">Lua cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="matcher.html">Matcher cluster specifier</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../tcp_bridge/tcp_bridge.html">HTTP TCP bridge</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../http.html">HTTP</a></li>
+          <li class="breadcrumb-item"><a href="cluster_specifier.html">HTTP cluster specifier</a></li>
+      <li class="breadcrumb-item active">Dynamic modules cluster specifier</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/http/cluster_specifier/dynamic_modules.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dynamic-modules-cluster-specifier">
+<span id="config-http-cluster-specifier-dynamic-modules"></span><h1>Dynamic modules cluster specifier<a class="headerlink" href="#dynamic-modules-cluster-specifier" title="Link to this heading"></a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../../../api-v3/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-router-cluster-specifiers-dynamic-modules-v3-dynamicmoduleclusterspecifier"><span class="std std-ref">DynamicModuleClusterSpecifier</span></a>
+configuration specifies a cluster specifier backed by a <a class="reference internal" href="../../../intro/arch_overview/advanced/dynamic_modules.html#arch-overview-dynamic-modules"><span class="std std-ref">dynamic module</span></a>.
+The module selects the upstream cluster for a request and may replace the timeout, idle timeout,
+priority, request body buffer limit, cluster not found response code, hash policy, retry policy,
+metadata match criteria and request mirroring policies of the matched route.</p>
+<p>The module is invoked while the route is being resolved, so its selection is visible to the router
+without clearing the route cache. It is invoked again whenever a filter calls
+<a class="reference internal" href="../../../intro/arch_overview/http/http_filters.html#arch-overview-http-filters-route-mutation"><span class="std std-ref">refreshRouteCluster()</span></a> or a retry re-selects the
+cluster, so the module must be able to reach a decision from the request headers and the stream info
+alone. When the module reports no decision, the properties of the matched route stay in effect.</p>
+<p>The properties that are built from other extensions are declared as named
+<a class="reference internal" href="../../../api-v3/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-field-extensions-router-cluster-specifiers-dynamic-modules-v3-dynamicmoduleclusterspecifier-route-action-overrides"><span class="std std-ref">route action overrides</span></a>.
+Each override is built and validated once when the cluster specifier is configured, so an invalid
+override is rejected at configuration load rather than on the request path, and the module selects
+one by name. An override that replaces no property is rejected too, so a module can rely on a
+declared name changing something. Selecting a name that is not declared leaves the route action
+properties of the matched route in effect and logs a warning. When
+<a class="reference internal" href="../../../api-v3/config/route/v3/route.proto.html#envoy-v3-api-field-config-route-v3-routeconfiguration-validate-clusters"><span class="std std-ref">validate_clusters</span></a>
+is enabled, the statically named mirror clusters of every override are checked against the cluster
+manager.</p>
+<p>Not every property can be changed once the request is under way, because Envoy reads each of them at
+a different point:</p>
+<ul class="simple">
+<li><p>The cluster name and the priority are read on every upstream attempt, so a later selection
+replaces them.</p></li>
+<li><p>The metadata match criteria are read on every upstream attempt as well, but Envoy merges any
+<code class="docutils literal notranslate"><span class="pre">envoy.lb</span></code> dynamic metadata over them and caches the result, so a later selection cannot replace
+them once that has happened.</p></li>
+<li><p>The idle timeout and the request body buffer limit are read while the route is resolved, and the
+timeout, the retry policy and the request mirroring policies are read before the first upstream
+attempt, so only the first selection applies to them.</p></li>
+<li><p>The hash policy is read during host selection on every upstream attempt, so a later selection
+replaces it. A cluster-level hash policy and a load-balancer-level hash policy, when configured,
+take precedence over the route-level policy the module selects.</p></li>
+<li><p>The cluster not found response code is read only when the selected cluster does not exist, which
+ends the request, so the selection that named the missing cluster is the one that applies.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_cluster_host_count</span></code> reports whether a cluster is routable from the current worker and
+returns host counts at a priority level. It uses <code class="docutils literal notranslate"><span class="pre">getThreadLocalCluster()</span></code>, so it can return
+false even when the cluster is configured but not yet warmed on the worker.</p></li>
+<li><p>Custom counters, gauges and histograms can be defined during configuration and recorded during
+selection, and are emitted under the <code class="docutils literal notranslate"><span class="pre">metrics_namespace</span></code> prefix of <code class="docutils literal notranslate"><span class="pre">DynamicModuleConfig</span></code>.</p></li>
+</ul>
+</section>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>This extension should be configured with the type URL
+<code class="docutils literal notranslate"><span class="pre">type.googleapis.com/envoy.extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier</span></code>.</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.proto.html#envoy-v3-api-msg-extensions-router-cluster-specifiers-dynamic-modules-v3-dynamicmoduleclusterspecifier"><span class="std std-ref">v3 API reference</span></a></p></li>
+</ul>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Dynamic modules run in-process with the same privileges as Envoy. Only load modules you trust.
+This extension is currently under active development. Capabilities and ABI are expected to
+evolve.</p>
+</div>
+</section>
+<section id="configuration-example">
+<h2>Configuration example<a class="headerlink" href="#configuration-example" title="Link to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">route_config</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="w">    </span><span class="nt">domains</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;*&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">routes</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/&quot;</span>
+<span class="w">      </span><span class="nt">route</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">inline_cluster_specifier_plugin</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">extension</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.router.cluster_specifier_plugin.dynamic_modules</span>
+<span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier</span>
+<span class="w">              </span><span class="nt">dynamic_module_config</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_cluster_specifier</span>
+<span class="w">                </span><span class="nt">do_not_close</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">              </span><span class="nt">specifier_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_specifier_impl</span>
+<span class="w">              </span><span class="nt">specifier_config</span><span class="p">:</span>
+<span class="w">                </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/google.protobuf.Struct</span>
+<span class="w">                </span><span class="nt">value</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">cluster_name_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shard-</span>
+<span class="w">              </span><span class="nt">route_action_overrides</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">canary</span><span class="p">:</span>
+<span class="w">                  </span><span class="nt">retry_policy</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">retry_on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5xx</span>
+<span class="w">                    </span><span class="nt">num_retries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">                  </span><span class="nt">metadata_match</span><span class="p">:</span>
+<span class="w">                    </span><span class="nt">filter_metadata</span><span class="p">:</span>
+<span class="w">                      </span><span class="nt">envoy.lb</span><span class="p">:</span>
+<span class="w">                        </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">canary</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="cluster_specifier.html" class="btn btn-neutral float-left" title="HTTP cluster specifier" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="golang.html" class="btn btn-neutral float-right" title="Golang cluster specifier" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Dynamic modules cluster specifier</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#configuration">Configuration</a></li>
+<li><a class="reference internal" href="#configuration-example">Configuration example</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

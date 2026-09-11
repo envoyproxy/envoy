@@ -1,0 +1,20 @@
+.. _version_history_1.30.7:
+
+1.30.7 (October 29, 2024)
+==========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **tracing**: Fixed a bug where the OpenTelemetry tracer exports the OTLP request even when no spans are present.
+

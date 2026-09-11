@@ -1,0 +1,184 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/ext_authz/v3/ext_authz.proto:
+
+Network External Authorization  (proto)
+=======================================
+
+.. _extension_envoy.filters.network.ext_authz:
+
+This extension has the qualified name ``envoy.filters.network.ext_authz``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`
+
+
+
+The network layer external authorization service configuration
+:ref:`configuration overview <config_network_filters_ext_authz>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz:
+
+extensions.filters.network.ext_authz.v3.ExtAuthz
+------------------------------------------------
+
+
+:repo:`[extensions.filters.network.ext_authz.v3.ExtAuthz proto] <api/envoy/extensions/filters/network/ext_authz/v3/ext_authz.proto#L28>`
+
+External Authorization filter calls out to an external service over the
+gRPC Authorization API defined by
+:ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
+A failed check will cause this filter to close the TCP connection.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "grpc_service": {...},
+    "failure_mode_allow": ...,
+    "include_peer_certificate": ...,
+    "transport_api_version": ...,
+    "filter_enabled_metadata": {...},
+    "bootstrap_metadata_labels_key": ...,
+    "include_tls_session": ...,
+    "send_tls_alert_on_denial": ...,
+    "metadata_context_namespaces": [],
+    "typed_metadata_context_namespaces": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The prefix to use when emitting statistics.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.grpc_service:
+
+
+grpc_service
+  (:ref:`config.core.v3.GrpcService <envoy_v3_api_msg_config.core.v3.GrpcService>`) The external authorization gRPC service configuration.
+  The default timeout is set to 200ms by this filter.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.failure_mode_allow:
+
+
+failure_mode_allow
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The filter's behaviour in case the external authorization service does
+  not respond back. When it is set to true, Envoy will also allow traffic in case of
+  communication failure between authorization service and the proxy.
+  Defaults to false.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.include_peer_certificate:
+
+
+include_peer_certificate
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies if the peer certificate is sent to the external service.
+
+  When this field is true, Envoy will include the peer X.509 certificate, if available, in the
+  :ref:`certificate<envoy_v3_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.transport_api_version:
+
+
+transport_api_version
+  (:ref:`config.core.v3.ApiVersion <envoy_v3_api_enum_config.core.v3.ApiVersion>`) API version for ext_authz transport protocol. This describes the ext_authz gRPC endpoint and
+  version of Check{Request,Response} used on the wire.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.filter_enabled_metadata:
+
+
+filter_enabled_metadata
+  (:ref:`type.matcher.v3.MetadataMatcher <envoy_v3_api_msg_type.matcher.v3.MetadataMatcher>`) Specifies if the filter is enabled with metadata matcher.
+  If this field is not specified, the filter will be enabled for all requests.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.bootstrap_metadata_labels_key:
+
+
+bootstrap_metadata_labels_key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional labels that will be passed to :ref:`labels<envoy_v3_api_field_service.auth.v3.AttributeContext.Peer.labels>` in
+  :ref:`destination<envoy_v3_api_field_service.auth.v3.AttributeContext.destination>`.
+  The labels will be read from :ref:`metadata<envoy_v3_api_msg_config.core.v3.Node>` with the specified key.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.include_tls_session:
+
+
+include_tls_session
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies if the TLS session level details like SNI are sent to the external service.
+
+  When this field is true, Envoy will include the SNI name used for TLSClientHello, if available, in the
+  :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.send_tls_alert_on_denial:
+
+
+send_tls_alert_on_denial
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When set to ``true``, the filter will send a TLS ``access_denied(49)`` alert before closing
+  the connection when authorization is denied. This provides better visibility to TLS clients
+  about the reason for connection closure. This alert is only sent for TLS connections. The
+  non-TLS connections will be closed without sending an alert.
+
+  Defaults to ``false``.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.metadata_context_namespaces:
+
+
+metadata_context_namespaces
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies a list of metadata namespaces whose values, if present, will be passed to the
+  ext_authz service. The :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`
+  is passed as an opaque ``protobuf::Struct``.
+
+  For example, if the ``proxy_protocol`` listener filter is used and populates TLV metadata,
+  then the following will pass that metadata to the authorization server for making decisions
+  based on proxy protocol information.
+
+  .. code-block:: yaml
+
+     metadata_context_namespaces:
+     - envoy.filters.listener.proxy_protocol
+
+
+
+.. _envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.typed_metadata_context_namespaces:
+
+
+typed_metadata_context_namespaces
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies a list of metadata namespaces whose values, if present, will be passed to the
+  ext_authz service. :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>`
+  is passed as a ``protobuf::Any``.
+
+  This works similarly to ``metadata_context_namespaces`` but allows Envoy and the ext_authz server to share
+  the protobuf message definition in order to perform safe parsing.
+
+
+

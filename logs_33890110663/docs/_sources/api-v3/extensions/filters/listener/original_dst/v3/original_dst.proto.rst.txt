@@ -1,0 +1,49 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/listener/original_dst/v3/original_dst.proto:
+
+Original Dst Filter (proto)
+===========================
+
+.. _extension_envoy.filters.listener.original_dst:
+
+This extension has the qualified name ``envoy.filters.listener.original_dst``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.listener <extension_category_envoy.filters.listener>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst <envoy_v3_api_msg_extensions.filters.listener.original_dst.v3.OriginalDst>`
+
+
+
+Use the Original destination address on downstream connections.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.listener.original_dst.v3.OriginalDst:
+
+extensions.filters.listener.original_dst.v3.OriginalDst
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.listener.original_dst.v3.OriginalDst proto] <api/envoy/extensions/filters/listener/original_dst/v3/original_dst.proto#L17>`
+
+
+
+
+

@@ -1,0 +1,87 @@
+.. _envoy_v3_api_file_envoy/extensions/internal_redirect/filter_state/v3/filter_state_config.proto:
+
+Filter-state internal redirect predicate (proto)
+================================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.internal_redirect.filter_state.v3.FilterStateConfig:
+
+extensions.internal_redirect.filter_state.v3.FilterStateConfig
+--------------------------------------------------------------
+
+
+:repo:`[extensions.internal_redirect.filter_state.v3.FilterStateConfig proto] <api/envoy/extensions/internal_redirect/filter_state/v3/filter_state_config.proto#L31>`
+
+An internal redirect predicate that decides whether to follow a redirect by
+reading a boolean filter-state object set earlier in the request by another
+filter (Lua, ext_proc, ``set_filter_state``, a dynamic module, ...).
+
+The predicate reads the filter-state boolean object named ``redirect_enabled_key``:
+
+* If the value is ``true``: follows the redirect
+* If the value is ``false``: does not follow the redirect
+* If the object is absent: ``redirect_if_absent`` decides (default: false)
+
+This lets a request-phase filter decide, per request, whether an
+otherwise-enabled internal redirect is actually taken, without changing route
+matching. Rich, request-time logic (tenant, JWT claim, header, time-of-day,
+rollout %) belongs in the filter that *sets* the boolean value; this predicate
+is a thin reader.
+
+.. _extension_envoy.internal_redirect_predicates.filter_state:
+
+This extension has the qualified name ``envoy.internal_redirect_predicates.filter_state``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.internal_redirect_predicates <extension_category_envoy.internal_redirect_predicates>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.internal_redirect.filter_state.v3.FilterStateConfig <envoy_v3_api_msg_extensions.internal_redirect.filter_state.v3.FilterStateConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "redirect_enabled_key": ...,
+    "redirect_if_absent": ...
+  }
+
+.. _envoy_v3_api_field_extensions.internal_redirect.filter_state.v3.FilterStateConfig.redirect_enabled_key:
+
+
+redirect_enabled_key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Name of the filter-state boolean object to read. If true, the redirect is
+  followed; if false, the redirect is skipped. Must be non-empty.
+
+
+.. _envoy_v3_api_field_extensions.internal_redirect.filter_state.v3.FilterStateConfig.redirect_if_absent:
+
+
+redirect_if_absent
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether to follow the redirect when the filter-state object is absent.
+  Defaults to false (do not redirect if the gate wasn't explicitly set),
+  giving an opt-in posture.
+
+

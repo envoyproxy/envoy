@@ -1,0 +1,82 @@
+.. _envoy_v3_api_file_envoy/extensions/upstreams/tcp/v3/tcp_protocol_options.proto:
+
+TCP Protocol Options (proto)
+============================
+
+.. _extension_envoy.upstreams.tcp.tcp_protocol_options:
+
+This extension has the qualified name ``envoy.upstreams.tcp.tcp_protocol_options``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.upstream_options <extension_category_envoy.upstream_options>`
+
+
+
+
+
+
+
+TCProtocolOptions specifies TCP upstream protocol options. This object
+is used in
+:ref:`typed_extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
+keyed by the name ``envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions``.
+
+.. code::
+
+  clusters:
+    - name: some_service
+      connect_timeout: 5s
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions
+          idle_timeout: 10m
+       .... [further cluster config]
+
+
+
+
+.. _envoy_v3_api_msg_extensions.upstreams.tcp.v3.TcpProtocolOptions:
+
+extensions.upstreams.tcp.v3.TcpProtocolOptions
+----------------------------------------------
+
+
+:repo:`[extensions.upstreams.tcp.v3.TcpProtocolOptions proto] <api/envoy/extensions/upstreams/tcp/v3/tcp_protocol_options.proto#L33>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "idle_timeout": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout:
+
+
+idle_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The idle timeout for the connection. The idle timeout is defined as the period in which
+  the connection is not associated with a downstream connection. When the idle timeout is
+  reached, the connection will be closed.
+
+  If not set, the default idle timeout is 10 minutes. To disable idle timeouts, explicitly set this to 0.
+
+  .. warning::
+    Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP
+    FIN packets, etc.
+
+

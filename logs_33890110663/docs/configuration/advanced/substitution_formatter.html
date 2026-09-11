@@ -1,0 +1,2187 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Substitution Formatter &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Configuration best practices" href="../best_practices/best_practices.html" />
+    <link rel="prev" title="Metadata configurations" href="metadata_configurations.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../http/http.html">HTTP</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="advanced.html">Advanced</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="well_known_dynamic_metadata.html">Well Known Dynamic Metadata</a></li>
+<li class="toctree-l3"><a class="reference internal" href="well_known_filter_state.html">Well Known Filter State Objects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="metadata_configurations.html">Metadata configurations</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Substitution Formatter</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="advanced.html">Advanced</a></li>
+      <li class="breadcrumb-item active">Substitution Formatter</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/configuration/advanced/substitution_formatter.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="substitution-formatter">
+<h1>Substitution Formatter<a class="headerlink" href="#substitution-formatter" title="Link to this heading"></a></h1>
+<p>The substitution formatter allows you to define custom substitutions that can be used
+in various configuration fields throughout Envoy. This feature enables dynamic content generation
+based on runtime data, making configurations more flexible and adaptable to different environments.</p>
+<p>For example, you can define a substitution that retrieves the current timestamp or the value of an
+environment variable, and use it in logging formats, headers, or other configuration parameters.</p>
+<section id="supported-commands">
+<span id="config-advanced-substitution-operators"></span><h2>Supported commands<a class="headerlink" href="#supported-commands" title="Link to this heading"></a></h2>
+<p>Current supported substitution commands include:</p>
+<dl id="config-access-log-format-start-time">
+<dt><code class="docutils literal notranslate"><span class="pre">%START_TIME%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/THRIFT</dt><dd><p>Request start time including milliseconds.</p>
+</dd>
+<dt>TCP</dt><dd><p>Downstream connection start time including milliseconds.</p>
+</dd>
+<dt>UDP</dt><dd><p>UDP proxy session start time including milliseconds.</p>
+</dd>
+</dl>
+<p><code class="docutils literal notranslate"><span class="pre">START_TIME</span></code> can be customized using a <a class="reference external" href="https://en.cppreference.com/w/cpp/io/manip/put_time">format string</a>.
+In addition, <code class="docutils literal notranslate"><span class="pre">START_TIME</span></code> also accepts the following specifiers:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Specifier</p></th>
+<th class="head"><p>Explanation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">%s</span></code></p></td>
+<td><p>The number of seconds since the Epoch</p></td>
+</tr>
+<tr class="row-odd"><td rowspan="2"><p><code class="docutils literal notranslate"><span class="pre">%f</span></code>, <code class="docutils literal notranslate"><span class="pre">%[1-9]f</span></code></p></td>
+<td><p>Fractional seconds digits, default is 9 digits (nanosecond)</p></td>
+</tr>
+<tr class="row-even"><td><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">%3f</span></code> millisecond (3 digits)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%6f</span></code> microsecond (6 digits)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%9f</span></code> nanosecond (9 digits)</p></li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Examples of formatting <code class="docutils literal notranslate"><span class="pre">START_TIME</span></code> are as follows:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%START_TIME(%Y/%m/%dT%H:%M:%S%z)%
+
+%START_TIME(%s)%
+
+# To include millisecond fraction of the second (.000 ... .999). E.g. 1527590590.528.
+%START_TIME(%s.%3f)%
+
+%START_TIME(%s.%6f)%
+
+%START_TIME(%s.%9f)%
+</pre></div>
+</div>
+<p>In typed JSON logs, <code class="docutils literal notranslate"><span class="pre">START_TIME</span></code> is always rendered as a string.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-start-time-local">
+<dt><code class="docutils literal notranslate"><span class="pre">%START_TIME_LOCAL%</span></code></dt><dd><p>Same as <a class="reference internal" href="#config-access-log-format-start-time"><span class="std std-ref">START_TIME</span></a>, but use local time zone.</p>
+</dd>
+</dl>
+<dl id="config-access-log-format-emit-time">
+<dt><code class="docutils literal notranslate"><span class="pre">%EMIT_TIME%</span></code></dt><dd><p>The time when log entry is emitted including milliseconds.</p>
+<p><code class="docutils literal notranslate"><span class="pre">EMIT_TIME</span></code> can be customized using a <a class="reference external" href="https://en.cppreference.com/w/cpp/io/manip/put_time">format string</a>.
+See <a class="reference internal" href="#config-access-log-format-start-time"><span class="std std-ref">START_TIME</span></a> for additional format specifiers and examples.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-emit-time-local">
+<dt><code class="docutils literal notranslate"><span class="pre">%EMIT_TIME_LOCAL%</span></code></dt><dd><p>Same as <a class="reference internal" href="#config-access-log-format-emit-time"><span class="std std-ref">EMIT_TIME</span></a>, but use local time zone.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%REQUEST_HEADERS_BYTES%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Uncompressed bytes of request headers.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl id="config-access-log-format-bytes-received">
+<dt><code class="docutils literal notranslate"><span class="pre">%BYTES_RECEIVED%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/THRIFT</dt><dd><p>Body bytes received from the downstream, i.e. the size of the request body. This value is
+independent of <a class="reference internal" href="#config-access-log-format-bytes-sent"><span class="std std-ref">%BYTES_SENT%</span></a>, which reflects the
+response body sent to the downstream, so the two may differ significantly (e.g. a large file
+upload with a small response, or vice versa).</p>
+</dd>
+<dt>TCP</dt><dd><p>Downstream bytes received on connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Bytes received from the downstream in the UDP session.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%BYTES_RETRANSMITTED%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/3 (QUIC)</dt><dd><p>Body bytes retransmitted.</p>
+</dd>
+<dt>HTTP/1 and HTTP/2</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%PACKETS_RETRANSMITTED%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/3 (QUIC)</dt><dd><p>Number of packets retransmitted.</p>
+</dd>
+<dt>HTTP/1 and HTTP/2</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%PROTOCOL%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Protocol. Currently either <strong>HTTP/1.1</strong>, <strong>HTTP/2</strong> or <strong>HTTP/3</strong>.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>In typed JSON logs, <code class="docutils literal notranslate"><span class="pre">PROTOCOL</span></code> will render the string <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> if the protocol is not
+available (e.g., in TCP logs).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_PROTOCOL%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Upstream protocol. Currently either <strong>HTTP/1.1</strong>, <strong>HTTP/2</strong> or <strong>HTTP/3</strong>.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>In typed JSON logs, <code class="docutils literal notranslate"><span class="pre">UPSTREAM_PROTOCOL</span></code> will render the string <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> if the protocol is not
+available (e.g., in TCP logs).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%RESPONSE_CODE%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p>HTTP response code.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A response code of <code class="docutils literal notranslate"><span class="pre">0</span></code> means that the server never sent the beginning of a response.
+This generally means that the (downstream) client disconnected.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In the case of <code class="docutils literal notranslate"><span class="pre">100</span></code>-continue responses, only the response code of the final headers
+will be logged. If a <code class="docutils literal notranslate"><span class="pre">100</span></code>-continue is followed by a <code class="docutils literal notranslate"><span class="pre">200</span></code>, the logged response will be <code class="docutils literal notranslate"><span class="pre">200</span></code>.
+If a <code class="docutils literal notranslate"><span class="pre">100</span></code>-continue results in a disconnect, the <code class="docutils literal notranslate"><span class="pre">100</span></code> will be logged.</p>
+</div>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-response-code-details">
+<dt><code class="docutils literal notranslate"><span class="pre">%RESPONSE_CODE_DETAILS(X)%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>HTTP response code details provides additional information about the response code, such as
+who set it (the upstream or Envoy) and why. The string will not contain any whitespaces, which
+will be converted to underscore ‘_’, unless optional parameter <code class="docutils literal notranslate"><span class="pre">X</span></code> is <code class="docutils literal notranslate"><span class="pre">ALLOW_WHITESPACES</span></code>.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-connection-termination-details">
+<dt><code class="docutils literal notranslate"><span class="pre">%CONNECTION_TERMINATION_DETAILS%</span></code></dt><dd><dl class="simple">
+<dt>HTTP and TCP</dt><dd><p>Connection termination details may provide additional information about why the connection was
+terminated by Envoy for L4 reasons.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%RESPONSE_HEADERS_BYTES%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Uncompressed bytes of response headers.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%RESPONSE_TRAILERS_BYTES%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Uncompressed bytes of response trailers.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl id="config-access-log-format-bytes-sent">
+<dt><code class="docutils literal notranslate"><span class="pre">%BYTES_SENT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/THRIFT</dt><dd><p>Body bytes sent to the downstream, i.e. the size of the response body (which is typically
+produced by the upstream). For WebSocket connection it will also include response header
+bytes. This value is independent of <a class="reference internal" href="#config-access-log-format-bytes-received"><span class="std std-ref">%BYTES_RECEIVED%</span></a>,
+which reflects the request body received from the downstream, so the two may differ
+significantly (e.g. a large file upload with a small response, or vice versa).</p>
+</dd>
+<dt>TCP</dt><dd><p>Downstream bytes sent on connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Bytes sent to the downstream in the UDP session.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_REQUEST_ATTEMPT_COUNT%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p>Number of times the request is attempted upstream.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>An attempt count of <code class="docutils literal notranslate"><span class="pre">0</span></code> means that the request was never attempted upstream.</p>
+</div>
+</dd>
+<dt>TCP</dt><dd><p>Number of times the connection request is attempted upstream.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>An attempt count of <code class="docutils literal notranslate"><span class="pre">0</span></code> means that the connection request was never attempted upstream.</p>
+</div>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_WIRE_BYTES_SENT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Total number of bytes sent to the upstream by the HTTP stream.</p>
+</dd>
+<dt>TCP</dt><dd><p>Total number of bytes sent to the upstream by the tcp proxy.</p>
+</dd>
+<dt>UDP</dt><dd><p>Total number of bytes sent to the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_WIRE_BYTES_RECEIVED%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Total number of bytes received from the upstream by the HTTP stream.</p>
+</dd>
+<dt>TCP</dt><dd><p>Total number of bytes received from the upstream by the tcp proxy.</p>
+</dd>
+<dt>UDP</dt><dd><p>Total number of bytes received from the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_HEADER_BYTES_SENT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Number of header bytes sent to the upstream by the HTTP stream.</p>
+</dd>
+<dt>TCP</dt><dd><p>Total number of HTTP header bytes sent to the upstream stream, for TCP tunneling flows. Not supported for non-tunneling.</p>
+</dd>
+<dt>UDP</dt><dd><p>Total number of HTTP header bytes sent to the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Number of decompressed header bytes sent to the upstream by the HTTP stream.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_HEADER_BYTES_RECEIVED%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Number of header bytes received from the upstream by the HTTP stream.</p>
+</dd>
+<dt>TCP</dt><dd><p>Total number of HTTP header bytes received from the upstream stream, for TCP tunneling flows. Not supported for non-tunneling.</p>
+</dd>
+<dt>UDP</dt><dd><p>Total number of HTTP header bytes received from the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Number of decompressed header bytes received from the upstream by the HTTP stream.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_WIRE_BYTES_SENT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Total number of bytes sent to the downstream by the HTTP stream.</p>
+</dd>
+<dt>TCP</dt><dd><p>Total number of bytes sent to the downstream by the tcp proxy.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_WIRE_BYTES_RECEIVED%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Total number of bytes received from the downstream by the HTTP stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.</p>
+</dd>
+<dt>TCP</dt><dd><p>Total number of bytes received from the downstream by the tcp proxy.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_HEADER_BYTES_SENT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Number of header bytes sent to the downstream by the HTTP stream.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Number of decompressed header bytes sent to the downstream by the HTTP stream.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_HEADER_BYTES_RECEIVED%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Number of header bytes received from the downstream by the HTTP stream.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Number of decompressed header bytes received from the downstream by the HTTP stream.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl id="config-access-log-format-duration">
+<dt><code class="docutils literal notranslate"><span class="pre">%DURATION%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/THRIFT</dt><dd><p>Total duration in milliseconds of the request from the start time to the last byte out.</p>
+</dd>
+<dt>TCP</dt><dd><p>Total duration in milliseconds of the downstream connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+</dl>
+<dl id="config-access-log-format-common-duration">
+<dt><code class="docutils literal notranslate"><span class="pre">%COMMON_DURATION(START:END:PRECISION)%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p>Total duration between the <code class="docutils literal notranslate"><span class="pre">START</span></code> time point and the <code class="docutils literal notranslate"><span class="pre">END</span></code> time point in specific <code class="docutils literal notranslate"><span class="pre">PRECISION</span></code>.
+The <code class="docutils literal notranslate"><span class="pre">START</span></code> and <code class="docutils literal notranslate"><span class="pre">END</span></code> time points are specified by the following values (all values
+here are case-sensitive):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_CX_BEG</span></code>: The time point at which the downstream connection was established (accepted)
+by Envoy, i.e. the connection start time. Note this is unlike <code class="docutils literal notranslate"><span class="pre">US_CX_BEG</span></code>/<code class="docutils literal notranslate"><span class="pre">US_CX_END</span></code>,
+which mark the begin and end of the upstream connection <em>establishment</em>; <code class="docutils literal notranslate"><span class="pre">DS_CX_BEG</span></code> is the
+single time point at which the already-established downstream connection begins.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_CX_END</span></code>: The time point at which the downstream connection was closed, i.e. the
+connection close time. Note this is unlike <code class="docutils literal notranslate"><span class="pre">US_CX_END</span></code>, which marks the end of the upstream
+connection <em>establishment</em> rather than the connection close.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_HS_BEG</span></code>: The time point of the downstream TLS handshake begin, i.e. when the
+ClientHello was received.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_HS_END</span></code>: The time point of the downstream TLS handshake end.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_RX_BEG</span></code>: The time point of the downstream request receiving begin.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_RX_HDR_END</span></code>: The time point of the downstream request header receiving end.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_RX_END</span></code>: The time point of the downstream request receiving end.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">US_CX_BEG</span></code>: The time point of the upstream TCP connect begin.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">US_CX_END</span></code>: The time point of the upstream TCP connect end.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">US_HS_END</span></code>: The time point of the upstream TLS handshake end.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">US_TX_BEG</span></code>: The time point of the upstream request sending begin.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">US_TX_END</span></code>: The time point of the upstream request sending end.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">US_RX_BEG</span></code>: The time point of the upstream response receiving begin.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">US_RX_BODY_BEG</span></code>: The time point of the upstream response body receiving begin.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">US_RX_END</span></code>: The time point of the upstream response receiving end.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_TX_BEG</span></code>: The time point of the downstream response sending begin.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_TX_END</span></code>: The time point of the downstream response sending end.</p></li>
+<li><p>Dynamic value: Other values will be treated as custom time points that are set by named keys.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Upstream connection establishment time points (<code class="docutils literal notranslate"><span class="pre">US_CX_*</span></code>, <code class="docutils literal notranslate"><span class="pre">US_HS_END</span></code>) repeat for all requests
+in a given connection.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">DS_CX_BEG</span></code> time point reflects the downstream connection begin and repeats for all
+requests on a given connection. The <code class="docutils literal notranslate"><span class="pre">DS_CX_END</span></code> time point is only populated for requests
+that are active when the downstream connection closes and renders as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> otherwise.</p>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">PRECISION</span></code> is specified by the following values (all values here are case-sensitive):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ms</span></code>: Millisecond precision.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">us</span></code>: Microsecond precision.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ns</span></code>: Nanosecond precision.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Enabling independent half-close behavior for H/2 and H/3 protocols can produce
+<code class="docutils literal notranslate"><span class="pre">*_TX_END</span></code> values lower than <code class="docutils literal notranslate"><span class="pre">*_RX_END</span></code> values, in cases where upstream peer has half-closed
+its stream before downstream peer. In these cases the <code class="docutils literal notranslate"><span class="pre">COMMON_DURATION</span></code> value will become negative.</p>
+</div>
+</dd>
+<dt>TCP</dt><dd><p>Total duration between the <code class="docutils literal notranslate"><span class="pre">START</span></code> time point and the <code class="docutils literal notranslate"><span class="pre">END</span></code> time point in specific <code class="docutils literal notranslate"><span class="pre">PRECISION</span></code>.
+The connection time points are populated for TCP connections and specified by the following
+values (all values here are case-sensitive):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_CX_BEG</span></code>: The time point at which the downstream connection was established (accepted)
+by Envoy, i.e. the connection start time. Note this is unlike <code class="docutils literal notranslate"><span class="pre">US_CX_BEG</span></code>/<code class="docutils literal notranslate"><span class="pre">US_CX_END</span></code>,
+which mark the begin and end of the upstream connection <em>establishment</em>; <code class="docutils literal notranslate"><span class="pre">DS_CX_BEG</span></code> is the
+single time point at which the already-established downstream connection begins.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_CX_END</span></code>: The time point at which the downstream connection was closed, i.e. the
+connection close time. Note this is unlike <code class="docutils literal notranslate"><span class="pre">US_CX_END</span></code>, which marks the end of the upstream
+connection <em>establishment</em> rather than the connection close.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_HS_BEG</span></code>: The time point of the downstream TLS handshake begin, i.e. when the
+ClientHello was received.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DS_HS_END</span></code>: The time point of the downstream TLS handshake end.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">US_CX_BEG</span></code>: The time point of the upstream TCP connect begin.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">US_CX_END</span></code>: The time point of the upstream TCP connect end.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">PRECISION</span></code> is the same as the HTTP case above.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%REQUEST_DURATION%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Total duration in milliseconds of the request from the start time to the last byte of
+the request received from the downstream.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%REQUEST_TX_DURATION%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Total duration in milliseconds of the request from the start time to the last byte sent upstream.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%RESPONSE_DURATION%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Total duration in milliseconds of the request from the start time to the first byte read from the
+upstream host.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%ROUNDTRIP_DURATION%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/3 (QUIC)</dt><dd><p>Total duration in milliseconds of the request from the start time to receiving the final ack from
+the downstream.</p>
+</dd>
+<dt>HTTP/1 and HTTP/2</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%RESPONSE_TX_DURATION%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Total duration in milliseconds of the request from the first byte read from the upstream host to the last
+byte sent downstream.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_HANDSHAKE_DURATION%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+<dt>TCP</dt><dd><p>Total duration in milliseconds from the start of the connection to the TLS handshake being completed.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_CX_RTT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP</dt><dd><p>The last measured round trip time in milliseconds of the downstream connection, as reported by
+the underlying transport (e.g. the kernel TCP stack). It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access
+logs if the round trip time is not available.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_CONNECTION_POOL_READY_DURATION%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP</dt><dd><p>Total duration in milliseconds from when the upstream request was created to when the connection pool is ready.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p>Renders a numeric value in typed JSON logs.</p>
+</dd>
+</dl>
+<dl id="config-access-log-format-response-flags">
+<dt><code class="docutils literal notranslate"><span class="pre">%RESPONSE_FLAGS%</span></code> / <code class="docutils literal notranslate"><span class="pre">%RESPONSE_FLAGS_LONG%</span></code></dt><dd><p>Additional details about the response or connection, if any. For TCP connections, the response codes mentioned in
+the descriptions do not apply. <code class="docutils literal notranslate"><span class="pre">%RESPONSE_FLAGS%</span></code> will output a short string. <code class="docutils literal notranslate"><span class="pre">%RESPONSE_FLAGS_LONG%</span></code> will output a Pascal case string.
+Possible values are:</p>
+<p>HTTP and TCP</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Long name</p></th>
+<th class="head"><p>Short name</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NoHealthyUpstream</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">UH</span></code></p></td>
+<td><p>No healthy upstream hosts in upstream cluster in addition to <code class="docutils literal notranslate"><span class="pre">503</span></code> response code.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">UpstreamConnectionFailure</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">UF</span></code></p></td>
+<td><p>Upstream connection failure in addition to <code class="docutils literal notranslate"><span class="pre">503</span></code> response code.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">UpstreamOverflow</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">UO</span></code></p></td>
+<td><p>Upstream overflow (<a class="reference internal" href="../../intro/arch_overview/upstream/circuit_breaking.html#arch-overview-circuit-break"><span class="std std-ref">circuit breaking</span></a>) in addition to <code class="docutils literal notranslate"><span class="pre">503</span></code> response code.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NoRouteFound</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">NR</span></code></p></td>
+<td><p>No <a class="reference internal" href="../../intro/arch_overview/http/http_routing.html#arch-overview-http-routing"><span class="std std-ref">route configured</span></a> for a given request in addition to <code class="docutils literal notranslate"><span class="pre">404</span></code> response code or no matching filter chain for a downstream connection.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">UpstreamRetryLimitExceeded</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">URX</span></code></p></td>
+<td><p>The request was rejected because the <a class="reference internal" href="../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-num-retries"><span class="std std-ref">upstream retry limit (HTTP)</span></a>  or <a class="reference internal" href="../../api-v3/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto.html#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-max-connect-attempts"><span class="std std-ref">maximum connect attempts (TCP)</span></a> was reached.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NoClusterFound</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">NC</span></code></p></td>
+<td><p>Upstream cluster not found.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DurationTimeout</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DT</span></code></p></td>
+<td><p>When a request or connection exceeded <a class="reference internal" href="../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-httpprotocoloptions-max-connection-duration"><span class="std std-ref">max_connection_duration</span></a> or <a class="reference internal" href="../../api-v3/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto.html#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-max-downstream-connection-duration"><span class="std std-ref">max_downstream_connection_duration</span></a>.</p></td>
+</tr>
+</tbody>
+</table>
+<p>HTTP only</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Long name</p></th>
+<th class="head"><p>Short name</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DownstreamConnectionTermination</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DC</span></code></p></td>
+<td><p>Downstream connection termination.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">FailedLocalHealthCheck</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">LH</span></code></p></td>
+<td><p>Local service failed <a class="reference internal" href="../../intro/arch_overview/upstream/health_checking.html#arch-overview-health-checking"><span class="std std-ref">health check request</span></a> in addition to <code class="docutils literal notranslate"><span class="pre">503</span></code> response code.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">UpstreamRequestTimeout</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">UT</span></code></p></td>
+<td><p>Upstream request timeout in addition to <code class="docutils literal notranslate"><span class="pre">504</span></code> response code.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">LocalReset</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">LR</span></code></p></td>
+<td><p>Connection local reset in addition to <code class="docutils literal notranslate"><span class="pre">503</span></code> response code.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">UpstreamRemoteReset</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">UR</span></code></p></td>
+<td><p>Upstream remote reset in addition to <code class="docutils literal notranslate"><span class="pre">503</span></code> response code.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">UpstreamConnectionTermination</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">UC</span></code></p></td>
+<td><p>Upstream connection termination in addition to <code class="docutils literal notranslate"><span class="pre">503</span></code> response code.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DelayInjected</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DI</span></code></p></td>
+<td><p>The request processing was delayed for a period specified via <a class="reference internal" href="../http/http_filters/fault_filter.html#config-http-filters-fault-injection"><span class="std std-ref">fault injection</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">FaultInjected</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">FI</span></code></p></td>
+<td><p>The request was aborted with a response code specified via <a class="reference internal" href="../http/http_filters/fault_filter.html#config-http-filters-fault-injection"><span class="std std-ref">fault injection</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">RateLimited</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">RL</span></code></p></td>
+<td><p>The request was rate-limited locally by the <a class="reference internal" href="../http/http_filters/rate_limit_filter.html#config-http-filters-rate-limit"><span class="std std-ref">HTTP rate limit filter</span></a> in addition to <code class="docutils literal notranslate"><span class="pre">429</span></code> response code.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">UnauthorizedExternalService</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">UAEX</span></code></p></td>
+<td><p>The request was denied by the external authorization service.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">RateLimitServiceError</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">RLSE</span></code></p></td>
+<td><p>The request was rejected because there was an error in rate limit service.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">InvalidEnvoyRequestHeaders</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">IH</span></code></p></td>
+<td><p>The request was rejected because it set an invalid value for a <a class="reference internal" href="../../api-v3/extensions/filters/http/router/v3/router.proto.html#envoy-v3-api-field-extensions-filters-http-router-v3-router-strict-check-headers"><span class="std std-ref">strictly-checked header</span></a> in addition to <code class="docutils literal notranslate"><span class="pre">400</span></code> response code.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">StreamIdleTimeout</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SI</span></code></p></td>
+<td><p>Stream idle timeout in addition to <code class="docutils literal notranslate"><span class="pre">408</span></code> or <code class="docutils literal notranslate"><span class="pre">504</span></code> response code.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DownstreamProtocolError</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DPE</span></code></p></td>
+<td><p>The downstream request had an HTTP protocol error.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">UpstreamProtocolError</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">UPE</span></code></p></td>
+<td><p>The upstream response had an HTTP protocol error.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">UpstreamMaxStreamDurationReached</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">UMSDR</span></code></p></td>
+<td><p>The upstream request reached max stream duration.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ResponseFromCacheFilter</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">RFCF</span></code></p></td>
+<td><p>The response was served from an Envoy cache filter.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NoFilterConfigFound</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">NFCF</span></code></p></td>
+<td><p>The request is terminated because filter configuration was not received within the permitted warming deadline.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">OverloadManagerTerminated</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">OM</span></code></p></td>
+<td><p>Overload Manager terminated the request.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DnsResolutionFailed</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DF</span></code></p></td>
+<td><p>The request was terminated due to DNS resolution failure.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DropOverload</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DO</span></code></p></td>
+<td><p>The request was terminated in addition to <code class="docutils literal notranslate"><span class="pre">503</span></code> response code due to <a class="reference internal" href="../../api-v3/config/endpoint/v3/endpoint.proto.html#envoy-v3-api-field-config-endpoint-v3-clusterloadassignment-policy-drop-overloads"><span class="std std-ref">drop_overloads</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DownstreamRemoteReset</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DR</span></code></p></td>
+<td><p>The response details are <code class="docutils literal notranslate"><span class="pre">http2.remote_reset</span></code> or <code class="docutils literal notranslate"><span class="pre">http2.remote_refuse</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">UnconditionalDropOverload</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">UDO</span></code></p></td>
+<td><p>The request was terminated in addition to <code class="docutils literal notranslate"><span class="pre">503</span></code> response code due to <a class="reference internal" href="../../api-v3/config/endpoint/v3/endpoint.proto.html#envoy-v3-api-field-config-endpoint-v3-clusterloadassignment-policy-drop-overloads"><span class="std std-ref">drop_overloads</span></a> is set to <code class="docutils literal notranslate"><span class="pre">100%</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="simple">
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%ROUTE_NAME%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP</dt><dd><p>Name of the route.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%VIRTUAL_CLUSTER_NAME%</span></code></dt><dd><dl class="simple">
+<dt>HTTP*/gRPC</dt><dd><p>Name of the matched Virtual Cluster (if any).</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-upstream-host">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_HOST%</span></code></dt><dd><p>Main address of upstream host (e.g., ip:port for TCP connections).</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-upstream-host-name">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_HOST_NAME%</span></code></dt><dd><p>Upstream host name (e.g., DNS name). If no DNS name is available, the main address of the upstream host
+(e.g., ip:port for TCP connections) will be used.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-upstream-host-name-without-port">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_HOST_NAME_WITHOUT_PORT%</span></code></dt><dd><p>Upstream host name (e.g., DNS name) without port component. If no DNS name is available,
+the main address of the upstream host (e.g., ip for TCP connections) will be used.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-upstream-hosts-attempted">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_HOSTS_ATTEMPTED%</span></code></dt><dd><p>Comma-separated list of upstream host addresses (e.g., ip:port) that were attempted during the request,
+including retries. This is useful for debugging retry behavior and understanding which hosts were tried
+before a successful connection or final failure.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-upstream-hosts-attempted-without-port">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT%</span></code></dt><dd><p>Same as <code class="docutils literal notranslate"><span class="pre">%UPSTREAM_HOSTS_ATTEMPTED%</span></code> but without port components.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-upstream-host-names-attempted">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_HOST_NAMES_ATTEMPTED%</span></code></dt><dd><p>Comma-separated list of upstream host names (e.g., DNS names) that were attempted during the request,
+including retries. If no DNS name is available for a host, its main address (e.g., ip:port) will be used.
+This is useful for debugging retry behavior with human-readable host names.</p>
+</dd>
+</dl>
+<dl id="config-access-log-format-upstream-host-names-attempted-without-port">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT%</span></code></dt><dd><p>Same as <code class="docutils literal notranslate"><span class="pre">%UPSTREAM_HOST_NAMES_ATTEMPTED%</span></code> but without port components.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_CLUSTER%</span></code></dt><dd><p>Upstream cluster to which the upstream host belongs to. <a class="reference internal" href="../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-alt-stat-name"><span class="std std-ref">alt_stat_name</span></a> will be used if provided.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_CLUSTER_RAW%</span></code></dt><dd><p>Upstream cluster to which the upstream host belongs to. <a class="reference internal" href="../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-alt-stat-name"><span class="std std-ref">alt_stat_name</span></a> does NOT modify this value.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_LOCAL_ADDRESS%</span></code></dt><dd><p>Local address of the upstream connection. If the address is an IP address, it includes both
+address and port.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%</span></code></dt><dd><p>Local address of the upstream connection, without any port component.
+IP addresses are the only address type with a port component.</p>
+<ul class="simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> is specified, the IP address is masked to that many bits and returned in CIDR notation.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> is omitted, the unmasked address is returned (without port).</p></li>
+<li><p>For IPv4, <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> must be between 0-32.</p></li>
+<li><p>For IPv6, <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> must be between 0-128.</p></li>
+</ul>
+<p>Examples:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(16)%</span></code> returns <code class="docutils literal notranslate"><span class="pre">10.1.0.0/16</span></code> for source IP <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(64)%</span></code> returns <code class="docutils literal notranslate"><span class="pre">2001:db8:1234:5678::/64</span></code> for source IP <code class="docutils literal notranslate"><span class="pre">2001:db8:1234:5678:9abc:def0:1234:5678</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%</span></code> returns <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code> for source IP <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code></p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_LOCAL_PORT%</span></code></dt><dd><p>Local port of the upstream connection.
+IP addresses are the only address type with a port component.</p>
+</dd>
+</dl>
+<dl id="config-access-log-format-upstream-remote-address">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_REMOTE_ADDRESS%</span></code></dt><dd><p>Remote address of the upstream connection. If the address is an IP address, it includes both
+address and port. Identical to the <a class="reference internal" href="#config-access-log-format-upstream-host"><span class="std std-ref">UPSTREAM_HOST</span></a> value if the upstream
+host only has one address and connection is established successfully.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%</span></code></dt><dd><p>Remote address of the upstream connection, without any port component.
+IP addresses are the only address type with a port component.</p>
+<ul class="simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> is specified, the IP address is masked to that many bits and returned in CIDR notation.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> is omitted, the unmasked address is returned (without port).</p></li>
+<li><p>For IPv4, <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> must be between 0-32.</p></li>
+<li><p>For IPv6, <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> must be between 0-128.</p></li>
+</ul>
+<p>Examples:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%</span></code> returns <code class="docutils literal notranslate"><span class="pre">10.1.0.0/16</span></code> for upstream IP <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(64)%</span></code> returns <code class="docutils literal notranslate"><span class="pre">2001:db8:1234:5678::/64</span></code> for upstream IP <code class="docutils literal notranslate"><span class="pre">2001:db8:1234:5678:9abc:def0:1234:5678</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%</span></code> returns <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code> for upstream IP <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code></p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_REMOTE_PORT%</span></code></dt><dd><p>Remote port of the upstream connection.
+IP addresses are the only address type with a port component.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_REMOTE_ADDRESS_ENDPOINT_ID%</span></code></dt><dd><p>The endpoint ID of the Envoy internal address used to establish an upstream connection through an
+<a class="reference internal" href="../other_features/internal_listener.html#config-internal-listener"><span class="std std-ref">internal listener</span></a>. Envoy internal addresses are the only address
+type with an endpoint ID component.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-upstream-transport-failure-reason">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_TRANSPORT_FAILURE_REASON%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>If upstream connection failed due to transport socket (e.g., TLS handshake), provides the failure
+reason from the transport socket. The format of this field depends on the configured upstream
+transport socket. Common TLS failures are in <a class="reference internal" href="../../intro/arch_overview/security/ssl.html#arch-overview-ssl-trouble-shooting"><span class="std std-ref">TLS troubleshooting</span></a>.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-upstream-detected-close-type">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_DETECTED_CLOSE_TYPE%</span></code></dt><dd><p>The detected close type of the upstream connection. This is only available on access logs recorded after the connection has been closed.
+Possible values are <code class="docutils literal notranslate"><span class="pre">Normal</span></code>, <code class="docutils literal notranslate"><span class="pre">LocalReset</span></code>, and <code class="docutils literal notranslate"><span class="pre">RemoteReset</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-upstream-local-close-reason">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_LOCAL_CLOSE_REASON%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP</dt><dd><p>If upstream connection was closed locally, provides the reason.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented (“-“)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl id="config-access-log-format-downstream-transport-failure-reason">
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_TRANSPORT_FAILURE_REASON%</span></code></dt><dd><dl>
+<dt>HTTP/TCP</dt><dd><p>If downstream connection failed due to transport socket (e.g., TLS handshake), provides the failure
+reason from the transport socket. The format of this field depends on the configured downstream
+transport socket. Common TLS failures are in <a class="reference internal" href="../../intro/arch_overview/security/ssl.html#arch-overview-ssl-trouble-shooting"><span class="std std-ref">TLS troubleshooting</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It only works in listener access config, and the HTTP or TCP access logs would observe empty values.</p>
+</div>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-downstream-local-close-reason">
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_CLOSE_REASON%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP</dt><dd><p>If downstream connection was closed locally, provides the reason.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented (“-“)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl id="config-access-log-format-downstream-detected-close-type">
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DETECTED_CLOSE_TYPE%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP</dt><dd><p>The detected close type of the downstream connection. This is only available on access logs recorded after the connection has been closed.
+Possible values are <code class="docutils literal notranslate"><span class="pre">Normal</span></code>, <code class="docutils literal notranslate"><span class="pre">LocalReset</span></code>, and <code class="docutils literal notranslate"><span class="pre">RemoteReset</span></code>.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_REMOTE_ADDRESS%</span></code></dt><dd><p>Remote address of the downstream connection. If the address is an IP address, it includes both
+address and port.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This may not be the physical remote address of the peer if the address has been inferred from
+<a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a> or <a class="reference internal" href="../http/http_conn_man/headers.html#config-http-conn-man-headers-x-forwarded-for"><span class="std std-ref">x-forwarded-for</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%</span></code></dt><dd><p>Remote address of the downstream connection, without any port component.
+IP addresses are the only address type with a port component.</p>
+<ul class="simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> is specified, the IP address is masked to that many bits and returned in CIDR notation.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> is omitted, the unmasked address is returned (without port).</p></li>
+<li><p>For IPv4, <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> must be between 0-32.</p></li>
+<li><p>For IPv6, <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> must be between 0-128.</p></li>
+</ul>
+<p>Examples:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%</span></code> returns <code class="docutils literal notranslate"><span class="pre">10.1.0.0/16</span></code> for client IP <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(64)%</span></code> returns <code class="docutils literal notranslate"><span class="pre">2001:db8:1234:5678::/64</span></code> for client IP <code class="docutils literal notranslate"><span class="pre">2001:db8:1234:5678:9abc:def0:1234:5678</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%</span></code> returns <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code> for client IP <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code></p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This may not be the physical remote address of the peer if the address has been inferred from
+<a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a> or <a class="reference internal" href="../http/http_conn_man/headers.html#config-http-conn-man-headers-x-forwarded-for"><span class="std std-ref">x-forwarded-for</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_REMOTE_PORT%</span></code></dt><dd><p>Remote port of the downstream connection.
+IP addresses are the only address type with a port component.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This may not be the physical remote address of the peer if the address has been inferred from
+<a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a> or <a class="reference internal" href="../http/http_conn_man/headers.html#config-http-conn-man-headers-x-forwarded-for"><span class="std std-ref">x-forwarded-for</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%</span></code></dt><dd><p>Direct remote address of the downstream connection. If the address is an IP address, it includes both
+address and port.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is always the physical remote address of the peer even if the downstream remote address has
+been inferred from <a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a>
+or <a class="reference internal" href="../http/http_conn_man/headers.html#config-http-conn-man-headers-x-forwarded-for"><span class="std std-ref">x-forwarded-for</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%</span></code></dt><dd><p>Direct remote address of the downstream connection, without any port component.
+IP addresses are the only address type with a port component.</p>
+<ul class="simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> is specified, the IP address is masked to that many bits and returned in CIDR notation.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> is omitted, the unmasked address is returned (without port).</p></li>
+<li><p>For IPv4, <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> must be between 0-32.</p></li>
+<li><p>For IPv6, <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> must be between 0-128.</p></li>
+</ul>
+<p>Examples:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT(16)%</span></code> returns <code class="docutils literal notranslate"><span class="pre">10.1.0.0/16</span></code> for client IP <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT(64)%</span></code> returns <code class="docutils literal notranslate"><span class="pre">2001:db8:1234:5678::/64</span></code> for client IP <code class="docutils literal notranslate"><span class="pre">2001:db8:1234:5678:9abc:def0:1234:5678</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%</span></code> returns <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code> for client IP <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code></p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is always the physical remote address of the peer even if the downstream remote address has
+been inferred from <a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a>
+or <a class="reference internal" href="../http/http_conn_man/headers.html#config-http-conn-man-headers-x-forwarded-for"><span class="std std-ref">x-forwarded-for</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_REMOTE_PORT%</span></code></dt><dd><p>Direct remote port of the downstream connection.
+IP addresses are the only address type with a port component.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is always the physical remote address of the peer even if the downstream remote address has
+been inferred from <a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a>
+or <a class="reference internal" href="../http/http_conn_man/headers.html#config-http-conn-man-headers-x-forwarded-for"><span class="std std-ref">x-forwarded-for</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_ADDRESS%</span></code></dt><dd><p>Local address of the downstream connection. If the address is an IP address, it includes both
+address and port.</p>
+<p>If the original connection was redirected by iptables REDIRECT, this represents
+the original destination address restored by the
+<a class="reference internal" href="../listeners/listener_filters/original_dst_filter.html#config-listener-filters-original-dst"><span class="std std-ref">Original Destination Filter</span></a> using SO_ORIGINAL_DST socket option.
+If the original connection was redirected by iptables TPROXY, and the listener’s transparent
+option was set to true, this represents the original destination address and port.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This may not be the physical remote address of the peer if the address has been inferred from
+<a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_LOCAL_ADDRESS%</span></code></dt><dd><p>Direct local address of the downstream connection.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is always the physical local address even if the downstream remote address has been inferred from
+<a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%</span></code></dt><dd><p>Local address of the downstream connection, without any port component.
+IP addresses are the only address type with a port component.</p>
+<ul class="simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> is specified, the IP address is masked to that many bits and returned in CIDR notation.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> is omitted, the unmasked address is returned (without port).</p></li>
+<li><p>For IPv4, <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> must be between 0-32.</p></li>
+<li><p>For IPv6, <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> must be between 0-128.</p></li>
+</ul>
+<p>Examples:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(16)%</span></code> returns <code class="docutils literal notranslate"><span class="pre">10.1.0.0/16</span></code> for local IP <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(64)%</span></code> returns <code class="docutils literal notranslate"><span class="pre">2001:db8:1234:5678::/64</span></code> for local IP <code class="docutils literal notranslate"><span class="pre">2001:db8:1234:5678:9abc:def0:1234:5678</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%</span></code> returns <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code> for local IP <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code></p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This may not be the physical local address if the downstream local address has been inferred from
+<a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%</span></code></dt><dd><p>Direct local address of the downstream connection, without any port component.</p>
+<ul class="simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> is specified, the IP address is masked to that many bits and returned in CIDR notation.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> is omitted, the unmasked address is returned (without port).</p></li>
+<li><p>For IPv4, <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> must be between 0-32.</p></li>
+<li><p>For IPv6, <code class="docutils literal notranslate"><span class="pre">MASK_PREFIX_LEN</span></code> must be between 0-128.</p></li>
+</ul>
+<p>Examples:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT(16)%</span></code> returns <code class="docutils literal notranslate"><span class="pre">10.1.0.0/16</span></code> for local IP <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT(64)%</span></code> returns <code class="docutils literal notranslate"><span class="pre">2001:db8:1234:5678::/64</span></code> for local IP <code class="docutils literal notranslate"><span class="pre">2001:db8:1234:5678:9abc:def0:1234:5678</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT%</span></code> returns <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code> for local IP <code class="docutils literal notranslate"><span class="pre">10.1.10.23</span></code></p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is always the physical local address even if the downstream local address has been inferred from
+<a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_PORT%</span></code></dt><dd><p>Local port of the downstream connection.
+IP addresses are the only address type with a port component.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This may not be the physical port if the downstream local address has been inferred from
+<a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_LOCAL_PORT%</span></code></dt><dd><p>Direct local port of the downstream connection.
+IP addresses are the only address type with a port component.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is always the listener port even if the downstream local address has been inferred from
+<a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_ADDRESS_ENDPOINT_ID%</span></code></dt><dd><p>The endpoint ID of the local Envoy internal address on a downstream connection through an
+<a class="reference internal" href="../other_features/internal_listener.html#config-internal-listener"><span class="std std-ref">internal listener</span></a>. Envoy internal addresses are the only address
+type with an endpoint ID component.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This may not be the endpoint ID if the downstream local address has been inferred from the
+<a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_ENDPOINT_ID%</span></code></dt><dd><p>The endpoint ID of the direct local Envoy internal address on a downstream connection through an
+<a class="reference internal" href="../other_features/internal_listener.html#config-internal-listener"><span class="std std-ref">internal listener</span></a>. Envoy internal addresses are the only address
+type with an endpoint ID component.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is always the endpoint ID even if the downstream local address has been inferred from the
+<a class="reference internal" href="../listeners/listener_filters/proxy_protocol.html#config-listener-filters-proxy-protocol"><span class="std std-ref">Proxy Protocol filter</span></a>.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-connection-id">
+<dt><code class="docutils literal notranslate"><span class="pre">%CONNECTION_ID%</span></code></dt><dd><p>An identifier for the downstream connection. It can be used to
+cross-reference TCP access logs across multiple log sinks, or to
+cross-reference timer-based reports for the same connection. The identifier
+is unique with high likelihood within an execution, but can duplicate across
+multiple instances or between restarts.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-upstream-connection-id">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_CONNECTION_ID%</span></code></dt><dd><p>An identifier for the upstream connection. It can be used to
+cross-reference TCP access logs across multiple log sinks, or to
+cross-reference timer-based reports for the same connection. The identifier
+is unique with high likelihood within an execution, but can duplicate across
+multiple instances or between restarts.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-upstream-connection-ids-attempted">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_CONNECTION_IDS_ATTEMPTED%</span></code></dt><dd><p>Comma-separated list of upstream connection IDs that were attempted during the request, including retries.
+This is useful for cross-referencing with other logs to understand connection reuse and retry behavior.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-stream-id">
+<dt><code class="docutils literal notranslate"><span class="pre">%STREAM_ID%</span></code></dt><dd><p>An identifier for the stream (HTTP request, long-live HTTP2 stream, TCP connection, etc.). It can be used to
+cross-reference TCP access logs across multiple log sinks, or to cross-reference timer-based reports for the same connection.
+Unlike <code class="docutils literal notranslate"><span class="pre">%CONNECTION_ID%</span></code>, the identifier should be unique across multiple instances or between restarts.
+And its value should be the same as <code class="docutils literal notranslate"><span class="pre">%REQUEST_HEADER(X-REQUEST-ID)%</span></code> for HTTP requests.
+This should be used to replace <code class="docutils literal notranslate"><span class="pre">%CONNECTION_ID%</span></code> and <code class="docutils literal notranslate"><span class="pre">%REQUEST_HEADER(X-REQUEST-ID)%</span></code> in most cases.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%GRPC_STATUS(X)%</span></code></dt><dd><p><a class="reference external" href="https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto">gRPC status code</a> formatted according to the optional parameter <code class="docutils literal notranslate"><span class="pre">X</span></code>, which can be <code class="docutils literal notranslate"><span class="pre">CAMEL_STRING</span></code>, <code class="docutils literal notranslate"><span class="pre">SNAKE_STRING</span></code> and <code class="docutils literal notranslate"><span class="pre">NUMBER</span></code>.
+For example, if the grpc status is <code class="docutils literal notranslate"><span class="pre">INVALID_ARGUMENT</span></code> (represented by number 3), the formatter will return <code class="docutils literal notranslate"><span class="pre">InvalidArgument</span></code> for <code class="docutils literal notranslate"><span class="pre">CAMEL_STRING</span></code>, <code class="docutils literal notranslate"><span class="pre">INVALID_ARGUMENT</span></code> for <code class="docutils literal notranslate"><span class="pre">SNAKE_STRING</span></code> and <code class="docutils literal notranslate"><span class="pre">3</span></code> for <code class="docutils literal notranslate"><span class="pre">NUMBER</span></code>.
+If <code class="docutils literal notranslate"><span class="pre">X</span></code> isn’t provided, <code class="docutils literal notranslate"><span class="pre">CAMEL_STRING</span></code> will be used.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%GRPC_STATUS_NUMBER%</span></code></dt><dd><p>gRPC status code.</p>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-req">
+<dt><code class="docutils literal notranslate"><span class="pre">%REQUEST_HEADER(X?Y):Z%</span></code> / <code class="docutils literal notranslate"><span class="pre">%REQ(X?Y):Z%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>An HTTP request header where <code class="docutils literal notranslate"><span class="pre">X</span></code> is the main HTTP header, <code class="docutils literal notranslate"><span class="pre">Y</span></code> is the alternative one, and <code class="docutils literal notranslate"><span class="pre">Z</span></code> is an
+optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long. The value is taken from
+the HTTP request header named <code class="docutils literal notranslate"><span class="pre">X</span></code> first and if it’s not set, then request header <code class="docutils literal notranslate"><span class="pre">Y</span></code> is used. If
+none of the headers are present <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> symbol will be in the log.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%RESPONSE_HEADER(X?Y):Z%</span></code> / <code class="docutils literal notranslate"><span class="pre">%RESP(X?Y):Z%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Same as <code class="docutils literal notranslate"><span class="pre">%REQUEST_HEADER(X?Y):Z%</span></code> but taken from HTTP response headers.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%RESPONSE_TRAILER(X?Y):Z%</span></code> / <code class="docutils literal notranslate"><span class="pre">%TRAILER(X?Y):Z%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>Same as <code class="docutils literal notranslate"><span class="pre">%REQUEST_HEADER(X?Y):Z%</span></code> but taken from HTTP response trailers.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl id="config-access-log-format-dynamic-metadata">
+<dt><code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA(NAMESPACE:KEY*):Z%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p><a class="reference internal" href="../../api-v3/config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-metadata"><span class="std std-ref">Dynamic Metadata</span></a> info,
+where <code class="docutils literal notranslate"><span class="pre">NAMESPACE</span></code> is the filter namespace used when setting the metadata, <code class="docutils literal notranslate"><span class="pre">KEY</span></code> is an optional
+lookup key in the namespace with the option of specifying nested keys separated by ‘:’, and <code class="docutils literal notranslate"><span class="pre">Z</span></code> is an
+optional parameter denoting string (and other non-structured value) truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long.
+Dynamic Metadata can be set by filters using the <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/envoy/stream_info/stream_info.h">StreamInfo</a> API:
+<em>setDynamicMetadata</em>. The data will be logged as a JSON string. For example, for the following dynamic metadata:</p>
+<p><code class="docutils literal notranslate"><span class="pre">com.test.my_filter:</span> <span class="pre">{&quot;test_key&quot;:</span> <span class="pre">&quot;foo&quot;,</span> <span class="pre">&quot;test_object&quot;:</span> <span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}}</span></code></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA(com.test.my_filter)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">{&quot;test_key&quot;:</span> <span class="pre">&quot;foo&quot;,</span> <span class="pre">&quot;test_object&quot;:</span> <span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}}</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA(com.test.my_filter:test_key)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">foo</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA(com.test.my_filter:test_object)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA(com.test.my_filter:test_object:inner_key)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">bar</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA(com.unknown_filter)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">-</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA(com.test.my_filter:unknown_key)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">-</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA(com.test.my_filter:test_object):2%</span></code> will log (no truncation for struct): <code class="docutils literal notranslate"><span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA(com.test.my_filter:test_key):2%</span></code> will log (truncation at 2 characters): <code class="docutils literal notranslate"><span class="pre">fo</span></code></p></li>
+</ul>
+</dd>
+<dt>TCP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+<dt>UDP</dt><dd><p>For <a class="reference internal" href="../listeners/udp_filters/udp_proxy.html#config-udp-listener-filters-udp-proxy"><span class="std std-ref">UDP Proxy</span></a>,
+when <code class="docutils literal notranslate"><span class="pre">NAMESPACE</span></code> is set to “udp.proxy.session”, the following optional <code class="docutils literal notranslate"><span class="pre">KEY</span></code> values are available:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">cluster_name</span></code>: Name of the cluster.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">bytes_sent</span></code>: Total number of bytes sent to the downstream in the session.</p>
+<div class="deprecated">
+<p><span class="versionmodified deprecated">Deprecated since version 1.32.0: </span>Please use <code class="docutils literal notranslate"><span class="pre">%BYTES_SENT%</span></code> instead.</p>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">bytes_received</span></code>: Total number of bytes received from the downstream in the session.</p>
+<div class="deprecated">
+<p><span class="versionmodified deprecated">Deprecated since version 1.32.0: </span>Please use <code class="docutils literal notranslate"><span class="pre">%BYTES_RECEIVED%</span></code> instead.</p>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">errors_sent</span></code>: Number of errors that have occurred when sending datagrams to the downstream in the session.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">datagrams_sent</span></code>: Number of datagrams sent to the downstream in the session.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">datagrams_received</span></code>: Number of datagrams received from the downstream in the session.</p></li>
+</ul>
+<p>Recommended session access log format for UDP proxy:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[%START_TIME%] %DYNAMIC_METADATA(udp.proxy.session:cluster_name)%
+%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)%
+%DYNAMIC_METADATA(udp.proxy.session:bytes_received)%
+%DYNAMIC_METADATA(udp.proxy.session:errors_sent)%
+%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)%
+%DYNAMIC_METADATA(udp.proxy.session:datagrams_received)%
+</pre></div>
+</div>
+<p>when <code class="docutils literal notranslate"><span class="pre">NAMESPACE</span></code> is set to “udp.proxy.proxy”, the following optional <code class="docutils literal notranslate"><span class="pre">KEY</span></code> values are available:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">bytes_sent</span></code>: Total number of bytes sent to the downstream in UDP proxy.</p>
+<div class="deprecated">
+<p><span class="versionmodified deprecated">Deprecated since version 1.32.0: </span>Please use <code class="docutils literal notranslate"><span class="pre">%BYTES_SENT%</span></code> instead.</p>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">bytes_received</span></code>: Total number of bytes received from the downstream in UDP proxy.</p>
+<div class="deprecated">
+<p><span class="versionmodified deprecated">Deprecated since version 1.32.0: </span>Please use <code class="docutils literal notranslate"><span class="pre">%BYTES_RECEIVED%</span></code> instead.</p>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">errors_sent</span></code>: Number of errors that have occurred when sending datagrams to the downstream in UDP proxy.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">errors_received</span></code>: Number of errors that have occurred when receiving datagrams from the downstream in UDP proxy.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">datagrams_sent</span></code>: Number of datagrams sent to the downstream in UDP proxy.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">datagrams_received</span></code>: Number of datagrams received from the downstream in UDP proxy.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">no_route</span></code>: Number of times that no upstream cluster found in UDP proxy.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">session_total</span></code>: Total number of sessions in UDP proxy.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">idle_timeout</span></code>: Number of times that sessions idle timeout occurred in UDP proxy.</p></li>
+</ul>
+<p>Recommended proxy access log format for UDP proxy:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[%START_TIME%]
+%DYNAMIC_METADATA(udp.proxy.proxy:bytes_sent)%
+%DYNAMIC_METADATA(udp.proxy.proxy:bytes_received)%
+%DYNAMIC_METADATA(udp.proxy.proxy:errors_sent)%
+%DYNAMIC_METADATA(udp.proxy.proxy:errors_received)%
+%DYNAMIC_METADATA(udp.proxy.proxy:datagrams_sent)%
+%DYNAMIC_METADATA(udp.proxy.proxy:datagrams_received)%
+%DYNAMIC_METADATA(udp.proxy.proxy:session_total)%
+</pre></div>
+</div>
+</dd>
+<dt>THRIFT</dt><dd><p>For <a class="reference internal" href="../listeners/network_filters/thrift_proxy_filter.html#config-network-filters-thrift-proxy"><span class="std std-ref">Thrift Proxy</span></a>,
+<code class="docutils literal notranslate"><span class="pre">NAMESPACE</span></code> should be always set to “thrift.proxy”, the following optional <code class="docutils literal notranslate"><span class="pre">KEY</span></code> values are available:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">method</span></code>: Name of the method.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cluster_name</span></code>: Name of the cluster.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">passthrough</span></code>: Passthrough support for the request and response.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">request:transport_type</span></code>: The transport type of the request.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">request:protocol_type</span></code>: The protocol type of the request.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">request:message_type</span></code>: The message type of the request.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">response:transport_type</span></code>: The transport type of the response.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">response:protocol_type</span></code>: The protocol type of the response.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">response:message_type</span></code>: The message type of the response.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">response:reply_type</span></code>: The reply type of the response.</p></li>
+</ul>
+<p>Recommended access log format for Thrift proxy:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[%START_TIME%] %DYNAMIC_METADATA(thrift.proxy:method)%
+%DYNAMIC_METADATA(thrift.proxy:cluster)%
+%DYNAMIC_METADATA(thrift.proxy:request:transport_type)%
+%DYNAMIC_METADATA(thrift.proxy:request:protocol_type)%
+%DYNAMIC_METADATA(thrift.proxy:request:message_type)%
+%DYNAMIC_METADATA(thrift.proxy:response:transport_type)%
+%DYNAMIC_METADATA(thrift.proxy:response:protocol_type)%
+%DYNAMIC_METADATA(thrift.proxy:response:message_type)%
+%DYNAMIC_METADATA(thrift.proxy:response:reply_type)%
+%BYTES_RECEIVED%
+%BYTES_SENT%
+%DURATION%
+%UPSTREAM_HOST%
+</pre></div>
+</div>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+when the referenced key is a simple value. If the referenced key is a struct or list value, a
+JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+length is ignored.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">DYNAMIC_METADATA</span></code> command operator will be deprecated in the future in favor of <a class="reference internal" href="../../api-v3/extensions/formatter/metadata/v3/metadata.proto.html#envoy-v3-api-msg-extensions-formatter-metadata-v3-metadata"><span class="std std-ref">METADATA</span></a> operator.</p>
+</div>
+</dd>
+</dl>
+<dl id="config-access-log-format-cluster-metadata">
+<dt><code class="docutils literal notranslate"><span class="pre">%CLUSTER_METADATA(NAMESPACE:KEY*):Z%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p><a class="reference internal" href="../../api-v3/config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-metadata"><span class="std std-ref">Upstream cluster Metadata</span></a> info,
+where <code class="docutils literal notranslate"><span class="pre">NAMESPACE</span></code> is the filter namespace used when setting the metadata, <code class="docutils literal notranslate"><span class="pre">KEY</span></code> is an optional
+lookup key in the namespace with the option of specifying nested keys separated by ‘:’,
+and <code class="docutils literal notranslate"><span class="pre">Z</span></code> is an optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long. The data
+will be logged as a JSON string. For example, for the following dynamic metadata:</p>
+<p><code class="docutils literal notranslate"><span class="pre">com.test.my_filter:</span> <span class="pre">{&quot;test_key&quot;:</span> <span class="pre">&quot;foo&quot;,</span> <span class="pre">&quot;test_object&quot;:</span> <span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}}</span></code></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">%CLUSTER_METADATA(com.test.my_filter)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">{&quot;test_key&quot;:</span> <span class="pre">&quot;foo&quot;,</span> <span class="pre">&quot;test_object&quot;:</span> <span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}}</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%CLUSTER_METADATA(com.test.my_filter:test_key)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">foo</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%CLUSTER_METADATA(com.test.my_filter:test_object)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%CLUSTER_METADATA(com.test.my_filter:test_object:inner_key)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">bar</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%CLUSTER_METADATA(com.unknown_filter)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">-</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%CLUSTER_METADATA(com.test.my_filter:unknown_key)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">-</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%CLUSTER_METADATA(com.test.my_filter):25%</span></code> will log (truncation at 25 characters): <code class="docutils literal notranslate"><span class="pre">{&quot;test_key&quot;:</span> <span class="pre">&quot;foo&quot;,</span> <span class="pre">&quot;test</span></code></p></li>
+</ul>
+</dd>
+<dt>TCP/UDP/THRIFT</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+when the referenced key is a simple value. If the referenced key is a struct or list value, a
+JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+length is ignored.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">CLUSTER_METADATA</span></code> command operator will be deprecated in the future in favor of <a class="reference internal" href="../../api-v3/extensions/formatter/metadata/v3/metadata.proto.html#envoy-v3-api-msg-extensions-formatter-metadata-v3-metadata"><span class="std std-ref">METADATA</span></a> operator.</p>
+</div>
+</dd>
+</dl>
+<dl id="config-access-log-format-upstream-host-metadata">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_METADATA(NAMESPACE:KEY*):Z%</span></code></dt><dd><dl>
+<dt>HTTP/TCP</dt><dd><p><a class="reference internal" href="../../api-v3/config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-metadata"><span class="std std-ref">Upstream host Metadata</span></a> info,
+where <code class="docutils literal notranslate"><span class="pre">NAMESPACE</span></code> is the filter namespace used when setting the metadata, <code class="docutils literal notranslate"><span class="pre">KEY</span></code> is an optional
+lookup key in the namespace with the option of specifying nested keys separated by ‘:’,
+and <code class="docutils literal notranslate"><span class="pre">Z</span></code> is an optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long. The data
+will be logged as a JSON string. For example, for the following upstream host metadata:</p>
+<p><code class="docutils literal notranslate"><span class="pre">com.test.my_filter:</span> <span class="pre">{&quot;test_key&quot;:</span> <span class="pre">&quot;foo&quot;,</span> <span class="pre">&quot;test_object&quot;:</span> <span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}}</span></code></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_METADATA(com.test.my_filter)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">{&quot;test_key&quot;:</span> <span class="pre">&quot;foo&quot;,</span> <span class="pre">&quot;test_object&quot;:</span> <span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}}</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_METADATA(com.test.my_filter:test_key)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">foo</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_METADATA(com.test.my_filter:test_object)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_METADATA(com.test.my_filter:test_object:inner_key)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">bar</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_METADATA(com.unknown_filter)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">-</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_METADATA(com.test.my_filter:unknown_key)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">-</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_METADATA(com.test.my_filter):25%</span></code> will log (truncation at 25 characters): <code class="docutils literal notranslate"><span class="pre">{&quot;test_key&quot;:</span> <span class="pre">&quot;foo&quot;,</span> <span class="pre">&quot;test</span></code></p></li>
+</ul>
+</dd>
+<dt>UDP/THRIFT</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+when the referenced key is a simple value. If the referenced key is a struct or list value, a
+JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+length is ignored.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">UPSTREAM_METADATA</span></code> command operator will be deprecated in the future in favor of <a class="reference internal" href="../../api-v3/extensions/formatter/metadata/v3/metadata.proto.html#envoy-v3-api-msg-extensions-formatter-metadata-v3-metadata"><span class="std std-ref">METADATA</span></a> operator.</p>
+</div>
+</dd>
+</dl>
+<dl id="config-access-log-format-filter-state">
+<dt><code class="docutils literal notranslate"><span class="pre">%FILTER_STATE(KEY:F:FIELD?):Z%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p><a class="reference internal" href="../../intro/arch_overview/advanced/data_sharing_between_filters.html#arch-overview-data-sharing-between-filters"><span class="std std-ref">Filter State</span></a> info, where the <code class="docutils literal notranslate"><span class="pre">KEY</span></code> is required to
+look up the filter state object. The serialized proto will be logged as JSON string if possible.
+If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
+<code class="docutils literal notranslate"><span class="pre">Z</span></code> is an optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long.
+<code class="docutils literal notranslate"><span class="pre">F</span></code> is an optional parameter used to indicate which method FilterState uses for serialization.
+If <code class="docutils literal notranslate"><span class="pre">PLAIN</span></code> is set, the filter state object will be serialized as an unstructured string.
+If <code class="docutils literal notranslate"><span class="pre">TYPED</span></code> is set or no <code class="docutils literal notranslate"><span class="pre">F</span></code> provided, the filter state object will be serialized as an JSON string.
+If <code class="docutils literal notranslate"><span class="pre">F</span></code> is set to <code class="docutils literal notranslate"><span class="pre">FIELD</span></code>, the filter state object field with the name <code class="docutils literal notranslate"><span class="pre">FIELD</span></code> will be serialized.
+<code class="docutils literal notranslate"><span class="pre">FIELD</span></code> parameter should only be used with <code class="docutils literal notranslate"><span class="pre">F</span></code> set to <code class="docutils literal notranslate"><span class="pre">FIELD</span></code>.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Same as HTTP, the filter state is from connection instead of a L7 request.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+when the referenced key is a simple value. If the referenced key is a struct or list value, a
+JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+length is ignored</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_FILTER_STATE(KEY:F:FIELD?):Z%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p>Extracts filter state from upstream components like cluster or transport socket extensions.</p>
+<p><a class="reference internal" href="../../intro/arch_overview/advanced/data_sharing_between_filters.html#arch-overview-data-sharing-between-filters"><span class="std std-ref">Filter State</span></a> info, where the <code class="docutils literal notranslate"><span class="pre">KEY</span></code> is required to
+look up the filter state object. The serialized proto will be logged as JSON string if possible.
+If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
+<code class="docutils literal notranslate"><span class="pre">Z</span></code> is an optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long.
+<code class="docutils literal notranslate"><span class="pre">F</span></code> is an optional parameter used to indicate which method FilterState uses for serialization.
+If <code class="docutils literal notranslate"><span class="pre">PLAIN</span></code> is set, the filter state object will be serialized as an unstructured string.
+If <code class="docutils literal notranslate"><span class="pre">TYPED</span></code> is set or no <code class="docutils literal notranslate"><span class="pre">F</span></code> provided, the filter state object will be serialized as an JSON string.
+If <code class="docutils literal notranslate"><span class="pre">F</span></code> is set to <code class="docutils literal notranslate"><span class="pre">FIELD</span></code>, the filter state object field with the name <code class="docutils literal notranslate"><span class="pre">FIELD</span></code> will be serialized.
+<code class="docutils literal notranslate"><span class="pre">FIELD</span></code> parameter should only be used with <code class="docutils literal notranslate"><span class="pre">F</span></code> set to <code class="docutils literal notranslate"><span class="pre">FIELD</span></code>.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">UPSTREAM_FILTER_STATE</span></code> command operator is only available for <a class="reference internal" href="../../api-v3/extensions/filters/http/router/v3/router.proto.html#envoy-v3-api-field-extensions-filters-http-router-v3-router-upstream-log"><span class="std std-ref">upstream_log</span></a>.</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%REQUESTED_SERVER_NAME(X:Y)%</span></code></dt><dd><dl>
+<dt>HTTP/TCP/THRIFT</dt><dd><p>String value set on ssl connection socket for Server Name Indication (SNI) or host header.
+The parameter <code class="docutils literal notranslate"><span class="pre">X</span></code> is used to specify whether the output should fallback to the host header when SNI is not set.
+The parameter <code class="docutils literal notranslate"><span class="pre">Y</span></code> is used to specify the source of the request host. Both <code class="docutils literal notranslate"><span class="pre">X</span></code> and <code class="docutils literal notranslate"><span class="pre">Y</span></code> are optional. <code class="docutils literal notranslate"><span class="pre">Y</span></code> makes no sense
+when <code class="docutils literal notranslate"><span class="pre">X</span></code> is set to <code class="docutils literal notranslate"><span class="pre">SNI_ONLY</span></code>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">X</span></code> parameter can be:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">SNI_ONLY</span></code>: String value set on ssl connection socket for Server Name Indication (SNI), this is the default value of <code class="docutils literal notranslate"><span class="pre">X</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">SNI_FIRST</span></code>: The output will retrieve from <code class="docutils literal notranslate"><span class="pre">:authority</span></code> or <code class="docutils literal notranslate"><span class="pre">x-envoy-original-host</span></code> header when SNI is not set.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">HOST_FIRST</span></code>: The output will retrieve from <code class="docutils literal notranslate"><span class="pre">:authority</span></code> or <code class="docutils literal notranslate"><span class="pre">x-envoy-original-host</span></code> header.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">Y</span></code> parameter can be:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ORIG</span></code>: Get the request host from the <code class="docutils literal notranslate"><span class="pre">x-envoy-original-host</span></code> header.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">HOST</span></code>: Get the request host from the <code class="docutils literal notranslate"><span class="pre">:authority</span></code> header.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ORIG_OR_HOST</span></code>: Get the request host from the <code class="docutils literal notranslate"><span class="pre">x-envoy-original-host</span></code> header if it is
+present, otherwise get it from the <code class="docutils literal notranslate"><span class="pre">:authority</span></code> header. If the <code class="docutils literal notranslate"><span class="pre">Y</span></code> is not present, <code class="docutils literal notranslate"><span class="pre">ORIG_OR_HOST</span></code>
+will be used.</p></li>
+</ul>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_IP_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The ip addresses present in the SAN of the local certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_IP_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The ip addresses present in the SAN of the peer certificate received from the downstream client to establish the
+TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_DNS_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The DNS names present in the SAN of the local certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_DNS_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The DNS names present in the SAN of the peer certificate received from the downstream client to establish the
+TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_URI_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_URI_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_EMAIL_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The emails present in the SAN of the local certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_EMAIL_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The emails present in the SAN of the peer certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_OTHERNAME_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The OtherNames present in the SAN of the local certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_OTHERNAME_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The OtherNames present in the SAN of the peer certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_LOCAL_SUBJECT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The subject present in the local certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_SUBJECT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The subject present in the peer certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_ISSUER%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The issuer present in the peer certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_TLS_SESSION_ID%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The session ID for the established downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_TLS_CIPHER%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_TLS_GROUP%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The name of the TLS group used for the key agreement to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_TLS_VERSION%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The TLS version (e.g., <code class="docutils literal notranslate"><span class="pre">TLSv1.2</span></code>, <code class="docutils literal notranslate"><span class="pre">TLSv1.3</span></code>) used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_FINGERPRINT_256%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_FINGERPRINT_1%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_SERIAL%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The serial number of the client certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The comma-separated hex-encoded SHA256 fingerprints of all client certificates used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The comma-separated hex-encoded SHA1 fingerprints of all client certificates used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_CHAIN_SERIALS%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The comma-separated serial numbers of all client certificates used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The hex-encoded SHA256 fingerprint of the verified issuer (CA) certificate from the
+validated downstream TLS peer certificate. Requires a validated peer certificate chain
+(e.g., mTLS with <code class="docutils literal notranslate"><span class="pre">require_client_certificate:</span> <span class="pre">true</span></code> and a <code class="docutils literal notranslate"><span class="pre">validation_context</span></code>). Returns
+<code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> if there is no validated peer certificate chain or no issuer certificate can be found.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_ISSUER_SERIAL%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The serial number of the verified issuer (CA) certificate from the validated downstream TLS
+peer certificate. Requires a validated peer certificate chain (e.g., mTLS with
+<code class="docutils literal notranslate"><span class="pre">require_client_certificate:</span> <span class="pre">true</span></code> and a <code class="docutils literal notranslate"><span class="pre">validation_context</span></code>). Returns <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> if there
+is no validated peer certificate chain or no issuer certificate can be found.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_CERT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%TLS_JA3_FINGERPRINT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/Thrift</dt><dd><p>The JA3 fingerprint (MD5 hash) of the TLS Client Hello message from the downstream connection.
+Provides a way to fingerprint TLS clients based on various Client Hello parameters like cipher suites,
+extensions, elliptic curves, etc. Will be <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> if TLS is not used or the handshake is incomplete.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%TLS_JA4_FINGERPRINT%</span></code></dt><dd><dl>
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The JA4 fingerprint of the TLS Client Hello message from the downstream connection. JA4 is an advanced TLS client
+fingerprinting method that provides more granularity than JA3 by including the protocol version, cipher preference
+order, and ALPN (Application-Layer Protocol Negotiation) protocols. This enhanced fingerprinting facilitates
+improved threat hunting and security analysis.</p>
+<p>The JA4 fingerprint follows the format <code class="docutils literal notranslate"><span class="pre">a_b_c</span></code>, where:</p>
+<ul class="simple">
+<li><p><strong>a</strong>: Represents the TLS protocol version and cipher preference order.</p></li>
+<li><p><strong>b</strong>: Encodes the list of cipher suites offered by the client.</p></li>
+<li><p><strong>c</strong>: Contains the ALPN protocols advertised by the client.</p></li>
+</ul>
+<p>This structured format allows for detailed analysis of client applications based on their TLS handshake
+characteristics. It enables the identification of specific applications, underlying TLS libraries, and even
+potential malicious activities by comparing fingerprints against known profiles.</p>
+<p>If TLS is not used or the handshake is incomplete, the value of <code class="docutils literal notranslate"><span class="pre">%TLS_JA4_FINGERPRINT%</span></code> will be <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code>.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl id="config-access-log-format-downstream-peer-cert-v-start">
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_CERT_V_START%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The validity start date of the client certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p><code class="docutils literal notranslate"><span class="pre">DOWNSTREAM_PEER_CERT_V_START</span></code> can be customized using a <a class="reference external" href="https://en.cppreference.com/w/cpp/io/manip/put_time">format string</a>.
+See <a class="reference internal" href="#config-access-log-format-start-time"><span class="std std-ref">START_TIME</span></a> for additional format specifiers and examples.</p>
+</dd>
+</dl>
+<dl id="config-access-log-format-downstream-peer-cert-v-end">
+<dt><code class="docutils literal notranslate"><span class="pre">%DOWNSTREAM_PEER_CERT_V_END%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The validity end date of the client certificate used to establish the downstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p><code class="docutils literal notranslate"><span class="pre">DOWNSTREAM_PEER_CERT_V_END</span></code> can be customized using a <a class="reference external" href="https://en.cppreference.com/w/cpp/io/manip/put_time">format string</a>.
+See <a class="reference internal" href="#config-access-log-format-start-time"><span class="std std-ref">START_TIME</span></a> for additional format specifiers and examples.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_PEER_SUBJECT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The subject present in the peer certificate used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_PEER_ISSUER%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The issuer present in the peer certificate used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_TLS_SESSION_ID%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The session ID for the established upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">0</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_TLS_CIPHER%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The OpenSSL name for the set of ciphers used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_TLS_GROUP%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The name of the TLS group used for the key agreement to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_TLS_VERSION%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The TLS version (e.g., <code class="docutils literal notranslate"><span class="pre">TLSv1.2</span></code>, <code class="docutils literal notranslate"><span class="pre">TLSv1.3</span></code>) used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="simple" id="config-access-log-format-upstream-server-name">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_SERVER_NAME%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The TLS SNI value used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_PEER_CERT%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The server certificate in the URL-encoded PEM format used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl id="config-access-log-format-upstream-peer-cert-v-start">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_PEER_CERT_V_START%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The validity start date of the upstream server certificate used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p><code class="docutils literal notranslate"><span class="pre">UPSTREAM_PEER_CERT_V_START</span></code> can be customized using a <a class="reference external" href="https://en.cppreference.com/w/cpp/io/manip/put_time">format string</a>.
+See <a class="reference internal" href="#config-access-log-format-start-time"><span class="std std-ref">START_TIME</span></a> for additional format specifiers and examples.</p>
+</dd>
+</dl>
+<dl id="config-access-log-format-upstream-peer-cert-v-end">
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_PEER_CERT_V_END%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The validity end date of the upstream server certificate used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+<p><code class="docutils literal notranslate"><span class="pre">UPSTREAM_PEER_CERT_V_END</span></code> can be customized using a <a class="reference external" href="https://en.cppreference.com/w/cpp/io/manip/put_time">format string</a>.
+See <a class="reference internal" href="#config-access-log-format-start-time"><span class="std std-ref">START_TIME</span></a> for additional format specifiers and examples.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_PEER_URI_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The URIs present in the SAN of the peer certificate used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_PEER_DNS_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The DNS names present in the SAN of the peer certificate used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_PEER_IP_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The ip addresses present in the SAN of the peer certificate used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_LOCAL_URI_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The URIs present in the SAN of the local certificate used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_LOCAL_DNS_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The DNS names present in the SAN of the local certificate used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UPSTREAM_LOCAL_IP_SAN%</span></code></dt><dd><dl class="simple">
+<dt>HTTP/TCP/THRIFT</dt><dd><p>The ip addresses present in the SAN of the local certificate used to establish the upstream TLS connection.</p>
+</dd>
+<dt>UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%HOSTNAME%</span></code></dt><dd><p>The system hostname.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%LOCAL_REPLY_BODY%</span></code></dt><dd><p>The body text for the requests rejected by the Envoy.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%FILTER_CHAIN_NAME%</span></code></dt><dd><p>The <a class="reference internal" href="../../api-v3/config/listener/v3/listener_components.proto.html#envoy-v3-api-field-config-listener-v3-filterchain-name"><span class="std std-ref">network filter chain name</span></a> of the downstream connection.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%LISTENER_NAME%</span></code></dt><dd><p>The <a class="reference internal" href="../../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-field-config-listener-v3-listener-name"><span class="std std-ref">name</span></a> of the listener that accepted the downstream connection.</p>
+</dd>
+</dl>
+<dl id="config-access-log-format-access-log-type">
+<dt><code class="docutils literal notranslate"><span class="pre">%ACCESS_LOG_TYPE%</span></code></dt><dd><p>The type of the access log, which indicates when the access log was recorded. If a non-supported log (from the list below)
+uses this substitution string, then the value will be an empty string.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">TcpUpstreamConnected</span></code> - When TCP Proxy filter has successfully established an upstream connection.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TcpPeriodic</span></code> - On any TCP Proxy filter periodic log record.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TcpConnectionEnd</span></code> - When a TCP connection is ended on TCP Proxy filter.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TcpConnectionStart</span></code> - When a TCP connection is accepted by the TCP Proxy filter.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DownstreamStart</span></code> - When HTTP Connection Manager filter receives a new HTTP request.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DownstreamTunnelSuccessfullyEstablished</span></code> - When the HTTP Connection Manager sends response headers indicating a successful HTTP tunnel.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DownstreamPeriodic</span></code> - On any HTTP Connection Manager periodic log record.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DownstreamEnd</span></code> - When an HTTP stream is ended on HTTP Connection Manager filter.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">UpstreamPoolReady</span></code> - When a new HTTP request is received by the HTTP Router filter.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">UpstreamPeriodic</span></code> - On any HTTP Router filter periodic log record.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">UpstreamEnd</span></code> - When an HTTP request is finished on the HTTP Router filter.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">UdpTunnelUpstreamConnected</span></code> - When UDP Proxy filter has successfully established an upstream connection.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It is only relevant for UDP tunneling over HTTP.</p>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">UdpPeriodic</span></code> - On any UDP Proxy filter periodic log record.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">UdpSessionEnd</span></code> - When a UDP session is ended on UDP Proxy filter.</p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%UNIQUE_ID%</span></code></dt><dd><p>A unique identifier (UUID) that is generated dynamically.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%ENVIRONMENT(X):Z%</span></code></dt><dd><p>Environment value of environment variable <code class="docutils literal notranslate"><span class="pre">X</span></code>. If no valid environment variable <code class="docutils literal notranslate"><span class="pre">X</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> symbol will be used.
+<code class="docutils literal notranslate"><span class="pre">Z</span></code> is an optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%TRACE_ID%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>The trace ID of the request. If the request does not have a trace ID, this will be an empty string.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%SPAN_ID%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>The span ID of the active (downstream) span for the request. If the request does not have a span ID,
+this will be an empty string. Note that span ID availability depends on the tracing provider; not all
+providers implement span ID retrieval.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%QUERY_PARAM(X):Z%</span></code></dt><dd><dl class="simple">
+<dt>HTTP</dt><dd><p>The value of the query parameter <code class="docutils literal notranslate"><span class="pre">X</span></code>. If the query parameter <code class="docutils literal notranslate"><span class="pre">X</span></code> is not present, <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> symbol will be used.
+<code class="docutils literal notranslate"><span class="pre">Z</span></code> is an optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%QUERY_PARAMS(X):Z%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p>All of the query parameters. The parameter <code class="docutils literal notranslate"><span class="pre">X</span></code> is used to specify how the query parameters are presented
+and is optional, with <code class="docutils literal notranslate"><span class="pre">ORIG</span></code> then being the default.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">X</span></code> parameter can be:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ORIG</span></code>: The output will be original query params string part of the path with no treatment.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DECODED</span></code>: The query params will be URL decoded.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">Z</span></code> is an optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%PATH(X:Y):Z%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p>The value of the request path. The parameter <code class="docutils literal notranslate"><span class="pre">X</span></code> is used to specify whether the output contains
+the query or not. The parameter <code class="docutils literal notranslate"><span class="pre">Y</span></code> is used to specify the source of the request path. Both <code class="docutils literal notranslate"><span class="pre">X</span></code> and <code class="docutils literal notranslate"><span class="pre">Y</span></code>
+are optional. And <code class="docutils literal notranslate"><span class="pre">Z</span></code> is an optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">X</span></code> parameter can be:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">WQ</span></code>: The output will be the full request path which contains the query parameters. If the <code class="docutils literal notranslate"><span class="pre">X</span></code>
+is not present, <code class="docutils literal notranslate"><span class="pre">WQ</span></code> will be used.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">NQ</span></code>: The output will be the request path without the query parameters.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">Y</span></code> parameter can be:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ORIG</span></code>: Get the request path from the <code class="docutils literal notranslate"><span class="pre">x-envoy-original-path</span></code> header.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PATH</span></code>: Get the request path from the <code class="docutils literal notranslate"><span class="pre">:path</span></code> header.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ORIG_OR_PATH</span></code>: Get the request path from the <code class="docutils literal notranslate"><span class="pre">x-envoy-original-path</span></code> header if it is
+present, otherwise get it from the <code class="docutils literal notranslate"><span class="pre">:path</span></code> header. If the <code class="docutils literal notranslate"><span class="pre">Y</span></code> is not present, <code class="docutils literal notranslate"><span class="pre">ORIG_OR_PATH</span></code>
+will be used.</p></li>
+</ul>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%CUSTOM_FLAGS%</span></code></dt><dd><p>Custom flags set into the stream info. This could be used to log any custom event from the filters.
+Multiple flags are separated by comma.</p>
+</dd>
+</dl>
+<dl id="config-access-log-format-coalesce">
+<dt><code class="docutils literal notranslate"><span class="pre">%COALESCE(JSON_CONFIG):Z%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p>A higher-order formatter operator that evaluates multiple formatter operators in sequence and
+returns the first non-null result. This is useful for implementing fallback behavior,
+such as using SNI when available but falling back to the <code class="docutils literal notranslate"><span class="pre">:authority</span></code> header when SNI is not set.</p>
+<p>An operator that produces a value which is present but empty is accepted as the result. Set the
+runtime guard <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.coalesce_formatter_accept_empty_values</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>
+to restore the legacy behavior, where an empty value is skipped and the next operator is
+evaluated.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">JSON_CONFIG</span></code> parameter is a JSON object with an <code class="docutils literal notranslate"><span class="pre">operators</span></code> array. Each operator can be
+specified as either:</p>
+<ul class="simple">
+<li><p>A string representing a simple command name that does not require a parameter.</p></li>
+<li><p>An object with the following fields:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">command</span></code> (required): The command name (e.g., <code class="docutils literal notranslate"><span class="pre">REQ</span></code>, <code class="docutils literal notranslate"><span class="pre">REQUESTED_SERVER_NAME</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">param</span></code> (optional): The command parameter (e.g., <code class="docutils literal notranslate"><span class="pre">:authority</span></code> for the <code class="docutils literal notranslate"><span class="pre">REQ</span></code> command).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">max_length</span></code> (optional): Maximum length for this operator’s output.</p></li>
+</ul>
+</li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">Z</span></code> is an optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters for the final output.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The JSON parameter cannot contain literal <code class="docutils literal notranslate"><span class="pre">)</span></code> characters as they would interfere with the
+command parser. If you need a <code class="docutils literal notranslate"><span class="pre">)</span></code> character in a string value, use the Unicode escape
+sequence <code class="docutils literal notranslate"><span class="pre">\u0029</span></code>.</p>
+</div>
+<p><strong>Example: SNI with fallback to authority header</strong></p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%COALESCE({&quot;operators&quot;: [&quot;REQUESTED_SERVER_NAME&quot;, {&quot;command&quot;: &quot;REQ&quot;, &quot;param&quot;: &quot;:authority&quot;}]})%
+</pre></div>
+</div>
+<p>This returns the Server Name Indication (SNI) if available, otherwise falls back to the
+<code class="docutils literal notranslate"><span class="pre">:authority</span></code> header.</p>
+<p><strong>Example: Cascade fallback with multiple headers</strong></p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%COALESCE({&quot;operators&quot;: [&quot;REQUESTED_SERVER_NAME&quot;, {&quot;command&quot;: &quot;REQ&quot;, &quot;param&quot;: &quot;:authority&quot;}, {&quot;command&quot;: &quot;REQ&quot;, &quot;param&quot;: &quot;x-envoy-original-host&quot;}]})%
+</pre></div>
+</div>
+<p>This tries SNI first, then <code class="docutils literal notranslate"><span class="pre">:authority</span></code>, then <code class="docutils literal notranslate"><span class="pre">x-envoy-original-host</span></code>.</p>
+<p><strong>Example: With length truncation</strong></p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%COALESCE({&quot;operators&quot;: [{&quot;command&quot;: &quot;REQ&quot;, &quot;param&quot;: &quot;:authority&quot;}]}):50%
+</pre></div>
+</div>
+<p>This returns the <code class="docutils literal notranslate"><span class="pre">:authority</span></code> header value truncated to 50 characters.</p>
+<p><strong>Supported Commands</strong></p>
+<p>The <code class="docutils literal notranslate"><span class="pre">COALESCE</span></code> operator supports any built-in formatter command.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%METADATA(TYPE:NAMESPACE:KEY*):Z%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p><a class="reference internal" href="../../api-v3/config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-metadata"><span class="std std-ref">Metadata</span></a> info,
+where <code class="docutils literal notranslate"><span class="pre">TYPE</span></code> is the type of metadata, <code class="docutils literal notranslate"><span class="pre">NAMESPACE</span></code> is the filter namespace used when setting
+the metadata, <code class="docutils literal notranslate"><span class="pre">KEY</span></code> is an optional lookup key in the namespace with the option of specifying
+nested keys separated by ‘:’, and <code class="docutils literal notranslate"><span class="pre">Z</span></code> is an optional parameter denoting string truncation up to
+<code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long. The data will be logged as a JSON string.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">TYPE</span></code> parameter can be one of the following (case-sensitive):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">DYNAMIC</span></code>: Dynamic metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CLUSTER</span></code>: Upstream cluster metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ROUTE</span></code>: Route metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">UPSTREAM_HOST</span></code>: Upstream host metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">LISTENER</span></code>: Listener metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">LISTENER_FILTER_CHAIN</span></code>: Listener filter chain metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VIRTUAL_HOST</span></code>: Virtual host metadata</p></li>
+</ul>
+<p>For example, for the following ROUTE metadata:</p>
+<p><code class="docutils literal notranslate"><span class="pre">com.test.my_filter:</span> <span class="pre">{&quot;test_key&quot;:</span> <span class="pre">&quot;foo&quot;,</span> <span class="pre">&quot;test_object&quot;:</span> <span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}}</span></code></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">%METADATA(ROUTE:com.test.my_filter)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">{&quot;test_key&quot;:</span> <span class="pre">&quot;foo&quot;,</span> <span class="pre">&quot;test_object&quot;:</span> <span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}}</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%METADATA(ROUTE:com.test.my_filter:test_key)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">foo</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%METADATA(ROUTE:com.test.my_filter:test_object)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">{&quot;inner_key&quot;:</span> <span class="pre">&quot;bar&quot;}</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%METADATA(ROUTE:com.test.my_filter:test_object:inner_key)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">bar</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%METADATA(ROUTE:com.unknown_filter)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">-</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%METADATA(ROUTE:com.test.my_filter:unknown_key)%</span></code> will log: <code class="docutils literal notranslate"><span class="pre">-</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">%METADATA(ROUTE:com.test.my_filter):25%</span></code> will log (truncation at 25 characters): <code class="docutils literal notranslate"><span class="pre">{&quot;test_key&quot;:</span> <span class="pre">&quot;foo&quot;,</span> <span class="pre">&quot;test</span></code></p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+when the referenced key is a simple value. If the referenced key is a struct or list value, a
+JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+length is ignored.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">%METADATA(DYNAMIC:NAMESPACE:KEY):Z%</span></code> is equivalent to <code class="docutils literal notranslate"><span class="pre">%DYNAMIC_METADATA(NAMESPACE:KEY):Z%</span></code></p>
+<p><code class="docutils literal notranslate"><span class="pre">%METADATA(CLUSTER:NAMESPACE:KEY):Z%</span></code> is equivalent to <code class="docutils literal notranslate"><span class="pre">%CLUSTER_METADATA(NAMESPACE:KEY):Z%</span></code></p>
+<p><code class="docutils literal notranslate"><span class="pre">%METADATA(UPSTREAM_HOST:NAMESPACE:KEY):Z%</span></code> is equivalent to <code class="docutils literal notranslate"><span class="pre">%UPSTREAM_METADATA(NAMESPACE:KEY):Z%</span></code></p>
+</div>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%CEL(EXPRESSION):Z%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p>Evaluates a Common Expression Language (CEL) expression based on Envoy <a class="reference internal" href="../../intro/arch_overview/advanced/attributes.html#arch-overview-attributes"><span class="std std-ref">attributes</span></a>.
+Expression errors are rendered as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code>. <code class="docutils literal notranslate"><span class="pre">Z</span></code> is an optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long.</p>
+<p>Examples:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%CEL(response.code)%
+%CEL(connection.mtls)%
+%CEL(request.headers[&#39;x-envoy-original-path&#39;]):10%
+%CEL(request.headers[&#39;x-log-mtls&#39;] || request.url_path.contains(&#39;v1beta3&#39;))%
+</pre></div>
+</div>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%TYPED_CEL(EXPRESSION):Z%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p>Evaluates a Common Expression Language (CEL) expression and emits values of non-string types
+(number, boolean, null) in non-text access log formats like JSON. Otherwise functions the same as <code class="docutils literal notranslate"><span class="pre">%CEL%</span></code>.
+CEL types not native to JSON are coerced as follows:</p>
+<ul class="simple">
+<li><p>Bytes are base64 encoded to produce a string.</p></li>
+<li><p>Durations are stringified as a count of seconds (e.g., <code class="docutils literal notranslate"><span class="pre">duration(&quot;1h30m&quot;)</span></code> becomes <code class="docutils literal notranslate"><span class="pre">&quot;5400s&quot;</span></code>).</p></li>
+<li><p>Timestamps are formatted to UTC (e.g., <code class="docutils literal notranslate"><span class="pre">timestamp(&quot;2023-08-26T12:39:00-07:00&quot;)</span></code> becomes <code class="docutils literal notranslate"><span class="pre">&quot;2023-08-26T19:39:00+00:00&quot;</span></code>).</p></li>
+<li><p>Maps become objects, provided all keys can be coerced to strings and all values can coerce to JSON-representable types.</p></li>
+<li><p>Lists become lists, provided all values can coerce to JSON-representable types.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">Z</span></code> is an optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long.</p>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%REQ_WITHOUT_QUERY(X?Y):Z%</span></code></dt><dd><dl>
+<dt>HTTP</dt><dd><p>An HTTP request header where <code class="docutils literal notranslate"><span class="pre">X</span></code> is the main HTTP header, <code class="docutils literal notranslate"><span class="pre">Y</span></code> is the alternative one, and <code class="docutils literal notranslate"><span class="pre">Z</span></code> is an
+optional parameter denoting string truncation up to <code class="docutils literal notranslate"><span class="pre">Z</span></code> characters long. The value is taken from
+the HTTP request header named <code class="docutils literal notranslate"><span class="pre">X</span></code> first and if it’s not set, then request header <code class="docutils literal notranslate"><span class="pre">Y</span></code> is used. If
+none of the headers are present <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> symbol will be in the log.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This operator is deprecated. Please use <code class="docutils literal notranslate"><span class="pre">%PATH%</span></code> instead.</p>
+</div>
+</dd>
+<dt>TCP/UDP</dt><dd><p>Not implemented. It will appear as <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> in the access logs.</p>
+</dd>
+</dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%FILE_CONTENT(X:Y):Z%</span></code></dt><dd><p>Evaluates to the content of the file at path <code class="docutils literal notranslate"><span class="pre">X</span></code>. The file is reloaded whenever it changes.</p>
+<p>Optionally specify a directory <code class="docutils literal notranslate"><span class="pre">Y</span></code> to watch, and reload the file when changes occur. See
+<a class="reference internal" href="../../api-v3/config/core/v3/base.proto.html#envoy-v3-api-field-config-core-v3-datasource-watched-directory"><span class="std std-ref">watched_directory</span></a>
+for more detailed semantics.</p>
+<p>Takes an optional parameter <code class="docutils literal notranslate"><span class="pre">Z</span></code> to denote the maximum string length after which the
+string is truncated.</p>
+<p>This formatter is an extension, which must be explictly configured with:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.formatter.file_content</span>
+<span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">  </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.formatter.file_content.v3.FileContent</span>
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%SECRET(X):Z%</span></code></dt><dd><p>Evaluates to a secret value <code class="docutils literal notranslate"><span class="pre">X</span></code> in the configuration for this formatter, with an optional
+maximum length <code class="docutils literal notranslate"><span class="pre">Z</span></code> after which the data is truncated. The format string <code class="docutils literal notranslate"><span class="pre">%SECRET(my-api-token)%</span></code>
+could we used with the following formatter extension configuration:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.formatter.generic_secret</span>
+<span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">  </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.formatter.generic_secret.v3.GenericSecret</span>
+<span class="w">  </span><span class="nt">secret_configs</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">my-api-token</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bearer-token</span>
+<span class="w">      </span><span class="nt">sds_config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">ads</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+</pre></div>
+</div>
+<p>This formatter is an extension and must be explicitly configured.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="metadata_configurations.html" class="btn btn-neutral float-left" title="Metadata configurations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../best_practices/best_practices.html" class="btn btn-neutral float-right" title="Configuration best practices" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Substitution Formatter</a><ul>
+<li><a class="reference internal" href="#supported-commands">Supported commands</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

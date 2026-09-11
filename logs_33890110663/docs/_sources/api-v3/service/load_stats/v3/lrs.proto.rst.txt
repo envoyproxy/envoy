@@ -1,0 +1,116 @@
+.. _envoy_v3_api_file_envoy/service/load_stats/v3/lrs.proto:
+
+Load reporting service (LRS) (proto)
+====================================
+
+
+
+
+Load Reporting Service is an Envoy API to emit load reports. Envoy will initiate a bi-directional
+stream with a management server. Upon connecting, the management server can send a
+:ref:`LoadStatsResponse <envoy_v3_api_msg_service.load_stats.v3.LoadStatsResponse>` to a node it is
+interested in getting the load reports for. Envoy in this node will start sending
+:ref:`LoadStatsRequest <envoy_v3_api_msg_service.load_stats.v3.LoadStatsRequest>`. This is done periodically
+based on the :ref:`load reporting interval <envoy_v3_api_field_service.load_stats.v3.LoadStatsResponse.load_reporting_interval>`
+For details, take a look at the :ref:`Load Reporting Service sandbox example <install_sandboxes_load_reporting_service>`.
+
+
+
+
+.. _envoy_v3_api_msg_service.load_stats.v3.LoadStatsRequest:
+
+service.load_stats.v3.LoadStatsRequest
+--------------------------------------
+
+
+:repo:`[service.load_stats.v3.LoadStatsRequest proto] <api/envoy/service/load_stats/v3/lrs.proto#L62>`
+
+A load report Envoy sends to the management server.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "node": {...},
+    "cluster_stats": []
+  }
+
+.. _envoy_v3_api_field_service.load_stats.v3.LoadStatsRequest.node:
+
+
+node
+  (:ref:`config.core.v3.Node <envoy_v3_api_msg_config.core.v3.Node>`) Node identifier for Envoy instance.
+
+
+.. _envoy_v3_api_field_service.load_stats.v3.LoadStatsRequest.cluster_stats:
+
+
+cluster_stats
+  (**repeated** :ref:`config.endpoint.v3.ClusterStats <envoy_v3_api_msg_config.endpoint.v3.ClusterStats>`) A list of load stats to report.
+
+
+
+.. _envoy_v3_api_msg_service.load_stats.v3.LoadStatsResponse:
+
+service.load_stats.v3.LoadStatsResponse
+---------------------------------------
+
+
+:repo:`[service.load_stats.v3.LoadStatsResponse proto] <api/envoy/service/load_stats/v3/lrs.proto#L75>`
+
+The management server sends envoy a LoadStatsResponse with all clusters it
+is interested in learning load stats about.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "clusters": [],
+    "send_all_clusters": ...,
+    "load_reporting_interval": {...},
+    "report_endpoint_granularity": ...
+  }
+
+.. _envoy_v3_api_field_service.load_stats.v3.LoadStatsResponse.clusters:
+
+
+clusters
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Clusters to report stats for.
+  Not populated if ``send_all_clusters`` is true.
+
+
+.. _envoy_v3_api_field_service.load_stats.v3.LoadStatsResponse.send_all_clusters:
+
+
+send_all_clusters
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, the client should send all clusters it knows about.
+  Only clients that advertise the "envoy.lrs.supports_send_all_clusters" capability in their
+  :ref:`client_features<envoy_v3_api_field_config.core.v3.Node.client_features>` field will honor this field.
+
+
+.. _envoy_v3_api_field_service.load_stats.v3.LoadStatsResponse.load_reporting_interval:
+
+
+load_reporting_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The minimum interval of time to collect stats over. This is only a minimum for two reasons:
+
+  1. There may be some delay from when the timer fires until stats sampling occurs.
+  2. For clusters that were already feature in the previous ``LoadStatsResponse``, any traffic
+     that is observed in between the corresponding previous ``LoadStatsRequest`` and this
+     ``LoadStatsResponse`` will also be accumulated and billed to the cluster. This avoids a period
+     of inobservability that might otherwise exists between the messages. New clusters are not
+     subject to this consideration.
+
+
+.. _envoy_v3_api_field_service.load_stats.v3.LoadStatsResponse.report_endpoint_granularity:
+
+
+report_endpoint_granularity
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Set to ``true`` if the management server supports endpoint granularity
+  report.
+
+

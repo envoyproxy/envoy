@@ -1,0 +1,66 @@
+.. _envoy_v3_api_file_envoy/extensions/clusters/aggregate/v3/cluster.proto:
+
+Aggregate cluster configuration (proto)
+=======================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.clusters.aggregate.v3.ClusterConfig:
+
+extensions.clusters.aggregate.v3.ClusterConfig
+----------------------------------------------
+
+
+:repo:`[extensions.clusters.aggregate.v3.ClusterConfig proto] <api/envoy/extensions/clusters/aggregate/v3/cluster.proto#L21>`
+
+Configuration for the aggregate cluster. See the :ref:`architecture overview
+<arch_overview_aggregate_cluster>` for more information.
+
+.. _extension_envoy.clusters.aggregate:
+
+This extension has the qualified name ``envoy.clusters.aggregate``
+
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.clusters <extension_category_envoy.clusters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig <envoy_v3_api_msg_extensions.clusters.aggregate.v3.ClusterConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "clusters": []
+  }
+
+.. _envoy_v3_api_field_extensions.clusters.aggregate.v3.ClusterConfig.clusters:
+
+
+clusters
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Load balancing clusters in aggregate cluster. Clusters are prioritized based on the order they
+  appear in this list.
+
+
+
+

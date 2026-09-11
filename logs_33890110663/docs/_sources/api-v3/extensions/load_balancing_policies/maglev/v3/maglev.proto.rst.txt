@@ -1,0 +1,83 @@
+.. _envoy_v3_api_file_envoy/extensions/load_balancing_policies/maglev/v3/maglev.proto:
+
+Maglev Load Balancing Policy (proto)
+====================================
+
+.. _extension_envoy.load_balancing_policies.maglev:
+
+This extension has the qualified name ``envoy.load_balancing_policies.maglev``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.load_balancing_policies <extension_category_envoy.load_balancing_policies>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.load_balancing_policies.maglev.v3.Maglev <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev:
+
+extensions.load_balancing_policies.maglev.v3.Maglev
+---------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.maglev.v3.Maglev proto] <api/envoy/extensions/load_balancing_policies/maglev/v3/maglev.proto#L23>`
+
+This configuration allows the built-in Maglev LB policy to be configured via the LB policy
+extension point. See the :ref:`load balancing architecture overview
+<arch_overview_load_balancing_types>` and :ref:`Maglev<arch_overview_load_balancing_types_maglev>` for more information.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "table_size": {...},
+    "consistent_hashing_lb_config": {...},
+    "locality_weighted_lb_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.maglev.v3.Maglev.table_size:
+
+
+table_size
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) The table size for Maglev hashing. Maglev aims for "minimal disruption" rather than an absolute guarantee.
+  Minimal disruption means that when the set of upstream hosts change, a connection will likely be sent to the same
+  upstream as it was before. Increasing the table size reduces the amount of disruption.
+  The table size must be prime number limited to 5000011. If it is not specified, the default is 65537.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.maglev.v3.Maglev.consistent_hashing_lb_config:
+
+
+consistent_hashing_lb_config
+  (:ref:`extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig>`) Common configuration for hashing-based load balancing policies.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.maglev.v3.Maglev.locality_weighted_lb_config:
+
+
+locality_weighted_lb_config
+  (:ref:`extensions.load_balancing_policies.common.v3.LocalityLbConfig.LocalityWeightedLbConfig <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.LocalityLbConfig.LocalityWeightedLbConfig>`) Enable locality weighted load balancing for maglev lb explicitly.
+
+

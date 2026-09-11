@@ -1,0 +1,40 @@
+.. _envoy_v3_api_file_envoy/type/matcher/v3/path.proto:
+
+Path matcher (proto)
+====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.PathMatcher:
+
+type.matcher.v3.PathMatcher
+---------------------------
+
+
+:repo:`[type.matcher.v3.PathMatcher proto] <api/envoy/type/matcher/v3/path.proto#L19>`
+
+Specifies the way to match a path on HTTP request.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "path": {...}
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.PathMatcher.path:
+
+
+path
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`, *REQUIRED*) The ``path`` must match the URL path portion of the :path header. The query and fragment
+  string (if present) are removed in the URL path portion.
+  For example, the path ``/data`` will match the ``:path`` header ``/data#fragment?param=value``.
+
+
+  
+

@@ -1,0 +1,81 @@
+.. _envoy_v3_api_file_envoy/config/core/v3/resolver.proto:
+
+Resolver (proto)
+================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.DnsResolverOptions:
+
+config.core.v3.DnsResolverOptions
+---------------------------------
+
+
+:repo:`[config.core.v3.DnsResolverOptions proto] <api/envoy/config/core/v3/resolver.proto#L18>`
+
+Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "use_tcp_for_dns_lookups": ...,
+    "no_default_search_domain": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.DnsResolverOptions.use_tcp_for_dns_lookups:
+
+
+use_tcp_for_dns_lookups
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Use TCP for all DNS queries instead of the default protocol UDP.
+
+
+.. _envoy_v3_api_field_config.core.v3.DnsResolverOptions.no_default_search_domain:
+
+
+no_default_search_domain
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Do not use the default search domains; only query hostnames as-is or as aliases.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.DnsResolutionConfig:
+
+config.core.v3.DnsResolutionConfig
+----------------------------------
+
+
+:repo:`[config.core.v3.DnsResolutionConfig proto] <api/envoy/config/core/v3/resolver.proto#L27>`
+
+DNS resolution configuration which includes the underlying dns resolver addresses and options.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "resolvers": [],
+    "dns_resolver_options": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.DnsResolutionConfig.resolvers:
+
+
+resolvers
+  (**repeated** :ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`, *REQUIRED*) A list of dns resolver addresses. If specified, the DNS client library will perform resolution
+  via the underlying DNS resolvers. Otherwise, the default system resolvers
+  (e.g., /etc/resolv.conf) will be used.
+
+
+.. _envoy_v3_api_field_config.core.v3.DnsResolutionConfig.dns_resolver_options:
+
+
+dns_resolver_options
+  (:ref:`config.core.v3.DnsResolverOptions <envoy_v3_api_msg_config.core.v3.DnsResolverOptions>`) Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
+
+

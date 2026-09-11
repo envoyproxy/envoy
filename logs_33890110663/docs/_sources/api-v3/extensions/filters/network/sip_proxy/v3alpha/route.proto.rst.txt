@@ -1,0 +1,151 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.proto:
+
+Sip Proxy Route Configuration (proto)
+=====================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.RouteConfiguration:
+
+extensions.filters.network.sip_proxy.v3alpha.RouteConfiguration
+---------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.v3alpha.RouteConfiguration proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.proto#L15>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "routes": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.RouteConfiguration.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of the route configuration. Reserved for future use in asynchronous route discovery.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.RouteConfiguration.routes:
+
+
+routes
+  (**repeated** :ref:`extensions.filters.network.sip_proxy.v3alpha.Route <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.Route>`) The list of routes that will be matched, in order, against incoming requests. The first route
+  that matches will be used.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.Route:
+
+extensions.filters.network.sip_proxy.v3alpha.Route
+--------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.v3alpha.Route proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.proto#L24>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "match": {...},
+    "route": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.Route.match:
+
+
+match
+  (:ref:`extensions.filters.network.sip_proxy.v3alpha.RouteMatch <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.RouteMatch>`, *REQUIRED*) Route matching parameters.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.Route.route:
+
+
+route
+  (:ref:`extensions.filters.network.sip_proxy.v3alpha.RouteAction <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.RouteAction>`, *REQUIRED*) Route request to some upstream cluster.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.RouteMatch:
+
+extensions.filters.network.sip_proxy.v3alpha.RouteMatch
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.v3alpha.RouteMatch proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.proto#L32>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "domain": ...,
+    "header": ...,
+    "parameter": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.RouteMatch.domain:
+
+
+domain
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The domain from Request URI or Route Header.
+
+
+  
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.RouteMatch.header:
+
+
+header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The header to get match parameter, default is "Route".
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.RouteMatch.parameter:
+
+
+parameter
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The parameter to get domain, default is "host".
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.RouteAction:
+
+extensions.filters.network.sip_proxy.v3alpha.RouteAction
+--------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.v3alpha.RouteAction proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.proto#L47>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.RouteAction.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Indicates a single upstream cluster to which the request should be routed
+  to.
+
+
+  
+

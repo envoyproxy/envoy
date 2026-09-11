@@ -1,0 +1,88 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/generic_proxy/router/v3/router.proto:
+
+Router for generic proxy (proto)
+================================
+
+.. _extension_envoy.filters.generic.router:
+
+This extension has the qualified name ``envoy.filters.generic.router``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.generic_proxy.filters <extension_category_envoy.generic_proxy.filters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.generic_proxy.router.v3.Router <envoy_v3_api_msg_extensions.filters.network.generic_proxy.router.v3.Router>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.router.v3.Router:
+
+extensions.filters.network.generic_proxy.router.v3.Router
+---------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.router.v3.Router proto] <api/envoy/extensions/filters/network/generic_proxy/router/v3/router.proto#L18>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "bind_upstream_connection": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.router.v3.Router.bind_upstream_connection:
+
+
+bind_upstream_connection
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Set to true if the upstream connection should be bound to the downstream connection, false
+  otherwise.
+
+  By default, one random upstream connection will be selected from the upstream connection pool
+  and used for every request. And after the request is finished, the upstream connection will be
+  released back to the upstream connection pool.
+
+  If this option is true, the upstream connection will be bound to the downstream connection and
+  have same lifetime as the downstream connection. The same upstream connection will be used for
+  all requests from the same downstream connection.
+
+  And if this options is true, one of the following requirements must be met:
+
+  1. The request must be handled one by one. That is, the next request can not be sent to the
+     upstream until the previous request is finished.
+  2. Unique request id must be provided for each request and response. The request id must be
+     unique for each request and response pair in same connection pair. And the request id must
+     be the same for the corresponding request and response.
+
+  This could be useful for some protocols that require the same upstream connection to be used
+  for all requests from the same downstream connection. For example, the protocol using stateful
+  connection.
+
+

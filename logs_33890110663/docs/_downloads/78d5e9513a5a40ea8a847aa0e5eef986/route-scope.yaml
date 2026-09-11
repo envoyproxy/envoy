@@ -1,0 +1,60 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          scoped_routes:
+            name: scope_by_addr
+            scope_key_builder:
+              fragments:
+              - header_value_extractor:
+                  name: Addr
+                  element_separator: ";"
+                  element:
+                    key: x-foo-key
+                    separator: "="
+            scoped_route_configurations_list:
+              scoped_route_configurations:
+              - on_demand: true
+                name: scoped_route_0
+                key:
+                  fragments:
+                  - string_key: bar
+                route_configuration:
+                  name: local_route
+                  virtual_hosts:
+                  - name: local_service
+                    domains: ["*"]
+                    routes:
+                    - match:
+                        prefix: "/"
+                      route:
+                        cluster: cluster_0
+
+  clusters:
+  - name: cluster_0
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: service_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service.local
+                port_value: 80

@@ -1,0 +1,68 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/listener/original_src/v3/original_src.proto:
+
+Original Src Filter (proto)
+===========================
+
+.. _extension_envoy.filters.listener.original_src:
+
+This extension has the qualified name ``envoy.filters.listener.original_src``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.listener <extension_category_envoy.filters.listener>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.listener.original_src.v3.OriginalSrc <envoy_v3_api_msg_extensions.filters.listener.original_src.v3.OriginalSrc>`
+
+
+
+Use the Original source address on upstream connections.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.listener.original_src.v3.OriginalSrc:
+
+extensions.filters.listener.original_src.v3.OriginalSrc
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.listener.original_src.v3.OriginalSrc proto] <api/envoy/extensions/filters/listener/original_src/v3/original_src.proto#L20>`
+
+The Original Src filter binds upstream connections to the original source address determined
+for the connection. This address could come from something like the Proxy Protocol filter, or it
+could come from trusted http headers.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "mark": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.listener.original_src.v3.OriginalSrc.mark:
+
+
+mark
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Sets the SO_MARK option on the upstream connection's socket to the provided value. Used to
+  ensure that non-local addresses may be routed back through envoy when binding to the original
+  source address. The option will not be applied if the mark is 0.
+
+

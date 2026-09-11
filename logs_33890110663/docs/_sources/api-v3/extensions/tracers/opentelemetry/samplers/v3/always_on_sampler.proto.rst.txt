@@ -1,0 +1,55 @@
+.. _envoy_v3_api_file_envoy/extensions/tracers/opentelemetry/samplers/v3/always_on_sampler.proto:
+
+Always On Sampler config (proto)
+================================
+
+.. _extension_envoy.tracers.opentelemetry.samplers.always_on:
+
+This extension has the qualified name ``envoy.tracers.opentelemetry.samplers.always_on``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers.opentelemetry.samplers <extension_category_envoy.tracers.opentelemetry.samplers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig <envoy_v3_api_msg_extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig>`
+
+
+
+Configuration for the "AlwaysOn" Sampler extension.
+The sampler follows the "AlwaysOn" implementation from the OpenTelemetry
+SDK specification.
+
+See:
+`AlwaysOn sampler specification <https://opentelemetry.io/docs/specs/otel/trace/sdk/#alwayson>`_
+
+
+
+
+.. _envoy_v3_api_msg_extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig:
+
+extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
+------------------------------------------------------------------
+
+
+:repo:`[extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig proto] <api/envoy/extensions/tracers/opentelemetry/samplers/v3/always_on_sampler.proto#L21>`
+
+
+
+
+

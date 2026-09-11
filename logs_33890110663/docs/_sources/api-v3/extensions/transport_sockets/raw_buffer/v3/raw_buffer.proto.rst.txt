@@ -1,0 +1,51 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.proto:
+
+Raw Buffer (proto)
+==================
+
+.. _extension_envoy.transport_sockets.raw_buffer:
+
+This extension has the qualified name ``envoy.transport_sockets.raw_buffer``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.transport_sockets.downstream <extension_category_envoy.transport_sockets.downstream>`
+
+  - :ref:`envoy.transport_sockets.upstream <extension_category_envoy.transport_sockets.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer <envoy_v3_api_msg_extensions.transport_sockets.raw_buffer.v3.RawBuffer>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.raw_buffer.v3.RawBuffer:
+
+extensions.transport_sockets.raw_buffer.v3.RawBuffer
+----------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.raw_buffer.v3.RawBuffer proto] <api/envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.proto#L17>`
+
+Configuration for raw buffer transport socket.
+
+
+
+

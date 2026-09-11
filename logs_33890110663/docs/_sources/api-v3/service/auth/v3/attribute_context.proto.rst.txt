@@ -1,0 +1,410 @@
+.. _envoy_v3_api_file_envoy/service/auth/v3/attribute_context.proto:
+
+Attribute context (proto)
+=========================
+
+
+
+
+See :ref:`network filter configuration overview <config_network_filters_ext_authz>`
+and :ref:`HTTP filter configuration overview <config_http_filters_ext_authz>`.
+
+
+
+
+.. _envoy_v3_api_msg_service.auth.v3.AttributeContext:
+
+service.auth.v3.AttributeContext
+--------------------------------
+
+
+:repo:`[service.auth.v3.AttributeContext proto] <api/envoy/service/auth/v3/attribute_context.proto#L42>`
+
+An attribute is a piece of metadata that describes an activity on a network.
+For example, the size of an HTTP request, or the status code of an HTTP response.
+
+Each attribute has a type and a name, which is logically defined as a proto message field
+of the ``AttributeContext``. The ``AttributeContext`` is a collection of individual attributes
+supported by Envoy authorization system.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "source": {...},
+    "destination": {...},
+    "request": {...},
+    "context_extensions": {...},
+    "metadata_context": {...},
+    "route_metadata_context": {...},
+    "tls_session": {...}
+  }
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.source:
+
+
+source
+  (:ref:`service.auth.v3.AttributeContext.Peer <envoy_v3_api_msg_service.auth.v3.AttributeContext.Peer>`) The source of a network activity, such as starting a TCP connection.
+  In a multi hop network activity, the source represents the sender of the
+  last hop.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.destination:
+
+
+destination
+  (:ref:`service.auth.v3.AttributeContext.Peer <envoy_v3_api_msg_service.auth.v3.AttributeContext.Peer>`) The destination of a network activity, such as accepting a TCP connection.
+  In a multi hop network activity, the destination represents the receiver of
+  the last hop.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.request:
+
+
+request
+  (:ref:`service.auth.v3.AttributeContext.Request <envoy_v3_api_msg_service.auth.v3.AttributeContext.Request>`) Represents a network request, such as an HTTP request.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.context_extensions:
+
+
+context_extensions
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_>) This is analogous to http_request.headers, however these contents will not be sent to the
+  upstream server. Context_extensions provide an extension mechanism for sending additional
+  information to the auth server without modifying the proto definition. It maps to the
+  internal opaque context in the filter chain.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.metadata_context:
+
+
+metadata_context
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Dynamic metadata associated with the request.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.route_metadata_context:
+
+
+route_metadata_context
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Metadata associated with the selected route.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session:
+
+
+tls_session
+  (:ref:`service.auth.v3.AttributeContext.TLSSession <envoy_v3_api_msg_service.auth.v3.AttributeContext.TLSSession>`) TLS session details of the underlying connection.
+  This is not populated by default and will be populated only if the ext_authz filter has
+  been specifically configured to include this information.
+  For HTTP ext_authz, that requires :ref:`include_tls_session <config_http_filters_ext_authz>`
+  to be set to true.
+  For network ext_authz, that requires :ref:`include_tls_session <config_network_filters_ext_authz>`
+  to be set to true.
+
+
+.. _envoy_v3_api_msg_service.auth.v3.AttributeContext.Peer:
+
+service.auth.v3.AttributeContext.Peer
+-------------------------------------
+
+
+:repo:`[service.auth.v3.AttributeContext.Peer proto] <api/envoy/service/auth/v3/attribute_context.proto#L51>`
+
+This message defines attributes for a node that handles a network request.
+The node can be either a service or an application that sends, forwards,
+or receives the request. Service peers should fill in the ``service``,
+``principal``, and ``labels`` as appropriate.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "address": {...},
+    "service": ...,
+    "labels": {...},
+    "principal": ...,
+    "certificate": ...
+  }
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.Peer.address:
+
+
+address
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`) The address of the peer, this is typically the IP address.
+  It can also be UDS path, or others.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.Peer.service:
+
+
+service
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The canonical service name of the peer.
+  It should be set to :ref:`the HTTP x-envoy-downstream-service-cluster
+  <config_http_conn_man_headers_downstream-service-cluster>`
+  If a more trusted source of the service name is available through mTLS/secure naming, it
+  should be used.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.Peer.labels:
+
+
+labels
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_>) The labels associated with the peer.
+  These could be pod labels for Kubernetes or tags for VMs.
+  The source of the labels could be an X.509 certificate or other configuration.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.Peer.principal:
+
+
+principal
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The authenticated identity of this peer.
+  For example, the identity associated with the workload such as a service account.
+  If an X.509 certificate is used to assert the identity this field should be sourced from
+  ``URI Subject Alternative Names``, ``DNS Subject Alternate Names`` or ``Subject`` in that order.
+  The primary identity should be the principal. The principal format is issuer specific.
+
+  Examples:
+
+  - SPIFFE format is ``spiffe://trust-domain/path``.
+  - Google account format is ``https://accounts.google.com/{userid}``.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.Peer.certificate:
+
+
+certificate
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The X.509 certificate used to authenticate the identify of this peer.
+  When present, the certificate contents are encoded in URL and PEM format.
+
+
+
+
+
+.. _envoy_v3_api_msg_service.auth.v3.AttributeContext.Request:
+
+service.auth.v3.AttributeContext.Request
+----------------------------------------
+
+
+:repo:`[service.auth.v3.AttributeContext.Request proto] <api/envoy/service/auth/v3/attribute_context.proto#L89>`
+
+Represents a network request, such as an HTTP request.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "time": {...},
+    "http": {...}
+  }
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.Request.time:
+
+
+time
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp when the proxy receives the first byte of the request.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.Request.http:
+
+
+http
+  (:ref:`service.auth.v3.AttributeContext.HttpRequest <envoy_v3_api_msg_service.auth.v3.AttributeContext.HttpRequest>`) Represents an HTTP request or an HTTP-like request.
+
+
+
+.. _envoy_v3_api_msg_service.auth.v3.AttributeContext.HttpRequest:
+
+service.auth.v3.AttributeContext.HttpRequest
+--------------------------------------------
+
+
+:repo:`[service.auth.v3.AttributeContext.HttpRequest proto] <api/envoy/service/auth/v3/attribute_context.proto#L103>`
+
+This message defines attributes for an HTTP request.
+HTTP/1.x, HTTP/2, gRPC are all considered as HTTP requests.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "id": ...,
+    "method": ...,
+    "headers": {...},
+    "header_map": {...},
+    "path": ...,
+    "host": ...,
+    "scheme": ...,
+    "query": ...,
+    "fragment": ...,
+    "size": ...,
+    "protocol": ...,
+    "body": ...,
+    "raw_body": ...
+  }
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.id:
+
+
+id
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The unique ID for a request, which can be propagated to downstream
+  systems. The ID should have low probability of collision
+  within a single day for a specific service.
+  For HTTP requests, it should be X-Request-ID or equivalent.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.method:
+
+
+method
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The HTTP request method, such as ``GET``, ``POST``.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers:
+
+
+headers
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_>) The HTTP request headers. If multiple headers share the same key, they
+  must be merged according to the HTTP spec. All header keys must be
+  lower-cased, because HTTP header keys are case-insensitive.
+  Header value is encoded as UTF-8 string. Non-UTF-8 characters will be replaced by "!".
+  This field will not be set if
+  :ref:`encode_raw_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`
+  is set to true.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.header_map:
+
+
+header_map
+  (:ref:`config.core.v3.HeaderMap <envoy_v3_api_msg_config.core.v3.HeaderMap>`) A list of the raw HTTP request headers. This is used instead of
+  :ref:`headers <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>` when
+  :ref:`encode_raw_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`
+  is set to true.
+
+  Note that this is not actually a map type. ``header_map`` contains a single repeated field
+  ``headers``.
+
+  Here, only the ``key`` and ``raw_value`` fields will be populated for each HeaderValue, and
+  that is only when
+  :ref:`encode_raw_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`
+  is set to true.
+
+  Also, unlike the
+  :ref:`headers <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>`
+  field, headers with the same key are not combined into a single comma separated header.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.path:
+
+
+path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The request target, as it appears in the first line of the HTTP request. This includes
+  the URL path and query-string. No decoding is performed.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.host:
+
+
+host
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The HTTP request ``Host`` or ``:authority`` header value.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.scheme:
+
+
+scheme
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The HTTP URL scheme, such as ``http`` and ``https``.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.query:
+
+
+query
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This field is always empty, and exists for compatibility reasons. The HTTP URL query is
+  included in ``path`` field.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.fragment:
+
+
+fragment
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This field is always empty, and exists for compatibility reasons. The URL fragment is
+  not submitted as part of HTTP requests; it is unknowable.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.size:
+
+
+size
+  (`int64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The HTTP request size in bytes. If unknown, it must be -1.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.protocol:
+
+
+protocol
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The network protocol used with the request, such as "HTTP/1.0", "HTTP/1.1", or "HTTP/2".
+
+  See :repo:`headers.h:ProtocolStrings <source/common/http/headers.h>` for a list of all
+  possible values.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body:
+
+
+body
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The HTTP request body.
+
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body:
+
+
+raw_body
+  (`bytes <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The HTTP request body in bytes. This is used instead of
+  :ref:`body <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` when
+  :ref:`pack_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>`
+  is set to true.
+
+
+
+
+
+.. _envoy_v3_api_msg_service.auth.v3.AttributeContext.TLSSession:
+
+service.auth.v3.AttributeContext.TLSSession
+-------------------------------------------
+
+
+:repo:`[service.auth.v3.AttributeContext.TLSSession proto] <api/envoy/service/auth/v3/attribute_context.proto#L183>`
+
+This message defines attributes for the underlying TLS session.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "sni": ...
+  }
+
+.. _envoy_v3_api_field_service.auth.v3.AttributeContext.TLSSession.sni:
+
+
+sni
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) SNI used for TLS session.
+
+
+
+
+

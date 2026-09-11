@@ -1,0 +1,175 @@
+.. _envoy_v3_api_file_envoy/extensions/health_checkers/thrift/v3/thrift.proto:
+
+Thrift (proto)
+==============
+
+.. _extension_envoy.health_checkers.thrift:
+
+This extension has the qualified name ``envoy.health_checkers.thrift``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.health_checkers <extension_category_envoy.health_checkers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.health_checkers.thrift.v3.Thrift <envoy_v3_api_msg_extensions.health_checkers.thrift.v3.Thrift>`
+
+
+
+Thrift health checker :ref:`configuration overview <config_health_checkers_thrift>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.health_checkers.thrift.v3.Thrift:
+
+extensions.health_checkers.thrift.v3.Thrift
+-------------------------------------------
+
+
+:repo:`[extensions.health_checkers.thrift.v3.Thrift proto] <api/envoy/extensions/health_checkers/thrift/v3/thrift.proto#L19>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "method_name": ...,
+    "transport": ...,
+    "protocol": ...
+  }
+
+.. _envoy_v3_api_field_extensions.health_checkers.thrift.v3.Thrift.method_name:
+
+
+method_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Specifies the method name that will be set on each health check request dispatched to an upstream host.
+  Note that method name is case sensitive.
+
+
+.. _envoy_v3_api_field_extensions.health_checkers.thrift.v3.Thrift.transport:
+
+
+transport
+  (:ref:`extensions.filters.network.thrift_proxy.v3.TransportType <envoy_v3_api_enum_extensions.filters.network.thrift_proxy.v3.TransportType>`) Configures the transport type to be used with the health checks. Note that
+  :ref:`AUTO_TRANSPORT<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`
+  is not supported, and we don't honor :ref:`ThriftProtocolOptions<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProtocolOptions>`
+  since it's possible to set to :ref:`AUTO_TRANSPORT<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`.
+
+
+  .. _extension_category_envoy.filters.network:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.filters.network.connection_limit <extension_envoy.filters.network.connection_limit>`
+
+    - :ref:`envoy.filters.network.direct_response <extension_envoy.filters.network.direct_response>`
+
+    - :ref:`envoy.filters.network.dubbo_proxy <extension_envoy.filters.network.dubbo_proxy>`
+
+    - :ref:`envoy.filters.network.dynamic_modules <extension_envoy.filters.network.dynamic_modules>`
+
+    - :ref:`envoy.filters.network.echo <extension_envoy.filters.network.echo>`
+
+    - :ref:`envoy.filters.network.envoy_mobile_http_connection_manager <extension_envoy.filters.network.envoy_mobile_http_connection_manager>`
+
+    - :ref:`envoy.filters.network.ext_authz <extension_envoy.filters.network.ext_authz>`
+
+    - :ref:`envoy.filters.network.ext_proc <extension_envoy.filters.network.ext_proc>`
+
+    - :ref:`envoy.filters.network.generic_proxy <extension_envoy.filters.network.generic_proxy>`
+
+    - :ref:`envoy.filters.network.geoip <extension_envoy.filters.network.geoip>`
+
+    - :ref:`envoy.filters.network.http_connection_manager <extension_envoy.filters.network.http_connection_manager>`
+
+    - :ref:`envoy.filters.network.local_ratelimit <extension_envoy.filters.network.local_ratelimit>`
+
+    - :ref:`envoy.filters.network.mongo_proxy <extension_envoy.filters.network.mongo_proxy>`
+
+    - :ref:`envoy.filters.network.ratelimit <extension_envoy.filters.network.ratelimit>`
+
+    - :ref:`envoy.filters.network.rbac <extension_envoy.filters.network.rbac>`
+
+    - :ref:`envoy.filters.network.redis_proxy <extension_envoy.filters.network.redis_proxy>`
+
+    - :ref:`envoy.filters.network.reverse_tunnel <extension_envoy.filters.network.reverse_tunnel>`
+
+    - :ref:`envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager <extension_envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager>`
+
+    - :ref:`envoy.filters.network.set_filter_state <extension_envoy.filters.network.set_filter_state>`
+
+    - :ref:`envoy.filters.network.sni_cluster <extension_envoy.filters.network.sni_cluster>`
+
+    - :ref:`envoy.filters.network.sni_dynamic_forward_proxy <extension_envoy.filters.network.sni_dynamic_forward_proxy>`
+
+    - :ref:`envoy.filters.network.tcp_bandwidth_limit <extension_envoy.filters.network.tcp_bandwidth_limit>`
+
+    - :ref:`envoy.filters.network.tcp_proxy <extension_envoy.filters.network.tcp_proxy>`
+
+    - :ref:`envoy.filters.network.thrift_proxy <extension_envoy.filters.network.thrift_proxy>`
+
+    - :ref:`envoy.filters.network.wasm <extension_envoy.filters.network.wasm>`
+
+    - :ref:`envoy.filters.network.zookeeper_proxy <extension_envoy.filters.network.zookeeper_proxy>`
+
+
+
+
+    The following extensions are available in :ref:`contrib <install_contrib>` images only:
+
+
+    - :ref:`envoy.filters.network.client_ssl_auth <extension_envoy.filters.network.client_ssl_auth>`
+
+    - :ref:`envoy.filters.network.golang <extension_envoy.filters.network.golang>`
+
+    - :ref:`envoy.filters.network.kafka_broker <extension_envoy.filters.network.kafka_broker>`
+
+    - :ref:`envoy.filters.network.kafka_mesh <extension_envoy.filters.network.kafka_mesh>`
+
+    - :ref:`envoy.filters.network.metadata_exchange <extension_envoy.filters.network.metadata_exchange>`
+
+    - :ref:`envoy.filters.network.mysql_proxy <extension_envoy.filters.network.mysql_proxy>`
+
+    - :ref:`envoy.filters.network.peer_metadata <extension_envoy.filters.network.peer_metadata>`
+
+    - :ref:`envoy.filters.network.postgres_proxy <extension_envoy.filters.network.postgres_proxy>`
+
+    - :ref:`envoy.filters.network.rocketmq_proxy <extension_envoy.filters.network.rocketmq_proxy>`
+
+    - :ref:`envoy.filters.network.sip_proxy <extension_envoy.filters.network.sip_proxy>`
+
+
+
+.. _envoy_v3_api_field_extensions.health_checkers.thrift.v3.Thrift.protocol:
+
+
+protocol
+  (:ref:`extensions.filters.network.thrift_proxy.v3.ProtocolType <envoy_v3_api_enum_extensions.filters.network.thrift_proxy.v3.ProtocolType>`) Configures the protocol type to be used with the health checks. Note that
+  :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`
+  and :ref:`TWITTER<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>`
+  are not supported, and we don't honor :ref:`ThriftProtocolOptions<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProtocolOptions>`
+  since it's possible to set to :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`
+  or :ref:`TWITTER<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>`.
+
+

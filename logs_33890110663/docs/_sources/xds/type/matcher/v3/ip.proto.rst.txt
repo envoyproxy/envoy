@@ -1,0 +1,101 @@
+.. _envoy_v3_api_file_xds/type/matcher/v3/ip.proto:
+
+IP matcher (proto)
+==================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher:
+
+.xds.type.matcher.v3.IPMatcher
+------------------------------
+
+
+`[.xds.type.matcher.v3.IPMatcher proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/ip.proto#L20>`_
+
+Matches a specific IP address against a set of possibly overlapping subnets using a trie.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "range_matchers": []
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.IPMatcher.range_matchers:
+
+
+range_matchers
+  (**repeated** :ref:`.xds.type.matcher.v3.IPMatcher.IPRangeMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher.IPRangeMatcher>`) Match IP address by CIDR ranges.
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher.IPRangeMatcher:
+
+.xds.type.matcher.v3.IPMatcher.IPRangeMatcher
+---------------------------------------------
+
+
+`[.xds.type.matcher.v3.IPMatcher.IPRangeMatcher proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/ip.proto#L22>`_
+
+Specifies a list of IP address ranges and a match action.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ranges": [],
+    "on_match": {...},
+    "exclusive": ...
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.IPMatcher.IPRangeMatcher.ranges:
+
+
+ranges
+  (**repeated** :ref:`.xds.core.v3.CidrRange <envoy_v3_api_msg_.xds.core.v3.CidrRange>`, *REQUIRED*) A non-empty set of CIDR ranges.
+
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.IPMatcher.IPRangeMatcher.on_match:
+
+
+on_match
+  (:ref:`.xds.type.matcher.v3.Matcher.OnMatch <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.OnMatch>`) Match action to apply when the IP address is within one of the CIDR ranges.
+
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.IPMatcher.IPRangeMatcher.exclusive:
+
+
+exclusive
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates whether this match option should be considered if there is a
+  more specific matcher. Exclusive matchers are not selected whenever a
+  more specific matcher exists (e.g. matcher with a longer prefix) even
+  when the more specific matcher fails its nested match condition.
+  Non-exclusive matchers are considered if the more specific matcher
+  exists but its nested match condition does not entirely match.
+  Non-exclusive matchers are selected in the order of their specificity
+  first (longest prefix first), then the order of declaration next.
+
+  For example, consider two range matchers: an exclusive matcher *X* on
+  ``0.0.0.0/0`` and a matcher *Y* on ``192.0.0.0/2`` with a nested match
+  condition *Z*. For the input IP ``192.168.0.1`` matcher *Y* is the most
+  specific. If its nested match condition *Z* does not accept the input,
+  then the less specific matcher *X* does not apply either despite the
+  input being within the range, because matcher *X* is exclusive.
+
+  The opposite is true if matcher *X* is not marked as exclusive. In that
+  case matcher *X* always matches whenever matcher "*Y* rejects the input.
+
+
+

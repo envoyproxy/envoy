@@ -1,0 +1,110 @@
+.. _envoy_v3_api_file_envoy/extensions/http/cache/file_system_http_cache/v3/file_system_http_cache.proto:
+
+FileSystemHttpCacheConfig (proto)
+=================================
+
+.. _extension_envoy.extensions.http.cache.file_system_http_cache:
+
+This extension has the qualified name ``envoy.extensions.http.cache.file_system_http_cache``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.http.cache <extension_category_envoy.http.cache>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig <envoy_v3_api_msg_extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig:
+
+extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig
+-------------------------------------------------------------------------
+
+
+:repo:`[extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig proto] <api/envoy/extensions/http/cache/file_system_http_cache/v3/file_system_http_cache.proto#L30>`
+
+Configuration for a cache implementation that caches in the local file system.
+
+By default this cache uses a least-recently-used eviction strategy.
+
+For implementation details, see `DESIGN.md <https://github.com/envoyproxy/envoy/blob/main/source/extensions/http/cache/file_system_http_cache/DESIGN.md>`_.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "manager_config": {...},
+    "cache_path": ...,
+    "max_cache_size_bytes": {...},
+    "max_cache_entry_count": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig.manager_config:
+
+
+manager_config
+  (:ref:`extensions.common.async_files.v3.AsyncFileManagerConfig <envoy_v3_api_msg_extensions.common.async_files.v3.AsyncFileManagerConfig>`, *REQUIRED*) Configuration of a manager for how the file system is used asynchronously.
+
+
+.. _envoy_v3_api_field_extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig.cache_path:
+
+
+cache_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Path at which the cache files will be stored.
+
+  This also doubles as the unique identifier for a cache, so a cache can be shared
+  between different routes, or separate paths can be used to specify separate caches.
+
+  If the same ``cache_path`` is used in more than one ``CacheConfig``, the rest of the
+  ``FileSystemHttpCacheConfig`` must also match, and will refer to the same cache
+  instance.
+
+
+.. _envoy_v3_api_field_extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig.max_cache_size_bytes:
+
+
+max_cache_size_bytes
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) The maximum size of the cache in bytes - when reached, cache eviction is triggered.
+
+  This is measured as the sum of file sizes, such that it includes headers, trailers,
+  and metadata, but does not include e.g. file system overhead and block size padding.
+
+  If unset there is no limit except file system failure.
+
+
+.. _envoy_v3_api_field_extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig.max_cache_entry_count:
+
+
+max_cache_entry_count
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) The maximum number of cache entries - when reached, cache eviction is triggered.
+
+  If unset there is no limit.
+
+

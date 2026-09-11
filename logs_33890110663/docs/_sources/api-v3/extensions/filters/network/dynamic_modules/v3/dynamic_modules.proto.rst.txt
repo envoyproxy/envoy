@@ -1,0 +1,133 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/dynamic_modules/v3/dynamic_modules.proto:
+
+Dynamic Modules Network Filter (proto)
+======================================
+
+.. _extension_envoy.filters.network.dynamic_modules:
+
+This extension has the qualified name ``envoy.filters.network.dynamic_modules``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter:
+
+extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter
+------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter proto] <api/envoy/extensions/filters/network/dynamic_modules/v3/dynamic_modules.proto#L31>`
+
+Configuration for the Dynamic Modules network filter. This filter allows loading shared object
+files that can be loaded via ``dlopen`` to extend the network filter chain.
+
+A module can be loaded by multiple network filters; the module is loaded only once and shared
+across multiple filters.
+
+Unlike HTTP filters which operate on structured headers, body, and trailers, network filters work
+with raw TCP byte streams. The filter can:
+
+* Inspect, modify, or inject data into the downstream connection.
+* Access connection-level information such as addresses and TLS status.
+* Control connection lifecycle (e.g., close the connection).
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "filter_name": ...,
+    "filter_config": {...},
+    "terminal_filter": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`) Specifies the shared-object level configuration.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter.filter_name:
+
+
+filter_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name for this filter configuration.
+
+  This can be used to distinguish between different filter implementations inside a dynamic
+  module. For example, a module can have completely different filter implementations. When Envoy
+  receives this configuration, it passes the ``filter_name`` to the dynamic module's network
+  filter config init function together with the ``filter_config``. That way a module can decide
+  which in-module filter implementation to use based on the name at load time.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter.filter_config:
+
+
+filter_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the filter chosen by ``filter_name``.
+
+  This is passed to the module's network filter initialization function. Together with the
+  ``filter_name``, the module can decide which in-module filter implementation to use and
+  fine-tune the behavior of the filter.
+
+  For example, if a module has two filter implementations, one for echo and one for rate
+  limiting, ``filter_name`` is used to choose either echo or rate limiting. The
+  ``filter_config`` can be used to configure the echo behavior or the rate limiting parameters.
+
+  ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
+  without the wrapper.
+
+  .. code-block:: yaml
+
+   # Passing a string value
+   filter_config:
+     "@type": "type.googleapis.com/google.protobuf.StringValue"
+     value: hello
+
+   # Passing raw bytes
+   filter_config:
+     "@type": "type.googleapis.com/google.protobuf.BytesValue"
+     value: aGVsbG8=  # echo -n "hello" | base64
+
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter.terminal_filter:
+
+
+terminal_filter
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If ``true``, the dynamic module is a terminal filter to use without an upstream connection.
+
+  The dynamic module is responsible for creating and sending the response to downstream.
+
+  Defaults to ``false``.
+
+

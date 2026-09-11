@@ -1,0 +1,194 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/common/fault/v3/fault.proto:
+
+Common fault injection types (proto)
+====================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.common.fault.v3.FaultDelay:
+
+extensions.filters.common.fault.v3.FaultDelay
+---------------------------------------------
+
+
+:repo:`[extensions.filters.common.fault.v3.FaultDelay proto] <api/envoy/extensions/filters/common/fault/v3/fault.proto#L23>`
+
+Delay specification is used to inject latency into the
+HTTP/Mongo operation.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "fixed_delay": {...},
+    "header_delay": {...},
+    "percentage": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.common.fault.v3.FaultDelay.fixed_delay:
+
+
+fixed_delay
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Add a fixed delay before forwarding the operation upstream. See
+  https://developers.google.com/protocol-buffers/docs/proto3#json for
+  the JSON/YAML Duration mapping. For HTTP/Mongo, the specified
+  delay will be injected before a new request/operation.
+  This is required if type is FIXED.
+
+
+  
+
+  Precisely one of :ref:`fixed_delay <envoy_v3_api_field_extensions.filters.common.fault.v3.FaultDelay.fixed_delay>`, :ref:`header_delay <envoy_v3_api_field_extensions.filters.common.fault.v3.FaultDelay.header_delay>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.common.fault.v3.FaultDelay.header_delay:
+
+
+header_delay
+  (:ref:`extensions.filters.common.fault.v3.FaultDelay.HeaderDelay <envoy_v3_api_msg_extensions.filters.common.fault.v3.FaultDelay.HeaderDelay>`) Fault delays are controlled via an HTTP header (if applicable).
+
+
+  
+
+  Precisely one of :ref:`fixed_delay <envoy_v3_api_field_extensions.filters.common.fault.v3.FaultDelay.fixed_delay>`, :ref:`header_delay <envoy_v3_api_field_extensions.filters.common.fault.v3.FaultDelay.header_delay>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.common.fault.v3.FaultDelay.percentage:
+
+
+percentage
+  (:ref:`type.v3.FractionalPercent <envoy_v3_api_msg_type.v3.FractionalPercent>`) The percentage of operations/connections/requests on which the delay will be injected.
+
+
+.. _envoy_v3_api_msg_extensions.filters.common.fault.v3.FaultDelay.HeaderDelay:
+
+extensions.filters.common.fault.v3.FaultDelay.HeaderDelay
+---------------------------------------------------------
+
+
+:repo:`[extensions.filters.common.fault.v3.FaultDelay.HeaderDelay proto] <api/envoy/extensions/filters/common/fault/v3/fault.proto#L35>`
+
+Fault delays are controlled via an HTTP header (if applicable). See the
+:ref:`HTTP fault filter <config_http_filters_fault_injection_http_header>` documentation for
+more information.
+
+
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.common.fault.v3.FaultDelay.FaultDelayType:
+
+Enum extensions.filters.common.fault.v3.FaultDelay.FaultDelayType
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.common.fault.v3.FaultDelay.FaultDelayType proto] <api/envoy/extensions/filters/common/fault/v3/fault.proto#L27>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.common.fault.v3.FaultDelay.FaultDelayType.FIXED:
+
+
+FIXED
+  *(DEFAULT)* ⁣Unused and deprecated.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.common.fault.v3.FaultRateLimit:
+
+extensions.filters.common.fault.v3.FaultRateLimit
+-------------------------------------------------
+
+
+:repo:`[extensions.filters.common.fault.v3.FaultRateLimit proto] <api/envoy/extensions/filters/common/fault/v3/fault.proto#L63>`
+
+Describes a rate limit to be applied.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "fixed_limit": {...},
+    "header_limit": {...},
+    "percentage": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.common.fault.v3.FaultRateLimit.fixed_limit:
+
+
+fixed_limit
+  (:ref:`extensions.filters.common.fault.v3.FaultRateLimit.FixedLimit <envoy_v3_api_msg_extensions.filters.common.fault.v3.FaultRateLimit.FixedLimit>`) A fixed rate limit.
+
+
+  
+
+  Precisely one of :ref:`fixed_limit <envoy_v3_api_field_extensions.filters.common.fault.v3.FaultRateLimit.fixed_limit>`, :ref:`header_limit <envoy_v3_api_field_extensions.filters.common.fault.v3.FaultRateLimit.header_limit>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.common.fault.v3.FaultRateLimit.header_limit:
+
+
+header_limit
+  (:ref:`extensions.filters.common.fault.v3.FaultRateLimit.HeaderLimit <envoy_v3_api_msg_extensions.filters.common.fault.v3.FaultRateLimit.HeaderLimit>`) Rate limits are controlled via an HTTP header (if applicable).
+
+
+  
+
+  Precisely one of :ref:`fixed_limit <envoy_v3_api_field_extensions.filters.common.fault.v3.FaultRateLimit.fixed_limit>`, :ref:`header_limit <envoy_v3_api_field_extensions.filters.common.fault.v3.FaultRateLimit.header_limit>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.common.fault.v3.FaultRateLimit.percentage:
+
+
+percentage
+  (:ref:`type.v3.FractionalPercent <envoy_v3_api_msg_type.v3.FractionalPercent>`) The percentage of operations/connections/requests on which the rate limit will be injected.
+
+
+.. _envoy_v3_api_msg_extensions.filters.common.fault.v3.FaultRateLimit.FixedLimit:
+
+extensions.filters.common.fault.v3.FaultRateLimit.FixedLimit
+------------------------------------------------------------
+
+
+:repo:`[extensions.filters.common.fault.v3.FaultRateLimit.FixedLimit proto] <api/envoy/extensions/filters/common/fault/v3/fault.proto#L68>`
+
+Describes a fixed/constant rate limit.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "limit_kbps": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.common.fault.v3.FaultRateLimit.FixedLimit.limit_kbps:
+
+
+limit_kbps
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The limit supplied in KiB/s.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.common.fault.v3.FaultRateLimit.HeaderLimit:
+
+extensions.filters.common.fault.v3.FaultRateLimit.HeaderLimit
+-------------------------------------------------------------
+
+
+:repo:`[extensions.filters.common.fault.v3.FaultRateLimit.HeaderLimit proto] <api/envoy/extensions/filters/common/fault/v3/fault.proto#L79>`
+
+Rate limits are controlled via an HTTP header (if applicable). See the
+:ref:`HTTP fault filter <config_http_filters_fault_injection_http_header>` documentation for
+more information.
+
+
+
+
+

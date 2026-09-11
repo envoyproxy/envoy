@@ -1,0 +1,82 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/clients/grpc_client/grpc_client.proto:
+
+contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/clients/grpc_client/grpc_client.proto (proto)
+=======================================================================================================
+
+
+
+
+.. _envoy_v3_api_msg_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.GrpcClientConfig:
+
+extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.GrpcClientConfig
+--------------------------------------------------------------------------------
+
+
+:repo:`[extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.GrpcClientConfig proto] <api/contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/clients/grpc_client/grpc_client.proto#L18>`
+
+Configuration for gRPC push-based connection event client.
+Actively pushes connection events to a cluster using grpc using some internal timing.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "cluster": ...,
+    "default_send_interval": {...},
+    "connect_retry_interval": {...},
+    "max_retries": ...,
+    "max_buffer_count": ...
+  }
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.GrpcClientConfig.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Stat prefix for this client's metrics.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.GrpcClientConfig.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Name of the cluster to send gRPC requests to.
+  It must be present in the config otherwise the setup will throw error in the onServerInitialized.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.GrpcClientConfig.default_send_interval:
+
+
+default_send_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Default interval between sending batched connection events.
+  Default is 5s.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.GrpcClientConfig.connect_retry_interval:
+
+
+connect_retry_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Interval between connection retry attempts to the gRPC service.
+  Connect timeouts are provided at the cluster level and will be handled by the http/2 client.
+  How much time to wait after a failed connect before retrying. Default is 5s.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.GrpcClientConfig.max_retries:
+
+
+max_retries
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Maximum number of retry attempts for failed gRPC sends.
+  Basically the cluster will have default_send_interval * max_retries time to respond.
+  Default is 5. After this we will disconnect and try to connect again.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.GrpcClientConfig.max_buffer_count:
+
+
+max_buffer_count
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Maximum events to buffer at any given time
+  Default is 1,000,000.
+
+

@@ -1,0 +1,152 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/on_demand/v3/on_demand.proto:
+
+On Demand Discovery (proto)
+===========================
+
+.. _extension_envoy.filters.http.on_demand:
+
+This extension has the qualified name ``envoy.filters.http.on_demand``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>`
+
+
+
+On Demand Discovery :ref:`configuration overview <config_http_filters_on_demand>`.
+
+.. warning::
+
+   Envoy currently only supports On-demand CDS when using Incremental-xDS and not State-of-the-World.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemandCds:
+
+extensions.filters.http.on_demand.v3.OnDemandCds
+------------------------------------------------
+
+
+:repo:`[extensions.filters.http.on_demand.v3.OnDemandCds proto] <api/envoy/extensions/filters/http/on_demand/v3/on_demand.proto#L27>`
+
+Configuration of on-demand CDS.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "source": {...},
+    "resources_locator": ...,
+    "timeout": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemandCds.source:
+
+
+source
+  (:ref:`config.core.v3.ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`) A configuration source for the service that will be used for
+  on-demand cluster discovery.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemandCds.resources_locator:
+
+
+resources_locator
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) xdstp:// resource locator for on-demand cluster collection.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemandCds.timeout:
+
+
+timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The timeout for on demand cluster lookup. If not set, defaults to 5 seconds.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand:
+
+extensions.filters.http.on_demand.v3.OnDemand
+---------------------------------------------
+
+
+:repo:`[extensions.filters.http.on_demand.v3.OnDemand proto] <api/envoy/extensions/filters/http/on_demand/v3/on_demand.proto#L40>`
+
+On Demand Discovery filter config.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "odcds": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.odcds:
+
+
+odcds
+  (:ref:`extensions.filters.http.on_demand.v3.OnDemandCds <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemandCds>`) An optional configuration for on-demand cluster discovery
+  service. If not specified, the on-demand cluster discovery will
+  be disabled. When it's specified, the filter will pause the
+  request to an unknown cluster and will begin a cluster discovery
+  process. When the discovery is finished (successfully or not), the
+  request will be resumed for further processing.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig:
+
+extensions.filters.http.on_demand.v3.PerRouteConfig
+---------------------------------------------------
+
+
+:repo:`[extensions.filters.http.on_demand.v3.PerRouteConfig proto] <api/envoy/extensions/filters/http/on_demand/v3/on_demand.proto#L54>`
+
+Per-route configuration for On Demand Discovery.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "odcds": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.on_demand.v3.PerRouteConfig.odcds:
+
+
+odcds
+  (:ref:`extensions.filters.http.on_demand.v3.OnDemandCds <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemandCds>`) An optional configuration for on-demand cluster discovery
+  service. If not specified, the on-demand cluster discovery will
+  be disabled. When it's specified, the filter will pause the
+  request to an unknown cluster and will begin a cluster discovery
+  process. When the discovery is finished (successfully or not), the
+  request will be resumed for further processing.
+
+

@@ -1,0 +1,534 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dynamic configuration (control plane) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Dynamic configuration (filesystem)" href="dynamic-config-fs.html" />
+    <link rel="prev" title="Double proxy (with mTLS encryption)" href="double-proxy.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../start.html">Getting Started</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Sandboxes</a></li>
+      <li class="breadcrumb-item active">Dynamic configuration (control plane)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/start/sandboxes/dynamic-config-cp.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dynamic-configuration-control-plane">
+<span id="install-sandboxes-dynamic-config-cp"></span><h1>Dynamic configuration (control plane)<a class="headerlink" href="#dynamic-configuration-control-plane" title="Link to this heading"></a></h1>
+<aside class="sidebar">
+<p class="sidebar-title">Requirements</p>
+<dl class="simple">
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup"><span class="std std-ref">Sandbox environment</span></a></dt><dd><p>Setup your sandbox environment with Docker and Docker Compose,
+and clone the Envoy repository with Git.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup-curl"><span class="std std-ref">curl</span></a></dt><dd><p>Used to make HTTP requests.</p>
+</dd>
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup-jq"><span class="std std-ref">jq</span></a></dt><dd><p>Parse JSON output from the upstream echo servers.</p>
+</dd>
+</dl>
+</aside>
+<p>This example walks through configuring Envoy using the <a class="reference external" href="https://github.com/envoyproxy/go-control-plane">Go Control Plane</a>
+reference implementation.</p>
+<p>It demonstrates how configuration provided to Envoy persists, even when the control plane is not available,
+and provides a trivial example of how to update Envoy’s configuration dynamically.</p>
+<section id="step-1-start-the-proxy-container">
+<h2>Step 1: Start the proxy container<a class="headerlink" href="#step-1-start-the-proxy-container" title="Link to this heading"></a></h2>
+<p>Change to the <code class="docutils literal notranslate"><span class="pre">dynamic-config-cp</span></code> directory.</p>
+<p>First build the containers and start the <code class="docutils literal notranslate"><span class="pre">proxy</span></code> container.</p>
+<p>This should also start two upstream HTTP echo servers, <code class="docutils literal notranslate"><span class="pre">service1</span></code> and <code class="docutils literal notranslate"><span class="pre">service2</span></code>.</p>
+<p>The control plane has not yet been started.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">pwd</span>
+<span class="go">examples/dynamic-config-cp</span>
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>pull
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d<span class="w"> </span>proxy
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>ps
+
+<span class="go">       Name                            Command                State                     Ports</span>
+<span class="go">------------------------------------------------------------------------------------------------------------------------</span>
+<span class="go">dynamic-config-cp_proxy_1      /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000-&gt;10000/tcp, 0.0.0.0:19000-&gt;19000/tcp</span>
+<span class="go">dynamic-config-cp_service1_1   /bin/echo-server               Up      8080/tcp</span>
+<span class="go">dynamic-config-cp_service2_1   /bin/echo-server               Up      8080/tcp</span>
+</pre></div>
+</div>
+</section>
+<section id="step-2-check-initial-config-and-web-response">
+<h2>Step 2: Check initial config and web response<a class="headerlink" href="#step-2-check-initial-config-and-web-response" title="Link to this heading"></a></h2>
+<p>As we have not yet started the control plane, nothing should be responding on port <code class="docutils literal notranslate"><span class="pre">10000</span></code>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>http://localhost:10000
+<span class="go">curl: (56) Recv failure: Connection reset by peer</span>
+</pre></div>
+</div>
+<p>Dump the proxy’s <a class="reference internal" href="../../api-v3/admin/v3/config_dump_shared.proto.html#envoy-v3-api-field-admin-v3-clustersconfigdump-static-clusters"><span class="std std-ref">static_clusters</span></a>
+configuration and you should see the cluster named <code class="docutils literal notranslate"><span class="pre">xds_cluster</span></code> configured for the control plane:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:19000/config_dump<span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.configs[1].static_clusters&#39;</span>
+</pre></div>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;@type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;type.googleapis.com/envoy.api.v2.Cluster&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;xds_cluster&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;STRICT_DNS&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;connect_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1s&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;http2_protocol_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">      </span><span class="nt">&quot;load_assignment&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="hll"><span class="w">        </span><span class="nt">&quot;cluster_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;xds_cluster&quot;</span><span class="p">,</span>
+</span><span class="w">        </span><span class="nt">&quot;endpoints&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;lb_endpoints&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;endpoint&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                  </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="nt">&quot;socket_address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="hll"><span class="w">                      </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;go-control-plane&quot;</span><span class="p">,</span>
+</span><span class="hll"><span class="w">                      </span><span class="nt">&quot;port_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">18000</span>
+</span><span class="w">                    </span><span class="p">}</span>
+<span class="w">                  </span><span class="p">}</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">              </span><span class="p">}</span>
+<span class="w">            </span><span class="p">]</span>
+<span class="w">          </span><span class="p">}</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;last_updated&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2020-10-25T20:20:54.897Z&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p>No <a class="reference internal" href="../../api-v3/admin/v3/config_dump_shared.proto.html#envoy-v3-api-field-admin-v3-clustersconfigdump-dynamic-active-clusters"><span class="std std-ref">dynamic_active_clusters</span></a>
+have been configured yet:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:19000/config_dump<span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.configs[1].dynamic_active_clusters&#39;</span>
+<span class="go">null</span>
+</pre></div>
+</div>
+</section>
+<section id="step-3-start-the-control-plane">
+<h2>Step 3: Start the control plane<a class="headerlink" href="#step-3-start-the-control-plane" title="Link to this heading"></a></h2>
+<p>Start up the <code class="docutils literal notranslate"><span class="pre">go-control-plane</span></code> service.</p>
+<p>You may need to wait a moment or two for it to become <code class="docutils literal notranslate"><span class="pre">healthy</span></code>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d<span class="w"> </span>go-control-plane
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>ps
+
+<span class="go">        Name                                Command                  State                    Ports</span>
+<span class="go">-------------------------------------------------------------------------------------------------------------------------------------</span>
+<span class="go">dynamic-config-cp_go-control-plane_1  bin/example -debug             Up (healthy)</span>
+<span class="go">dynamic-config-cp_proxy_1             /docker-entrypoint.sh /usr ... Up            0.0.0.0:10000-&gt;10000/tcp, 0.0.0.0:19000-&gt;19000/tcp</span>
+<span class="go">dynamic-config-cp_service1_1          /bin/echo-server               Up            8080/tcp</span>
+<span class="go">dynamic-config-cp_service2_1          /bin/echo-server               Up            8080/tcp</span>
+</pre></div>
+</div>
+</section>
+<section id="step-4-query-the-proxy">
+<h2>Step 4: Query the proxy<a class="headerlink" href="#step-4-query-the-proxy" title="Link to this heading"></a></h2>
+<p>Once the control plane has started and is <code class="docutils literal notranslate"><span class="pre">healthy</span></code>, you should be able to make a request to port <code class="docutils literal notranslate"><span class="pre">10000</span></code>,
+which will be served by <code class="docutils literal notranslate"><span class="pre">service1</span></code>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>http://localhost:10000
+<span class="go">Request served by service1</span>
+
+<span class="go">HTTP/1.1 GET /</span>
+
+<span class="go">Host: localhost:10000</span>
+<span class="go">Accept: */*</span>
+<span class="go">X-Forwarded-Proto: http</span>
+<span class="go">X-Request-Id: 1d93050e-f39c-4602-90f8-a124d6e78d26</span>
+<span class="go">X-Envoy-Expected-Rq-Timeout-Ms: 15000</span>
+<span class="go">Content-Length: 0</span>
+<span class="go">User-Agent: curl/7.72.0</span>
+</pre></div>
+</div>
+</section>
+<section id="step-5-dump-envoy-s-dynamic-active-clusters-config">
+<h2>Step 5: Dump Envoy’s <code class="docutils literal notranslate"><span class="pre">dynamic_active_clusters</span></code> config<a class="headerlink" href="#step-5-dump-envoy-s-dynamic-active-clusters-config" title="Link to this heading"></a></h2>
+<p>If you now dump the proxy’s <a class="reference internal" href="../../api-v3/admin/v3/config_dump_shared.proto.html#envoy-v3-api-field-admin-v3-clustersconfigdump-dynamic-active-clusters"><span class="std std-ref">dynamic_active_clusters</span></a>
+configuration, you should see it is configured with the <code class="docutils literal notranslate"><span class="pre">example_proxy_cluster</span></code> pointing to <code class="docutils literal notranslate"><span class="pre">service1</span></code>, and a version of <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:19000/config_dump<span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.configs[1].dynamic_active_clusters&#39;</span>
+</pre></div>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="hll"><span class="w">    </span><span class="nt">&quot;version_info&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1&quot;</span><span class="p">,</span>
+</span><span class="w">    </span><span class="nt">&quot;cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;@type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;type.googleapis.com/envoy.config.cluster.v3.Cluster&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example_proxy_cluster&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;LOGICAL_DNS&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;connect_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5s&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;dns_lookup_family&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;V4_ONLY&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;load_assignment&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="hll"><span class="w">        </span><span class="nt">&quot;cluster_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example_proxy_cluster&quot;</span><span class="p">,</span>
+</span><span class="w">        </span><span class="nt">&quot;endpoints&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;lb_endpoints&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;endpoint&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                  </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="nt">&quot;socket_address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="hll"><span class="w">                      </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;service1&quot;</span><span class="p">,</span>
+</span><span class="hll"><span class="w">                      </span><span class="nt">&quot;port_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8080</span>
+</span><span class="w">                    </span><span class="p">}</span>
+<span class="w">                  </span><span class="p">}</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">              </span><span class="p">}</span>
+<span class="w">            </span><span class="p">]</span>
+<span class="w">          </span><span class="p">}</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;last_updated&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2020-10-25T20:37:05.838Z&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</section>
+<section id="step-6-stop-the-control-plane">
+<h2>Step 6: Stop the control plane<a class="headerlink" href="#step-6-stop-the-control-plane" title="Link to this heading"></a></h2>
+<p>Stop the <code class="docutils literal notranslate"><span class="pre">go-control-plane</span></code> service:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>stop<span class="w"> </span>go-control-plane
+</pre></div>
+</div>
+<p>The Envoy proxy should continue proxying responses from <code class="docutils literal notranslate"><span class="pre">service1</span></code>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>http://localhost:10000<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;served by&quot;</span>
+<span class="go">Request served by service1</span>
+</pre></div>
+</div>
+</section>
+<section id="step-7-edit-go-file-and-restart-the-control-plane">
+<h2>Step 7: Edit <code class="docutils literal notranslate"><span class="pre">.go</span></code> file and restart the control plane<a class="headerlink" href="#step-7-edit-go-file-and-restart-the-control-plane" title="Link to this heading"></a></h2>
+<p>The example setup starts the <code class="docutils literal notranslate"><span class="pre">go-control-plane</span></code>
+service with a custom <a class="reference download internal" download="" href="../../_downloads/ef307e1c6786b51ee38110d4bc3a839b/resource.go"><code class="xref download docutils literal notranslate"><span class="pre">resource.go</span></code></a> file which
+specifies the configuration provided to Envoy.</p>
+<p>Update this to have Envoy proxy instead to <code class="docutils literal notranslate"><span class="pre">service2</span></code>.</p>
+<p>Edit <code class="docutils literal notranslate"><span class="pre">resource.go</span></code> in the dynamic configuration example folder and change the <code class="docutils literal notranslate"><span class="pre">UpstreamHost</span></code>
+from <code class="docutils literal notranslate"><span class="pre">service1</span></code> to <code class="docutils literal notranslate"><span class="pre">service2</span></code>:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="linenos">35</span><span class="kd">const</span><span class="w"> </span><span class="p">(</span>
+<span class="linenos">36</span><span class="w">	</span><span class="nx">ClusterName</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;example_proxy_cluster&quot;</span>
+<span class="linenos">37</span><span class="w">	</span><span class="nx">RouteName</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;local_route&quot;</span>
+<span class="linenos">38</span><span class="w">	</span><span class="nx">ListenerName</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;listener_0&quot;</span>
+<span class="linenos">39</span><span class="w">	</span><span class="nx">ListenerPort</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">10000</span>
+<span class="hll"><span class="linenos">40</span><span class="w">	</span><span class="nx">UpstreamHost</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;service1&quot;</span>
+</span><span class="linenos">41</span><span class="w">	</span><span class="nx">UpstreamPort</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">8080</span>
+<span class="linenos">42</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Further down in this file you must also change the configuration snapshot version number from
+<code class="docutils literal notranslate"><span class="pre">&quot;1&quot;</span></code> to <code class="docutils literal notranslate"><span class="pre">&quot;2&quot;</span></code> to ensure Envoy sees the configuration as newer:</p>
+<div class="highlight-go notranslate"><div class="highlight"><pre><span></span><span class="linenos">175</span><span class="kd">func</span><span class="w"> </span><span class="nx">GenerateSnapshot</span><span class="p">()</span><span class="w"> </span><span class="nx">cache</span><span class="p">.</span><span class="nx">Snapshot</span><span class="w"> </span><span class="p">{</span>
+<span class="linenos">176</span><span class="w">	</span><span class="k">return</span><span class="w"> </span><span class="nx">cache</span><span class="p">.</span><span class="nx">NewSnapshot</span><span class="p">(</span>
+<span class="hll"><span class="linenos">177</span><span class="w">		</span><span class="s">&quot;1&quot;</span><span class="p">,</span>
+</span><span class="linenos">178</span><span class="w">		</span><span class="p">[]</span><span class="nx">types</span><span class="p">.</span><span class="nx">Resource</span><span class="p">{},</span><span class="w"> </span><span class="c1">// endpoints</span>
+<span class="linenos">179</span><span class="w">		</span><span class="p">[]</span><span class="nx">types</span><span class="p">.</span><span class="nx">Resource</span><span class="p">{</span><span class="nx">makeCluster</span><span class="p">(</span><span class="nx">ClusterName</span><span class="p">)},</span>
+<span class="linenos">180</span><span class="w">		</span><span class="p">[]</span><span class="nx">types</span><span class="p">.</span><span class="nx">Resource</span><span class="p">{</span><span class="nx">makeRoute</span><span class="p">(</span><span class="nx">RouteName</span><span class="p">,</span><span class="w"> </span><span class="nx">ClusterName</span><span class="p">)},</span>
+<span class="linenos">181</span><span class="w">		</span><span class="p">[]</span><span class="nx">types</span><span class="p">.</span><span class="nx">Resource</span><span class="p">{</span><span class="nx">makeHTTPListener</span><span class="p">(</span><span class="nx">ListenerName</span><span class="p">,</span><span class="w"> </span><span class="nx">RouteName</span><span class="p">)},</span>
+<span class="linenos">182</span><span class="w">		</span><span class="p">[]</span><span class="nx">types</span><span class="p">.</span><span class="nx">Resource</span><span class="p">{},</span><span class="w"> </span><span class="c1">// runtimes</span>
+<span class="linenos">183</span><span class="w">		</span><span class="p">[]</span><span class="nx">types</span><span class="p">.</span><span class="nx">Resource</span><span class="p">{},</span><span class="w"> </span><span class="c1">// secrets</span>
+<span class="linenos">184</span><span class="w">		</span><span class="p">[]</span><span class="nx">types</span><span class="p">.</span><span class="nx">Resource</span><span class="p">{},</span><span class="w"> </span><span class="c1">// extensions configs</span>
+<span class="linenos">185</span><span class="w">	</span><span class="p">)</span>
+<span class="linenos">186</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>Now rebuild and restart the control plane:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d<span class="w"> </span>go-control-plane
+</pre></div>
+</div>
+<p>You may need to wait a moment or two for the <code class="docutils literal notranslate"><span class="pre">go-control-plane</span></code> service to become <code class="docutils literal notranslate"><span class="pre">healthy</span></code> again.</p>
+</section>
+<section id="step-8-check-envoy-uses-the-updated-configuration">
+<h2>Step 8: Check Envoy uses the updated configuration<a class="headerlink" href="#step-8-check-envoy-uses-the-updated-configuration" title="Link to this heading"></a></h2>
+<p>Now when you make a request to the proxy it should be served by the <code class="docutils literal notranslate"><span class="pre">service2</span></code> upstream service.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>http://localhost:10000<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;served by&quot;</span>
+<span class="go">Request served by service2</span>
+</pre></div>
+</div>
+<p>Dumping the <a class="reference internal" href="../../api-v3/admin/v3/config_dump_shared.proto.html#envoy-v3-api-field-admin-v3-clustersconfigdump-dynamic-active-clusters"><span class="std std-ref">dynamic_active_clusters</span></a>
+you should see the cluster configuration now has a version of <code class="docutils literal notranslate"><span class="pre">2</span></code>, and <code class="docutils literal notranslate"><span class="pre">example_proxy_cluster</span></code>
+is configured to proxy to <code class="docutils literal notranslate"><span class="pre">service2</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:19000/config_dump<span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.configs[1].dynamic_active_clusters&#39;</span>
+</pre></div>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="hll"><span class="w">    </span><span class="nt">&quot;version_info&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2&quot;</span><span class="p">,</span>
+</span><span class="w">    </span><span class="nt">&quot;cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;@type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;type.googleapis.com/envoy.config.cluster.v3.Cluster&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example_proxy_cluster&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;LOGICAL_DNS&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;connect_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5s&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;dns_lookup_family&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;V4_ONLY&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;load_assignment&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="hll"><span class="w">        </span><span class="nt">&quot;cluster_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example_proxy_cluster&quot;</span><span class="p">,</span>
+</span><span class="w">        </span><span class="nt">&quot;endpoints&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;lb_endpoints&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;endpoint&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                  </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="nt">&quot;socket_address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="hll"><span class="w">                      </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;service2&quot;</span><span class="p">,</span>
+</span><span class="hll"><span class="w">                      </span><span class="nt">&quot;port_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8080</span>
+</span><span class="w">                    </span><span class="p">}</span>
+<span class="w">                  </span><span class="p">}</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">              </span><span class="p">}</span>
+<span class="w">            </span><span class="p">]</span>
+<span class="w">          </span><span class="p">}</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;last_updated&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2020-10-26T14:35:17.360Z&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In this example we increment the version for simplicity.</p>
+<p>Any change to the version will trigger an update in Envoy, and ordering is not significant
+(see <a class="reference internal" href="../../api-docs/xds_protocol.html#xds-ack-nack"><span class="std std-ref">xDS protocol docs for further information about updates</span></a>).</p>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="../quick-start/configuration-dynamic-control-plane.html#start-quick-start-dynamic-control-plane"><span class="std std-ref">Dynamic configuration (control plane) quick start guide</span></a></dt><dd><p>Quick start guide to dynamic configuration of Envoy with a control plane.</p>
+</dd>
+<dt><a class="reference internal" href="../quick-start/admin.html#start-quick-start-admin"><span class="std std-ref">Envoy admin quick start guide</span></a></dt><dd><p>Quick start guide to the Envoy admin interface.</p>
+</dd>
+<dt><a class="reference internal" href="dynamic-config-fs.html#install-sandboxes-dynamic-config-fs"><span class="std std-ref">Dynamic configuration (filesystem) sandbox</span></a></dt><dd><p>Configure Envoy using filesystem-based dynamic configuration.</p>
+</dd>
+<dt><a class="reference external" href="https://github.com/envoyproxy/go-control-plane">Go control plane</a></dt><dd><p>Reference implementation of Envoy control plane written in Golang.</p>
+</dd>
+</dl>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="double-proxy.html" class="btn btn-neutral float-left" title="Double proxy (with mTLS encryption)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="dynamic-config-fs.html" class="btn btn-neutral float-right" title="Dynamic configuration (filesystem)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Dynamic configuration (control plane)</a><ul>
+<li><a class="reference internal" href="#step-1-start-the-proxy-container">Step 1: Start the proxy container</a></li>
+<li><a class="reference internal" href="#step-2-check-initial-config-and-web-response">Step 2: Check initial config and web response</a></li>
+<li><a class="reference internal" href="#step-3-start-the-control-plane">Step 3: Start the control plane</a></li>
+<li><a class="reference internal" href="#step-4-query-the-proxy">Step 4: Query the proxy</a></li>
+<li><a class="reference internal" href="#step-5-dump-envoy-s-dynamic-active-clusters-config">Step 5: Dump Envoy’s <code class="docutils literal notranslate"><span class="pre">dynamic_active_clusters</span></code> config</a></li>
+<li><a class="reference internal" href="#step-6-stop-the-control-plane">Step 6: Stop the control plane</a></li>
+<li><a class="reference internal" href="#step-7-edit-go-file-and-restart-the-control-plane">Step 7: Edit <code class="docutils literal notranslate"><span class="pre">.go</span></code> file and restart the control plane</a></li>
+<li><a class="reference internal" href="#step-8-check-envoy-uses-the-updated-configuration">Step 8: Check Envoy uses the updated configuration</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

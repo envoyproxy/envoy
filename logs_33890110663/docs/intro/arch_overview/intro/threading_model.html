@@ -1,0 +1,582 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Threading model &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Listeners" href="../listeners/listeners_toc.html" />
+    <link rel="prev" title="Terminology" href="terminology.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="intro.html">Introduction</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="terminology.html">Terminology</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Threading model</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../http/http.html">HTTP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../observability/observability.html">Observability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../security/security.html">Security</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced/advanced.html">Advanced</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="intro.html">Introduction</a></li>
+      <li class="breadcrumb-item active">Threading model</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/intro/arch_overview/intro/threading_model.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="threading-model">
+<span id="arch-overview-threading"></span><h1>Threading model<a class="headerlink" href="#threading-model" title="Link to this heading"></a></h1>
+<p>Envoy uses a “single process, multiple threads” architecture. This model is designed to be highly
+concurrent and non-blocking. This allows a single Envoy process to efficiently handle a massive
+number of active connections and requests.</p>
+<section id="high-level-overview">
+<h2>High-Level Overview<a class="headerlink" href="#high-level-overview" title="Link to this heading"></a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Matt Klein wrote a <a class="reference external" href="https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310">detailed blog post</a>
+on the Envoy threading model. Though it is a bit old, it is still accurate and a great companion to this
+document.</p>
+</div>
+<p>At a high level, the threading model consists of three main components:</p>
+<ol class="arabic simple">
+<li><p><strong>Main Thread</strong>: A single thread that handles various (critical) coordination tasks. This
+includes configuration updates (xDS), stats flushing, and the administration interface. It
+does <em>not</em> handle high-volume traffic directly.</p></li>
+<li><p><strong>Worker Threads</strong>: A configurable number of threads (controlled by the <code class="docutils literal notranslate"><span class="pre">--concurrency</span></code> flag)
+that handle the actual listening, filtering, and forwarding of network traffic.</p></li>
+<li><p><strong>File Flusher Thread</strong>: A dedicated thread for flushing access logs to disk to avoid blocking
+the main processing path.</p></li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>For most workloads, we recommend configuring the number of worker threads to be equal to the
+number of hardware threads on the machine. This maximizes CPU utilization without incurring
+excessive context switching overhead.</p>
+</div>
+<section id="listener-connection-balancing">
+<h3>Listener connection balancing<a class="headerlink" href="#listener-connection-balancing" title="Link to this heading"></a></h3>
+<p>When a connection is accepted by a listener, it is bound to a single worker thread for its entire
+lifetime. This design means that Envoy’s “hot path” is highly parallelized and it avoids complex
+locking for the vast majority of request processing. In general, Envoy is written to be
+non-blocking.</p>
+<p>By default, there is no coordination between worker threads. This means that all worker threads
+independently attempt to accept connections on each listener and rely on the kernel to perform
+the balancing between threads.</p>
+<p>For most workloads, the kernel does a very good job of balancing incoming connections. However, for
+some workloads with a small number of very long lived connections (e.g., service mesh HTTP2/gRPC
+egress), it might be desirable to have Envoy forcibly balance connections between worker threads.
+To support this behavior, Envoy allows for different types of
+<a class="reference internal" href="../../../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-field-config-listener-v3-listener-connection-balance-config"><span class="std std-ref">connection balancing</span></a> to be configured on each
+<a class="reference internal" href="../listeners/listeners.html#arch-overview-listeners"><span class="std std-ref">listener</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>On Windows the kernel is not able to balance the connections properly with the async IO model
+that Envoy is using.</p>
+<p>Until this is fixed by the platform, Envoy will enforce listener connection balancing on Windows.
+This allows us to balance connections between different worker threads. However, this behavior
+comes with a performance penalty.</p>
+</div>
+</section>
+</section>
+<section id="envoy-s-threading-model-for-developers">
+<h2>Envoy’s Threading Model for Developers<a class="headerlink" href="#envoy-s-threading-model-for-developers" title="Link to this heading"></a></h2>
+<section id="dispatcher">
+<h3>Dispatcher<a class="headerlink" href="#dispatcher" title="Link to this heading"></a></h3>
+<p>At the core of Envoy’s threading model is the <a class="reference external" href="https://github.com/envoyproxy/envoy/blob/main/envoy/event/dispatcher.h">Event::Dispatcher</a>. Each thread (Main and Worker)
+runs a loop rooted in a <code class="docutils literal notranslate"><span class="pre">Dispatcher</span></code>. This is a wrapper around <code class="docutils literal notranslate"><span class="pre">libevent</span></code> (or other event loops
+in the future) that manages:</p>
+<ul class="simple">
+<li><p><strong>File Descriptors</strong>: Watching sockets for read/write events.</p></li>
+<li><p><strong>Timers</strong>: Scheduling tasks to run at a future time.</p></li>
+<li><p><strong>Signals</strong>: Handling OS signals (mainly on the Main Thread).</p></li>
+</ul>
+<p>The Dispatcher allows code to be written in a single-threaded, non-blocking style. Instead of
+blocking on I/O, you register a callback that triggers when the I/O is ready.</p>
+<p>When running the dispatcher, you can specify how it should run using <cite>Event::Dispatcher::RunType</cite>:</p>
+<ul class="simple">
+<li><p><strong>Block</strong>: Runs the event loop until there are no pending events. This is useful for clearing out any work that is ready to be executed.</p></li>
+<li><p><strong>NonBlock</strong>: Checks for any pending events that are ready to activate, executes them, and then exits. It exits immediately if there are no events ready.</p></li>
+<li><p><strong>RunUntilExit</strong>: Runs the event loop indefinitely until <cite>dispatcher.exit()</cite> is called. This is the standard mode for long-running threads like the main thread or workers.</p></li>
+</ul>
+</section>
+<section id="io-uring">
+<h3>io_uring<a class="headerlink" href="#io-uring" title="Link to this heading"></a></h3>
+<p><a class="reference external" href="https://man7.org/linux/man-pages/man7/io_uring.7.html">io_uring</a> is an asynchronous I/O interface for Linux kernels that
+can offer significant performance improvements over standard syscalls. Envoy supports using
+<code class="docutils literal notranslate"><span class="pre">io_uring</span></code> for specific I/O operations.</p>
+<p>In Envoy’s threading model, <code class="docutils literal notranslate"><span class="pre">io_uring</span></code> is integrated directly into the event loop of each worker
+thread.</p>
+<ul class="simple">
+<li><p><strong>Per-Thread Rings</strong>: Each worker thread maintains its own independent <code class="docutils literal notranslate"><span class="pre">io_uring</span></code> instance
+(submission and completion queues). This adheres to Envoy’s shared-nothing architecture and
+avoids locking contention between workers.</p></li>
+<li><p><strong>Event Integration</strong>: The <code class="docutils literal notranslate"><span class="pre">io_uring</span></code> completion queue is monitored via an <code class="docutils literal notranslate"><span class="pre">eventfd</span></code> which
+is registered with the thread’s <code class="docutils literal notranslate"><span class="pre">Event::Dispatcher</span></code>.</p></li>
+<li><p><strong>Completion Processing</strong>: When the kernel places a completion event in the queue, it signals
+the <code class="docutils literal notranslate"><span class="pre">eventfd</span></code>. The Dispatcher wakes up, executes the callback, and processes the I/O
+completion just like any other file event.</p></li>
+</ul>
+<p>This allows <code class="docutils literal notranslate"><span class="pre">io_uring</span></code> to coexist transparently with other event-driven mechanisms in Envoy.</p>
+</section>
+<section id="thread-local-storage-tls">
+<h3>Thread Local Storage (TLS)<a class="headerlink" href="#thread-local-storage-tls" title="Link to this heading"></a></h3>
+<p>Envoy relies heavily on Thread Local Storage (TLS) to avoid locking contention. The
+<a class="reference external" href="https://github.com/envoyproxy/envoy/blob/main/envoy/thread_local/thread_local.h">ThreadLocal::Instance</a> interface provides a mechanism to store data that is local to each thread
+but accessible (mostly) via a global slot index.</p>
+<ul class="simple">
+<li><p><strong>Allocating a Slot</strong>: Code allocates a “slot” on the main thread. This slot acts as an index
+into a vector stored on every thread.</p></li>
+<li><p><strong>Posting Updates</strong>: When the main thread initiates a config update, it “posts” a closure to all
+worker threads. This closure runs on each worker, creating or updating the thread-local version
+of the data.</p></li>
+<li><p><strong>O(1) Access</strong>: At runtime, worker threads access their local data using the slot index, which
+is a fast O(1) vector lookup. This allows mechanisms like the Cluster Manager or Stats Store to
+be lock-free on the data path.</p></li>
+</ul>
+</section>
+<section id="main-thread-responsibilities">
+<h3>Main Thread Responsibilities<a class="headerlink" href="#main-thread-responsibilities" title="Link to this heading"></a></h3>
+<p>The Main Thread receives special treatment. Its responsibilities include:</p>
+<ul class="simple">
+<li><p><strong>xDS Processing</strong>: It connects to the control plane, parses configuration updates, and orchestrates the update process across workers.</p></li>
+<li><p><strong>Stats Flushing</strong>: It periodically snapshots operational counters and flushes them to sinks (e.g., StatsD, Prometheus).</p></li>
+<li><p><strong>Admin Listener</strong>: It hosts the <code class="docutils literal notranslate"><span class="pre">/admin</span></code> endpoint logic.</p></li>
+<li><p><strong>Process Signals</strong>: Handles SIGTERM, SIGHUP, etc.</p></li>
+</ul>
+</section>
+<section id="exceptions-and-extensions">
+<h3>Exceptions and Extensions<a class="headerlink" href="#exceptions-and-extensions" title="Link to this heading"></a></h3>
+<p>While the core model is strict, some extensions may need their own threads to manage their memory or perform complex operations.</p>
+<ul class="simple">
+<li><p><strong>Async File I/O</strong>: The <a class="reference external" href="https://github.com/envoyproxy/envoy/blob/main/source/extensions/common/async_files/async_file_manager_thread_pool.h">AsyncFileManagerThreadPool</a> manages a pool of threads to perform
+blocking file operations (like opening files or reading large bodies) without blocking the
+non-blocking worker threads.</p></li>
+<li><p><strong>Cache Eviction</strong>: The <a class="reference external" href="https://github.com/envoyproxy/envoy/blob/main/source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h">CacheEvictionThread</a> runs in the background to enforce cache size
+limits and evict old entries, preventing these expensive iterators from stalling the data path.</p></li>
+<li><p><strong>Geolocation</strong>: The <a class="reference external" href="https://github.com/envoyproxy/envoy/blob/main/source/extensions/geoip_providers/maxmind/geoip_provider.cc">GeoipProvider</a> (MaxMind) uses a background thread to reload the database file when it changes.</p></li>
+<li><p><strong>DNS Resolution</strong>: The <a class="reference external" href="https://github.com/envoyproxy/envoy/blob/main/source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.cc">GetAddrInfoDnsResolver</a> uses a pool of dedicated threads to perform blocking <code class="docutils literal notranslate"><span class="pre">getaddrinfo</span></code> calls, ensuring that the main event loop is never blocked by OS-level DNS resolution.</p></li>
+</ul>
+</section>
+</section>
+<section id="development-patterns-extension-guide">
+<h2>Development Patterns (Extension Guide)<a class="headerlink" href="#development-patterns-extension-guide" title="Link to this heading"></a></h2>
+<p>If you are writing an Envoy extension, follow these patterns to ensure thread safety and performance.</p>
+<section id="spawning-threads">
+<h3>Spawning Threads<a class="headerlink" href="#spawning-threads" title="Link to this heading"></a></h3>
+<p>Developers might want to spawn threads for tasks that involve heavy processing which should not interfere with the request’s “hot path”, such as blocking I/O, complex computations, or background maintenance tasks (e.g. database reloading).</p>
+<p>Do <strong>not</strong> use <code class="docutils literal notranslate"><span class="pre">std::thread</span></code> directly. Instead, use the <a class="reference external" href="https://github.com/envoyproxy/envoy/blob/main/envoy/thread/thread.h">Thread::ThreadFactory</a> available in the
+<a class="reference external" href="https://github.com/envoyproxy/envoy/blob/main/envoy/server/factory_context.h">Server::Configuration::FactoryContext</a>.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Good: Uses Envoy&#39;s tracking and instrumented thread factory.</span>
+<span class="n">Thread</span><span class="o">::</span><span class="n">ThreadPtr</span><span class="w"> </span><span class="n">my_thread</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">thread_factory</span><span class="p">.</span><span class="n">createThread</span><span class="p">([</span><span class="k">this</span><span class="p">]()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">doStuff</span><span class="p">();</span><span class="w"> </span><span class="p">});</span>
+
+<span class="c1">// BAD: Bypasses Envoy&#39;s thread tracking.</span>
+<span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="nf">my_thread</span><span class="p">([</span><span class="k">this</span><span class="p">]()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">doStuff</span><span class="p">();</span><span class="w"> </span><span class="p">});</span>
+</pre></div>
+</div>
+<p>Using the factory ensures that:
+*   The thread is registered with the <code class="docutils literal notranslate"><span class="pre">Thread::ThreadId</span></code> system.
+*   It respects Envoy’s signal handling and shutdown sequences.
+*   It appears in crash dumps and debugging tools correctly.</p>
+</section>
+<section id="dispatcher-access-usage">
+<h3>Dispatcher Access &amp; Usage<a class="headerlink" href="#dispatcher-access-usage" title="Link to this heading"></a></h3>
+<p>You will often need to execute code on a specific thread.</p>
+<ul class="simple">
+<li><p><strong>From Main to Worker</strong>: Use <code class="docutils literal notranslate"><span class="pre">ThreadLocal::Instance::runOnAllThreads</span></code> to execute a closure on every worker.</p></li>
+<li><p><strong>Cross-Thread Posting</strong>: Use <code class="docutils literal notranslate"><span class="pre">Event::Dispatcher::post()</span></code>. This is thread-safe and allows you
+to queue a unit of work to be executed in the target thread’s loop.</p></li>
+</ul>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Example: Posting a task to the main thread&#39;s dispatcher from a worker</span>
+<span class="n">main_thread_dispatcher_</span><span class="o">-&gt;</span><span class="k">post</span><span class="p">([</span><span class="k">this</span><span class="p">]()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// This code runs on the main thread</span>
+<span class="w">  </span><span class="n">updateGlobalStats</span><span class="p">();</span>
+<span class="p">});</span>
+</pre></div>
+</div>
+</section>
+<section id="threading-in-tests">
+<h3>Threading in Tests<a class="headerlink" href="#threading-in-tests" title="Link to this heading"></a></h3>
+<p>Envoy’s testing philosophy prioritizes determinism. But alas, threaded code poses a challenge.</p>
+<section id="unit-tests">
+<h4>Unit Tests<a class="headerlink" href="#unit-tests" title="Link to this heading"></a></h4>
+<p>For unit tests, the goal is to verify logic without the non-determinism of real threads.</p>
+<ul class="simple">
+<li><p><strong>Mocking Threads</strong>: Use <a class="reference external" href="https://github.com/envoyproxy/envoy/blob/main/test/mocks/thread/mocks.h">Thread::MockThreadFactory</a> instead of the real
+factory. This allows you to inspect what runnable was passed to the thread without spawning a
+system thread.</p></li>
+<li><p><strong>Simulated Time</strong>: Use <a class="reference external" href="https://github.com/envoyproxy/envoy/blob/main/test/test_common/simulated_time_system.h">Event::SimulatedTimeSystem</a> to
+control the flow of time and timer firing explicitly.</p></li>
+</ul>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Do this in your test fixture.</span>
+<span class="n">NiceMock</span><span class="o">&lt;</span><span class="n">Thread</span><span class="o">::</span><span class="n">MockThreadFactory</span><span class="o">&gt;</span><span class="w"> </span><span class="n">thread_factory_</span><span class="p">;</span>
+<span class="n">EXPECT_CALL</span><span class="p">(</span><span class="n">thread_factory_</span><span class="p">,</span><span class="w"> </span><span class="n">createThread</span><span class="p">(</span><span class="n">_</span><span class="p">)).</span><span class="n">WillOnce</span><span class="p">(</span><span class="n">Invoke</span><span class="p">([](</span><span class="n">std</span><span class="o">::</span><span class="n">function</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cb</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// Execute the callback immediately or store it for later to simulate thread timing.</span>
+<span class="w">  </span><span class="n">cb</span><span class="p">();</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nb">nullptr</span><span class="p">;</span>
+<span class="p">}));</span>
+</pre></div>
+</div>
+</section>
+<section id="integration-tests">
+<h4>Integration Tests<a class="headerlink" href="#integration-tests" title="Link to this heading"></a></h4>
+<p>Integration tests use real worker threads. To test them reliably, you must synchronize steps using
+objects like <code class="docutils literal notranslate"><span class="pre">absl::Notification</span></code>.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Signal from the background thread.</span>
+<span class="n">absl</span><span class="o">::</span><span class="n">Notification</span><span class="w"> </span><span class="n">done</span><span class="p">;</span>
+<span class="n">dispatcher_</span><span class="o">-&gt;</span><span class="k">post</span><span class="p">([</span><span class="o">&amp;</span><span class="n">done</span><span class="p">]()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">doWork</span><span class="p">();</span>
+<span class="w">  </span><span class="n">done</span><span class="p">.</span><span class="n">Notify</span><span class="p">();</span>
+<span class="p">});</span>
+
+<span class="c1">// Wait on the main test thread</span>
+<span class="n">done</span><span class="p">.</span><span class="n">WaitForNotification</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>This is an extremely powerful way to reproduce (or prevent) race conditions.</p>
+</section>
+</section>
+<section id="threading-in-integration-tests">
+<h3>Threading in Integration Tests<a class="headerlink" href="#threading-in-integration-tests" title="Link to this heading"></a></h3>
+<p>Integration tests in Envoy are designed to test the interaction between components using real threads. Understanding the threading model of the test framework is crucial for writing reliable tests.</p>
+<section id="component-threading">
+<h4>Component Threading<a class="headerlink" href="#component-threading" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>Test Environment</strong>: The main test thread orchestrates the test. It creates the server, upstreams, and drives the test logic.</p></li>
+<li><p><strong>IntegrationTestServer</strong>: Runs the Envoy server instance on a separate thread. This thread runs the <cite>runs()</cite> loop of the server.</p></li>
+<li><p><strong>FakeUpstream</strong>: Typically runs on its own thread (or shares a thread pool), accepting connections and processing requests from Envoy.</p></li>
+<li><p><strong>RawConnectionDriver</strong>: Usually runs on the main test thread but drives a <cite>ClientConnection</cite> that uses a <cite>Dispatcher</cite>. It delegates I/O events to the dispatcher which might be running on the same or different thread depending on the setup.</p></li>
+</ul>
+</section>
+<section id="thread-synchronization">
+<h4>Thread Synchronization<a class="headerlink" href="#thread-synchronization" title="Link to this heading"></a></h4>
+<p>To test race conditions or specific sequences of events across these threads, Envoy uses <a class="reference external" href="https://github.com/envoyproxy/envoy/blob/main/source/common/common/thread_synchronizer.h">ThreadSynchronizer</a>.</p>
+<ul class="simple">
+<li><p><strong>Sync Points</strong>: You can define sync points in the production code using <code class="docutils literal notranslate"><span class="pre">thread_synchronizer.syncPoint(&quot;event_name&quot;)</span></code>.</p></li>
+<li><p><strong>Wait and Signal</strong>: In the test code, you can use <code class="docutils literal notranslate"><span class="pre">thread_synchronizer.waitOn(&quot;event_name&quot;)</span></code> to block the test execution until the production code reaches that point, or <code class="docutils literal notranslate"><span class="pre">thread_synchronizer.signal(&quot;event_name&quot;)</span></code> to unblock a thread waiting at a sync point.</p></li>
+</ul>
+<p>This allows for deterministic testing of concurrent behaviors that would otherwise be flaky.</p>
+</section>
+<section id="custom-threads-in-tests">
+<h4>Custom Threads in Tests<a class="headerlink" href="#custom-threads-in-tests" title="Link to this heading"></a></h4>
+<p>Sometimes tests effectively act as a client or a concurrent actor. Use <code class="docutils literal notranslate"><span class="pre">Thread::ThreadFactory</span></code> to spawn threads in tests to simulate concurrent events.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Example from TrackedWatermarkBufferTest</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">thread1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Thread</span><span class="o">::</span><span class="n">threadFactoryForTest</span><span class="p">().</span><span class="n">createThread</span><span class="p">([</span><span class="o">&amp;</span><span class="p">]()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">buffer1</span><span class="o">-&gt;</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;a&quot;</span><span class="p">);</span><span class="w"> </span><span class="p">});</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">thread2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Thread</span><span class="o">::</span><span class="n">threadFactoryForTest</span><span class="p">().</span><span class="n">createThread</span><span class="p">([</span><span class="o">&amp;</span><span class="p">]()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">buffer2</span><span class="o">-&gt;</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;b&quot;</span><span class="p">);</span><span class="w"> </span><span class="p">});</span>
+<span class="c1">// ...</span>
+<span class="n">thread1</span><span class="o">-&gt;</span><span class="n">join</span><span class="p">();</span>
+<span class="n">thread2</span><span class="o">-&gt;</span><span class="n">join</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+<section id="simulated-time-in-integration-tests">
+<h4>Simulated Time in Integration Tests<a class="headerlink" href="#simulated-time-in-integration-tests" title="Link to this heading"></a></h4>
+<p>When using <cite>TestUsingSimulatedTime</cite> (or <cite>SimulatedTimeSystem</cite>) in integration tests, time advances are broadcast to all schedulers.</p>
+<ul class="simple">
+<li><p><strong>Event Loops</strong>: Implementations of <cite>Event::Dispatcher</cite> register their schedulers with the simulated time system.</p></li>
+<li><p><strong>Advancing Time</strong>: When the test calls <code class="docutils literal notranslate"><span class="pre">timeSystem().advanceTimeWait(duration)</span></code>, it advances the simulated time and wakes up all registered schedulers. The schedulers then process any timers that have expired due to the time advance.</p></li>
+<li><p><strong>Real Threads</strong>: Since integration tests use real threads for the server and upstreams, those threads will process the expired timers in their respective event loops. This synchronization ensures that time-dependent behavior (like timeouts) can be tested reliably without waiting for real wall-clock time.</p></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading"></a></h2>
+<p>Envoy provides several tools to help debug threading issues.</p>
+<section id="watchdog">
+<h3>Watchdog<a class="headerlink" href="#watchdog" title="Link to this heading"></a></h3>
+<p>Envoy includes a configurable “Watchdog” system. It spawns a separate thread that monitors the
+liveness of the Main Thread and all Worker Threads.</p>
+<ul class="simple">
+<li><p><strong>Mechanism</strong>: Each monitored thread must “touch” a shared timestamp periodically. The watchdog thread scans these timestamps.</p></li>
+<li><p><strong>Detection</strong>: If a thread hasn’t updated its timestamp within the configured interval (default
+200ms), the watchdog registers a “Miss”. Extended blocking can trigger “MegaMiss” or even kill the
+process (fail-fast) to produce a core dump for analysis.</p></li>
+<li><p><strong>Use Case</strong>: This is primarily used to detect deadlocks or infinite loops in code.</p></li>
+</ul>
+</section>
+<section id="debug-assertions">
+<h3>Debug Assertions<a class="headerlink" href="#debug-assertions" title="Link to this heading"></a></h3>
+<p>In debug builds (or when configured), Envoy employs thread-safety assertions.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ASSERT_IS_MAIN_OR_TEST_THREAD()</span></code>: Ensures the current code is running on the main thread.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ASSERT_IS_WORKER_THREAD()</span></code>: (If defined) Ensures code is running on the expected thread (Guard Dog thread).</p></li>
+</ul>
+</section>
+<section id="mutex-tracing">
+<h3>Mutex Tracing<a class="headerlink" href="#mutex-tracing" title="Link to this heading"></a></h3>
+<p>For performance debugging, Envoy supports mutex tracing (<code class="docutils literal notranslate"><span class="pre">--enable-mutex-tracing</span></code>). This allows
+you to identify lock contention hotspots by recording hold times and wait times for contended
+mutexes, viewable via the admin interface.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="terminology.html" class="btn btn-neutral float-left" title="Terminology" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../listeners/listeners_toc.html" class="btn btn-neutral float-right" title="Listeners" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Threading model</a><ul>
+<li><a class="reference internal" href="#high-level-overview">High-Level Overview</a><ul>
+<li><a class="reference internal" href="#listener-connection-balancing">Listener connection balancing</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#envoy-s-threading-model-for-developers">Envoy’s Threading Model for Developers</a><ul>
+<li><a class="reference internal" href="#dispatcher">Dispatcher</a></li>
+<li><a class="reference internal" href="#io-uring">io_uring</a></li>
+<li><a class="reference internal" href="#thread-local-storage-tls">Thread Local Storage (TLS)</a></li>
+<li><a class="reference internal" href="#main-thread-responsibilities">Main Thread Responsibilities</a></li>
+<li><a class="reference internal" href="#exceptions-and-extensions">Exceptions and Extensions</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#development-patterns-extension-guide">Development Patterns (Extension Guide)</a><ul>
+<li><a class="reference internal" href="#spawning-threads">Spawning Threads</a></li>
+<li><a class="reference internal" href="#dispatcher-access-usage">Dispatcher Access &amp; Usage</a></li>
+<li><a class="reference internal" href="#threading-in-tests">Threading in Tests</a><ul>
+<li><a class="reference internal" href="#unit-tests">Unit Tests</a></li>
+<li><a class="reference internal" href="#integration-tests">Integration Tests</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#threading-in-integration-tests">Threading in Integration Tests</a><ul>
+<li><a class="reference internal" href="#component-threading">Component Threading</a></li>
+<li><a class="reference internal" href="#thread-synchronization">Thread Synchronization</a></li>
+<li><a class="reference internal" href="#custom-threads-in-tests">Custom Threads in Tests</a></li>
+<li><a class="reference internal" href="#simulated-time-in-integration-tests">Simulated Time in Integration Tests</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#troubleshooting">Troubleshooting</a><ul>
+<li><a class="reference internal" href="#watchdog">Watchdog</a></li>
+<li><a class="reference internal" href="#debug-assertions">Debug Assertions</a></li>
+<li><a class="reference internal" href="#mutex-tracing">Mutex Tracing</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

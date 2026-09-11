@@ -1,0 +1,85 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/network/metadata_exchange/v3/metadata_exchange.proto:
+
+Metadata exchange TCP filter (proto)
+====================================
+
+.. _extension_envoy.filters.network.metadata_exchange:
+
+This extension has the qualified name ``envoy.filters.network.metadata_exchange``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange <envoy_v3_api_msg_tcp.metadataexchange.config.MetadataExchange>`
+
+
+
+
+Metadata exchange TCP filter for deriving and propagating peer telemetry attributes.
+
+
+
+
+.. _envoy_v3_api_msg_tcp.metadataexchange.config.MetadataExchange:
+
+tcp.metadataexchange.config.MetadataExchange
+--------------------------------------------
+
+
+:repo:`[tcp.metadataexchange.config.MetadataExchange proto] <api/contrib/envoy/extensions/filters/network/metadata_exchange/v3/metadata_exchange.proto#L19>`
+
+MetadataExchange protocol match and data transfer
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "protocol": ...,
+    "enable_discovery": ...,
+    "additional_labels": []
+  }
+
+.. _envoy_v3_api_field_tcp.metadataexchange.config.MetadataExchange.protocol:
+
+
+protocol
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Protocol that Alpn should support on the server.
+
+
+.. _envoy_v3_api_field_tcp.metadataexchange.config.MetadataExchange.enable_discovery:
+
+
+enable_discovery
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, will attempt to use WDS in case the prefix peer metadata is not available.
+
+
+.. _envoy_v3_api_field_tcp.metadataexchange.config.MetadataExchange.additional_labels:
+
+
+additional_labels
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Additional labels to be added to the peer metadata to help your understand the traffic.
+  e.g. ``role``, ``location`` etc.
+
+

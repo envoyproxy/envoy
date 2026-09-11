@@ -1,0 +1,112 @@
+Extension security: ``unknown``
+===============================
+
+* :ref:`envoy.access_loggers.extension_filters.cel <extension_envoy.access_loggers.extension_filters.cel>` (alpha)
+* :ref:`envoy.access_loggers.extension_filters.process_ratelimit <extension_envoy.access_loggers.extension_filters.process_ratelimit>` (alpha)
+* :ref:`envoy.access_loggers.wasm <extension_envoy.access_loggers.wasm>` (alpha)
+* :ref:`envoy.bootstrap.wasm <extension_envoy.bootstrap.wasm>` (alpha)
+* envoy.built_in_formatters.xfcc_value (alpha)
+* :ref:`envoy.config.validators.minimum_clusters_validator <extension_envoy.config.validators.minimum_clusters_validator>`
+* :ref:`envoy.config_mux.delta_grpc_mux_factory <extension_envoy.config_mux.delta_grpc_mux_factory>`
+* :ref:`envoy.config_mux.sotw_grpc_mux_factory <extension_envoy.config_mux.sotw_grpc_mux_factory>`
+* :ref:`envoy.config_subscription.ads <extension_envoy.config_subscription.ads>`
+* :ref:`envoy.config_subscription.ads_collection <extension_envoy.config_subscription.ads_collection>`
+* :ref:`envoy.config_subscription.aggregated_delta_grpc_collection <extension_envoy.config_subscription.aggregated_delta_grpc_collection>`
+* :ref:`envoy.config_subscription.aggregated_grpc_collection <extension_envoy.config_subscription.aggregated_grpc_collection>`
+* :ref:`envoy.config_subscription.delta_grpc <extension_envoy.config_subscription.delta_grpc>`
+* :ref:`envoy.config_subscription.filesystem <extension_envoy.config_subscription.filesystem>`
+* :ref:`envoy.config_subscription.filesystem_collection <extension_envoy.config_subscription.filesystem_collection>`
+* :ref:`envoy.config_subscription.grpc <extension_envoy.config_subscription.grpc>`
+* :ref:`envoy.config_subscription.rest <extension_envoy.config_subscription.rest>`
+* :ref:`envoy.filters.http.a2a <extension_envoy.filters.http.a2a>` (alpha)
+* :ref:`envoy.filters.http.adaptive_concurrency <extension_envoy.filters.http.adaptive_concurrency>`
+* :ref:`envoy.filters.http.admission_control <extension_envoy.filters.http.admission_control>`
+* :ref:`envoy.filters.http.ai_protocol_manager <extension_envoy.filters.http.ai_protocol_manager>` (alpha)
+* :ref:`envoy.filters.http.alternate_protocols_cache <extension_envoy.filters.http.alternate_protocols_cache>` (alpha)
+* :ref:`envoy.filters.http.bandwidth_limit <extension_envoy.filters.http.bandwidth_limit>`
+* :ref:`envoy.filters.http.cdn_loop <extension_envoy.filters.http.cdn_loop>` (alpha)
+* :ref:`envoy.filters.http.composite <extension_envoy.filters.http.composite>`
+* :ref:`envoy.filters.http.connect_grpc_bridge <extension_envoy.filters.http.connect_grpc_bridge>` (alpha)
+* :ref:`envoy.filters.http.credential_injector <extension_envoy.filters.http.credential_injector>` (alpha)
+* :ref:`envoy.filters.http.filter_chain <extension_envoy.filters.http.filter_chain>` (alpha)
+* :ref:`envoy.filters.http.gcp_authn <extension_envoy.filters.http.gcp_authn>` (alpha)
+* :ref:`envoy.filters.http.geoip <extension_envoy.filters.http.geoip>`
+* :ref:`envoy.filters.http.grpc_field_extraction <extension_envoy.filters.http.grpc_field_extraction>` (alpha)
+* :ref:`envoy.filters.http.grpc_http1_bridge <extension_envoy.filters.http.grpc_http1_bridge>`
+* :ref:`envoy.filters.http.grpc_http1_reverse_bridge <extension_envoy.filters.http.grpc_http1_reverse_bridge>` (alpha)
+* :ref:`envoy.filters.http.grpc_json_reverse_transcoder <extension_envoy.filters.http.grpc_json_reverse_transcoder>` (alpha)
+* :ref:`envoy.filters.http.grpc_stats <extension_envoy.filters.http.grpc_stats>`
+* :ref:`envoy.filters.http.header_mutation <extension_envoy.filters.http.header_mutation>` (alpha)
+* :ref:`envoy.filters.http.local_ratelimit <extension_envoy.filters.http.local_ratelimit>`
+* :ref:`envoy.filters.http.mcp <extension_envoy.filters.http.mcp>` (alpha)
+* :ref:`envoy.filters.http.mcp_json_rest_bridge <extension_envoy.filters.http.mcp_json_rest_bridge>` (alpha)
+* :ref:`envoy.filters.http.mcp_router <extension_envoy.filters.http.mcp_router>` (alpha)
+* :ref:`envoy.filters.http.proto_api_scrubber <extension_envoy.filters.http.proto_api_scrubber>` (alpha)
+* :ref:`envoy.filters.http.proto_message_extraction <extension_envoy.filters.http.proto_message_extraction>` (alpha)
+* :ref:`envoy.filters.http.rate_limit_quota <extension_envoy.filters.http.rate_limit_quota>`
+* :ref:`envoy.filters.http.set_filter_state <extension_envoy.filters.http.set_filter_state>` (alpha)
+* :ref:`envoy.filters.http.transform <extension_envoy.filters.http.transform>` (alpha)
+* :ref:`envoy.filters.http.wasm <extension_envoy.filters.http.wasm>` (alpha)
+* :ref:`envoy.filters.listener.set_filter_state <extension_envoy.filters.listener.set_filter_state>` (alpha)
+* :ref:`envoy.filters.network.direct_response <extension_envoy.filters.network.direct_response>`
+* :ref:`envoy.filters.network.echo <extension_envoy.filters.network.echo>`
+* :ref:`envoy.filters.network.reverse_tunnel <extension_envoy.filters.network.reverse_tunnel>` (alpha)
+* :ref:`envoy.filters.network.set_filter_state <extension_envoy.filters.network.set_filter_state>` (alpha)
+* :ref:`envoy.filters.network.sni_cluster <extension_envoy.filters.network.sni_cluster>`
+* :ref:`envoy.filters.network.sni_dynamic_forward_proxy <extension_envoy.filters.network.sni_dynamic_forward_proxy>` (alpha)
+* :ref:`envoy.filters.network.tcp_bandwidth_limit <extension_envoy.filters.network.tcp_bandwidth_limit>` (alpha)
+* :ref:`envoy.filters.network.wasm <extension_envoy.filters.network.wasm>` (alpha)
+* :ref:`envoy.http.injected_credentials.generic <extension_envoy.http.injected_credentials.generic>` (alpha)
+* :ref:`envoy.http.injected_credentials.oauth2 <extension_envoy.http.injected_credentials.oauth2>` (alpha)
+* :ref:`envoy.http.stateful_session.cookie <extension_envoy.http.stateful_session.cookie>` (alpha)
+* :ref:`envoy.http.stateful_session.envelope <extension_envoy.http.stateful_session.envelope>` (alpha)
+* :ref:`envoy.http.stateful_session.header <extension_envoy.http.stateful_session.header>` (alpha)
+* :ref:`envoy.load_balancing_policies.client_side_weighted_round_robin <extension_envoy.load_balancing_policies.client_side_weighted_round_robin>` (alpha)
+* :ref:`envoy.load_balancing_policies.least_request <extension_envoy.load_balancing_policies.least_request>`
+* :ref:`envoy.load_balancing_policies.override_host <extension_envoy.load_balancing_policies.override_host>` (alpha)
+* :ref:`envoy.load_balancing_policies.wrr_locality <extension_envoy.load_balancing_policies.wrr_locality>` (alpha)
+* :ref:`envoy.matching.action.transport_socket.name <extension_envoy.matching.action.transport_socket.name>`
+* :ref:`envoy.matching.actions.format_string <extension_envoy.matching.actions.format_string>`
+* :ref:`envoy.matching.actions.transform_stat <extension_envoy.matching.actions.transform_stat>` (alpha)
+* :ref:`envoy.matching.custom_matchers.domain_matcher <extension_envoy.matching.custom_matchers.domain_matcher>` (alpha)
+* :ref:`envoy.matching.custom_matchers.ip_range_matcher <extension_envoy.matching.custom_matchers.ip_range_matcher>`
+* :ref:`envoy.matching.inputs.application_protocol <extension_envoy.matching.inputs.application_protocol>`
+* :ref:`envoy.matching.inputs.cel_data_input <extension_envoy.matching.inputs.cel_data_input>`
+* :ref:`envoy.matching.inputs.destination_ip <extension_envoy.matching.inputs.destination_ip>`
+* :ref:`envoy.matching.inputs.destination_port <extension_envoy.matching.inputs.destination_port>`
+* :ref:`envoy.matching.inputs.direct_source_ip <extension_envoy.matching.inputs.direct_source_ip>`
+* :ref:`envoy.matching.inputs.dns_san <extension_envoy.matching.inputs.dns_san>`
+* :ref:`envoy.matching.inputs.dynamic_metadata <extension_envoy.matching.inputs.dynamic_metadata>`
+* :ref:`envoy.matching.inputs.endpoint_metadata <extension_envoy.matching.inputs.endpoint_metadata>`
+* :ref:`envoy.matching.inputs.filter_state <extension_envoy.matching.inputs.filter_state>`
+* :ref:`envoy.matching.inputs.local_reply <extension_envoy.matching.inputs.local_reply>`
+* :ref:`envoy.matching.inputs.locality_metadata <extension_envoy.matching.inputs.locality_metadata>`
+* :ref:`envoy.matching.inputs.network_namespace <extension_envoy.matching.inputs.network_namespace>`
+* :ref:`envoy.matching.inputs.query_params <extension_envoy.matching.inputs.query_params>`
+* :ref:`envoy.matching.inputs.request_headers <extension_envoy.matching.inputs.request_headers>`
+* :ref:`envoy.matching.inputs.request_trailers <extension_envoy.matching.inputs.request_trailers>`
+* :ref:`envoy.matching.inputs.response_headers <extension_envoy.matching.inputs.response_headers>`
+* :ref:`envoy.matching.inputs.response_trailers <extension_envoy.matching.inputs.response_trailers>`
+* :ref:`envoy.matching.inputs.server_name <extension_envoy.matching.inputs.server_name>`
+* :ref:`envoy.matching.inputs.source_ip <extension_envoy.matching.inputs.source_ip>`
+* :ref:`envoy.matching.inputs.source_port <extension_envoy.matching.inputs.source_port>`
+* :ref:`envoy.matching.inputs.source_type <extension_envoy.matching.inputs.source_type>`
+* :ref:`envoy.matching.inputs.subject <extension_envoy.matching.inputs.subject>`
+* :ref:`envoy.matching.inputs.transport_protocol <extension_envoy.matching.inputs.transport_protocol>`
+* :ref:`envoy.matching.inputs.transport_socket_filter_state <extension_envoy.matching.inputs.transport_socket_filter_state>`
+* :ref:`envoy.matching.inputs.uri_san <extension_envoy.matching.inputs.uri_san>`
+* :ref:`envoy.matching.matchers.metadata_matcher <extension_envoy.matching.matchers.metadata_matcher>` (alpha)
+* :ref:`envoy.quic.connection_id_generator.quic_lb <extension_envoy.quic.connection_id_generator.quic_lb>`
+* :ref:`envoy.rate_limit_descriptors.expr <extension_envoy.rate_limit_descriptors.expr>`
+* :ref:`envoy.rbac.matchers.upstream_ip_port <extension_envoy.rbac.matchers.upstream_ip_port>` (alpha)
+* :ref:`envoy.tls.certificate_mappers.sni <extension_envoy.tls.certificate_mappers.sni>` (alpha)
+* :ref:`envoy.tls.certificate_mappers.static_name <extension_envoy.tls.certificate_mappers.static_name>` (alpha)
+* :ref:`envoy.tls.certificate_selectors.on_demand_secret <extension_envoy.tls.certificate_selectors.on_demand_secret>` (alpha)
+* :ref:`envoy.tls.upstream_certificate_mappers.filter_state_override <extension_envoy.tls.upstream_certificate_mappers.filter_state_override>` (alpha)
+* :ref:`envoy.transport_sockets.http_11_proxy <extension_envoy.transport_sockets.http_11_proxy>` (alpha)
+* :ref:`envoy.upstream.local_address_selector.default_local_address_selector <extension_envoy.upstream.local_address_selector.default_local_address_selector>` (alpha)
+* :ref:`envoy.upstream.local_address_selector.filter_state_override <extension_envoy.upstream.local_address_selector.filter_state_override>` (alpha)
+* :ref:`envoy.upstreams.tcp.tcp_protocol_options <extension_envoy.upstreams.tcp.tcp_protocol_options>` (alpha)
+* :ref:`envoy.wasm.runtime.v8 <extension_envoy.wasm.runtime.v8>` (alpha)
+* :ref:`envoy.wasm.runtime.wamr <extension_envoy.wasm.runtime.wamr>` (alpha)
+* :ref:`envoy.wasm.runtime.wasmtime <extension_envoy.wasm.runtime.wasmtime>` (alpha)

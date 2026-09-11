@@ -1,0 +1,88 @@
+.. _version_history:
+
+Version history
+---------------
+
+
+.. toctree::
+  :titlesonly:
+  :maxdepth: 2
+  :caption: Current development version
+
+  v1.40/v1.40.0
+
+
+
+Stable versions
+===============
+
+Versions that are currently supported.
+
+.. toctree::
+  :titlesonly:
+  :maxdepth: 2
+  :caption: Changelog
+
+  v1.39: 1.39.1 (August 27, 2026) <v1.39/v1.39>
+  v1.38: 1.38.4 (August 26, 2026) <v1.38/v1.38>
+  v1.37: 1.37.6 (August 26, 2026) <v1.37/v1.37>
+  v1.36: 1.36.10 (August 26, 2026) <v1.36/v1.36>
+
+Archived versions
+=================
+
+Versions that are no longer supported.
+
+.. toctree::
+  :titlesonly:
+  :maxdepth: 1
+
+  v1.35: 1.35.13 (June 23, 2026) <v1.35/v1.35>
+  v1.34: 1.34.14 (April 10, 2026) <v1.34/v1.34>
+  v1.33: 1.33.14 (December 9, 2025) <v1.33/v1.33>
+  v1.32: 1.32.13 (October 13, 2025) <v1.32/v1.32>
+  v1.31: 1.31.10 (July 18, 2025) <v1.31/v1.31>
+  v1.30: 1.30.11 (March 25, 2025) <v1.30/v1.30>
+  v1.29: 1.29.12 (December 18, 2024) <v1.29/v1.29>
+  v1.28: 1.28.7 (September 19, 2024) <v1.28/v1.28>
+  v1.27: 1.27.7 (June 28, 2024) <v1.27/v1.27>
+  v1.26: 1.26.8 (April 4, 2024) <v1.26/v1.26>
+  v1.25: 1.25.11 (October 16, 2023) <v1.25/v1.25>
+  v1.24: 1.24.11 (October 10, 2023) <v1.24/v1.24>
+  v1.23: 1.23.12 (July 25, 2023) <v1.23/v1.23>
+  v1.22: 1.22.11 (April 11, 2023) <v1.22/v1.22>
+  v1.21: 1.21.6 (November 28, 2022) <v1.21/v1.21>
+  v1.20: 1.20.7 (July 21, 2022) <v1.20/v1.20>
+  v1.19: 1.19.5 (June 9, 2022) <v1.19/v1.19>
+  v1.18: 1.18.6 (February 22, 2022) <v1.18/v1.18>
+  v1.17: 1.17.4 (August 24, 2021) <v1.17/v1.17>
+  v1.16: 1.16.5 (August 24, 2021) <v1.16/v1.16>
+  v1.15: 1.15.5 (May 11, 2021) <v1.15/v1.15>
+  v1.14: 1.14.7 (April 15, 2020) <v1.14/v1.14>
+  v1.13: 1.13.8 (January 15, 2021) <v1.13/v1.13>
+  v1.12: 1.12.7 (September 29, 2020) <v1.12/v1.12>
+  v1.11: 1.11.2 (October 8, 2019) <v1.11/v1.11>
+  v1.10: 1.10.0 (April 5, 2019) <v1.10/v1.10>
+  v1.9: 1.9.1 (April 2, 2019) <v1.9/v1.9>
+  v1.8: 1.8.0 (October 4, 2018) <v1.8/v1.8>
+  v1.7: 1.7.1 (August 3, 2018) <v1.7/v1.7>
+  v1.6: 1.6.0 (March 20, 2018) <v1.6/v1.6>
+  v1.5: 1.5.0 (December 4, 2017) <v1.5/v1.5>
+  v1.4: 1.4.0 (August 24, 2017) <v1.4/v1.4>
+  v1.3: 1.3.0 (May 17, 2017) <v1.3/v1.3>
+  v1.2: 1.2.0 (March 7, 2017) <v1.2/v1.2>
+  v1.1: 1.1.0 (November 30, 2016) <v1.1/v1.1>
+  v1.0: 1.0.0 (September 12, 2016) <v1.0/v1.0>
+
+.. _deprecated:
+
+Deprecation Policy
+==================
+
+As of release 1.3.0, Envoy will follow a
+`Breaking Change Policy <https://github.com/envoyproxy/envoy/blob/main//CONTRIBUTING.md#breaking-change-policy>`_.
+
+Features in the deprecated list for each version have been DEPRECATED
+and will be removed in the specified release cycle. A logged warning
+is expected for each deprecated item that is in deprecation window.
+

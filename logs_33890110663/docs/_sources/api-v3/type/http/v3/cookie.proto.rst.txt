@@ -1,0 +1,98 @@
+.. _envoy_v3_api_file_envoy/type/http/v3/cookie.proto:
+
+HTTP cookie API (proto)
+=======================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.http.v3.Cookie:
+
+type.http.v3.Cookie
+-------------------
+
+
+:repo:`[type.http.v3.Cookie proto] <api/envoy/type/http/v3/cookie.proto#L18>`
+
+Cookie defines an API for obtaining or generating HTTP cookie.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "ttl": {...},
+    "path": ...,
+    "attributes": []
+  }
+
+.. _envoy_v3_api_field_type.http.v3.Cookie.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name that will be used to obtain cookie value from downstream HTTP request or generate
+  new cookie for downstream.
+
+
+.. _envoy_v3_api_field_type.http.v3.Cookie.ttl:
+
+
+ttl
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Duration of cookie. This will be used to set the expiry time of a new cookie when it is
+  generated. Set this to 0s to use a session cookie and disable cookie expiration.
+
+
+.. _envoy_v3_api_field_type.http.v3.Cookie.path:
+
+
+path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Path of cookie. This will be used to set the path of a new cookie when it is generated.
+  If no path is specified here, no path will be set for the cookie.
+
+
+.. _envoy_v3_api_field_type.http.v3.Cookie.attributes:
+
+
+attributes
+  (**repeated** :ref:`type.http.v3.CookieAttribute <envoy_v3_api_msg_type.http.v3.CookieAttribute>`) Additional attributes for the cookie. They will be used when generating a new cookie.
+
+
+
+.. _envoy_v3_api_msg_type.http.v3.CookieAttribute:
+
+type.http.v3.CookieAttribute
+----------------------------
+
+
+:repo:`[type.http.v3.CookieAttribute proto] <api/envoy/type/http/v3/cookie.proto#L36>`
+
+CookieAttribute defines an API for adding additional attributes for a HTTP cookie.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "value": ...
+  }
+
+.. _envoy_v3_api_field_type.http.v3.CookieAttribute.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the cookie attribute.
+
+
+.. _envoy_v3_api_field_type.http.v3.CookieAttribute.value:
+
+
+value
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The optional value of the cookie attribute.
+
+

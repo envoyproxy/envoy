@@ -1,0 +1,107 @@
+node:
+  cluster: envoy_cluster
+  id: envoy_node
+
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: upstream
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: upstream-service
+          http_filters:
+          - name: envoy.filters.http.oauth2
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
+              config:
+                token_endpoint:
+                  cluster: oauth
+                  uri: https://myoauthprovider.net/oauth2/default/v1/token
+                  timeout: 5s
+                authorization_endpoint: https://myoauthprovider.net/oauth2/default/v1/authorize
+                redirect_uri: http://localhost:8000/callback
+                redirect_path_matcher:
+                  path:
+                    exact: "/callback"
+                signout_path:
+                  path:
+                    exact: "/signout"
+                credentials:
+                  client_id: "my-client-id"
+                  token_secret:
+                    name: token
+                    sds_config:
+                      api_config_source:
+                        api_type: GRPC
+                        grpc_services:
+                        - envoy_grpc:
+                            cluster_name: sds_server_uds
+                  hmac_secret:
+                    name: hmac
+                    sds_config:
+                      api_config_source:
+                        api_type: GRPC
+                        grpc_services:
+                        - envoy_grpc:
+                            cluster_name: sds_server_uds
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+  - name: sds_server_uds
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    load_assignment:
+      cluster_name: sds_server_uds
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              pipe:
+                path: /tmp/uds_path
+  - name: upstream-service
+    load_assignment:
+      cluster_name: upstream-service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8000
+  - name: oauth
+    type: LOGICAL_DNS
+    load_assignment:
+      cluster_name: oauth
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: "myoauthprovider.net"
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: "myoauthprovider.net"

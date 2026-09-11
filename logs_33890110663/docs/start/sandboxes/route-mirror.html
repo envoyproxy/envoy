@@ -1,0 +1,439 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Route mirroring policies &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Single page React app (with OAuth)" href="single-page-app.html" />
+    <link rel="prev" title="Redis filter" href="redis.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../start.html">Getting Started</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Sandboxes</a></li>
+      <li class="breadcrumb-item active">Route mirroring policies</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/start/sandboxes/route-mirror.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="route-mirroring-policies">
+<span id="install-sandboxes-route-mirror"></span><h1>Route mirroring policies<a class="headerlink" href="#route-mirroring-policies" title="Link to this heading"></a></h1>
+<aside class="sidebar">
+<p class="sidebar-title">Requirements</p>
+<dl class="simple">
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup"><span class="std std-ref">Sandbox environment</span></a></dt><dd><p>Setup your sandbox environment with Docker and Docker Compose,
+and clone the Envoy repository with Git.</p>
+</dd>
+</dl>
+</aside>
+<p>This simple example demonstrates Envoy’s request mirroring capability using
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-msg-config-route-v3-routeaction-requestmirrorpolicy">request mirror policies</a>.</p>
+<p>Incoming requests are received by <code class="docutils literal notranslate"><span class="pre">envoy-front-proxy</span></code> service.</p>
+<p>Requests for the path <code class="docutils literal notranslate"><span class="pre">/service/1</span></code> are statically mirrored.</p>
+<p>Each request is handled by the <code class="docutils literal notranslate"><span class="pre">service1</span></code> cluster, and in addition, forwarded to
+the <code class="docutils literal notranslate"><span class="pre">service1-mirror</span></code> cluster:</p>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text">Envoy configuration with static route mirror policy <a class="reference download internal" download="" href="../../_downloads/f638ddcd685797bf0eef840c98909df0/envoy.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy.yaml</span></code></a></span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="w">            </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="linenos"> 2</span><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">backend</span>
+<span class="linenos"> 3</span><span class="w">              </span><span class="nt">domains</span><span class="p">:</span>
+<span class="linenos"> 4</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;*&quot;</span>
+<span class="linenos"> 5</span><span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="hll"><span class="linenos"> 6</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos"> 7</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/service/1&quot;</span>
+</span><span class="hll"><span class="linenos"> 8</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos"> 9</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service1</span>
+</span><span class="hll"><span class="linenos">10</span><span class="w">                  </span><span class="nt">request_mirror_policies</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">11</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;service1-mirror&quot;</span>
+</span><span class="linenos">12</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">13</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/service/2&quot;</span>
+<span class="linenos">14</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">15</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service2</span>
+<span class="linenos">16</span><span class="w">                  </span><span class="nt">request_mirror_policies</span><span class="p">:</span>
+<span class="linenos">17</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">cluster_header</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;x-mirror-cluster&quot;</span>
+<span class="linenos">18</span>
+<span class="linenos">19</span><span class="w">         </span><span class="w w-Error"> </span><span class="nt">http_filters</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<p>Requests for the path <code class="docutils literal notranslate"><span class="pre">/service/2</span></code> are dynamically mirrored according to the presence and value of
+the <code class="docutils literal notranslate"><span class="pre">x-mirror-cluster</span></code> header.</p>
+<p>All reqests for this path are forwarded to the <code class="docutils literal notranslate"><span class="pre">service2</span></code> cluster, and are also mirrored
+to the cluster named in the header.</p>
+<p>For example, if we send a request with the header <code class="docutils literal notranslate"><span class="pre">x-mirror-cluster:</span> <span class="pre">service2-mirror</span></code>,
+the request will be forwarded to the <code class="docutils literal notranslate"><span class="pre">service2-mirror</span></code> cluster.</p>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text">Envoy configuration with header based route mirror policy <a class="reference download internal" download="" href="../../_downloads/f638ddcd685797bf0eef840c98909df0/envoy.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy.yaml</span></code></a></span><a class="headerlink" href="#id2" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="w">            </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="linenos"> 2</span><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">backend</span>
+<span class="linenos"> 3</span><span class="w">              </span><span class="nt">domains</span><span class="p">:</span>
+<span class="linenos"> 4</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;*&quot;</span>
+<span class="linenos"> 5</span><span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="linenos"> 6</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos"> 7</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/service/1&quot;</span>
+<span class="linenos"> 8</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos"> 9</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service1</span>
+<span class="linenos">10</span><span class="w">                  </span><span class="nt">request_mirror_policies</span><span class="p">:</span>
+<span class="linenos">11</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;service1-mirror&quot;</span>
+<span class="hll"><span class="linenos">12</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">13</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/service/2&quot;</span>
+</span><span class="hll"><span class="linenos">14</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">15</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service2</span>
+</span><span class="hll"><span class="linenos">16</span><span class="w">                  </span><span class="nt">request_mirror_policies</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">17</span><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">cluster_header</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;x-mirror-cluster&quot;</span>
+</span><span class="linenos">18</span>
+<span class="linenos">19</span><span class="w">         </span><span class="w w-Error"> </span><span class="nt">http_filters</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Allowing a request header to determine the cluster that the request is mirrored to is most useful in
+a trusted environment.</p>
+<p>For example, a downstream Envoy instance (or other application acting as a proxy) might
+automatically add this header to requests for processing by an upstream Envoy instance
+configured with request mirror policies.</p>
+<p>If you allow dynamic mirroring according to request header, you may wish to restrict which requests
+can set or proxy the header.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Envoy will only return the response it receives from the primary cluster to the client.</p>
+<p>For this example, responses from <code class="docutils literal notranslate"><span class="pre">service1</span></code> and <code class="docutils literal notranslate"><span class="pre">service2</span></code> clusters will be sent
+to the client. A response returned by the <code class="docutils literal notranslate"><span class="pre">service1-mirror</span></code> or the <code class="docutils literal notranslate"><span class="pre">service2-mirror</span></code>
+cluster is not sent back to the client.</p>
+<p>This also means that any problems or latency in request processing in the mirror cluster
+don’t affect the response received by the client.</p>
+</div>
+<section id="step-1-build-the-sandbox">
+<h2>Step 1: Build the sandbox<a class="headerlink" href="#step-1-build-the-sandbox" title="Link to this heading"></a></h2>
+<p>Change to the <code class="docutils literal notranslate"><span class="pre">route-mirror</span></code> directory.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">pwd</span>
+<span class="go">examples/route-mirror</span>
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>build
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>ps
+<span class="go">NAME                               COMMAND                  SERVICE             STATUS              PORTS</span>
+<span class="go">route-mirror-envoy-front-proxy-1   &quot;/docker-entrypoint.…&quot;   envoy-front-proxy   running             0.0.0.0:10000-&gt;10000/tcp, :::10000-&gt;10000/tcp</span>
+<span class="go">route-mirror-service1-1            &quot;python3 /code/servi…&quot;   service1            running (healthy)</span>
+<span class="go">route-mirror-service1-mirror-1     &quot;python3 /code/servi…&quot;   service1-mirror     running (healthy)</span>
+<span class="go">route-mirror-service2-1            &quot;python3 /code/servi…&quot;   service2            running (healthy)</span>
+<span class="go">route-mirror-service2-mirror-1     &quot;python3 /code/servi…&quot;   service2-mirror     running (healthy)</span>
+</pre></div>
+</div>
+</section>
+<section id="step-2-make-a-request-to-the-statically-mirrored-route">
+<h2>Step 2: Make a request to the statically mirrored route<a class="headerlink" href="#step-2-make-a-request-to-the-statically-mirrored-route" title="Link to this heading"></a></h2>
+<p>Let’s send a request to the <code class="docutils literal notranslate"><span class="pre">envoy-front-proxy</span></code> service which forwards the request to
+<code class="docutils literal notranslate"><span class="pre">service1</span></code> and also sends the request to <code class="docutils literal notranslate"><span class="pre">service1-mirror</span></code>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>localhost:10000/service/1
+<span class="go">Hello from behind Envoy (service 1)!</span>
+</pre></div>
+</div>
+</section>
+<section id="step-3-view-logs-for-the-statically-mirrored-request">
+<h2>Step 3: View logs for the statically mirrored request<a class="headerlink" href="#step-3-view-logs-for-the-statically-mirrored-request" title="Link to this heading"></a></h2>
+<p>The logs from the <code class="docutils literal notranslate"><span class="pre">service1</span></code> and <code class="docutils literal notranslate"><span class="pre">service1-mirror</span></code> services show that
+both the <code class="docutils literal notranslate"><span class="pre">service1</span></code> and <code class="docutils literal notranslate"><span class="pre">service1-mirror</span></code> services received the request made
+in Step 2.</p>
+<p>You can also see that for the request to the <code class="docutils literal notranslate"><span class="pre">service1-mirror</span></code>
+service, the <code class="docutils literal notranslate"><span class="pre">Host</span></code> header was modified by Envoy to have a <code class="docutils literal notranslate"><span class="pre">-shadow</span></code> suffix
+in the hostname.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>service1
+<span class="go">...</span>
+<span class="go">Host: localhost:10000</span>
+<span class="go">192.168.80.6 - - [06/Oct/2022 03:56:22] &quot;GET /service/1 HTTP/1.1&quot; 200 -</span>
+
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>service1-mirror
+<span class="go">...</span>
+<span class="go">Host: localhost-shadow:10000</span>
+<span class="go">192.168.80.6 - - [06/Oct/2022 03:56:22] &quot;GET /service/1 HTTP/1.1&quot; 200 -</span>
+</pre></div>
+</div>
+</section>
+<section id="step-4-make-a-request-to-the-route-mirrored-by-request-header">
+<h2>Step 4: Make a request to the route mirrored by request header<a class="headerlink" href="#step-4-make-a-request-to-the-route-mirrored-by-request-header" title="Link to this heading"></a></h2>
+<p>In this step, we will see a demonstration where the request specifies via a header, <code class="docutils literal notranslate"><span class="pre">x-mirror-cluster</span></code>,
+the cluster that envoy will mirror the request to.</p>
+<p>Let’s send a request to the <code class="docutils literal notranslate"><span class="pre">envoy-front-proxy</span></code> service which forwards the request to
+<code class="docutils literal notranslate"><span class="pre">service2</span></code> and also mirrors the request to the cluster named, <code class="docutils literal notranslate"><span class="pre">service2-mirror</span></code>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>--header<span class="w"> </span><span class="s2">&quot;x-mirror-cluster: service2-mirror&quot;</span><span class="w"> </span>localhost:10000/service/2
+<span class="go">Hello from behind Envoy (service 2)!</span>
+</pre></div>
+</div>
+</section>
+<section id="step-5-view-logs-for-the-request-mirrored-by-request-header">
+<h2>Step 5: View logs for the request mirrored by request header<a class="headerlink" href="#step-5-view-logs-for-the-request-mirrored-by-request-header" title="Link to this heading"></a></h2>
+<p>The logs show that both the <code class="docutils literal notranslate"><span class="pre">service2</span></code> and <code class="docutils literal notranslate"><span class="pre">service2-mirror</span></code> services
+got the request.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>service2
+<span class="go">...</span>
+<span class="go">Host: localhost:10000</span>
+<span class="go">192.168.80.6 - - [06/Oct/2022 03:56:22] &quot;GET /service/2 HTTP/1.1&quot; 200 -</span>
+
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>service2-mirror
+<span class="go">...</span>
+<span class="go">Host: localhost-shadow:10000</span>
+<span class="go">192.168.80.6 - - [06/Oct/2022 03:56:22] &quot;GET /service/2 HTTP/1.1&quot; 200 -</span>
+</pre></div>
+</div>
+<p>You can also see that for the request to the <code class="docutils literal notranslate"><span class="pre">service2-mirror</span></code> service, the
+<code class="docutils literal notranslate"><span class="pre">Host</span></code> header was modified by Envoy to have a <code class="docutils literal notranslate"><span class="pre">-shadow</span></code> suffix in the
+hostname.</p>
+</section>
+<section id="step-6-missing-or-invalid-cluster-name-in-request-header">
+<h2>Step 6: Missing or invalid cluster name in request header<a class="headerlink" href="#step-6-missing-or-invalid-cluster-name-in-request-header" title="Link to this heading"></a></h2>
+<p>If you do not specify the <code class="docutils literal notranslate"><span class="pre">x-mirror-cluster</span></code> in the request to <code class="docutils literal notranslate"><span class="pre">service2</span></code>,
+or specify an unknown cluster, the request will not be mirrored but will be
+handled in the normal way.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>localhost:10000/service/2
+<span class="go">Hello from behind Envoy (service 2)!</span>
+
+<span class="gp">$ </span>curl<span class="w"> </span>--header<span class="w"> </span><span class="s2">&quot;x-mirror-cluster: service2-mirror-non-existent&quot;</span><span class="w"> </span>localhost:10000/service/2
+<span class="go">Hello from behind Envoy (service 2)!</span>
+</pre></div>
+</div>
+<p>View the logs for <code class="docutils literal notranslate"><span class="pre">service2</span></code> and <code class="docutils literal notranslate"><span class="pre">service2-mirror</span></code> services.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>service2
+<span class="go">...</span>
+<span class="go">Host: localhost:10000</span>
+<span class="go">192.168.80.6 - - [06/Oct/2022 03:56:22] &quot;GET /service/2 HTTP/1.1&quot; 200 -</span>
+
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>service2-mirror
+<span class="gp"># </span>No<span class="w"> </span>new<span class="w"> </span>logs
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-routeaction-requestmirrorpolicy"><span class="std std-ref">Envoy request mirror policy</span></a></dt><dd><p>Learn more Envoy’s request mirroring policy.</p>
+</dd>
+</dl>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="redis.html" class="btn btn-neutral float-left" title="Redis filter" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="single-page-app.html" class="btn btn-neutral float-right" title="Single page React app (with OAuth)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Route mirroring policies</a><ul>
+<li><a class="reference internal" href="#step-1-build-the-sandbox">Step 1: Build the sandbox</a></li>
+<li><a class="reference internal" href="#step-2-make-a-request-to-the-statically-mirrored-route">Step 2: Make a request to the statically mirrored route</a></li>
+<li><a class="reference internal" href="#step-3-view-logs-for-the-statically-mirrored-request">Step 3: View logs for the statically mirrored request</a></li>
+<li><a class="reference internal" href="#step-4-make-a-request-to-the-route-mirrored-by-request-header">Step 4: Make a request to the route mirrored by request header</a></li>
+<li><a class="reference internal" href="#step-5-view-logs-for-the-request-mirrored-by-request-header">Step 5: View logs for the request mirrored by request header</a></li>
+<li><a class="reference internal" href="#step-6-missing-or-invalid-cluster-name-in-request-header">Step 6: Missing or invalid cluster name in request header</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

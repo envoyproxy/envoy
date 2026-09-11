@@ -1,0 +1,1107 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gRPC access logs (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="AI data" href="../../ai/ai.html" />
+    <link rel="prev" title="Access logs" href="../accesslog.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../config/config.html">Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../data.html">Envoy data</a><ul class="current">
+<li class="toctree-l4 current"><a class="reference internal" href="../accesslog.html">Access logs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ai/ai.html">AI data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../cluster/cluster.html">Cluster data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../core/core.html">Core data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../dns/dns.html">Extensions objects</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tap/tap.html">Tap</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../data.html">Envoy data</a></li>
+          <li class="breadcrumb-item"><a href="../accesslog.html">Access logs</a></li>
+      <li class="breadcrumb-item active">gRPC access logs (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/data/accesslog/v3/accesslog.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="grpc-access-logs-proto">
+<span id="envoy-v3-api-file-envoy-data-accesslog-v3-accesslog-proto"></span><h1>gRPC access logs (proto)<a class="headerlink" href="#grpc-access-logs-proto" title="Link to this heading"></a></h1>
+<p>Envoy access logs describe incoming interaction with Envoy over a fixed
+period of time, and typically cover a single request/response exchange,
+(e.g. HTTP), stream (e.g. over HTTP/gRPC), or proxied connection (e.g. TCP).
+Access logs contain fields defined in protocol-specific protobuf messages.</p>
+<p>Except where explicitly declared otherwise, all fields describe
+<em>downstream</em> interaction between Envoy and a connected client.
+Fields describing <em>upstream</em> interaction will explicitly include <code class="docutils literal notranslate"><span class="pre">upstream</span></code>
+in their name.</p>
+<section id="data-accesslog-v3-tcpaccesslogentry">
+<span id="envoy-v3-api-msg-data-accesslog-v3-tcpaccesslogentry"></span><h2>data.accesslog.v3.TCPAccessLogEntry<a class="headerlink" href="#data-accesslog-v3-tcpaccesslogentry" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L52">[data.accesslog.v3.TCPAccessLogEntry proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;common_properties&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;connection_properties&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-tcpaccesslogentry-common-properties">
+<dt>common_properties</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-data-accesslog-v3-accesslogcommon"><span class="std std-ref">data.accesslog.v3.AccessLogCommon</span></a>) Common properties shared by all Envoy access logs.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-tcpaccesslogentry-connection-properties">
+<dt>connection_properties</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-data-accesslog-v3-connectionproperties"><span class="std std-ref">data.accesslog.v3.ConnectionProperties</span></a>) Properties of the TCP connection.</p>
+</dd>
+</dl>
+</section>
+<section id="data-accesslog-v3-httpaccesslogentry">
+<span id="envoy-v3-api-msg-data-accesslog-v3-httpaccesslogentry"></span><h2>data.accesslog.v3.HTTPAccessLogEntry<a class="headerlink" href="#data-accesslog-v3-httpaccesslogentry" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L63">[data.accesslog.v3.HTTPAccessLogEntry proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;common_properties&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;protocol_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;request&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;response&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httpaccesslogentry-common-properties">
+<dt>common_properties</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-data-accesslog-v3-accesslogcommon"><span class="std std-ref">data.accesslog.v3.AccessLogCommon</span></a>) Common properties shared by all Envoy access logs.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httpaccesslogentry-protocol-version">
+<dt>protocol_version</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-data-accesslog-v3-httpaccesslogentry-httpversion"><span class="std std-ref">data.accesslog.v3.HTTPAccessLogEntry.HTTPVersion</span></a>)</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httpaccesslogentry-request">
+<dt>request</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-data-accesslog-v3-httprequestproperties"><span class="std std-ref">data.accesslog.v3.HTTPRequestProperties</span></a>) Description of the incoming HTTP request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httpaccesslogentry-response">
+<dt>response</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-data-accesslog-v3-httpresponseproperties"><span class="std std-ref">data.accesslog.v3.HTTPResponseProperties</span></a>) Description of the outgoing HTTP response.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-data-accesslog-v3-httpaccesslogentry-httpversion">
+<span id="envoy-v3-api-enum-data-accesslog-v3-httpaccesslogentry-httpversion"></span><h2>Enum data.accesslog.v3.HTTPAccessLogEntry.HTTPVersion<a class="headerlink" href="#enum-data-accesslog-v3-httpaccesslogentry-httpversion" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L68">[data.accesslog.v3.HTTPAccessLogEntry.HTTPVersion proto]</a></p>
+<p>HTTP version</p>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-httpaccesslogentry-httpversion-protocol-unspecified">
+<dt>PROTOCOL_UNSPECIFIED</dt><dd><p><em>(DEFAULT)</em> ⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-httpaccesslogentry-httpversion-http10">
+<dt>HTTP10</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-httpaccesslogentry-httpversion-http11">
+<dt>HTTP11</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-httpaccesslogentry-httpversion-http2">
+<dt>HTTP2</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-httpaccesslogentry-httpversion-http3">
+<dt>HTTP3</dt><dd><p>⁣</p>
+</dd>
+</dl>
+</section>
+<section id="data-accesslog-v3-connectionproperties">
+<span id="envoy-v3-api-msg-data-accesslog-v3-connectionproperties"></span><h2>data.accesslog.v3.ConnectionProperties<a class="headerlink" href="#data-accesslog-v3-connectionproperties" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L89">[data.accesslog.v3.ConnectionProperties proto]</a></p>
+<p>Defines fields for a connection</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;received_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;sent_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-connectionproperties-received-bytes">
+<dt>received_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Number of bytes received from downstream.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-connectionproperties-sent-bytes">
+<dt>sent_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Number of bytes sent to downstream.</p>
+</dd>
+</dl>
+</section>
+<section id="data-accesslog-v3-accesslogcommon">
+<span id="envoy-v3-api-msg-data-accesslog-v3-accesslogcommon"></span><h2>data.accesslog.v3.AccessLogCommon<a class="headerlink" href="#data-accesslog-v3-accesslogcommon" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L102">[data.accesslog.v3.AccessLogCommon proto]</a></p>
+<p>Defines fields that are shared by all Envoy access logs.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;downstream_remote_address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;downstream_local_address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;tls_properties&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;start_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;time_to_last_rx_byte&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;time_to_first_upstream_tx_byte&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;time_to_last_upstream_tx_byte&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;time_to_first_upstream_rx_byte&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;time_to_last_upstream_rx_byte&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;time_to_first_downstream_tx_byte&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;time_to_last_downstream_tx_byte&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;upstream_remote_address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;upstream_local_address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;upstream_cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;response_flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;upstream_transport_failure_reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;route_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;downstream_direct_remote_address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;filter_state_objects&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;custom_tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;upstream_request_attempt_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;connection_termination_details&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;stream_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;intermediate_log_entry&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;downstream_transport_failure_reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;downstream_wire_bytes_sent&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;downstream_wire_bytes_received&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upstream_wire_bytes_sent&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upstream_wire_bytes_received&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;access_log_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-downstream-remote-address">
+<dt>downstream_remote_address</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-address"><span class="std std-ref">config.core.v3.Address</span></a>) This field is the remote/origin address on which the request from the user was received.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This may not be the actual peer address. For example, it might be derived from headers like <code class="docutils literal notranslate"><span class="pre">x-forwarded-for</span></code>,
+the proxy protocol, or similar sources.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-downstream-local-address">
+<dt>downstream_local_address</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-address"><span class="std std-ref">config.core.v3.Address</span></a>) This field is the local/destination address on which the request from the user was received.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-tls-properties">
+<dt>tls_properties</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-data-accesslog-v3-tlsproperties"><span class="std std-ref">data.accesslog.v3.TLSProperties</span></a>) If the connection is secure, this field will contain TLS properties.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-start-time">
+<dt>start_time</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp">Timestamp</a>) The time that Envoy started servicing this request. This is effectively the time that the first
+downstream byte is received.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-time-to-last-rx-byte">
+<dt>time_to_last_rx_byte</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Interval between the first downstream byte received and the last
+downstream byte received (i.e. time it takes to receive a request).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-time-to-first-upstream-tx-byte">
+<dt>time_to_first_upstream_tx_byte</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Interval between the first downstream byte received and the first upstream byte sent. There may
+be considerable delta between <code class="docutils literal notranslate"><span class="pre">time_to_last_rx_byte</span></code> and this value due to filters.
+Additionally, the same caveats apply as documented in <code class="docutils literal notranslate"><span class="pre">time_to_last_downstream_tx_byte</span></code> about
+not accounting for kernel socket buffer time, etc.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-time-to-last-upstream-tx-byte">
+<dt>time_to_last_upstream_tx_byte</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Interval between the first downstream byte received and the last upstream byte sent. There may
+by considerable delta between <code class="docutils literal notranslate"><span class="pre">time_to_last_rx_byte</span></code> and this value due to filters.
+Additionally, the same caveats apply as documented in <code class="docutils literal notranslate"><span class="pre">time_to_last_downstream_tx_byte</span></code> about
+not accounting for kernel socket buffer time, etc.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-time-to-first-upstream-rx-byte">
+<dt>time_to_first_upstream_rx_byte</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Interval between the first downstream byte received and the first upstream
+byte received (i.e. time it takes to start receiving a response).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-time-to-last-upstream-rx-byte">
+<dt>time_to_last_upstream_rx_byte</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Interval between the first downstream byte received and the last upstream
+byte received (i.e. time it takes to receive a complete response).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-time-to-first-downstream-tx-byte">
+<dt>time_to_first_downstream_tx_byte</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Interval between the first downstream byte received and the first downstream byte sent.
+There may be a considerable delta between the <code class="docutils literal notranslate"><span class="pre">time_to_first_upstream_rx_byte</span></code> and this field
+due to filters. Additionally, the same caveats apply as documented in
+<code class="docutils literal notranslate"><span class="pre">time_to_last_downstream_tx_byte</span></code> about not accounting for kernel socket buffer time, etc.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-time-to-last-downstream-tx-byte">
+<dt>time_to_last_downstream_tx_byte</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Interval between the first downstream byte received and the last downstream byte sent.
+Depending on protocol, buffering, windowing, filters, etc. there may be a considerable delta
+between <code class="docutils literal notranslate"><span class="pre">time_to_last_upstream_rx_byte</span></code> and this field. Note also that this is an approximate
+time. In the current implementation it does not include kernel socket buffer time. In the
+current implementation it also does not include send window buffering inside the HTTP/2 codec.
+In the future it is likely that work will be done to make this duration more accurate.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-upstream-remote-address">
+<dt>upstream_remote_address</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-address"><span class="std std-ref">config.core.v3.Address</span></a>) The upstream remote/destination address that handles this exchange. This does not include
+retries.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-upstream-local-address">
+<dt>upstream_local_address</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-address"><span class="std std-ref">config.core.v3.Address</span></a>) The upstream local/origin address that handles this exchange. This does not include retries.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-upstream-cluster">
+<dt>upstream_cluster</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The upstream cluster that <code class="docutils literal notranslate"><span class="pre">upstream_remote_address</span></code> belongs to.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-response-flags">
+<dt>response_flags</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-data-accesslog-v3-responseflags"><span class="std std-ref">data.accesslog.v3.ResponseFlags</span></a>) Flags indicating occurrences during request/response processing.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-metadata">
+<dt>metadata</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-metadata"><span class="std std-ref">config.core.v3.Metadata</span></a>) All metadata encountered during request processing, including endpoint
+selection.</p>
+<p>This can be used to associate IDs attached to the various configurations
+used to process this request with the access log entry. For example, a
+route created from a higher level forwarding rule with some ID can place
+that ID in this field and cross reference later. It can also be used to
+determine if a canary endpoint was used or not.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-upstream-transport-failure-reason">
+<dt>upstream_transport_failure_reason</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) If upstream connection failed due to transport socket (e.g. TLS handshake), provides the
+failure reason from the transport socket. The format of this field depends on the configured
+upstream transport socket. Common TLS failures are in
+<a class="reference internal" href="../../../../intro/arch_overview/security/ssl.html#arch-overview-ssl-trouble-shooting"><span class="std std-ref">TLS troubleshooting</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-route-name">
+<dt>route_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The name of the route</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-downstream-direct-remote-address">
+<dt>downstream_direct_remote_address</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-address"><span class="std std-ref">config.core.v3.Address</span></a>) This field is the downstream direct remote address on which the request from the user was
+received. Note: This is always the physical peer, even if the remote address is inferred from
+for example the x-forwarder-for header, proxy protocol, etc.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-filter-state-objects">
+<dt>filter_state_objects</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any">Any</a>&gt;) Map of filter state in stream info that have been configured to be logged. If the filter
+state serialized to any message other than <code class="docutils literal notranslate"><span class="pre">google.protobuf.Any</span></code> it will be packed into
+<code class="docutils literal notranslate"><span class="pre">google.protobuf.Any</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-custom-tags">
+<dt>custom_tags</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>&gt;) A list of custom tags, which annotate logs with additional information.
+To configure this value, see the documentation for
+<a class="reference internal" href="../../../extensions/access_loggers/grpc/v3/als.proto.html#envoy-v3-api-field-extensions-access-loggers-grpc-v3-commongrpcaccesslogconfig-custom-tags"><span class="std std-ref">custom_tags</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-duration">
+<dt>duration</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) For HTTP: Total duration in milliseconds of the request from the start time to the last byte out.
+For TCP: Total duration in milliseconds of the downstream connection.
+This is the total duration of the request (i.e., when the request’s ActiveStream is destroyed)
+and may be longer than <code class="docutils literal notranslate"><span class="pre">time_to_last_downstream_tx_byte</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-upstream-request-attempt-count">
+<dt>upstream_request_attempt_count</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) For HTTP: Number of times the request is attempted upstream. Note that the field is omitted when the request was never attempted upstream.
+For TCP: Number of times the connection request is attempted upstream. Note that the field is omitted when the connect request was never attempted upstream.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-connection-termination-details">
+<dt>connection_termination_details</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Connection termination details may provide additional information about why the connection was terminated by Envoy for L4 reasons.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-stream-id">
+<dt>stream_id</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional unique id of stream (TCP connection, long-live HTTP2 stream, HTTP request) for logging and tracing.
+This could be any format string that could be used to identify one stream.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-intermediate-log-entry">
+<dt>intermediate_log_entry</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates whether this log entry is the final entry (flushed after the stream completed) or an intermediate entry
+(flushed periodically during the stream).</p>
+<p>For long-lived streams (e.g., TCP connections or long-lived HTTP/2 streams), there may be multiple intermediate
+entries and only one final entry.</p>
+<p>If needed, a unique identifier (see <a class="reference internal" href="#envoy-v3-api-field-data-accesslog-v3-accesslogcommon-stream-id"><span class="std std-ref">stream_id</span></a>)
+can be used to correlate all intermediate and final log entries for the same stream.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>This field is deprecated in favor of <code class="docutils literal notranslate"><span class="pre">access_log_type</span></code>, which provides a clearer indication of the log entry
+type.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-downstream-transport-failure-reason">
+<dt>downstream_transport_failure_reason</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) If downstream connection in listener failed due to transport socket (e.g. TLS handshake), provides the
+failure reason from the transport socket. The format of this field depends on the configured downstream
+transport socket. Common TLS failures are in <a class="reference internal" href="../../../../intro/arch_overview/security/ssl.html#arch-overview-ssl-trouble-shooting"><span class="std std-ref">TLS troubleshooting</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-downstream-wire-bytes-sent">
+<dt>downstream_wire_bytes_sent</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) For HTTP: Total number of bytes sent to the downstream by the http stream.
+For TCP: Total number of bytes sent to the downstream by the <a class="reference internal" href="../../../../configuration/listeners/network_filters/tcp_proxy_filter.html#config-network-filters-tcp-proxy"><span class="std std-ref">TCP Proxy</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-downstream-wire-bytes-received">
+<dt>downstream_wire_bytes_received</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) For HTTP: Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
+For TCP: Total number of bytes received from the downstream by the <a class="reference internal" href="../../../../configuration/listeners/network_filters/tcp_proxy_filter.html#config-network-filters-tcp-proxy"><span class="std std-ref">TCP Proxy</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-upstream-wire-bytes-sent">
+<dt>upstream_wire_bytes_sent</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) For HTTP: Total number of bytes sent to the upstream by the http stream. This value accumulates during upstream retries.
+For TCP: Total number of bytes sent to the upstream by the <a class="reference internal" href="../../../../configuration/listeners/network_filters/tcp_proxy_filter.html#config-network-filters-tcp-proxy"><span class="std std-ref">TCP Proxy</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-upstream-wire-bytes-received">
+<dt>upstream_wire_bytes_received</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) For HTTP: Total number of bytes received from the upstream by the http stream.
+For TCP: Total number of bytes sent to the upstream by the <a class="reference internal" href="../../../../configuration/listeners/network_filters/tcp_proxy_filter.html#config-network-filters-tcp-proxy"><span class="std std-ref">TCP Proxy</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-accesslogcommon-access-log-type">
+<dt>access_log_type</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-data-accesslog-v3-accesslogtype"><span class="std std-ref">data.accesslog.v3.AccessLogType</span></a>) The type of the access log, which indicates when the log was recorded.
+See <a class="reference internal" href="../../../../configuration/advanced/substitution_formatter.html#config-access-log-format-access-log-type"><span class="std std-ref">ACCESS_LOG_TYPE</span></a> for the available values.
+In case the access log was recorded by a flow which does not correspond to one of the supported
+values, then the default value will be <code class="docutils literal notranslate"><span class="pre">NotSet</span></code>.
+For more information about how access log behaves and when it is being recorded,
+please refer to <a class="reference internal" href="../../../../intro/arch_overview/observability/access_logging.html#arch-overview-access-logs"><span class="std std-ref">access logging</span></a>.</p>
+</dd>
+</dl>
+</section>
+<section id="data-accesslog-v3-responseflags">
+<span id="envoy-v3-api-msg-data-accesslog-v3-responseflags"></span><h2>data.accesslog.v3.ResponseFlags<a class="headerlink" href="#data-accesslog-v3-responseflags" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L278">[data.accesslog.v3.ResponseFlags proto]</a></p>
+<p>Flags indicating occurrences during request/response processing.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;failed_local_healthcheck&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;no_healthy_upstream&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upstream_request_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;local_reset&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upstream_remote_reset&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upstream_connection_failure&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upstream_connection_termination&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upstream_overflow&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;no_route_found&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;delay_injected&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;fault_injected&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;rate_limited&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;unauthorized_details&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;rate_limit_service_error&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;downstream_connection_termination&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upstream_retry_limit_exceeded&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;stream_idle_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;invalid_envoy_request_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;downstream_protocol_error&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upstream_max_stream_duration_reached&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;response_from_cache_filter&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;no_filter_config_found&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;duration_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upstream_protocol_error&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;no_cluster_found&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;overload_manager&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;dns_resolution_failure&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;downstream_remote_reset&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-failed-local-healthcheck">
+<dt>failed_local_healthcheck</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates local server healthcheck failed.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-no-healthy-upstream">
+<dt>no_healthy_upstream</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates there was no healthy upstream.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-upstream-request-timeout">
+<dt>upstream_request_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates there was an upstream request timeout.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-local-reset">
+<dt>local_reset</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates local codec level reset was sent on the stream.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-upstream-remote-reset">
+<dt>upstream_remote_reset</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates remote codec level reset was received on the stream.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-upstream-connection-failure">
+<dt>upstream_connection_failure</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates there was a local reset by a connection pool due to an initial connection failure.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-upstream-connection-termination">
+<dt>upstream_connection_termination</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates the stream was reset due to an upstream connection termination.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-upstream-overflow">
+<dt>upstream_overflow</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates the stream was reset because of a resource overflow.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-no-route-found">
+<dt>no_route_found</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates no route was found for the request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-delay-injected">
+<dt>delay_injected</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates that the request was delayed before proxying.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-fault-injected">
+<dt>fault_injected</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates that the request was aborted with an injected error code.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-rate-limited">
+<dt>rate_limited</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates that the request was rate-limited locally.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-unauthorized-details">
+<dt>unauthorized_details</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-data-accesslog-v3-responseflags-unauthorized"><span class="std std-ref">data.accesslog.v3.ResponseFlags.Unauthorized</span></a>) Indicates if the request was deemed unauthorized and the reason for it.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-rate-limit-service-error">
+<dt>rate_limit_service_error</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates that the request was rejected because there was an error in rate limit service.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-downstream-connection-termination">
+<dt>downstream_connection_termination</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates the stream was reset due to a downstream connection termination.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-upstream-retry-limit-exceeded">
+<dt>upstream_retry_limit_exceeded</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates that the upstream retry limit was exceeded, resulting in a downstream error.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-stream-idle-timeout">
+<dt>stream_idle_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates that the stream idle timeout was hit, resulting in a downstream 408.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-invalid-envoy-request-headers">
+<dt>invalid_envoy_request_headers</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates that the request was rejected because an envoy request header failed strict
+validation.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-downstream-protocol-error">
+<dt>downstream_protocol_error</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates there was an HTTP protocol error on the downstream request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-upstream-max-stream-duration-reached">
+<dt>upstream_max_stream_duration_reached</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates there was a max stream duration reached on the upstream request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-response-from-cache-filter">
+<dt>response_from_cache_filter</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates the response was served from a cache filter.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-no-filter-config-found">
+<dt>no_filter_config_found</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates that a filter configuration is not available.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-duration-timeout">
+<dt>duration_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates that the request or connection exceeded the downstream connection duration.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-upstream-protocol-error">
+<dt>upstream_protocol_error</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates there was an HTTP protocol error in the upstream response.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-no-cluster-found">
+<dt>no_cluster_found</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates no cluster was found for the request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-overload-manager">
+<dt>overload_manager</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates overload manager terminated the request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-dns-resolution-failure">
+<dt>dns_resolution_failure</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates a DNS resolution failed.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-downstream-remote-reset">
+<dt>downstream_remote_reset</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates a downstream remote codec level reset was received on the stream</p>
+</dd>
+</dl>
+</section>
+<section id="data-accesslog-v3-responseflags-unauthorized">
+<span id="envoy-v3-api-msg-data-accesslog-v3-responseflags-unauthorized"></span><h2>data.accesslog.v3.ResponseFlags.Unauthorized<a class="headerlink" href="#data-accesslog-v3-responseflags-unauthorized" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L282">[data.accesslog.v3.ResponseFlags.Unauthorized proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-responseflags-unauthorized-reason">
+<dt>reason</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-data-accesslog-v3-responseflags-unauthorized-reason"><span class="std std-ref">data.accesslog.v3.ResponseFlags.Unauthorized.Reason</span></a>)</p>
+</dd>
+</dl>
+</section>
+<section id="enum-data-accesslog-v3-responseflags-unauthorized-reason">
+<span id="envoy-v3-api-enum-data-accesslog-v3-responseflags-unauthorized-reason"></span><h2>Enum data.accesslog.v3.ResponseFlags.Unauthorized.Reason<a class="headerlink" href="#enum-data-accesslog-v3-responseflags-unauthorized-reason" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L287">[data.accesslog.v3.ResponseFlags.Unauthorized.Reason proto]</a></p>
+<p>Reasons why the request was unauthorized</p>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-responseflags-unauthorized-reason-reason-unspecified">
+<dt>REASON_UNSPECIFIED</dt><dd><p><em>(DEFAULT)</em> ⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-responseflags-unauthorized-reason-external-service">
+<dt>EXTERNAL_SERVICE</dt><dd><p>⁣The request was denied by the external authorization service.</p>
+</dd>
+</dl>
+</section>
+<section id="data-accesslog-v3-tlsproperties">
+<span id="envoy-v3-api-msg-data-accesslog-v3-tlsproperties"></span><h2>data.accesslog.v3.TLSProperties<a class="headerlink" href="#data-accesslog-v3-tlsproperties" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L385">[data.accesslog.v3.TLSProperties proto]</a></p>
+<p>Properties of a negotiated TLS connection.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;tls_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;tls_cipher_suite&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;tls_sni_hostname&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;local_certificate_properties&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;peer_certificate_properties&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;tls_session_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;ja3_fingerprint&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-tlsproperties-tls-version">
+<dt>tls_version</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-data-accesslog-v3-tlsproperties-tlsversion"><span class="std std-ref">data.accesslog.v3.TLSProperties.TLSVersion</span></a>) Version of TLS that was negotiated.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-data-accesslog-v3-tlsproperties-tls-cipher-suite">
+<dt>tls_cipher_suite</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) TLS cipher suite negotiated during handshake. The value is a
+four-digit hex code defined by the IANA TLS Cipher Suite Registry
+(e.g. <code class="docutils literal notranslate"><span class="pre">009C</span></code> for <code class="docutils literal notranslate"><span class="pre">TLS_RSA_WITH_AES_128_GCM_SHA256</span></code>).</p>
+<p>Here it is expressed as an integer.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-tlsproperties-tls-sni-hostname">
+<dt>tls_sni_hostname</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) SNI hostname from handshake.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-tlsproperties-local-certificate-properties">
+<dt>local_certificate_properties</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-data-accesslog-v3-tlsproperties-certificateproperties"><span class="std std-ref">data.accesslog.v3.TLSProperties.CertificateProperties</span></a>) Properties of the local certificate used to negotiate TLS.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-tlsproperties-peer-certificate-properties">
+<dt>peer_certificate_properties</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-data-accesslog-v3-tlsproperties-certificateproperties"><span class="std std-ref">data.accesslog.v3.TLSProperties.CertificateProperties</span></a>) Properties of the peer certificate used to negotiate TLS.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-tlsproperties-tls-session-id">
+<dt>tls_session_id</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The TLS session ID.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-tlsproperties-ja3-fingerprint">
+<dt>ja3_fingerprint</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The <code class="docutils literal notranslate"><span class="pre">JA3</span></code> fingerprint when <code class="docutils literal notranslate"><span class="pre">JA3</span></code> fingerprinting is enabled.</p>
+</dd>
+</dl>
+</section>
+<section id="data-accesslog-v3-tlsproperties-certificateproperties">
+<span id="envoy-v3-api-msg-data-accesslog-v3-tlsproperties-certificateproperties"></span><h2>data.accesslog.v3.TLSProperties.CertificateProperties<a class="headerlink" href="#data-accesslog-v3-tlsproperties-certificateproperties" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L397">[data.accesslog.v3.TLSProperties.CertificateProperties proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;subject_alt_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;subject&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;issuer&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-tlsproperties-certificateproperties-subject-alt-name">
+<dt>subject_alt_name</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-data-accesslog-v3-tlsproperties-certificateproperties-subjectaltname"><span class="std std-ref">data.accesslog.v3.TLSProperties.CertificateProperties.SubjectAltName</span></a>) SANs present in the certificate.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-tlsproperties-certificateproperties-subject">
+<dt>subject</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The subject field of the certificate.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-tlsproperties-certificateproperties-issuer">
+<dt>issuer</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The issuer field of the certificate.</p>
+</dd>
+</dl>
+</section>
+<section id="data-accesslog-v3-tlsproperties-certificateproperties-subjectaltname">
+<span id="envoy-v3-api-msg-data-accesslog-v3-tlsproperties-certificateproperties-subjectaltname"></span><h2>data.accesslog.v3.TLSProperties.CertificateProperties.SubjectAltName<a class="headerlink" href="#data-accesslog-v3-tlsproperties-certificateproperties-subjectaltname" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L401">[data.accesslog.v3.TLSProperties.CertificateProperties.SubjectAltName proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-tlsproperties-certificateproperties-subjectaltname-uri">
+<dt>uri</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>)</p>
+</dd>
+</dl>
+</section>
+<section id="enum-data-accesslog-v3-tlsproperties-tlsversion">
+<span id="envoy-v3-api-enum-data-accesslog-v3-tlsproperties-tlsversion"></span><h2>Enum data.accesslog.v3.TLSProperties.TLSVersion<a class="headerlink" href="#enum-data-accesslog-v3-tlsproperties-tlsversion" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L389">[data.accesslog.v3.TLSProperties.TLSVersion proto]</a></p>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-tlsproperties-tlsversion-version-unspecified">
+<dt>VERSION_UNSPECIFIED</dt><dd><p><em>(DEFAULT)</em> ⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-tlsproperties-tlsversion-tlsv1">
+<dt>TLSv1</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-tlsproperties-tlsversion-tlsv1-1">
+<dt>TLSv1_1</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-tlsproperties-tlsversion-tlsv1-2">
+<dt>TLSv1_2</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-tlsproperties-tlsversion-tlsv1-3">
+<dt>TLSv1_3</dt><dd><p>⁣</p>
+</dd>
+</dl>
+</section>
+<section id="data-accesslog-v3-httprequestproperties">
+<span id="envoy-v3-api-msg-data-accesslog-v3-httprequestproperties"></span><h2>data.accesslog.v3.HTTPRequestProperties<a class="headerlink" href="#data-accesslog-v3-httprequestproperties" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L450">[data.accesslog.v3.HTTPRequestProperties proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;request_method&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;scheme&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;authority&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;port&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;user_agent&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;referer&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;forwarded_for&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;request_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;original_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;request_headers_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;request_body_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;request_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;upstream_header_bytes_sent&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;downstream_header_bytes_received&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-request-method">
+<dt>request_method</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-enum-config-core-v3-requestmethod"><span class="std std-ref">config.core.v3.RequestMethod</span></a>) The request method (RFC 7231/2616).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-scheme">
+<dt>scheme</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The scheme portion of the incoming request URI.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-authority">
+<dt>authority</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) HTTP/2 <code class="docutils literal notranslate"><span class="pre">:authority</span></code> or HTTP/1.1 <code class="docutils literal notranslate"><span class="pre">Host</span></code> header value.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-port">
+<dt>port</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The port of the incoming request URI
+(unused currently, as port is composed onto authority).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-path">
+<dt>path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The path portion from the incoming request URI.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-user-agent">
+<dt>user_agent</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Value of the <code class="docutils literal notranslate"><span class="pre">User-Agent</span></code> request header.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-referer">
+<dt>referer</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Value of the <code class="docutils literal notranslate"><span class="pre">Referer</span></code> request header.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-forwarded-for">
+<dt>forwarded_for</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Value of the <code class="docutils literal notranslate"><span class="pre">X-Forwarded-For</span></code> request header.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-request-id">
+<dt>request_id</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Value of the <code class="docutils literal notranslate"><span class="pre">X-Request-Id</span></code> request header</p>
+<p>This header is used by Envoy to uniquely identify a request.
+It will be generated for all external requests and internal requests that
+do not already have a request ID.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-original-path">
+<dt>original_path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Value of the <code class="docutils literal notranslate"><span class="pre">x-envoy-original-path</span></code> request header.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-request-headers-bytes">
+<dt>request_headers_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Size of the HTTP request headers in bytes.</p>
+<p>This value is captured from the OSI layer 7 perspective, i.e. it does not
+include overhead from framing or encoding at other networking layers.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-request-body-bytes">
+<dt>request_body_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Size of the HTTP request body in bytes.</p>
+<p>This value is captured from the OSI layer 7 perspective, i.e. it does not
+include overhead from framing or encoding at other networking layers.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-request-headers">
+<dt>request_headers</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>&gt;) Map of additional headers that have been configured to be logged.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-upstream-header-bytes-sent">
+<dt>upstream_header_bytes_sent</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Number of header bytes sent to the upstream by the http stream, including protocol overhead.</p>
+<p>This value accumulates during upstream retries.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httprequestproperties-downstream-header-bytes-received">
+<dt>downstream_header_bytes_received</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Number of header bytes received from the downstream by the http stream, including protocol overhead.</p>
+</dd>
+</dl>
+</section>
+<section id="data-accesslog-v3-httpresponseproperties">
+<span id="envoy-v3-api-msg-data-accesslog-v3-httpresponseproperties"></span><h2>data.accesslog.v3.HTTPResponseProperties<a class="headerlink" href="#data-accesslog-v3-httpresponseproperties" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L514">[data.accesslog.v3.HTTPResponseProperties proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;response_code&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;response_headers_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;response_body_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;response_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;response_trailers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;response_code_details&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;upstream_header_bytes_received&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;downstream_header_bytes_sent&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httpresponseproperties-response-code">
+<dt>response_code</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The HTTP response code returned by Envoy.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-data-accesslog-v3-httpresponseproperties-response-headers-bytes">
+<dt>response_headers_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Size of the HTTP response headers in bytes.</p>
+<p>This value is captured from the OSI layer 7 perspective, i.e. it does not
+include protocol overhead or overhead from framing or encoding at other networking layers.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-data-accesslog-v3-httpresponseproperties-response-body-bytes">
+<dt>response_body_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Size of the HTTP response body in bytes.</p>
+<p>This value is captured from the OSI layer 7 perspective, i.e. it does not
+include overhead from framing or encoding at other networking layers.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httpresponseproperties-response-headers">
+<dt>response_headers</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>&gt;) Map of additional headers configured to be logged.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httpresponseproperties-response-trailers">
+<dt>response_trailers</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>&gt;) Map of trailers configured to be logged.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httpresponseproperties-response-code-details">
+<dt>response_code_details</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The HTTP response code details.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httpresponseproperties-upstream-header-bytes-received">
+<dt>upstream_header_bytes_received</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Number of header bytes received from the upstream by the http stream, including protocol overhead.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-data-accesslog-v3-httpresponseproperties-downstream-header-bytes-sent">
+<dt>downstream_header_bytes_sent</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Number of header bytes sent to the downstream by the http stream, including protocol overhead.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-data-accesslog-v3-accesslogtype">
+<span id="envoy-v3-api-enum-data-accesslog-v3-accesslogtype"></span><h2>Enum data.accesslog.v3.AccessLogType<a class="headerlink" href="#enum-data-accesslog-v3-accesslogtype" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/data/accesslog/v3/accesslog.proto#L34">[data.accesslog.v3.AccessLogType proto]</a></p>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-notset">
+<dt>NotSet</dt><dd><p><em>(DEFAULT)</em> ⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-tcpupstreamconnected">
+<dt>TcpUpstreamConnected</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-tcpperiodic">
+<dt>TcpPeriodic</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-tcpconnectionstart">
+<dt>TcpConnectionStart</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-tcpconnectionend">
+<dt>TcpConnectionEnd</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-downstreamstart">
+<dt>DownstreamStart</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-downstreamperiodic">
+<dt>DownstreamPeriodic</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-downstreamend">
+<dt>DownstreamEnd</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-upstreampoolready">
+<dt>UpstreamPoolReady</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-upstreamperiodic">
+<dt>UpstreamPeriodic</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-upstreamend">
+<dt>UpstreamEnd</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-downstreamtunnelsuccessfullyestablished">
+<dt>DownstreamTunnelSuccessfullyEstablished</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-udptunnelupstreamconnected">
+<dt>UdpTunnelUpstreamConnected</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-udpperiodic">
+<dt>UdpPeriodic</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-data-accesslog-v3-accesslogtype-udpsessionend">
+<dt>UdpSessionEnd</dt><dd><p>⁣</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../accesslog.html" class="btn btn-neutral float-left" title="Access logs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../ai/ai.html" class="btn btn-neutral float-right" title="AI data" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">gRPC access logs (proto)</a><ul>
+<li><a class="reference internal" href="#data-accesslog-v3-tcpaccesslogentry">data.accesslog.v3.TCPAccessLogEntry</a></li>
+<li><a class="reference internal" href="#data-accesslog-v3-httpaccesslogentry">data.accesslog.v3.HTTPAccessLogEntry</a></li>
+<li><a class="reference internal" href="#enum-data-accesslog-v3-httpaccesslogentry-httpversion">Enum data.accesslog.v3.HTTPAccessLogEntry.HTTPVersion</a></li>
+<li><a class="reference internal" href="#data-accesslog-v3-connectionproperties">data.accesslog.v3.ConnectionProperties</a></li>
+<li><a class="reference internal" href="#data-accesslog-v3-accesslogcommon">data.accesslog.v3.AccessLogCommon</a></li>
+<li><a class="reference internal" href="#data-accesslog-v3-responseflags">data.accesslog.v3.ResponseFlags</a></li>
+<li><a class="reference internal" href="#data-accesslog-v3-responseflags-unauthorized">data.accesslog.v3.ResponseFlags.Unauthorized</a></li>
+<li><a class="reference internal" href="#enum-data-accesslog-v3-responseflags-unauthorized-reason">Enum data.accesslog.v3.ResponseFlags.Unauthorized.Reason</a></li>
+<li><a class="reference internal" href="#data-accesslog-v3-tlsproperties">data.accesslog.v3.TLSProperties</a></li>
+<li><a class="reference internal" href="#data-accesslog-v3-tlsproperties-certificateproperties">data.accesslog.v3.TLSProperties.CertificateProperties</a></li>
+<li><a class="reference internal" href="#data-accesslog-v3-tlsproperties-certificateproperties-subjectaltname">data.accesslog.v3.TLSProperties.CertificateProperties.SubjectAltName</a></li>
+<li><a class="reference internal" href="#enum-data-accesslog-v3-tlsproperties-tlsversion">Enum data.accesslog.v3.TLSProperties.TLSVersion</a></li>
+<li><a class="reference internal" href="#data-accesslog-v3-httprequestproperties">data.accesslog.v3.HTTPRequestProperties</a></li>
+<li><a class="reference internal" href="#data-accesslog-v3-httpresponseproperties">data.accesslog.v3.HTTPResponseProperties</a></li>
+<li><a class="reference internal" href="#enum-data-accesslog-v3-accesslogtype">Enum data.accesslog.v3.AccessLogType</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

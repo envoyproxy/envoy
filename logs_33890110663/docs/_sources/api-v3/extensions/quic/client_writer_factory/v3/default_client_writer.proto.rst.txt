@@ -1,0 +1,49 @@
+.. _envoy_v3_api_file_envoy/extensions/quic/client_writer_factory/v3/default_client_writer.proto:
+
+Default QUIC Client Packet Writer (proto)
+=========================================
+
+.. _extension_envoy.quic.packet_writer.default:
+
+This extension has the qualified name ``envoy.quic.packet_writer.default``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.quic.client_packet_writer <extension_category_envoy.quic.client_packet_writer>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.quic.client_writer_factory.v3.DefaultClientWriter <envoy_v3_api_msg_extensions.quic.client_writer_factory.v3.DefaultClientWriter>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.quic.client_writer_factory.v3.DefaultClientWriter:
+
+extensions.quic.client_writer_factory.v3.DefaultClientWriter
+------------------------------------------------------------
+
+
+:repo:`[extensions.quic.client_writer_factory.v3.DefaultClientWriter proto] <api/envoy/extensions/quic/client_writer_factory/v3/default_client_writer.proto#L16>`
+
+The default QUIC packet writer used for QUIC upstream connections which is platform independent.
+
+
+
+

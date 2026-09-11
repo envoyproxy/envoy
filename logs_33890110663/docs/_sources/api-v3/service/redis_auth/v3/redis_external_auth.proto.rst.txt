@@ -1,0 +1,90 @@
+.. _envoy_v3_api_file_envoy/service/redis_auth/v3/redis_external_auth.proto:
+
+Redis external authentication service (proto)
+=============================================
+
+
+
+
+The messages used by the redis_proxy filter when performing external authentication.
+
+
+
+
+.. _envoy_v3_api_msg_service.redis_auth.v3.RedisProxyExternalAuthRequest:
+
+service.redis_auth.v3.RedisProxyExternalAuthRequest
+---------------------------------------------------
+
+
+:repo:`[service.redis_auth.v3.RedisProxyExternalAuthRequest proto] <api/envoy/service/redis_auth/v3/redis_external_auth.proto#L27>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "username": ...,
+    "password": ...
+  }
+
+.. _envoy_v3_api_field_service.redis_auth.v3.RedisProxyExternalAuthRequest.username:
+
+
+username
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Username, if applicable. Otherwise, empty.
+
+
+.. _envoy_v3_api_field_service.redis_auth.v3.RedisProxyExternalAuthRequest.password:
+
+
+password
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Password sent with the AUTH command.
+
+
+
+.. _envoy_v3_api_msg_service.redis_auth.v3.RedisProxyExternalAuthResponse:
+
+service.redis_auth.v3.RedisProxyExternalAuthResponse
+----------------------------------------------------
+
+
+:repo:`[service.redis_auth.v3.RedisProxyExternalAuthResponse proto] <api/envoy/service/redis_auth/v3/redis_external_auth.proto#L35>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "status": {...},
+    "expiration": {...},
+    "message": ...
+  }
+
+.. _envoy_v3_api_field_service.redis_auth.v3.RedisProxyExternalAuthResponse.status:
+
+
+status
+  (`Status <https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#status>`_) Status of the authentication check.
+
+
+.. _envoy_v3_api_field_service.redis_auth.v3.RedisProxyExternalAuthResponse.expiration:
+
+
+expiration
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) Optional expiration time for the authentication.
+  If set, the authentication will be valid until this time.
+  If not set, the authentication will be valid indefinitely.
+
+
+.. _envoy_v3_api_field_service.redis_auth.v3.RedisProxyExternalAuthResponse.message:
+
+
+message
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional message to be sent back to the client.
+
+

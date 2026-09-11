@@ -1,0 +1,54 @@
+.. _envoy_v3_api_file_envoy/extensions/http/cache_v2/simple_http_cache/v3/config.proto:
+
+SimpleHttpCache CacheFilter storage plugin (proto)
+==================================================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.http.cache_v2.simple_http_cache.v3.SimpleHttpCacheV2Config:
+
+extensions.http.cache_v2.simple_http_cache.v3.SimpleHttpCacheV2Config
+---------------------------------------------------------------------
+
+
+:repo:`[extensions.http.cache_v2.simple_http_cache.v3.SimpleHttpCacheV2Config proto] <api/envoy/extensions/http/cache_v2/simple_http_cache/v3/config.proto#L18>`
+
+
+.. _extension_envoy.extensions.http.cache_v2.simple:
+
+This extension has the qualified name ``envoy.extensions.http.cache_v2.simple``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.http.cache_v2 <extension_category_envoy.http.cache_v2>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.http.cache_v2.simple_http_cache.v3.SimpleHttpCacheV2Config <envoy_v3_api_msg_extensions.http.cache_v2.simple_http_cache.v3.SimpleHttpCacheV2Config>`
+
+
+
+
+

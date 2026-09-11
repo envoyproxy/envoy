@@ -1,0 +1,85 @@
+.. _envoy_v3_api_file_envoy/config/core/v3/http_service.proto:
+
+HTTP services (proto)
+=====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.HttpService:
+
+config.core.v3.HttpService
+--------------------------
+
+
+:repo:`[config.core.v3.HttpService proto] <api/envoy/config/core/v3/http_service.proto#L20>`
+
+HTTP service configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "http_uri": {...},
+    "request_headers_to_add": [],
+    "formatters": []
+  }
+
+.. _envoy_v3_api_field_config.core.v3.HttpService.http_uri:
+
+
+http_uri
+  (:ref:`config.core.v3.HttpUri <envoy_v3_api_msg_config.core.v3.HttpUri>`) The service's HTTP URI. For example:
+
+  .. code-block:: yaml
+
+     http_uri:
+       uri: https://www.myserviceapi.com/v1/data
+       cluster: www.myserviceapi.com|443
+
+
+
+.. _envoy_v3_api_field_config.core.v3.HttpService.request_headers_to_add:
+
+
+request_headers_to_add
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) Specifies a list of HTTP headers that should be added to each request
+  handled by this virtual host. Substitution formatters are supported.
+
+
+.. _envoy_v3_api_field_config.core.v3.HttpService.formatters:
+
+
+formatters
+  (**repeated** :ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Specifies a collection of Formatter plugins that can be used in substitution formatters
+  in ``request_headers_to_add``.
+  See the formatters extensions documentation for details.
+
+
+  .. _extension_category_envoy.formatter:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.formatter.cel <extension_envoy.formatter.cel>`
+
+    - :ref:`envoy.formatter.dynamic_modules <extension_envoy.formatter.dynamic_modules>`
+
+    - :ref:`envoy.formatter.file_content <extension_envoy.formatter.file_content>`
+
+    - :ref:`envoy.formatter.generic_secret <extension_envoy.formatter.generic_secret>`
+
+    - :ref:`envoy.formatter.metadata <extension_envoy.formatter.metadata>`
+
+    - :ref:`envoy.formatter.req_without_query <extension_envoy.formatter.req_without_query>`
+
+
+
+
+

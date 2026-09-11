@@ -1,0 +1,608 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Overload Manager (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="Rate limit service (proto)" href="../../ratelimit/v3/rls.proto.html" />
+    <link rel="prev" title="Metrics service (proto)" href="../../metrics/v3/metrics_service.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="../../../bootstrap/bootstrap.html">Bootstrap</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../bootstrap/v3/bootstrap.proto.html">Bootstrap (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/bootstrap/internal_listener/v3/internal_listener.proto.html">Internal Listener (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.proto.html">Bootstrap settings for downstream reverse connection socket interface (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.proto.html">Upstream reverse connection socket interface (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/network/socket_interface/sockmap/v3/sockmap.proto.html">Sockmap socket interface configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../metrics/v3/metrics_service.proto.html">Metrics service (proto)</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Overload Manager (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ratelimit/v3/rls.proto.html">Rate limit service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../metrics/v3/stats.proto.html">Stats (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/vcl/v3alpha/vcl_socket_interface.proto.html">VCL socket interface configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/wasm/v3/wasm.proto.html">Wasm (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/bootstrap/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Bootstrap Extension (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../config.html">Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+      <li class="breadcrumb-item active">Overload Manager (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/config/overload/v3/overload.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="overload-manager-proto">
+<span id="envoy-v3-api-file-envoy-config-overload-v3-overload-proto"></span><h1>Overload Manager (proto)<a class="headerlink" href="#overload-manager-proto" title="Link to this heading"></a></h1>
+<p>The Overload Manager provides an extensible framework to protect Envoy instances
+from overload of various resources (memory, cpu, file descriptors, etc).
+It monitors a configurable set of resources and notifies registered listeners
+when triggers related to those resources fire.</p>
+<section id="config-overload-v3-resourcemonitor">
+<span id="envoy-v3-api-msg-config-overload-v3-resourcemonitor"></span><h2>config.overload.v3.ResourceMonitor<a class="headerlink" href="#config-overload-v3-resourcemonitor" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/overload/v3/overload.proto#L27">[config.overload.v3.ResourceMonitor proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;typed_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-resourcemonitor-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The name of the resource monitor to instantiate. Must match a registered
+resource monitor type.
+See the <a class="reference internal" href="#extension-category-envoy-resource-monitors"><span class="std std-ref">extensions listed in typed_config below</span></a> for the default list of available resource monitor.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-overload-v3-resourcemonitor-typed-config">
+<dt>typed_config</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any">Any</a>)
+Configuration for the resource monitor being instantiated.</p>
+<div class="admonition tip" id="extension-category-envoy-resource-monitors">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../extensions/resource_monitors/cgroup_memory/v3/cgroup_memory.proto.html#extension-envoy-resource-monitors-cgroup-memory"><span class="std std-ref">envoy.resource_monitors.cgroup_memory</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.proto.html#extension-envoy-resource-monitors-cpu-utilization"><span class="std std-ref">envoy.resource_monitors.cpu_utilization</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/resource_monitors/fixed_heap/v3/fixed_heap.proto.html#extension-envoy-resource-monitors-fixed-heap"><span class="std std-ref">envoy.resource_monitors.fixed_heap</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/resource_monitors/downstream_connections/v3/downstream_connections.proto.html#extension-envoy-resource-monitors-global-downstream-max-connections"><span class="std std-ref">envoy.resource_monitors.global_downstream_max_connections</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/resource_monitors/injected_resource/v3/injected_resource.proto.html#extension-envoy-resource-monitors-injected-resource"><span class="std std-ref">envoy.resource_monitors.injected_resource</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+</section>
+<section id="config-overload-v3-thresholdtrigger">
+<span id="envoy-v3-api-msg-config-overload-v3-thresholdtrigger"></span><h2>config.overload.v3.ThresholdTrigger<a class="headerlink" href="#config-overload-v3-thresholdtrigger" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/overload/v3/overload.proto#L47">[config.overload.v3.ThresholdTrigger proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-thresholdtrigger-value">
+<dt>value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">double</a>) If the resource pressure is greater than or equal to this value, the trigger
+will enter saturation.</p>
+</dd>
+</dl>
+</section>
+<section id="config-overload-v3-scaledtrigger">
+<span id="envoy-v3-api-msg-config-overload-v3-scaledtrigger"></span><h2>config.overload.v3.ScaledTrigger<a class="headerlink" href="#config-overload-v3-scaledtrigger" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/overload/v3/overload.proto#L56">[config.overload.v3.ScaledTrigger proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;scaling_threshold&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;saturation_threshold&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-scaledtrigger-scaling-threshold">
+<dt>scaling_threshold</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">double</a>) If the resource pressure is greater than this value, the trigger will be in the
+<a class="reference internal" href="../../../../intro/arch_overview/operations/overload_manager.html#arch-overview-overload-manager-triggers-state"><span class="std std-ref">scaling</span></a> state with value
+<code class="docutils literal notranslate"><span class="pre">(pressure</span> <span class="pre">-</span> <span class="pre">scaling_threshold)</span> <span class="pre">/</span> <span class="pre">(saturation_threshold</span> <span class="pre">-</span> <span class="pre">scaling_threshold)</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-scaledtrigger-saturation-threshold">
+<dt>saturation_threshold</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">double</a>) If the resource pressure is greater than this value, the trigger will enter saturation.</p>
+</dd>
+</dl>
+</section>
+<section id="config-overload-v3-trigger">
+<span id="envoy-v3-api-msg-config-overload-v3-trigger"></span><h2>config.overload.v3.Trigger<a class="headerlink" href="#config-overload-v3-trigger" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/overload/v3/overload.proto#L66">[config.overload.v3.Trigger proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;threshold&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;scaled&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-trigger-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The name of the resource this is a trigger for.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-overload-v3-trigger-threshold">
+<dt>threshold</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-overload-v3-thresholdtrigger"><span class="std std-ref">config.overload.v3.ThresholdTrigger</span></a>)</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-overload-v3-trigger-threshold"><span class="std std-ref">threshold</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-overload-v3-trigger-scaled"><span class="std std-ref">scaled</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-overload-v3-trigger-scaled">
+<dt>scaled</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-overload-v3-scaledtrigger"><span class="std std-ref">config.overload.v3.ScaledTrigger</span></a>)</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-overload-v3-trigger-threshold"><span class="std std-ref">threshold</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-overload-v3-trigger-scaled"><span class="std std-ref">scaled</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="config-overload-v3-scaletimersoverloadactionconfig">
+<span id="envoy-v3-api-msg-config-overload-v3-scaletimersoverloadactionconfig"></span><h2>config.overload.v3.ScaleTimersOverloadActionConfig<a class="headerlink" href="#config-overload-v3-scaletimersoverloadactionconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/overload/v3/overload.proto#L85">[config.overload.v3.ScaleTimersOverloadActionConfig proto]</a></p>
+<p>Typed configuration for the “envoy.overload_actions.reduce_timeouts” action. See
+<a class="reference internal" href="../../../../configuration/operations/overload_manager/overload_manager.html#config-overload-manager-reducing-timeouts"><span class="std std-ref">the docs</span></a> for an example of how to configure
+the action with different timeouts and minimum values.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;timer_scale_factors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-scaletimersoverloadactionconfig-timer-scale-factors">
+<dt>timer_scale_factors</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-overload-v3-scaletimersoverloadactionconfig-scaletimer"><span class="std std-ref">config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer</span></a>, <em>REQUIRED</em>) A set of timer scaling rules to be applied.</p>
+</dd>
+</dl>
+</section>
+<section id="config-overload-v3-scaletimersoverloadactionconfig-scaletimer">
+<span id="envoy-v3-api-msg-config-overload-v3-scaletimersoverloadactionconfig-scaletimer"></span><h2>config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer<a class="headerlink" href="#config-overload-v3-scaletimersoverloadactionconfig-scaletimer" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/overload/v3/overload.proto#L121">[config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;timer&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;min_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;min_scale&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-scaletimersoverloadactionconfig-scaletimer-timer">
+<dt>timer</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-config-overload-v3-scaletimersoverloadactionconfig-timertype"><span class="std std-ref">config.overload.v3.ScaleTimersOverloadActionConfig.TimerType</span></a>) The type of timer this minimum applies to.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-overload-v3-scaletimersoverloadactionconfig-scaletimer-min-timeout">
+<dt>min_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Sets the minimum duration as an absolute value.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-overload-v3-scaletimersoverloadactionconfig-scaletimer-min-timeout"><span class="std std-ref">min_timeout</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-overload-v3-scaletimersoverloadactionconfig-scaletimer-min-scale"><span class="std std-ref">min_scale</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-overload-v3-scaletimersoverloadactionconfig-scaletimer-min-scale">
+<dt>min_scale</dt><dd><p>(<a class="reference internal" href="../../../type/v3/percent.proto.html#envoy-v3-api-msg-type-v3-percent"><span class="std std-ref">type.v3.Percent</span></a>) Sets the minimum duration as a percentage of the maximum value.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-overload-v3-scaletimersoverloadactionconfig-scaletimer-min-timeout"><span class="std std-ref">min_timeout</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-overload-v3-scaletimersoverloadactionconfig-scaletimer-min-scale"><span class="std std-ref">min_scale</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-config-overload-v3-scaletimersoverloadactionconfig-timertype">
+<span id="envoy-v3-api-enum-config-overload-v3-scaletimersoverloadactionconfig-timertype"></span><h2>Enum config.overload.v3.ScaleTimersOverloadActionConfig.TimerType<a class="headerlink" href="#enum-config-overload-v3-scaletimersoverloadactionconfig-timertype" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/overload/v3/overload.proto#L86">[config.overload.v3.ScaleTimersOverloadActionConfig.TimerType proto]</a></p>
+<dl class="simple" id="envoy-v3-api-enum-value-config-overload-v3-scaletimersoverloadactionconfig-timertype-unspecified">
+<dt>UNSPECIFIED</dt><dd><p><em>(DEFAULT)</em> ⁣Unsupported value; users must explicitly specify the timer they want scaled.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-overload-v3-scaletimersoverloadactionconfig-timertype-http-downstream-connection-idle">
+<dt>HTTP_DOWNSTREAM_CONNECTION_IDLE</dt><dd><p>⁣Adjusts the idle timer for downstream HTTP connections that takes effect when there are no active streams.
+This affects the value of <a class="reference internal" href="../../core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-httpprotocoloptions-idle-timeout"><span class="std std-ref">HttpConnectionManager.common_http_protocol_options.idle_timeout</span></a></p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-overload-v3-scaletimersoverloadactionconfig-timertype-http-downstream-stream-idle">
+<dt>HTTP_DOWNSTREAM_STREAM_IDLE</dt><dd><p>⁣Adjusts the idle timer for HTTP streams initiated by downstream clients.
+This affects the value of <a class="reference internal" href="../../route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-idle-timeout"><span class="std std-ref">RouteAction.idle_timeout</span></a> and
+<a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-stream-idle-timeout"><span class="std std-ref">HttpConnectionManager.stream_idle_timeout</span></a></p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-overload-v3-scaletimersoverloadactionconfig-timertype-transport-socket-connect">
+<dt>TRANSPORT_SOCKET_CONNECT</dt><dd><p>⁣Adjusts the timer for how long downstream clients have to finish transport-level negotiations
+before the connection is closed.
+This affects the value of
+<a class="reference internal" href="../../listener/v3/listener_components.proto.html#envoy-v3-api-field-config-listener-v3-filterchain-transport-socket-connect-timeout"><span class="std std-ref">FilterChain.transport_socket_connect_timeout</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-overload-v3-scaletimersoverloadactionconfig-timertype-http-downstream-connection-max">
+<dt>HTTP_DOWNSTREAM_CONNECTION_MAX</dt><dd><p>⁣Adjusts the max connection duration timer for downstream HTTP connections.
+This affects the value of
+<a class="reference internal" href="../../core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-httpprotocoloptions-max-connection-duration"><span class="std std-ref">HttpConnectionManager.common_http_protocol_options.max_connection_duration</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-overload-v3-scaletimersoverloadactionconfig-timertype-http-downstream-stream-flush">
+<dt>HTTP_DOWNSTREAM_STREAM_FLUSH</dt><dd><p>⁣Adjusts the timeout for the downstream codec to flush an ended stream.
+This affects the value of <a class="reference internal" href="../../route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-flush-timeout"><span class="std std-ref">RouteAction.flush_timeout</span></a> and
+<a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-stream-flush-timeout"><span class="std std-ref">HttpConnectionManager.stream_flush_timeout</span></a></p>
+</dd>
+</dl>
+</section>
+<section id="config-overload-v3-shrinkheapconfig">
+<span id="envoy-v3-api-msg-config-overload-v3-shrinkheapconfig"></span><h2>config.overload.v3.ShrinkHeapConfig<a class="headerlink" href="#config-overload-v3-shrinkheapconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/overload/v3/overload.proto#L143">[config.overload.v3.ShrinkHeapConfig proto]</a></p>
+<p>Typed configuration for the “envoy.overload_actions.shrink_heap” action.
+See <a class="reference internal" href="../../../../configuration/operations/overload_manager/overload_manager.html#config-overload-manager-shrink-heap"><span class="std std-ref">the docs</span></a> for an example of how to configure
+this action.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;timer_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_unfreed_memory_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-shrinkheapconfig-timer-interval">
+<dt>timer_interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The interval at which shrink heap action checks if memory should be released.
+If not specified, defaults to 10 seconds.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-shrinkheapconfig-max-unfreed-memory-bytes">
+<dt>max_unfreed_memory_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value">UInt64Value</a>) Maximum amount of unfreed memory in bytes to keep before releasing memory
+back to the system. This is used as the threshold passed to
+tcmalloc::MallocExtension::ReleaseMemoryToSystem().
+If not specified, defaults to 104857600 (100MB).</p>
+</dd>
+</dl>
+</section>
+<section id="config-overload-v3-overloadaction">
+<span id="envoy-v3-api-msg-config-overload-v3-overloadaction"></span><h2>config.overload.v3.OverloadAction<a class="headerlink" href="#config-overload-v3-overloadaction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/overload/v3/overload.proto#L155">[config.overload.v3.OverloadAction proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;triggers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;typed_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-overloadaction-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The name of the overload action. This is just a well-known string that
+listeners can use for registering callbacks.
+Valid known overload actions include:
+- envoy.overload_actions.stop_accepting_requests
+- envoy.overload_actions.disable_http_keepalive
+- envoy.overload_actions.stop_accepting_connections
+- envoy.overload_actions.reject_incoming_connections
+- envoy.overload_actions.shrink_heap
+- envoy.overload_actions.reduce_timeouts
+- envoy.overload_actions.reset_high_memory_stream</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-overloadaction-triggers">
+<dt>triggers</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-overload-v3-trigger"><span class="std std-ref">config.overload.v3.Trigger</span></a>, <em>REQUIRED</em>) A set of triggers for this action. The state of the action is the maximum
+state of all triggers, which can be scalar values between 0 and 1 or
+saturated. Listeners are notified when the overload action changes state.
+An overload manager action can only have one trigger for a given resource
+e.g. <a class="reference internal" href="#envoy-v3-api-field-config-overload-v3-trigger-name"><span class="std std-ref">Trigger.name</span></a> must be unique
+in this list.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-overloadaction-typed-config">
+<dt>typed_config</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any">Any</a>) Configuration for the action being instantiated if applicable.</p>
+</dd>
+</dl>
+</section>
+<section id="config-overload-v3-loadshedpoint">
+<span id="envoy-v3-api-msg-config-overload-v3-loadshedpoint"></span><h2>config.overload.v3.LoadShedPoint<a class="headerlink" href="#config-overload-v3-loadshedpoint" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/overload/v3/overload.proto#L187">[config.overload.v3.LoadShedPoint proto]</a></p>
+<p>A point within the connection or request lifecycle that provides context on
+whether to shed load at that given stage for the current entity at the
+point.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;triggers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-loadshedpoint-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) This is just a well-known string for the LoadShedPoint.
+Deployment specific LoadShedPoints e.g. within a custom extension should
+be prefixed by the company / deployment name to avoid colliding with any
+open source LoadShedPoints.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-loadshedpoint-triggers">
+<dt>triggers</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-overload-v3-trigger"><span class="std std-ref">config.overload.v3.Trigger</span></a>, <em>REQUIRED</em>) A set of triggers for this LoadShedPoint. The LoadShedPoint will use the
+the maximum state of all triggers, which can be scalar values between 0 and
+1 or saturated. A LoadShedPoint can only have one trigger for a given
+resource e.g. <a class="reference internal" href="#envoy-v3-api-field-config-overload-v3-trigger-name"><span class="std std-ref">Trigger.name</span></a> must be unique in
+this list.</p>
+</dd>
+</dl>
+</section>
+<section id="config-overload-v3-bufferfactoryconfig">
+<span id="envoy-v3-api-msg-config-overload-v3-bufferfactoryconfig"></span><h2>config.overload.v3.BufferFactoryConfig<a class="headerlink" href="#config-overload-v3-bufferfactoryconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/overload/v3/overload.proto#L205">[config.overload.v3.BufferFactoryConfig proto]</a></p>
+<p>Configuration for which accounts the WatermarkBuffer Factories should
+track.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;minimum_account_to_track_power_of_two&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-overload-v3-bufferfactoryconfig-minimum-account-to-track-power-of-two">
+<dt>minimum_account_to_track_power_of_two</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) The minimum power of two at which Envoy starts tracking an account.</p>
+<p>Envoy has 8 power of two buckets starting with the provided exponent below.
+Concretely the 1st bucket contains accounts for streams that use
+[2^minimum_account_to_track_power_of_two,
+2^(minimum_account_to_track_power_of_two + 1)) bytes.
+With the 8th bucket tracking accounts
+&gt;= 128 * 2^minimum_account_to_track_power_of_two.</p>
+<p>The maximum value is 56, since we’re using uint64_t for bytes counting,
+and that’s the last value that would use the 8 buckets. In practice,
+we don’t expect the proxy to be holding 2^56 bytes.</p>
+<p>If omitted, Envoy should not do any tracking.</p>
+</dd>
+</dl>
+</section>
+<section id="config-overload-v3-overloadmanager">
+<span id="envoy-v3-api-msg-config-overload-v3-overloadmanager"></span><h2>config.overload.v3.OverloadManager<a class="headerlink" href="#config-overload-v3-overloadmanager" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/overload/v3/overload.proto#L224">[config.overload.v3.OverloadManager proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;refresh_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;resource_monitors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;actions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;loadshed_points&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;buffer_factory_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-overloadmanager-refresh-interval">
+<dt>refresh_interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The interval for refreshing resource usage.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-overloadmanager-resource-monitors">
+<dt>resource_monitors</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-overload-v3-resourcemonitor"><span class="std std-ref">config.overload.v3.ResourceMonitor</span></a>, <em>REQUIRED</em>) The set of resources to monitor.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-overloadmanager-actions">
+<dt>actions</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-overload-v3-overloadaction"><span class="std std-ref">config.overload.v3.OverloadAction</span></a>) The set of overload actions.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-overloadmanager-loadshed-points">
+<dt>loadshed_points</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-overload-v3-loadshedpoint"><span class="std std-ref">config.overload.v3.LoadShedPoint</span></a>) The set of load shed points.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-overload-v3-overloadmanager-buffer-factory-config">
+<dt>buffer_factory_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-overload-v3-bufferfactoryconfig"><span class="std std-ref">config.overload.v3.BufferFactoryConfig</span></a>) Configuration for buffer factory.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../metrics/v3/metrics_service.proto.html" class="btn btn-neutral float-left" title="Metrics service (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../ratelimit/v3/rls.proto.html" class="btn btn-neutral float-right" title="Rate limit service (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Overload Manager (proto)</a><ul>
+<li><a class="reference internal" href="#config-overload-v3-resourcemonitor">config.overload.v3.ResourceMonitor</a></li>
+<li><a class="reference internal" href="#config-overload-v3-thresholdtrigger">config.overload.v3.ThresholdTrigger</a></li>
+<li><a class="reference internal" href="#config-overload-v3-scaledtrigger">config.overload.v3.ScaledTrigger</a></li>
+<li><a class="reference internal" href="#config-overload-v3-trigger">config.overload.v3.Trigger</a></li>
+<li><a class="reference internal" href="#config-overload-v3-scaletimersoverloadactionconfig">config.overload.v3.ScaleTimersOverloadActionConfig</a></li>
+<li><a class="reference internal" href="#config-overload-v3-scaletimersoverloadactionconfig-scaletimer">config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer</a></li>
+<li><a class="reference internal" href="#enum-config-overload-v3-scaletimersoverloadactionconfig-timertype">Enum config.overload.v3.ScaleTimersOverloadActionConfig.TimerType</a></li>
+<li><a class="reference internal" href="#config-overload-v3-shrinkheapconfig">config.overload.v3.ShrinkHeapConfig</a></li>
+<li><a class="reference internal" href="#config-overload-v3-overloadaction">config.overload.v3.OverloadAction</a></li>
+<li><a class="reference internal" href="#config-overload-v3-loadshedpoint">config.overload.v3.LoadShedPoint</a></li>
+<li><a class="reference internal" href="#config-overload-v3-bufferfactoryconfig">config.overload.v3.BufferFactoryConfig</a></li>
+<li><a class="reference internal" href="#config-overload-v3-overloadmanager">config.overload.v3.OverloadManager</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

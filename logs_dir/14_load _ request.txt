@@ -1,0 +1,434 @@
+﻿2026-08-18T18:08:09.7460420Z Current runner version: '2.336.0'
+2026-08-18T18:08:09.7478748Z ##[group]Runner Image Provisioner
+2026-08-18T18:08:09.7479650Z Hosted Compute Agent
+2026-08-18T18:08:09.7480275Z Version: 20260729.566
+2026-08-18T18:08:09.7480934Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-18T18:08:09.7481996Z Build Date: 2026-07-29T19:17:02Z
+2026-08-18T18:08:09.7482703Z Worker ID: {1307bd5a-0aeb-463d-b7f4-90a3058ea1af}
+2026-08-18T18:08:09.7483450Z Azure Region: centralus
+2026-08-18T18:08:09.7484060Z ##[endgroup]
+2026-08-18T18:08:09.7485223Z ##[group]Operating System
+2026-08-18T18:08:09.7485837Z Ubuntu
+2026-08-18T18:08:09.7486396Z 24.04.4
+2026-08-18T18:08:09.7486917Z LTS
+2026-08-18T18:08:09.7487470Z ##[endgroup]
+2026-08-18T18:08:09.7488062Z ##[group]Runner Image
+2026-08-18T18:08:09.7488656Z Image: ubuntu-24.04
+2026-08-18T18:08:09.7489293Z Version: 20260810.271.1
+2026-08-18T18:08:09.7490444Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260810.271/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-18T18:08:09.7491948Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260810.271
+2026-08-18T18:08:09.7492793Z ##[endgroup]
+2026-08-18T18:08:09.7493975Z ##[group]GITHUB_TOKEN Permissions
+2026-08-18T18:08:09.7495729Z Actions: read
+2026-08-18T18:08:09.7496325Z Contents: read
+2026-08-18T18:08:09.7496860Z Metadata: read
+2026-08-18T18:08:09.7497430Z PullRequests: read
+2026-08-18T18:08:09.7498014Z ##[endgroup]
+2026-08-18T18:08:09.7499592Z Secret source: Actions
+2026-08-18T18:08:09.7500599Z Prepare workflow directory
+2026-08-18T18:08:09.7883811Z Prepare all required actions
+2026-08-18T18:08:09.7918811Z Getting action download info
+2026-08-18T18:08:10.0811038Z Download action repository 'envoyproxy/toolshed@4a6a2986abd53c8a2d1077de4165fae369c5bc41' (SHA:4a6a2986abd53c8a2d1077de4165fae369c5bc41)
+2026-08-18T18:08:11.8441570Z Getting action download info
+2026-08-18T18:08:11.9883027Z Download action repository 'envoyproxy/toolshed@ab31cf868faba51af4bd9f04671c30d4084d70ee' (SHA:ab31cf868faba51af4bd9f04671c30d4084d70ee)
+2026-08-18T18:08:12.9856763Z Getting action download info
+2026-08-18T18:08:13.1220289Z Download action repository 'envoyproxy/toolshed@1ac5ac77787d653454e60604edb4dc46ddd8110e' (SHA:1ac5ac77787d653454e60604edb4dc46ddd8110e)
+2026-08-18T18:08:14.1562638Z Getting action download info
+2026-08-18T18:08:14.2935571Z Download action repository 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3' (SHA:3a2844b7e9c422d3c10d287c895573f7108da1b3)
+2026-08-18T18:08:14.6252930Z Uses: envoyproxy/envoy/.github/workflows/_load.yml@refs/heads/main (447ae91525105d3bd9c5c9bc3672078d89c6958e)
+2026-08-18T18:08:14.6256308Z ##[group] Inputs
+2026-08-18T18:08:14.6256618Z   agent-ubuntu: ubuntu-24.04
+2026-08-18T18:08:14.6256910Z   check-name: checks
+2026-08-18T18:08:14.6257186Z   check-title: 
+2026-08-18T18:08:14.6257464Z   head-sha: 
+2026-08-18T18:08:14.6257741Z   run-id: 31865235787
+2026-08-18T18:08:14.6258263Z   runs-after: false
+2026-08-18T18:08:14.6258679Z   template-request-summary: ## \($linkedTitle)
+
+\($summary)
+
+\($extra)
+
+2026-08-18T18:08:14.6259123Z ##[endgroup]
+2026-08-18T18:08:14.6259394Z Complete job name: load / request
+2026-08-18T18:08:14.6750845Z ##[group]Run envoyproxy/toolshed/actions/github/env/load@4a6a2986abd53c8a2d1077de4165fae369c5bc41
+2026-08-18T18:08:14.6751867Z with:
+2026-08-18T18:08:14.6752219Z   run-id: 31865235787
+2026-08-18T18:08:14.6752608Z   check-name: checks
+2026-08-18T18:08:14.6752955Z   name: env
+2026-08-18T18:08:14.6753517Z   template-check-text: ## \($icon) Check is running
+
+## The check run can be viewed here:
+
+# \($icon) [\($data.check.name) (\($summary.title))](\($runLink))
+
+2026-08-18T18:08:14.6754661Z   template-script-current: OUTPUT=\"$(gh api --jq '.workflow_runs[0].id' repos/\($repo)/actions/workflows/request.yml/runs?head_sha=\($head_sha))\"
+
+2026-08-18T18:08:14.6755564Z env:
+2026-08-18T18:08:14.6755881Z   CI_DEBUG: false
+2026-08-18T18:08:14.6758220Z   GH_TOKEN: ***
+2026-08-18T18:08:14.6758703Z ##[endgroup]
+2026-08-18T18:08:14.6810148Z ##[start-action display=Find request;id=data.find-request]
+2026-08-18T18:08:14.6816729Z ##[end-action id=data.find-request;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-08-18T18:08:14.6819221Z ##[start-action display=Download environment data;id=data.download]
+2026-08-18T18:08:14.6867271Z ##[group]Run envoyproxy/toolshed/actions/github/artifact/download@ab31cf868faba51af4bd9f04671c30d4084d70ee
+2026-08-18T18:08:14.6867939Z with:
+2026-08-18T18:08:14.6868278Z   name: env
+2026-08-18T18:08:14.6868635Z   path: /home/runner/work/_temp
+2026-08-18T18:08:14.6869030Z   run-id: 31865235787
+2026-08-18T18:08:14.6869384Z env:
+2026-08-18T18:08:14.6869752Z   CI_DEBUG: false
+2026-08-18T18:08:14.6871905Z   GH_TOKEN: ***
+2026-08-18T18:08:14.6872470Z ##[endgroup]
+2026-08-18T18:08:14.6877645Z ##[start-action display=Download artifact;id=data.download.__actions_github-script]
+2026-08-18T18:08:14.6944193Z ##[group]Run actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+2026-08-18T18:08:14.6944777Z with:
+2026-08-18T18:08:14.6946446Z   script: let allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    run_id: 31865235787,
+});
+let matchArtifact = allArtifacts.data.artifacts.filter((artifact) => {
+    return artifact.name == "env"
+})[0];
+let download = await github.rest.actions.downloadArtifact({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    artifact_id: matchArtifact.id,
+    archive_format: 'zip',
+});
+let fs = require('fs');
+fs.writeFileSync(`${process.env.GITHUB_WORKSPACE}/env.zip`, Buffer.from(download.data));
+
+2026-08-18T18:08:14.6949668Z   github-token: ***
+2026-08-18T18:08:14.6950038Z   debug: false
+2026-08-18T18:08:14.6950707Z   user-agent: actions/github-script
+2026-08-18T18:08:14.6951145Z   result-encoding: json
+2026-08-18T18:08:14.6951821Z   retries: 0
+2026-08-18T18:08:14.6952357Z   retry-exempt-status-codes: 400,401,403,404,422
+2026-08-18T18:08:14.6952759Z env:
+2026-08-18T18:08:14.6953111Z   CI_DEBUG: false
+2026-08-18T18:08:14.6954937Z   GH_TOKEN: ***
+2026-08-18T18:08:14.6955260Z ##[endgroup]
+2026-08-18T18:08:15.2818576Z ##[end-action id=data.download.__actions_github-script;outcome=success;conclusion=success;duration_ms=593]
+2026-08-18T18:08:15.2828348Z ##[start-action display=Run cd /home/runner/work/_temp;id=data.download.__run]
+2026-08-18T18:08:15.2858875Z ##[group]Run cd /home/runner/work/_temp
+2026-08-18T18:08:15.2859435Z [36;1mcd /home/runner/work/_temp[0m
+2026-08-18T18:08:15.2859854Z [36;1munzip -q ${GITHUB_WORKSPACE}/env.zip[0m
+2026-08-18T18:08:15.2884079Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-08-18T18:08:15.2884973Z env:
+2026-08-18T18:08:15.2885304Z   CI_DEBUG: false
+2026-08-18T18:08:15.2887149Z   GH_TOKEN: ***
+2026-08-18T18:08:15.2887487Z ##[endgroup]
+2026-08-18T18:08:15.2971170Z ##[end-action id=data.download.__run;outcome=success;conclusion=success;duration_ms=14]
+2026-08-18T18:08:15.2980810Z ##[end-action id=data.download;outcome=success;conclusion=success;duration_ms=616]
+2026-08-18T18:08:15.2983789Z ##[start-action display=Validate environment source;id=data.__envoyproxy_toolshed]
+2026-08-18T18:08:15.3044318Z ##[group]Run envoyproxy/toolshed/actions/jq@ab31cf868faba51af4bd9f04671c30d4084d70ee
+2026-08-18T18:08:15.3044858Z with:
+2026-08-18T18:08:15.3045529Z   input: workflow_event: "pull_request_target"
+workflow_repo: "envoyproxy/envoy"
+current_repo: "envoyproxy/envoy"
+allowed_events: ["pull_request_target", "push", "schedule"]
+
+2026-08-18T18:08:15.3046204Z   input-format: yaml
+2026-08-18T18:08:15.3046564Z   print-output: true
+2026-08-18T18:08:15.3046884Z   options: -r
+2026-08-18T18:08:15.3048418Z   filter: .workflow_event as $event
+| .workflow_repo as $repo
+| .current_repo as $current
+| .allowed_events as $allowed
+# Check that the workflow run came from the same repository
+| if $repo != $current then
+    error("Environment artifact must come from the same repository. Expected: \($current), Got: \($repo)")
+  # Check that the workflow run was triggered by an allowed event
+  elif ($allowed | index($event)) == null then
+    error("Environment artifact must come from an allowed event type. Allowed: \($allowed), Got: \($event)")
+  else
+    "✓ Environment source validation passed"
+  end
+
+2026-08-18T18:08:15.3050055Z   decode: false
+2026-08-18T18:08:15.3050380Z   encode: false
+2026-08-18T18:08:15.3050719Z   print-result: false
+2026-08-18T18:08:15.3051076Z   trim-result: true
+2026-08-18T18:08:15.3051394Z   use-tmp-file: true
+2026-08-18T18:08:15.3052044Z   use-tmp-file-filter: true
+2026-08-18T18:08:15.3052429Z env:
+2026-08-18T18:08:15.3052736Z   CI_DEBUG: false
+2026-08-18T18:08:15.3054587Z   GH_TOKEN: ***
+2026-08-18T18:08:15.3054920Z ##[endgroup]
+2026-08-18T18:08:15.3693888Z ✓ Environment source validation passed
+2026-08-18T18:08:15.3699698Z ##[end-action id=data.__envoyproxy_toolshed;outcome=success;conclusion=success;duration_ms=71]
+2026-08-18T18:08:15.3702729Z ##[start-action display=Load env data;id=data.data]
+2026-08-18T18:08:15.3760066Z ##[group]Run envoyproxy/toolshed/actions/jq@ab31cf868faba51af4bd9f04671c30d4084d70ee
+2026-08-18T18:08:15.3760606Z with:
+2026-08-18T18:08:15.3760992Z   input-format: json-path
+2026-08-18T18:08:15.3761403Z   input: /home/runner/work/_temp/env.json
+2026-08-18T18:08:15.3764331Z   filter: "checks" as $checkName
+| .check = .checks["\($checkName)"]
+| del(.checks)
+| . as $data
+| $data.summary as $summary
+| "success" as $conclusion
+| "32169091313" as $runId
+| "envoyproxy/envoy" as $repo
+| if $conclusion != "" and $conclusion != "success"
+    then "completed"
+  else "in_progress" end
+| . as $status
+| $data.config.envoy.icon as $icon
+| "https://github.com/\($repo)/actions/runs/\($runId)" as $runLink
+| "## \($icon) Check is running
+
+## The check run can be viewed here:
+
+# \($icon) [\($data.check.name) (\($summary.title))](\($runLink))
+" as $text
+| {name: $data.check.name,
+   head_sha: $data.request.sha,
+   status: $status,
+   external_id: "\($runId)",
+   output: {
+     summary: "Check is running",
+     title: "\($data.check.name) (\($status))",
+     text: $text}}
+| if $data.check.id and $data.check.id != "" and $status == "completed" then
+     .conclusion = "cancelled"
+  else . end
+| . as $check
+| $data.run
+| if $data.check["check-id"] and $status == "completed" then
+    with_entries(.value = false)
+  else . end
+| . as $run
+| $data
+| .run = $run
+| {$check,
+   data: .,
+   checks: {($checkName): $check}}
+
+2026-08-18T18:08:15.3767186Z   print-result: false
+2026-08-18T18:08:15.3767574Z   decode: false
+2026-08-18T18:08:15.3767889Z   encode: false
+2026-08-18T18:08:15.3768269Z   options: -c
+2026-08-18T18:08:15.3768615Z   print-output: false
+2026-08-18T18:08:15.3768957Z   trim-result: true
+2026-08-18T18:08:15.3769346Z   use-tmp-file: true
+2026-08-18T18:08:15.3769702Z   use-tmp-file-filter: true
+2026-08-18T18:08:15.3770046Z env:
+2026-08-18T18:08:15.3770397Z   CI_DEBUG: false
+2026-08-18T18:08:15.3772597Z   GH_TOKEN: ***
+2026-08-18T18:08:15.3772939Z ##[endgroup]
+2026-08-18T18:08:15.4506891Z ##[end-action id=data.data;outcome=success;conclusion=success;duration_ms=80]
+2026-08-18T18:08:15.4509808Z ##[start-action display=Run # Cleanup temporary env file;id=data.__run]
+2026-08-18T18:08:15.4524897Z ##[group]Run # Cleanup temporary env file
+2026-08-18T18:08:15.4525350Z [36;1m# Cleanup temporary env file[0m
+2026-08-18T18:08:15.4525630Z [36;1mrm -rf /home/runner/work/_temp/env.json[0m
+2026-08-18T18:08:15.4545418Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-08-18T18:08:15.4545731Z env:
+2026-08-18T18:08:15.4545938Z   CI_DEBUG: false
+2026-08-18T18:08:15.4547569Z   GH_TOKEN: ***
+2026-08-18T18:08:15.4547787Z ##[endgroup]
+2026-08-18T18:08:15.4588797Z ##[end-action id=data.__run;outcome=success;conclusion=success;duration_ms=7]
+2026-08-18T18:08:15.4648009Z ##[group]Run envoyproxy/toolshed/actions/appauth@4a6a2986abd53c8a2d1077de4165fae369c5bc41
+2026-08-18T18:08:15.4648423Z with:
+2026-08-18T18:08:15.4648697Z   app_id: ***
+2026-08-18T18:08:15.4653487Z   key: ***
+
+2026-08-18T18:08:15.4653814Z   token-ok: false
+2026-08-18T18:08:15.4654044Z   retries: 5
+2026-08-18T18:08:15.4654291Z   retry-base-delay-ms: 1000
+2026-08-18T18:08:15.4654665Z   retry-max-delay-ms: 15000
+2026-08-18T18:08:15.4654910Z env:
+2026-08-18T18:08:15.4655123Z   CI_DEBUG: false
+2026-08-18T18:08:15.4655344Z ##[endgroup]
+2026-08-18T18:08:15.8295545Z ##[group]Run envoyproxy/toolshed/actions/github/checks@4a6a2986abd53c8a2d1077de4165fae369c5bc41
+2026-08-18T18:08:15.8296001Z with:
+2026-08-18T18:08:15.8296243Z   action: update
+2026-08-18T18:08:15.8297700Z   checks: {
+  "checks": {
+    "name": "Envoy/Checks",
+    "head_sha": "143324b0689ad909b5da9949b35401e4379ca720",
+    "status": "in_progress",
+    "external_id": "32169091313",
+    "output": {
+      "summary": "Check is running",
+      "title": "Envoy/Checks (in_progress)",
+      "text": "## [![](https://avatars.githubusercontent.com/u/30125649?s=24&v=4)](#) Check is running\n\n## The check run can be viewed here:\n\n# [![](https://avatars.githubusercontent.com/u/30125649?s=24&v=4)](#) [Envoy/Checks (pr/46497/main@143324b)](https://github.com/envoyproxy/envoy/actions/runs/32169091313)\n"
+    }
+  }
+}
+2026-08-18T18:08:15.8300887Z   ***: ghs_***_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRobmQiLCJjdHgiOiJFZlVKVFpIZk5RUU8wS3d5bG5SWWZxREZNZVF6RVMwWkNCWExCVXczdVdRbU5TUzFNSjlJSEEiLCJleHAiOjE3ODcwODAwOTUsImlhdCI6MTc4NzA3NjQ5NSwiaXNzIjoiZ2l0aHViIiwianRpIjoiMzU5ZmJiODktYzg1My00YTQ1LTg2MDctZjgwYWExYTkwZDJmIiwidmVyIjozfQ.8iECplxmyonk8MFm7RASdivfI8rhe2Y7G4iFb9S9JaEsMzxTEKN5s68BVdfjpbf2i2LHBb6Y1CwMC_9Bv7GO8A
+2026-08-18T18:08:15.8302906Z   retries: 5
+2026-08-18T18:08:15.8303173Z   retry-base-delay-ms: 1000
+2026-08-18T18:08:15.8303444Z   retry-max-delay-ms: 15000
+2026-08-18T18:08:15.8303713Z   fail-on-partial: false
+2026-08-18T18:08:15.8303960Z env:
+2026-08-18T18:08:15.8304181Z   CI_DEBUG: false
+2026-08-18T18:08:15.8304424Z ##[endgroup]
+2026-08-18T18:08:16.4961053Z ##[group]Run envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41
+2026-08-18T18:08:16.4961674Z with:
+2026-08-18T18:08:16.4970891Z   input: {"action": "RUN",
+ "summary": {
+  "summary": "<img src=\"https://avatars.githubusercontent.com/u/93594454\" alt=\"mohitdebian\" width=\"18\" height=\"18\"> @mohitdebian [`143324b`](https://github.com/envoyproxy/envoy/commit/143324b0689ad909b5da9949b35401e4379ca720) ![](https://raw.githubusercontent.com/primer/octicons/main/icons/git-pull-request-16.svg) [#46497](https://github.com/envoyproxy/envoy/pull/46497) [`merge`](https://github.com/envoyproxy/envoy/commit/1f5a71c43c3f9e2a95cbd5782998ce95322f2f21) [`main@4cf50c6`](https://github.com/envoyproxy/envoy/commit/4cf50c646cf5a2bdf382eecb094a9a0ad91de487)\n\n\n<details >\n  <summary><b>transport_sockets: fix proxy protocol format_string in added_tlvs</b></summary>\n\n  > <!--\r\n  > !!!ATTENTION!!!\r\n  > \r\n  > If you are fixing **any** crash or **any** potential security issue, **do not\r\n  > open a pull request**.\r\n  > \r\n  > Instead, please\r\n  > [open a GitHub Security Advisory](https://github.com/envoyproxy/envoy/security/advisories/new)\r\n  > (preferred). Alternatively, you may email\r\n  > envoy-security@googlegroups.com.\r\n  > \r\n  > Thank you in advance for helping to keep Envoy secure.\r\n  > \r\n  > !!!ATTENTION!!!\r\n  > \r\n  > For an explanation of how to fill out the fields, please see the relevant section\r\n  > in [PULL_REQUESTS.md](https://github.com/envoyproxy/envoy/blob/main/PULL_REQUESTS.md)\r\n  > \r\n  > !!!ATTENTION!!!\r\n  > \r\n  > Please check the [use of generative AI policy](https://github.com/envoyproxy/envoy/blob/main/CONTRIBUTING.md?plain=1#L41).\r\n  > \r\n  > You may use generative AI only if you fully understand the code. You need to disclose\r\n  > this usage in the PR description to ensure transparency.\r\n  > -->\r\n  > \r\n  > Commit Message: transport_sockets: fix proxy protocol format_string in added_tlvs\r\n  > Additional Description: \r\n  > Fixes an issue where `format_string` was completely ignored inside `added_tlvs` for the upstream proxy protocol configuration, falling back to static ***s. \r\n  > \r\n  > **AI Usage Disclosure**: I used an AI coding assistant to help draft this fix. I fully understand the implementation and take responsibility for the code being submitted.\r\n  > Risk Level: Low\r\n  > Testing: Added `V2FormatStringTlv` test coverage in `proxy_protocol_test.cc` to verify that upstream remote address format strings evaluate successfully at connection time.\r\n  > Docs Changes: N/A\r\n  > Release Notes: Added under `changelogs/current/bug_fixes`\r\n  > Platform Specific Features: N/A\r\n  > [Optional Fixes #Issue] Fixes #45130\n\n</details>\n\n\n<details >\n  <summary><b>Environment</b></summary>\n\n  \n  #### Request variables\n  \n  | Key | Value |\n  | --- | --- | \n  ref|1f5a71c43c3f9e2a95cbd5782998ce95322f2f21\n  sha|143324b0689ad909b5da9949b35401e4379ca720\n  pr|`46497`\n  base-sha|4cf50c646cf5a2bdf382eecb094a9a0ad91de487\n  actor|<img src=\"https://avatars.githubusercontent.com/u/93594454\" alt=\"mohitdebian\" width=\"18\" height=\"18\">  @mohitdebian\n  message|transport_sockets: fix proxy protocol format_string in added_tlvs...\n  started|`1787076200.616904`\n  target-branch|main\n  trusted|`false`\n  \n  \n\n</details>\n\n\n<details >\n  <summary><b>Build image</b></summary>\n\n  \n  #### Container image/s (as used in this CI run)\n  \n  | Key | Value |\n  | --- | --- | \n  default|[docker.io/envoyproxy/envoy-build:v0.2.2](https://hub.docker.com/r/envoyproxy/envoy-build/tags?page=1&name=v0.2.2)\n  mobile|[docker.io/envoyproxy/envoy-build:mobile-v0.2.2](https://hub.docker.com/r/envoyproxy/envoy-build/tags?page=1&name=mobile-v0.2.2)\n  \n  \n\n</details>\n\n\n<details >\n  <summary><b>Version</b></summary>\n\n  \n  #### Envoy version (as used in this CI run)\n  \n  | Key | Value |\n  | --- | --- | \n  major|`1`\n  minor|`40`\n  patch|`0`\n  dev|`true`\n  \n  \n\n</details>",
+  "title": "pr/46497/main@143324b",
+  "link": "https://github.com/envoyproxy/envoy/actions/runs/31865235787",
+  "linked-title": "[![](https://avatars.githubusercontent.com/u/30125649?s=24&v=4)](#) Request ([pr/46497/main@143324b](https://github.com/envoyproxy/envoy/actions/runs/31865235787))"
+}}
+
+2026-08-18T18:08:16.4979835Z   output-path: GITHUB_STEP_SUMMARY
+2026-08-18T18:08:16.4980134Z   options: -r
+2026-08-18T18:08:16.4980859Z   filter: .action as $action
+| .summary as $summary
+| if ($action != "RUN") then
+    "### Envoy/Checks was skipped"
+  else "" end
+| . as $extra
+| $summary["linked-title"] as $linkedTitle
+| $summary.summary as $summary
+| "## \($linkedTitle)
+
+\($summary)
+
+\($extra)
+"
+
+2026-08-18T18:08:16.4981785Z   decode: false
+2026-08-18T18:08:16.4982043Z   encode: false
+2026-08-18T18:08:16.4982305Z   print-output: false
+2026-08-18T18:08:16.4982567Z   print-result: false
+2026-08-18T18:08:16.4982829Z   trim-result: true
+2026-08-18T18:08:16.4983068Z   use-tmp-file: true
+2026-08-18T18:08:16.4983324Z   use-tmp-file-filter: true
+2026-08-18T18:08:16.4983606Z   input-format: json
+2026-08-18T18:08:16.4983846Z env:
+2026-08-18T18:08:16.4984067Z   CI_DEBUG: false
+2026-08-18T18:08:16.4984305Z ##[endgroup]
+2026-08-18T18:08:16.5727291Z ##[group]Run envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41
+2026-08-18T18:08:16.5727783Z with:
+2026-08-18T18:08:16.5738889Z   input: {"check": {
+  "name": "Envoy/Checks",
+  "id": "checks",
+  "action": "RUN",
+  "check-id": 95815518379
+},
+ "config": {
+  "envoy": {
+    "icon": "[![](https://avatars.githubusercontent.com/u/30125649?s=24&v=4)](#)"
+  },
+  "ci": {
+    "agent-ubuntu": "ubuntu-24.04",
+    "build-image": {
+      "repo": "docker.io/envoyproxy/envoy-build",
+      "repo-gcr": "gcr.io/envoy-ci/envoy-build",
+      "sha": "eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663",
+      "sha-ci": "eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663",
+      "sha-devtools": "f1af63ebb1aa49a4ccd2bb4ae3bf94c5bc3221139538e21b365c9bea7575f702",
+      "sha-docker": "6deb8633c65ec8d25364beae1cefe1fbc6ec2f330292f9157ed91fdb3ae20b0c",
+      "sha-gcc": "d4ca56020e17aa36d6baad8e172d09c8a08e47ed0a911b779400c645957fa220",
+      "sha-mobile": "d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2",
+      "sha-worker": "7d3c99085fa5f1cff6b7293de256cc6c93ce61cd7ccb63432113a1f8fbf12a43",
+      "mobile-sha": "d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2",
+      "tag": "v0.2.2"
+    },
+    "cache": {
+      "bazel": {
+        "hash": "03750b7bb14932bca625354218ae7a59a6ccfaecbca43acaad934765991c9702",
+        "arm64": 9334221031,
+        "x64": 9334356959,
+        "docs-x64": 9334067108,
+        "external-x64": 9334067946
+      }
+    }
+  }
+},
+ "request": {
+  "ref": "1f5a71c43c3f9e2a95cbd5782998ce95322f2f21",
+  "sha": "143324b0689ad909b5da9949b35401e4379ca720",
+  "pr": 46497,
+  "base-sha": "4cf50c646cf5a2bdf382eecb094a9a0ad91de487",
+  "actor": {
+    "name": "mohitdebian",
+    "icon": "https://avatars.githubusercontent.com/u/93594454"
+  },
+  "message": "transport_sockets: fix proxy protocol format_string in added_tlvs\n<!--\r\n!!!ATTENTION!!!\r\n\r\nIf you are fixing **any** crash or **any** potential security issue, **do not\r\nopen a pull request**.\r\n\r\nInstead, please\r\n[open a GitHub Security Advisory](https://github.com/envoyproxy/envoy/security/advisories/new)\r\n(preferred). Alternatively, you may email\r\nenvoy-security@googlegroups.com.\r\n\r\nThank you in advance for helping to keep Envoy secure.\r\n\r\n!!!ATTENTION!!!\r\n\r\nFor an explanation of how to fill out the fields, please see the relevant section\r\nin [PULL_REQUESTS.md](https://github.com/envoyproxy/envoy/blob/main/PULL_REQUESTS.md)\r\n\r\n!!!ATTENTION!!!\r\n\r\nPlease check the [use of generative AI policy](https://github.com/envoyproxy/envoy/blob/main/CONTRIBUTING.md?plain=1#L41).\r\n\r\nYou may use generative AI only if you fully understand the code. You need to disclose\r\nthis usage in the PR description to ensure transparency.\r\n-->\r\n\r\nCommit Message: transport_sockets: fix proxy protocol format_string in added_tlvs\r\nAdditional Description: \r\nFixes an issue where `format_string` was completely ignored inside `added_tlvs` for the upstream proxy protocol configuration, falling back to static ***s. \r\n\r\n**AI Usage Disclosure**: I used an AI coding assistant to help draft this fix. I fully understand the implementation and take responsibility for the code being submitted.\r\nRisk Level: Low\r\nTesting: Added `V2FormatStringTlv` test coverage in `proxy_protocol_test.cc` to verify that upstream remote address format strings evaluate successfully at connection time.\r\nDocs Changes: N/A\r\nRelease Notes: Added under `changelogs/current/bug_fixes`\r\nPlatform Specific Features: N/A\r\n[Optional Fixes #Issue] Fixes #45130",
+  "started": 1787076200.6169,
+  "target-branch": "main",
+  "trusted": false,
+  "version": {
+    "major": 1,
+    "minor": 40,
+    "patch": 0,
+    "dev": true,
+    "changed": false
+  },
+  "version-current": {
+    "major": 1,
+    "minor": 40,
+    "patch": 0,
+    "dev": true
+  },
+  "build-image": {
+    "default": "docker.io/envoyproxy/envoy-build:v0.2.2@sha256:eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663",
+    "mobile": "docker.io/envoyproxy/envoy-build:mobile-v0.2.2@sha256:d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2"
+  },
+  "build-image-current": {
+    "default": "docker.io/envoyproxy/envoy-build:v0.2.2@sha256:eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663",
+    "mobile": "docker.io/envoyproxy/envoy-build:mobile-v0.2.2@sha256:d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2"
+  }
+},
+ "run": {
+  "build-macos": true,
+  "check-build": true,
+  "check-build-openssl": true,
+  "check-build-openssl-presubmit": false,
+  "check-coverage": true,
+  "check-runtime": false,
+  "check-san": true,
+  "mobile-android": false,
+  "mobile-android-all": false,
+  "mobile-android-tests": false,
+  "mobile-asan": false,
+  "mobile-cc": true,
+  "mobile-coverage": false,
+  "mobile-format": false,
+  "mobile-ios": false,
+  "mobile-ios-all": false,
+  "mobile-ios-tests": false,
+  "mobile-perf": false,
+  "mobile-python": false,
+  "mobile-release-validation": false,
+  "mobile-tsan": false,
+  "precheck-deps": false,
+  "precheck-external": true,
+  "precheck-format": true,
+  "precheck-publish": true,
+  "precheck-publish-config": true,
+  "release": true,
+  "verify": true
+},
+ "summary_title": "pr/46497/main@143324b"}
+
+2026-08-18T18:08:16.5749770Z   filter: .
+| .summary = {title: .summary_title}
+| del(.request.message, .summary_title)
+
+2026-08-18T18:08:16.5750159Z   print-result: false
+2026-08-18T18:08:16.5750417Z   decode: false
+2026-08-18T18:08:16.5750651Z   encode: false
+2026-08-18T18:08:16.5750885Z   options: -c
+2026-08-18T18:08:16.5751126Z   print-output: false
+2026-08-18T18:08:16.5751364Z   trim-result: true
+2026-08-18T18:08:16.5751767Z   use-tmp-file: true
+2026-08-18T18:08:16.5752026Z   use-tmp-file-filter: true
+2026-08-18T18:08:16.5752297Z   input-format: json
+2026-08-18T18:08:16.5752540Z env:
+2026-08-18T18:08:16.5752766Z   CI_DEBUG: false
+2026-08-18T18:08:16.5753011Z ##[endgroup]
+2026-08-18T18:08:16.6435187Z Evaluate and set job outputs
+2026-08-18T18:08:16.6448454Z Set output 'build-image'
+2026-08-18T18:08:16.6449506Z Set output 'check-id'
+2026-08-18T18:08:16.6456366Z Set output 'request'
+2026-08-18T18:08:16.6456750Z Set output 'trusted'
+2026-08-18T18:08:16.6457086Z Set output 'skip'
+2026-08-18T18:08:16.6457929Z Cleaning up orphan processes

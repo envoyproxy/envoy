@@ -1,0 +1,59 @@
+.. _envoy_v3_api_file_envoy/config/cluster/v3/filter.proto:
+
+Upstream network filters (proto)
+================================
+
+
+Upstream network filters apply to the connections to the upstream cluster hosts.
+
+
+
+
+.. _envoy_v3_api_msg_config.cluster.v3.Filter:
+
+config.cluster.v3.Filter
+------------------------
+
+
+:repo:`[config.cluster.v3.Filter proto] <api/envoy/config/cluster/v3/filter.proto#L21>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "typed_config": {...},
+    "config_discovery": {...}
+  }
+
+.. _envoy_v3_api_field_config.cluster.v3.Filter.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the filter configuration.
+
+
+.. _envoy_v3_api_field_config.cluster.v3.Filter.typed_config:
+
+
+typed_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) Filter specific configuration which depends on the filter being
+  instantiated. See the supported filters for further documentation.
+  Note that Envoy's :ref:`downstream network
+  filters <config_network_filters>` are not valid upstream network filters.
+  Only one of typed_config or config_discovery can be used.
+
+
+.. _envoy_v3_api_field_config.cluster.v3.Filter.config_discovery:
+
+
+config_discovery
+  (:ref:`config.core.v3.ExtensionConfigSource <envoy_v3_api_msg_config.core.v3.ExtensionConfigSource>`) Configuration source specifier for an extension configuration discovery
+  service. In case of a failure and without the default configuration, the
+  listener closes the connections.
+  Only one of typed_config or config_discovery can be used.
+
+

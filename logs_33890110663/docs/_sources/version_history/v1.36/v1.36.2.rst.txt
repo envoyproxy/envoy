@@ -1,0 +1,21 @@
+.. _version_history_1.36.2:
+
+1.36.2 (October 17, 2025)
+==========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **lua**: Fix a bug where Lua filters may result in Envoy crashes when setting response body to a
+  larger payload (greater than the body buffer limit).
+

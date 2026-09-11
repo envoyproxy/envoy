@@ -1,0 +1,268 @@
+.. _envoy_v3_api_file_envoy/extensions/compression/gzip/compressor/v3/gzip.proto:
+
+Gzip Compressor (proto)
+=======================
+
+.. _extension_envoy.compression.gzip.compressor:
+
+This extension has the qualified name ``envoy.compression.gzip.compressor``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.compression.compressor <extension_category_envoy.compression.compressor>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip <envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip:
+
+extensions.compression.gzip.compressor.v3.Gzip
+----------------------------------------------
+
+
+:repo:`[extensions.compression.gzip.compressor.v3.Gzip proto] <api/envoy/extensions/compression/gzip/compressor/v3/gzip.proto#L19>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "memory_level": {...},
+    "compression_level": ...,
+    "compression_strategy": ...,
+    "window_bits": {...},
+    "chunk_size": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.compression.gzip.compressor.v3.Gzip.memory_level:
+
+
+memory_level
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value from 1 to 9 that controls the amount of internal memory used by zlib. Higher values
+  use more memory, but are faster and produce better compression results.
+
+  Defaults to ``5``.
+
+
+.. _envoy_v3_api_field_extensions.compression.gzip.compressor.v3.Gzip.compression_level:
+
+
+compression_level
+  (:ref:`extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel <envoy_v3_api_enum_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel>`) A value used for selecting the zlib compression level. This setting will affect speed and
+  amount of compression applied to the content. ``BEST_COMPRESSION`` provides higher compression
+  at the cost of higher latency and is equal to ``COMPRESSION_LEVEL_9``. ``BEST_SPEED`` provides
+  lower compression with minimum impact on response time, the same as ``COMPRESSION_LEVEL_1``.
+  ``DEFAULT_COMPRESSION`` provides an optimal result between speed and compression. According
+  to zlib's manual, this level gives the same result as ``COMPRESSION_LEVEL_6``.
+
+  Defaults to ``DEFAULT_COMPRESSION``.
+
+
+.. _envoy_v3_api_field_extensions.compression.gzip.compressor.v3.Gzip.compression_strategy:
+
+
+compression_strategy
+  (:ref:`extensions.compression.gzip.compressor.v3.Gzip.CompressionStrategy <envoy_v3_api_enum_extensions.compression.gzip.compressor.v3.Gzip.CompressionStrategy>`) A value used for selecting the zlib compression strategy which is directly related to the
+  characteristics of the content. Most of the time ``DEFAULT_STRATEGY`` will be the best choice,
+  though there are situations when changing this parameter might produce better results. For
+  example, run-length encoding (RLE) is typically used when the content is known for having
+  sequences in which the same data occurs many consecutive times. For more information about
+  each strategy, please refer to the `zlib manual <https://www.zlib.net/manual.html>`_.
+
+  Defaults to ``DEFAULT_STRATEGY``.
+
+
+.. _envoy_v3_api_field_extensions.compression.gzip.compressor.v3.Gzip.window_bits:
+
+
+window_bits
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value from 9 to 15 that represents the base two logarithmic of the compressor's window size.
+  Larger window results in better compression at the expense of memory usage. For more details
+  about this parameter, please refer to the
+  `zlib manual <https://www.zlib.net/manual.html>`_ for ``deflateInit2``.
+
+  Defaults to ``12``, which will produce a 4096 bytes window.
+
+
+.. _envoy_v3_api_field_extensions.compression.gzip.compressor.v3.Gzip.chunk_size:
+
+
+chunk_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value for zlib's next output buffer. See the
+  `zlib manual <https://www.zlib.net/manual.html>`_ for more details. Also see
+  `envoy#8448 <https://github.com/envoyproxy/envoy/issues/8448>`_ for context on this filter's
+  performance.
+
+  Defaults to ``4096``.
+
+
+.. _envoy_v3_api_enum_extensions.compression.gzip.compressor.v3.Gzip.CompressionStrategy:
+
+Enum extensions.compression.gzip.compressor.v3.Gzip.CompressionStrategy
+-----------------------------------------------------------------------
+
+
+:repo:`[extensions.compression.gzip.compressor.v3.Gzip.CompressionStrategy proto] <api/envoy/extensions/compression/gzip/compressor/v3/gzip.proto#L23>`
+
+All the values of this enumeration translate directly to zlib's compression strategies.
+For more information about each strategy, please refer to the
+`zlib manual <https://www.zlib.net/manual.html>`_.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionStrategy.DEFAULT_STRATEGY:
+
+
+DEFAULT_STRATEGY
+  *(DEFAULT)* ⁣Default compression strategy.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionStrategy.FILTERED:
+
+
+FILTERED
+  ⁣Filtered compression strategy, designed for data produced by a filter or predictor.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionStrategy.HUFFMAN_ONLY:
+
+
+HUFFMAN_ONLY
+  ⁣Huffman-only compression strategy, which uses Huffman encoding only.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionStrategy.RLE:
+
+
+RLE
+  ⁣Run-length encoding (RLE) compression strategy, designed for image data.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionStrategy.FIXED:
+
+
+FIXED
+  ⁣Fixed compression strategy, which prevents the use of dynamic Huffman codes.
+
+
+
+.. _envoy_v3_api_enum_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel:
+
+Enum extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel
+--------------------------------------------------------------------
+
+
+:repo:`[extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel proto] <api/envoy/extensions/compression/gzip/compressor/v3/gzip.proto#L42>`
+
+Compression level values for zlib. Higher levels provide better compression at the cost of
+increased latency and CPU usage.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel.DEFAULT_COMPRESSION:
+
+
+DEFAULT_COMPRESSION
+  *(DEFAULT)* ⁣Default compression level, equivalent to ``COMPRESSION_LEVEL_6``.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel.BEST_SPEED:
+
+
+BEST_SPEED
+  ⁣Fastest compression with minimal compression ratio, equivalent to ``COMPRESSION_LEVEL_1``.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel.COMPRESSION_LEVEL_1:
+
+
+COMPRESSION_LEVEL_1
+  ⁣Compression level 1 (fastest).
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel.COMPRESSION_LEVEL_2:
+
+
+COMPRESSION_LEVEL_2
+  ⁣Compression level 2.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel.COMPRESSION_LEVEL_3:
+
+
+COMPRESSION_LEVEL_3
+  ⁣Compression level 3.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel.COMPRESSION_LEVEL_4:
+
+
+COMPRESSION_LEVEL_4
+  ⁣Compression level 4.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel.COMPRESSION_LEVEL_5:
+
+
+COMPRESSION_LEVEL_5
+  ⁣Compression level 5.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel.COMPRESSION_LEVEL_6:
+
+
+COMPRESSION_LEVEL_6
+  ⁣Compression level 6.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel.COMPRESSION_LEVEL_7:
+
+
+COMPRESSION_LEVEL_7
+  ⁣Compression level 7.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel.COMPRESSION_LEVEL_8:
+
+
+COMPRESSION_LEVEL_8
+  ⁣Compression level 8.
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel.COMPRESSION_LEVEL_9:
+
+
+COMPRESSION_LEVEL_9
+  ⁣Compression level 9 (best compression).
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.gzip.compressor.v3.Gzip.CompressionLevel.BEST_COMPRESSION:
+
+
+BEST_COMPRESSION
+  ⁣Best compression ratio with highest latency, equivalent to ``COMPRESSION_LEVEL_9``.
+
+
+

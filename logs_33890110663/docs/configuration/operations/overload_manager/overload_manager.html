@@ -1,0 +1,867 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Overload manager &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Config Validations" href="../config_validation/config_validation.html" />
+    <link rel="prev" title="Runtime" href="../runtime.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../http/http.html">HTTP</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../operations.html">Operations</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../runtime.html">Runtime</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Overload manager</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../config_validation/config_validation.html">Config Validations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tools/router_check.html">Route table check tool</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../operations.html">Operations</a></li>
+      <li class="breadcrumb-item active">Overload manager</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/operations/overload_manager/overload_manager.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="overload-manager">
+<span id="config-overload-manager"></span><h1>Overload manager<a class="headerlink" href="#overload-manager" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="../../../intro/arch_overview/operations/overload_manager.html#arch-overview-overload-manager"><span class="std std-ref">overload manager</span></a> is configured in the Bootstrap
+<a class="reference internal" href="../../../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-overload-manager"><span class="std std-ref">overload_manager</span></a>
+field.</p>
+<p>An example configuration of the overload manager is shown below. It shows a
+configuration to drain HTTP/X connections when heap memory usage reaches 92%
+(configured via <code class="docutils literal notranslate"><span class="pre">envoy.overload_actions.disable_http_keepalive</span></code>), to stop
+accepting requests when heap memory usage reaches 95% (configured via
+<code class="docutils literal notranslate"><span class="pre">envoy.overload_actions.stop_accepting_requests</span></code>) and to stop accepting new
+TCP connections when memory usage reaches 95% (configured via
+<code class="docutils literal notranslate"><span class="pre">envoy.load_shed_points.tcp_listener_accept</span></code>).</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">refresh_interval</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">  </span><span class="nt">nanos</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">250000000</span>
+<span class="nt">resource_monitors</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.fixed_heap&quot;</span>
+<span class="w">    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig</span>
+<span class="w">      </span><span class="nt">max_heap_size_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2147483648</span>
+<span class="nt">actions</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.overload_actions.disable_http_keepalive&quot;</span>
+<span class="w">    </span><span class="nt">triggers</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.fixed_heap&quot;</span>
+<span class="w">        </span><span class="nt">threshold</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.92</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.overload_actions.stop_accepting_requests&quot;</span>
+<span class="w">    </span><span class="nt">triggers</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.fixed_heap&quot;</span>
+<span class="w">        </span><span class="nt">threshold</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.95</span>
+<span class="w w-Error"> </span><span class="nt">loadshed_points</span><span class="p">:</span>
+<span class="w">   </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.load_shed_points.tcp_listener_accept&quot;</span>
+<span class="w">     </span><span class="nt">triggers</span><span class="p">:</span>
+<span class="w">       </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.fixed_heap&quot;</span>
+<span class="w">         </span><span class="nt">threshold</span><span class="p">:</span>
+<span class="w">           </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.95</span>
+</pre></div>
+</div>
+<section id="resource-monitors">
+<h2>Resource monitors<a class="headerlink" href="#resource-monitors" title="Link to this heading"></a></h2>
+<p>The overload manager uses Envoy’s <a class="reference internal" href="../../../extending/extending.html#extending"><span class="std std-ref">extension</span></a> framework for defining
+resource monitors. Envoy’s builtin resource monitors are listed
+<a class="reference internal" href="../../../api-v3/config/resource_monitor/resource_monitor.html#v3-config-resource-monitors"><span class="std std-ref">here</span></a>.</p>
+<section id="cgroup-memory">
+<span id="config-overload-manager-cgroup-memory"></span><h3>Cgroup Memory<a class="headerlink" href="#cgroup-memory" title="Link to this heading"></a></h3>
+<p>The cgroup memory resource monitor tracks memory pressure by reading memory usage and limits from the cgroup memory subsystem.
+This monitor supports both cgroup v1 and cgroup v2.</p>
+<p>The monitor reports memory pressure as a ratio of current memory usage to the memory limit. The limit is determined by:</p>
+<ol class="arabic simple">
+<li><p>The cgroup memory limit as reported by the monitor. This is the typical case.</p></li>
+<li><p>If max_memory_bytes is configured, the minimum between the configured max_memory_bytes value and the cgroup memory limit.
+In this case, max_memory_bytes serves as an upper bound on the memory limit used for pressure calculations.</p></li>
+</ol>
+<p>When no memory limit is set in cgroup (indicated by -1 in v1 or “max” in v2), the pressure is reported as 0.</p>
+<p>Example configuration:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">resource_monitors</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.cgroup_memory&quot;</span>
+<span class="w">    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig</span>
+<span class="w">      </span><span class="nt">max_memory_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1073741824</span><span class="w">  </span><span class="c1"># 1GB</span>
+</pre></div>
+</div>
+<p>This can be combined with actions to shed load when memory pressure increases:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">actions</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.overload_actions.stop_accepting_requests&quot;</span>
+<span class="w">    </span><span class="nt">triggers</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.cgroup_memory&quot;</span>
+<span class="w">        </span><span class="nt">threshold</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.95</span><span class="w">  </span><span class="c1"># Trigger at 95% memory utilization</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="triggers">
+<span id="config-overload-manager-triggers"></span><h2>Triggers<a class="headerlink" href="#triggers" title="Link to this heading"></a></h2>
+<p>Triggers connect resource monitors to actions. There are two types of triggers supported:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 33.3%" />
+<col style="width: 66.7%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><a class="reference internal" href="../../../api-v3/config/overload/v3/overload.proto.html#envoy-v3-api-msg-config-overload-v3-thresholdtrigger"><span class="std std-ref">threshold</span></a></p></td>
+<td><p>Sets the action state to 1 (= <em>saturated</em>) when the resource pressure is above a threshold, and to 0 otherwise.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../../../api-v3/config/overload/v3/overload.proto.html#envoy-v3-api-msg-config-overload-v3-scaledtrigger"><span class="std std-ref">scaled</span></a></p></td>
+<td><p>Sets the action state to 0 when the resource pressure is below the
+<a class="reference internal" href="../../../api-v3/config/overload/v3/overload.proto.html#envoy-v3-api-field-config-overload-v3-scaledtrigger-scaling-threshold"><span class="std std-ref">scaling_threshold</span></a>,
+<code class="docutils literal notranslate"><span class="pre">(pressure</span> <span class="pre">-</span> <span class="pre">scaling_threshold)/(saturation_threshold</span> <span class="pre">-</span> <span class="pre">scaling_threshold)</span></code> when
+<code class="docutils literal notranslate"><span class="pre">scaling_threshold</span> <span class="pre">&lt;</span> <span class="pre">pressure</span> <span class="pre">&lt;</span> <span class="pre">saturation_threshold</span></code>, and to 1 (<em>saturated</em>) when the
+pressure is above the
+<a class="reference internal" href="../../../api-v3/config/overload/v3/overload.proto.html#envoy-v3-api-field-config-overload-v3-scaledtrigger-saturation-threshold"><span class="std std-ref">saturation_threshold</span></a>.”</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="overload-actions">
+<span id="config-overload-manager-overload-actions"></span><h2>Overload actions<a class="headerlink" href="#overload-actions" title="Link to this heading"></a></h2>
+<p>The following overload actions are supported:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 33.3%" />
+<col style="width: 66.7%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>envoy.overload_actions.stop_accepting_requests</p></td>
+<td><p>Envoy will immediately respond with a 503 response code to new requests</p></td>
+</tr>
+<tr class="row-odd"><td><p>envoy.overload_actions.disable_http_keepalive</p></td>
+<td><p>Envoy will drain HTTP/2 and HTTP/3 connections using <code class="docutils literal notranslate"><span class="pre">GOAWAY</span></code> with a
+drain grace period. For HTTP/1, Envoy will set a drain timer to close the
+more idle recently used connections.</p></td>
+</tr>
+<tr class="row-even"><td><p>envoy.overload_actions.stop_accepting_connections</p></td>
+<td><p>Envoy will stop accepting new network connections on its configured listeners</p></td>
+</tr>
+<tr class="row-odd"><td><p>envoy.overload_actions.reject_incoming_connections</p></td>
+<td><p>Envoy will reject incoming connections on its configured listeners without processing any data</p></td>
+</tr>
+<tr class="row-even"><td><p>envoy.overload_actions.shrink_heap</p></td>
+<td><p>Envoy will periodically try to shrink the heap by releasing free memory to the system</p></td>
+</tr>
+<tr class="row-odd"><td><p>envoy.overload_actions.reduce_timeouts</p></td>
+<td><p>Envoy will reduce the waiting period for a configured set of timeouts. See
+<a class="reference internal" href="#config-overload-manager-reducing-timeouts"><span class="std std-ref">below</span></a> for details on configuration.</p></td>
+</tr>
+<tr class="row-even"><td><p>envoy.overload_actions.reset_high_memory_stream</p></td>
+<td><p>Envoy will reset expensive streams to terminate them. See
+<a class="reference internal" href="#config-overload-manager-reset-streams"><span class="std std-ref">below</span></a> for details on configuration.</p></td>
+</tr>
+<tr class="row-odd"><td><p>envoy.overload_actions.close_idle_http_connections</p></td>
+<td><p>Envoy will close idle downstream HTTP/3 QUIC connections when the action is active.
+When the action is <em>saturated</em>, connections will be closed aggressively (ignoring the idle timer threshold).
+When the action is in a <em>scaled active</em> state, the idle timer threshold is still respected.
+Note that this action is currently only supported for HTTP/3 QUIC connections.</p></td>
+</tr>
+</tbody>
+</table>
+<section id="shrink-heap">
+<span id="config-overload-manager-shrink-heap"></span><h3>Shrink Heap<a class="headerlink" href="#shrink-heap" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">envoy.overload_actions.shrink_heap</span></code> overload action will periodically attempt to
+release free memory from the heap back to the operating system when the action is triggered.
+This is useful for reducing memory fragmentation and returning unused memory to the system,
+particularly when using tcmalloc.</p>
+<p>The action can be optionally configured with
+<a class="reference internal" href="../../../api-v3/config/overload/v3/overload.proto.html#envoy-v3-api-msg-config-overload-v3-shrinkheapconfig"><span class="std std-ref">ShrinkHeapConfig</span></a>:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>timer_interval</p></td>
+<td><p>10s</p></td>
+<td><p>Interval at which the shrink heap action checks if memory should be released</p></td>
+</tr>
+<tr class="row-odd"><td><p>max_unfreed_memory_bytes</p></td>
+<td><p>104857600 (100MB)</p></td>
+<td><p>Maximum amount of unfreed memory to retain before releasing to the system</p></td>
+</tr>
+</tbody>
+</table>
+<p>Example configuration:</p>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/f4f842350aca5ac1b29d60240148f4ce/shrink_heap_overload.yaml"><code class="xref download docutils literal notranslate"><span class="pre">shrink_heap_overload.yaml</span></code></a></span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">1</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.overload_actions.shrink_heap&quot;</span>
+<span class="hll"><span class="linenos">2</span><span class="w">    </span><span class="nt">typed_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">3</span><span class="w">      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.overload.v3.ShrinkHeapConfig</span>
+</span><span class="hll"><span class="linenos">4</span><span class="w">      </span><span class="nt">timer_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+</span><span class="hll"><span class="linenos">5</span><span class="w">      </span><span class="nt">max_unfreed_memory_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">52428800</span>
+</span><span class="linenos">6</span><span class="w">    </span><span class="nt">triggers</span><span class="p">:</span>
+<span class="linenos">7</span><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.fixed_heap&quot;</span>
+<span class="linenos">8</span><span class="w">      </span><span class="nt">threshold</span><span class="p">:</span>
+<span class="linenos">9</span><span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.9</span>
+</pre></div>
+</div>
+</div>
+<p>If no <code class="docutils literal notranslate"><span class="pre">typed_config</span></code> is provided, the action will use default values.</p>
+</section>
+</section>
+<section id="load-shed-points">
+<h2>Load Shed Points<a class="headerlink" href="#load-shed-points" title="Link to this heading"></a></h2>
+<p>Load Shed Points are similar to overload actions as they are dependent on a
+given trigger to activate which determines whether Envoy ends up shedding load at
+the given point in a connection or stream lifecycle.</p>
+<p>For a given request on a newly created connection, we can think of the
+configured load shed points as a decision tree at key junctions of a connection
+/ stream lifecycle. While a connection / stream might pass one junction, it
+is possible that later on the conditions might change causing Envoy to shed load
+at a later junction.</p>
+<p>In comparision to analogous overload actions, Load Shed Points are more
+reactive to changing conditions, especially in cases of large traffic spikes.
+Overload actions can be better suited in cases where Envoy is deciding to shed load
+but the worker threads aren’t actively processing the connections or streams that
+Envoy wants to shed. For example
+<code class="docutils literal notranslate"><span class="pre">envoy.overload_actions.reset_high_memory_stream</span></code> can reset streams that are
+using a lot of memory even if those streams aren’t actively making progress.</p>
+<p>Compared to overload actions, Load Shed Points are also more flexible to
+integrate custom (e.g. company inteneral) Load Shed Points as long as the extension
+has access to the Overload Manager to request the custom Load Shed Point.</p>
+<p>The following core load shed points are supported:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 33.3%" />
+<col style="width: 66.7%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>envoy.load_shed_points.tcp_listener_accept</p></td>
+<td><p>Envoy will reject (close) new TCP connections. This occurs before the
+<a class="reference internal" href="../../../intro/life_of_a_request.html#life-of-a-request"><span class="std std-ref">Listener Filter Chain</span></a> is created.</p></td>
+</tr>
+<tr class="row-odd"><td><p>envoy.load_shed_points.http_connection_manager_decode_headers</p></td>
+<td><p>Envoy will reject new HTTP streams by sending a local reply. This occurs
+right after the HTTP codec has finished parsing headers but before the
+<a class="reference internal" href="../../../intro/life_of_a_request.html#life-of-a-request"><span class="std std-ref">HTTP Filter Chain is instantiated</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p>envoy.load_shed_points.http1_server_abort_dispatch</p></td>
+<td><p>Envoy will reject processing HTTP1 at the codec level. If a response has
+not yet started, Envoy will send a local reply. Envoy will then close the
+connection.</p></td>
+</tr>
+<tr class="row-odd"><td><p>envoy.load_shed_points.http2_server_go_away_on_dispatch</p></td>
+<td><p>Envoy will send a <code class="docutils literal notranslate"><span class="pre">GOAWAY</span></code> while processing HTTP2 requests at the codec
+level which will eventually drain the HTTP/2 connection.</p></td>
+</tr>
+<tr class="row-even"><td><p>envoy.load_shed_points.hcm_ondata_creating_codec</p></td>
+<td><p>Envoy will close the connections before creating codec if Envoy is under
+pressure, typically memory. This happens once geting data from the
+connection.</p></td>
+</tr>
+<tr class="row-odd"><td><p>envoy.load_shed_points.http_downstream_filter_check</p></td>
+<td><p>Envoy will send local reply directly before creating an upstream request in
+the router if Envoy is under resource pressure, typically memory. This change
+makes load shed check availabe in HTTP decoder filters.</p></td>
+</tr>
+<tr class="row-even"><td><p>envoy.load_shed_points.connection_pool_new_connection</p></td>
+<td><p>Envoy will stop creating new connections in the connection pool when
+it is under pressure (typically memory pressure). If a new connection is
+rejected by this load shed point and there is no available capacity
+to serve the downstream request, the downstream request will fail.</p></td>
+</tr>
+<tr class="row-odd"><td><p>envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch</p></td>
+<td><p>Envoy will send a <code class="docutils literal notranslate"><span class="pre">GOAWAY</span></code> while processing HTTP2 requests at the codec
+level AND immediately force close the downstream connection. If both this and
+<code class="docutils literal notranslate"><span class="pre">http2_server_go_away_on_dispatch</span></code> are configured and shouldShedLoad()
+returns true for both, this takes precedence. This is a disruptive action
+(causes downstream connections to ungracefully close) that should only be
+used with a very high threshold (if at all).</p></td>
+</tr>
+</tbody>
+</table>
+<section id="reducing-timeouts">
+<span id="config-overload-manager-reducing-timeouts"></span><h3>Reducing timeouts<a class="headerlink" href="#reducing-timeouts" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">envoy.overload_actions.reduce_timeouts</span></code> overload action will reduce the amount of time Envoy
+will spend waiting for some interactions to finish in response to resource pressure. The amount of
+reduction can be configured per timeout type by specifying the minimum timer value to use when the
+triggering resource monitor detects saturation. The minimum value for each timeout can be specified
+either by providing a scale factor to apply to the configured maximum, or as a concrete duration
+value.</p>
+<p>As an example, here is a single overload action entry that enables timeout reduction:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.overload_actions.reduce_timeouts&quot;</span>
+<span class="nt">triggers</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.fixed_heap&quot;</span>
+<span class="w">    </span><span class="nt">scaled</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">scaling_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.85</span>
+<span class="w">      </span><span class="nt">saturation_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.95</span>
+<span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">  </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig</span>
+<span class="w">  </span><span class="nt">timer_scale_factors</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">timer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HTTP_DOWNSTREAM_CONNECTION_IDLE</span>
+<span class="w">      </span><span class="nt">min_timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2s</span>
+</pre></div>
+</div>
+<p>It configures the overload manager to change the amount of time that HTTP connections are allowed
+to remain idle before being closed in response to heap size. When the heap usage is less than 85%,
+idle connections will time out at their usual time, which is configured through
+<a class="reference internal" href="../../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-httpprotocoloptions-idle-timeout"><span class="std std-ref">HttpConnectionManager.common_http_protocol_options.idle_timeout</span></a>.
+When the heap usage is at or above 95%, idle connections will be closed after the specified
+<code class="docutils literal notranslate"><span class="pre">min_timeout</span></code>, here 2 seconds. If the heap usage is between 85% and 95%, the idle connection timeout
+will vary between those two based on the formula for the <a class="reference internal" href="#config-overload-manager-triggers"><span class="std std-ref">scaled trigger</span></a>
+So if <code class="docutils literal notranslate"><span class="pre">RouteAction.idle_timeout</span> <span class="pre">=</span> <span class="pre">600</span> <span class="pre">seconds</span></code> and heap usage is at 92%, idle connections will time
+out after <span class="math notranslate nohighlight">\(2s + (600s - 2s) \cdot (95\% - 92\%) / (95\% - 85\%) = 181.4s\)</span>.</p>
+<p>Note in the example that the minimum idle time is specified as an absolute duration. If, instead,
+<code class="docutils literal notranslate"><span class="pre">min_timeout:</span> <span class="pre">2s</span></code> were to be replaced with <code class="docutils literal notranslate"><span class="pre">min_scale:</span> <span class="pre">{</span> <span class="pre">value:</span> <span class="pre">10</span> <span class="pre">}</span></code>, the minimum timer value
+would be computed based on the maximum (specified elsewhere). So if <code class="docutils literal notranslate"><span class="pre">idle_timeout</span></code> is
+again 600 seconds, then the minimum timer value would be <span class="math notranslate nohighlight">\(10\% \cdot 600s = 60s\)</span>.</p>
+</section>
+</section>
+<section id="limiting-active-connections">
+<span id="config-overload-manager-limiting-connections"></span><h2>Limiting Active Connections<a class="headerlink" href="#limiting-active-connections" title="Link to this heading"></a></h2>
+<p>To limit the total number of active downstream connections allowed across all
+listeners configure <a class="reference internal" href="../../../api-v3/extensions/resource_monitors/downstream_connections/v3/downstream_connections.proto.html#envoy-v3-api-msg-extensions-resource-monitors-downstream-connections-v3-downstreamconnectionsconfig"><span class="std std-ref">downstream connections monitor</span></a> in Overload Manager:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">resource_monitors</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.global_downstream_max_connections&quot;</span>
+<span class="w">    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig</span>
+<span class="w">      </span><span class="nt">max_active_downstream_connections</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+</pre></div>
+</div>
+<p><a class="reference internal" href="../../../api-v3/extensions/resource_monitors/downstream_connections/v3/downstream_connections.proto.html#envoy-v3-api-msg-extensions-resource-monitors-downstream-connections-v3-downstreamconnectionsconfig"><span class="std std-ref">Downstream connections monitor</span></a> does not
+support runtime updates for the configured value of <a class="reference internal" href="../../../api-v3/extensions/resource_monitors/downstream_connections/v3/downstream_connections.proto.html#envoy-v3-api-field-extensions-resource-monitors-downstream-connections-v3-downstreamconnectionsconfig-max-active-downstream-connections"><span class="std std-ref">max_active_downstream_connections</span></a>
+One could also set this limit via specifying an integer through the runtime key
+<code class="docutils literal notranslate"><span class="pre">overload.global_downstream_max_connections</span></code>, though this key is deprecated and will be removed in future.
+The connection limit is recommended to be less than
+half of the system’s file descriptor limit, to account for upstream connections, files, and other
+usage of file descriptors.</p>
+<p>If the value is unspecified, there is no global limit on the number of active downstream connections
+and Envoy will emit a warning indicating this at startup. To disable the warning without setting a
+limit on the number of active downstream connections, the runtime value may be set to a very large
+limit (~2e9).
+Listeners can opt out of this global connection limit by setting
+<a class="reference internal" href="../../../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-field-config-listener-v3-listener-ignore-global-conn-limit"><span class="std std-ref">Listener.ignore_global_conn_limit</span></a>
+to true. Similarly, you can opt out the admin listener by setting
+<a class="reference internal" href="../../../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-admin-ignore-global-conn-limit"><span class="std std-ref">Admin.ignore_global_conn_limit</span></a>.
+You may want to opt out a listener to be able to probe Envoy or collect stats while it is otherwise at its
+connection limit. Note that connections to listeners that opt out are still tracked and count towards the
+global limit.</p>
+<p>If it is desired to only limit the number of downstream connections for a particular listener,
+per-listener limits can be set via the <a class="reference internal" href="../../listeners/listeners.html#config-listeners"><span class="std std-ref">listener configuration</span></a>.</p>
+<p>One may simultaneously specify both per-listener and global downstream connection limits and the
+conditions will be enforced independently. For instance, if it is known that a particular listener
+should have a smaller number of open connections than others, one may specify a smaller connection
+limit for that specific listener and allow the global limit to enforce resource utilization among
+all listeners.</p>
+<p>An example configuration can be found in the <a class="reference internal" href="../../best_practices/edge.html#best-practices-edge"><span class="std std-ref">edge best practices document</span></a>.</p>
+<section id="reset-streams">
+<span id="config-overload-manager-reset-streams"></span><h3>Reset Streams<a class="headerlink" href="#reset-streams" title="Link to this heading"></a></h3>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Resetting streams via an overload action currently only works with HTTP2.</p>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">envoy.overload_actions.reset_high_memory_stream</span></code> overload action will reset
+expensive streams. This requires <a class="reference internal" href="../../../api-v3/config/overload/v3/overload.proto.html#envoy-v3-api-field-config-overload-v3-bufferfactoryconfig-minimum-account-to-track-power-of-two"><span class="std std-ref">minimum_account_to_track_power_of_two</span></a> to be
+configured via <a class="reference internal" href="../../../api-v3/config/overload/v3/overload.proto.html#envoy-v3-api-field-config-overload-v3-overloadmanager-buffer-factory-config"><span class="std std-ref">buffer_factory_config</span></a>.
+To understand the memory class scheme in detail see <a class="reference internal" href="../../../api-v3/config/overload/v3/overload.proto.html#envoy-v3-api-field-config-overload-v3-bufferfactoryconfig-minimum-account-to-track-power-of-two"><span class="std std-ref">minimum_account_to_track_power_of_two</span></a></p>
+<p>As an example, here is a partial Overload Manager configuration with minimum
+threshold for tracking and a single overload action entry that resets streams:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">buffer_factory_config</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">minimum_account_to_track_power_of_two</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
+<span class="nt">actions</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.overload_actions.reset_high_memory_stream&quot;</span>
+<span class="w">  </span><span class="nt">triggers</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.fixed_heap&quot;</span>
+<span class="w">      </span><span class="nt">scaled</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">scaling_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.85</span>
+<span class="w">        </span><span class="nt">saturation_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.95</span>
+<span class="nn">...</span>
+</pre></div>
+</div>
+<p>We will only track streams using &gt;=
+<span class="math notranslate nohighlight">\(2^{minimum\_account\_to\_track\_power\_of\_two}\)</span> worth of allocated memory in
+buffers. In this case, by setting the <a class="reference internal" href="../../../api-v3/config/overload/v3/overload.proto.html#envoy-v3-api-field-config-overload-v3-bufferfactoryconfig-minimum-account-to-track-power-of-two"><span class="std std-ref">minimum_account_to_track_power_of_two</span></a>
+to 20 we will track streams using &gt;= 1MiB since <span class="math notranslate nohighlight">\(2^{20}\)</span> is 1MiB. Streams
+using &gt;= 1MiB will be classified into 8 power of two sized buckets. Currently,
+the number of buckets is hardcoded to 8.  For this example, the buckets are as
+follows:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 33.3%" />
+<col style="width: 66.7%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Bucket index</p></th>
+<th class="head"><p>Contains streams using</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>[1MiB,2MiB)</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>[2MiB,4MiB)</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>[4MiB,8MiB)</p></td>
+</tr>
+<tr class="row-odd"><td><p>3</p></td>
+<td><p>[8MiB,16MiB)</p></td>
+</tr>
+<tr class="row-even"><td><p>4</p></td>
+<td><p>[16MiB,32MiB)</p></td>
+</tr>
+<tr class="row-odd"><td><p>5</p></td>
+<td><p>[32MiB,64MiB)</p></td>
+</tr>
+<tr class="row-even"><td><p>6</p></td>
+<td><p>[64MiB,128MiB)</p></td>
+</tr>
+<tr class="row-odd"><td><p>7</p></td>
+<td><p>&gt;= 128MiB</p></td>
+</tr>
+</tbody>
+</table>
+<p>The above configuration also configures the overload manager to reset our tracked
+streams based on heap usage as a trigger. When the heap usage is less than 85%,
+no streams will be reset.  When heap usage is at or above 85%, we start to
+reset buckets according to the strategy described below. When the heap
+usage is at 95% all streams using &gt;= 1MiB memory are eligible for reset.
+This overload action will reset up to 50 streams (this is a hardcoded limit)
+per worker everytime the action is invoked. This is both to reduce the amount
+of streams that end up getting reset and to prevent the worker thread from
+locking up and triggering the Watchdog system.</p>
+<p>Given that there are only 8 buckets, we partition the space with a gradation of
+<span class="math notranslate nohighlight">\(gradation = (saturation\_threshold - scaling\_threshold)/8\)</span>. Hence at 85%
+heap usage we reset streams in the last bucket e.g. those using <code class="docutils literal notranslate"><span class="pre">&gt;=</span> <span class="pre">128MiB</span></code>. At
+<span class="math notranslate nohighlight">\(85\% + 1 * gradation\)</span> heap usage we reset streams in the last two buckets
+e.g. those using <code class="docutils literal notranslate"><span class="pre">&gt;=</span> <span class="pre">64MiB</span></code>, prioritizing the streams in the last bucket since
+there’s a hard limit on the number of streams we can reset per invokation.
+At <span class="math notranslate nohighlight">\(85\% + 2 * gradation\)</span> heap usage we reset streams in the last three
+buckets e.g. those using <code class="docutils literal notranslate"><span class="pre">&gt;=</span> <span class="pre">32MiB</span></code>. And so forth as the heap usage is higher.</p>
+<p>It’s expected that the first few gradations shouldn’t trigger anything, unless
+there’s something seriously wrong e.g. in this example streams using <code class="docutils literal notranslate"><span class="pre">&gt;=</span>
+<span class="pre">128MiB</span></code> in buffers.</p>
+</section>
+</section>
+<section id="cpu-intensive-workload-brownout-protection">
+<h2>CPU Intensive Workload Brownout Protection<a class="headerlink" href="#cpu-intensive-workload-brownout-protection" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">envoy.overload_actions.stop_accepting_requests</span></code> overload action can be used
+to protect workloads from browning-out when an unexpected spike in the number of
+requests the workload receives that causes the CPU to become saturated. This overload
+action when used in conjunction with the <code class="docutils literal notranslate"><span class="pre">envoy.resource_monitors.cpu_utilization</span></code>
+resource monitor can reduce the pressure on the CPU by cheaply rejecting new requests.
+While the real mitigation for such request spikes are horizantally scaling the workload,
+this overload action can be used to ensure the fleet does not get into a cascading failure
+mode.
+Some platform owners may choose to install this overload action by default to protect the fleet,
+since it is easier to configure a target CPU utilization percentage than to configure a request rate per
+workload. This supports monitoring both HOST CPU Utilization and K8s Container CPU Utilization.
+By default it’s using <code class="docutils literal notranslate"><span class="pre">mode:</span> <span class="pre">HOST</span></code>, to trigger overload actions on Container CPU usage,
+use <code class="docutils literal notranslate"><span class="pre">mode:</span> <span class="pre">CONTAINER</span></code> to set the calculation strategy to evaluate Container CPU stats.</p>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/611d3fc72d0b36b83bc6706d88804ccc/cpu_utilization_monitor_overload.yaml"><code class="xref download docutils literal notranslate"><span class="pre">cpu_utilization_monitor_overload.yaml</span></code></a></span><a class="headerlink" href="#id2" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="nt">overload_manager</span><span class="p">:</span>
+<span class="linenos"> 2</span><span class="w">  </span><span class="nt">refresh_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.25s</span>
+<span class="hll"><span class="linenos"> 3</span><span class="w">  </span><span class="nt">resource_monitors</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos"> 4</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.cpu_utilization&quot;</span>
+</span><span class="hll"><span class="linenos"> 5</span><span class="w">    </span><span class="nt">typed_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos"> 6</span><span class="w">      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig</span>
+</span><span class="hll"><span class="linenos"> 7</span><span class="w">  </span><span class="nt">actions</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos"> 8</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.overload_actions.stop_accepting_requests&quot;</span>
+</span><span class="hll"><span class="linenos"> 9</span><span class="w">    </span><span class="nt">triggers</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">10</span><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.cpu_utilization&quot;</span>
+</span><span class="hll"><span class="linenos">11</span><span class="w">      </span><span class="nt">scaled</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">12</span><span class="w">        </span><span class="nt">scaling_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.80</span>
+</span><span class="hll"><span class="linenos">13</span><span class="w">        </span><span class="nt">saturation_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.95</span>
+</span></pre></div>
+</div>
+</div>
+</section>
+<section id="loadshedding-in-k8s-environment">
+<h2>Loadshedding in K8s environment<a class="headerlink" href="#loadshedding-in-k8s-environment" title="Link to this heading"></a></h2>
+<p>In a Kubernetes environment, where Envoy workloads often share node resources with other applications, configuring this
+overload action with a target container CPU utilization percentage offers a more adaptable approach than defining a fixed
+request rate. This ensures that Envoy workloads can dynamically manage their CPU usage based on container-level metrics
+without impacting other co-located workloads.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">envoy.overload_actions.stop_accepting_requests</span></code> overload action can be utilized to safeguard Envoy workloads
+in a Kubernetes environment from experiencing degraded performance during unexpected spikes in incoming requests
+that saturate the container’s allocated CPU resources. When combined with the <code class="docutils literal notranslate"><span class="pre">envoy.resource_monitors.cpu_utilization</span></code>
+resource monitor, this overload action can effectively reduce Container CPU pressure by rejecting new requests at a minimal
+computational cost.</p>
+<div class="literal-block-wrapper docutils container" id="id3">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../../_downloads/455d8a8d418ea77b8fee41498edcc2e5/container_cpu_utilization_monitor_overload.yaml"><code class="xref download docutils literal notranslate"><span class="pre">container_cpu_utilization_monitor_overload.yaml</span></code></a></span><a class="headerlink" href="#id3" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="nt">overload_manager</span><span class="p">:</span>
+<span class="linenos"> 2</span><span class="w">  </span><span class="nt">refresh_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+<span class="hll"><span class="linenos"> 3</span><span class="w">  </span><span class="nt">resource_monitors</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos"> 4</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.cpu_utilization&quot;</span>
+</span><span class="hll"><span class="linenos"> 5</span><span class="w">    </span><span class="nt">typed_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos"> 6</span><span class="w">      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig</span>
+</span><span class="hll"><span class="linenos"> 7</span><span class="w">      </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CONTAINER</span>
+</span><span class="hll"><span class="linenos"> 8</span><span class="w">  </span><span class="nt">actions</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos"> 9</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.overload_actions.stop_accepting_requests&quot;</span>
+</span><span class="hll"><span class="linenos">10</span><span class="w">    </span><span class="nt">triggers</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">11</span><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.resource_monitors.cpu_utilization&quot;</span>
+</span><span class="hll"><span class="linenos">12</span><span class="w">      </span><span class="nt">scaled</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">13</span><span class="w">        </span><span class="nt">scaling_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.80</span>
+</span><span class="hll"><span class="linenos">14</span><span class="w">        </span><span class="nt">saturation_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.95</span>
+</span></pre></div>
+</div>
+</div>
+</section>
+<section id="statistics">
+<h2>Statistics<a class="headerlink" href="#statistics" title="Link to this heading"></a></h2>
+<p>Each configured resource monitor has a statistics tree rooted at <code class="docutils literal notranslate"><span class="pre">overload.&lt;name&gt;.</span></code>
+with the following statistics:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>pressure</p></td>
+<td><p>Gauge</p></td>
+<td><p>Resource pressure as a percent</p></td>
+</tr>
+<tr class="row-odd"><td><p>failed_updates</p></td>
+<td><p>Counter</p></td>
+<td><p>Total failed attempts to update the resource pressure</p></td>
+</tr>
+<tr class="row-even"><td><p>skipped_updates</p></td>
+<td><p>Counter</p></td>
+<td><p>Total skipped attempts to update the resource pressure due to a pending update</p></td>
+</tr>
+<tr class="row-odd"><td><p>refresh_interval_delay</p></td>
+<td><p>Histogram</p></td>
+<td><p>Latencies for the delay between overload manager resource refresh loops</p></td>
+</tr>
+</tbody>
+</table>
+<p>Each configured overload action has a statistics tree rooted at <em>overload.&lt;name&gt;.</em>
+with the following statistics:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>active</p></td>
+<td><p>Gauge</p></td>
+<td><p>Active state of the action (0=scaling, 1=saturated)</p></td>
+</tr>
+<tr class="row-odd"><td><p>scale_percent</p></td>
+<td><p>Gauge</p></td>
+<td><p>Scaled value of the action as a percent (0-99=scaling, 100=saturated)</p></td>
+</tr>
+</tbody>
+</table>
+<p>Each configured Load Shed Point has a statistics tree rooted at <em>overload.&lt;name&gt;.</em>
+with the following statistics:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>scale_percent</p></td>
+<td><p>Gauge</p></td>
+<td><p>Scaled value of the action as a percent (0-99=scaling, 100=saturated)</p></td>
+</tr>
+<tr class="row-odd"><td><p>shed_load_count</p></td>
+<td><p>Counter</p></td>
+<td><p>Total count the load is sheded</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../runtime.html" class="btn btn-neutral float-left" title="Runtime" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../config_validation/config_validation.html" class="btn btn-neutral float-right" title="Config Validations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Overload manager</a><ul>
+<li><a class="reference internal" href="#resource-monitors">Resource monitors</a><ul>
+<li><a class="reference internal" href="#cgroup-memory">Cgroup Memory</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#triggers">Triggers</a></li>
+<li><a class="reference internal" href="#overload-actions">Overload actions</a><ul>
+<li><a class="reference internal" href="#shrink-heap">Shrink Heap</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#load-shed-points">Load Shed Points</a><ul>
+<li><a class="reference internal" href="#reducing-timeouts">Reducing timeouts</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#limiting-active-connections">Limiting Active Connections</a><ul>
+<li><a class="reference internal" href="#reset-streams">Reset Streams</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#cpu-intensive-workload-brownout-protection">CPU Intensive Workload Brownout Protection</a></li>
+<li><a class="reference internal" href="#loadshedding-in-k8s-environment">Loadshedding in K8s environment</a></li>
+<li><a class="reference internal" href="#statistics">Statistics</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

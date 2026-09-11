@@ -1,0 +1,144 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/sse_to_metadata/v3/sse_to_metadata.proto:
+
+SSE-To-Metadata Filter (proto)
+==============================
+
+.. _extension_envoy.filters.http.sse_to_metadata:
+
+This extension has the qualified name ``envoy.filters.http.sse_to_metadata``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.sse_to_metadata.v3.SseToMetadata <envoy_v3_api_msg_extensions.filters.http.sse_to_metadata.v3.SseToMetadata>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+The SSE-To-Metadata filter extracts values from Server-Sent Events (SSE) HTTP response bodies
+and writes them to dynamic metadata. This is useful for LLM token usage tracking,
+logging, and other observability use cases.
+
+The filter specifically handles SSE format (text/event-stream) and uses pluggable content
+parsers to extract values from the SSE data fields. The content parser is a typed extension
+that can be configured to handle different content types (JSON, plaintext, XML, etc.).
+
+The filter only processes responses with Content-Type "text/event-stream"
+(the standard SSE content type). Content-Type parameters such as charset are ignored.
+
+See SSE-To-Metadata :ref:`configuration overview <config_http_filters_sse_to_metadata>` for more details.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.sse_to_metadata.v3.SseToMetadata:
+
+extensions.filters.http.sse_to_metadata.v3.SseToMetadata
+--------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.sse_to_metadata.v3.SseToMetadata proto] <api/envoy/extensions/filters/http/sse_to_metadata/v3/sse_to_metadata.proto#L36>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "response_rules": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.sse_to_metadata.v3.SseToMetadata.response_rules:
+
+
+response_rules
+  (:ref:`extensions.filters.http.sse_to_metadata.v3.SseToMetadata.ProcessingRules <envoy_v3_api_msg_extensions.filters.http.sse_to_metadata.v3.SseToMetadata.ProcessingRules>`, *REQUIRED*) Rules for processing SSE response streams.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.sse_to_metadata.v3.SseToMetadata.ProcessingRules:
+
+extensions.filters.http.sse_to_metadata.v3.SseToMetadata.ProcessingRules
+------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.sse_to_metadata.v3.SseToMetadata.ProcessingRules proto] <api/envoy/extensions/filters/http/sse_to_metadata/v3/sse_to_metadata.proto#L42>`
+
+Rules for processing SSE streams and extracting metadata.
+
+The filter parses the SSE protocol (events delimited by blank lines), then delegates
+to a content parser to parse event content and extract metadata. The content parser
+determines which values to extract and how to write them to metadata.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "content_parser": {...},
+    "max_event_size": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.sse_to_metadata.v3.SseToMetadata.ProcessingRules.content_parser:
+
+
+content_parser
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`, *REQUIRED*) Content parser configuration for parsing event content and extracting metadata.
+
+  The content parser specifies:
+  - How to parse the event data (e.g., JSON, XML, plaintext)
+  - Which values to extract from the parsed content (e.g., JSON paths like usage.total_tokens)
+  - How to map extracted values to metadata (namespace, key, type conversions)
+  - When to write metadata (on_present, on_missing, on_error actions)
+
+
+  .. _extension_category_envoy.content_parsers:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.content_parsers.json <extension_envoy.content_parsers.json>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.sse_to_metadata.v3.SseToMetadata.ProcessingRules.max_event_size:
+
+
+max_event_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Maximum size in bytes for a single SSE event before it's considered invalid
+  and discarded. This protects against unbounded memory growth from malicious
+  or malformed streams that never send event delimiters (blank lines).
+
+  Default is 8192 bytes (8KB), which is sufficient for most legitimate events.
+  Set to 0 to disable the limit (not recommended for production).
+  Maximum allowed value is 10485760 bytes (10MB).
+
+
+

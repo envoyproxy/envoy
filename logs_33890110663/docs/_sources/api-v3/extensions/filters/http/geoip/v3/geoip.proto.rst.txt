@@ -1,0 +1,172 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/geoip/v3/geoip.proto:
+
+Geoip (proto)
+=============
+
+.. _extension_envoy.filters.http.geoip:
+
+This extension has the qualified name ``envoy.filters.http.geoip``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.geoip.v3.Geoip <envoy_v3_api_msg_extensions.filters.http.geoip.v3.Geoip>`
+
+
+
+Geoip :ref:`configuration overview <config_http_filters_geoip>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.geoip.v3.Geoip:
+
+extensions.filters.http.geoip.v3.Geoip
+--------------------------------------
+
+
+:repo:`[extensions.filters.http.geoip.v3.Geoip proto] <api/envoy/extensions/filters/http/geoip/v3/geoip.proto#L19>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "xff_config": {...},
+    "custom_header_config": {...},
+    "provider": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.xff_config:
+
+
+xff_config
+  (:ref:`extensions.filters.http.geoip.v3.Geoip.XffConfig <envoy_v3_api_msg_extensions.filters.http.geoip.v3.Geoip.XffConfig>`) Configuration for extracting the client IP address from the
+  ``x-forwarded-for`` header. If set, the
+  :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.XffConfig.xff_num_trusted_hops>`
+  field will be used to determine the trusted client address from the ``x-forwarded-for`` header.
+  If not set, the immediate downstream connection source address will be used.
+
+  Only one of ``xff_config`` or
+  :ref:`custom_header_config <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.custom_header_config>`
+  can be set.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.custom_header_config:
+
+
+custom_header_config
+  (:ref:`extensions.filters.http.geoip.v3.Geoip.CustomHeaderConfig <envoy_v3_api_msg_extensions.filters.http.geoip.v3.Geoip.CustomHeaderConfig>`) Configuration for extracting the client IP address from a custom request header.
+
+  If set, the
+  :ref:`header_name <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.CustomHeaderConfig.header_name>`
+  field will be used to extract the client IP address from the specified request header.
+
+  Only one of ``custom_header_config`` or
+  :ref:`xff_config <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.xff_config>`
+  can be set.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.provider:
+
+
+provider
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`, *REQUIRED*) Geoip driver specific configuration which depends on the driver being instantiated.
+  See the geoip drivers for examples:
+
+  - :ref:`MaxMindConfig <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
+
+
+  .. _extension_category_envoy.geoip_providers:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.geoip_providers.maxmind <extension_envoy.geoip_providers.maxmind>`
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.geoip.v3.Geoip.XffConfig:
+
+extensions.filters.http.geoip.v3.Geoip.XffConfig
+------------------------------------------------
+
+
+:repo:`[extensions.filters.http.geoip.v3.Geoip.XffConfig proto] <api/envoy/extensions/filters/http/geoip/v3/geoip.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "xff_num_trusted_hops": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.XffConfig.xff_num_trusted_hops:
+
+
+xff_num_trusted_hops
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The number of additional ingress proxy hops from the right side of the
+  :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
+  determining the origin client's IP address. See the documentation for
+  :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
+
+  Defaults to ``0``.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.geoip.v3.Geoip.CustomHeaderConfig:
+
+extensions.filters.http.geoip.v3.Geoip.CustomHeaderConfig
+---------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.geoip.v3.Geoip.CustomHeaderConfig proto] <api/envoy/extensions/filters/http/geoip/v3/geoip.proto#L30>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "header_name": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.CustomHeaderConfig.header_name:
+
+
+header_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the request header to extract the client IP address from.
+  The header value must contain a valid IP address (IPv4 or IPv6).
+
+  If the header is missing or contains an invalid IP address, the filter will fall back
+  to using the immediate downstream connection source address.
+
+
+

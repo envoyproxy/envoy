@@ -1,0 +1,64 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/wasm/v3/wasm.proto:
+
+Wasm (proto)
+============
+
+.. _extension_envoy.filters.network.wasm:
+
+This extension has the qualified name ``envoy.filters.network.wasm``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.wasm.v3.Wasm <envoy_v3_api_msg_extensions.filters.network.wasm.v3.Wasm>`
+
+
+
+Wasm :ref:`configuration overview <config_network_filters_wasm>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.wasm.v3.Wasm:
+
+extensions.filters.network.wasm.v3.Wasm
+---------------------------------------
+
+
+:repo:`[extensions.filters.network.wasm.v3.Wasm proto] <api/envoy/extensions/filters/network/wasm/v3/wasm.proto#L18>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.wasm.v3.Wasm.config:
+
+
+config
+  (:ref:`extensions.wasm.v3.PluginConfig <envoy_v3_api_msg_extensions.wasm.v3.PluginConfig>`) General Plugin configuration.
+
+

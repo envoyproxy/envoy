@@ -1,0 +1,76 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/alts/v3/alts.proto:
+
+ALTS (proto)
+============
+
+.. _extension_envoy.transport_sockets.alts:
+
+This extension has the qualified name ``envoy.transport_sockets.alts``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.transport_sockets.downstream <extension_category_envoy.transport_sockets.downstream>`
+
+  - :ref:`envoy.transport_sockets.upstream <extension_category_envoy.transport_sockets.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.alts.v3.Alts <envoy_v3_api_msg_extensions.transport_sockets.alts.v3.Alts>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.alts.v3.Alts:
+
+extensions.transport_sockets.alts.v3.Alts
+-----------------------------------------
+
+
+:repo:`[extensions.transport_sockets.alts.v3.Alts proto] <api/envoy/extensions/transport_sockets/alts/v3/alts.proto#L20>`
+
+Configuration for ALTS transport socket. This provides Google's ALTS protocol to Envoy.
+Store the peer identity in dynamic metadata, namespace is "envoy.transport_socket.peer_information", key is "peer_identity".
+https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security/
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "handshaker_service": ...,
+    "peer_service_accounts": []
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.alts.v3.Alts.handshaker_service:
+
+
+handshaker_service
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The location of a handshaker service, this is usually 169.254.169.254:8080
+  on GCE.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.alts.v3.Alts.peer_service_accounts:
+
+
+peer_service_accounts
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The acceptable service accounts from peer, peers not in the list will be rejected in the
+  handshake validation step. If empty, no validation will be performed.
+
+

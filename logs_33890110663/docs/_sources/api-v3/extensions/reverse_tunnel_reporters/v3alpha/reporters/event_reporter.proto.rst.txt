@@ -1,0 +1,77 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/reporters/event_reporter.proto:
+
+contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/reporters/event_reporter.proto (proto)
+================================================================================================
+
+
+
+
+.. _envoy_v3_api_msg_extensions.reverse_tunnel_reporters.v3alpha.reporters.ReverseConnectionReporterClient:
+
+extensions.reverse_tunnel_reporters.v3alpha.reporters.ReverseConnectionReporterClient
+-------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.reverse_tunnel_reporters.v3alpha.reporters.ReverseConnectionReporterClient proto] <api/contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/reporters/event_reporter.proto#L15>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "typed_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.reporters.ReverseConnectionReporterClient.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Name to use to pick out the client should match the one reported by the factory.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.reporters.ReverseConnectionReporterClient.typed_config:
+
+
+typed_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) Typed config for the client
+
+
+
+.. _envoy_v3_api_msg_extensions.reverse_tunnel_reporters.v3alpha.reporters.EventReporterConfig:
+
+extensions.reverse_tunnel_reporters.v3alpha.reporters.EventReporterConfig
+-------------------------------------------------------------------------
+
+
+:repo:`[extensions.reverse_tunnel_reporters.v3alpha.reporters.EventReporterConfig proto] <api/contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/reporters/event_reporter.proto#L24>`
+
+Configuration for the connection event reporter.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "clients": []
+  }
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.reporters.EventReporterConfig.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Stat prefix for this reporter's metrics.
+  Metrics will be emitted as ``{stat_prefix}.events_pushed``, etc.
+
+
+.. _envoy_v3_api_field_extensions.reverse_tunnel_reporters.v3alpha.reporters.EventReporterConfig.clients:
+
+
+clients
+  (**repeated** :ref:`extensions.reverse_tunnel_reporters.v3alpha.reporters.ReverseConnectionReporterClient <envoy_v3_api_msg_extensions.reverse_tunnel_reporters.v3alpha.reporters.ReverseConnectionReporterClient>`, *REQUIRED*) List of clients to report to.
+
+

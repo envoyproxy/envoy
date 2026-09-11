@@ -1,0 +1,580 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Composite (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../../../_static/favicon.ico"/>
+      <script src="../../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+    <link rel="next" title="Compressor (proto)" href="../../compressor/v3/compressor.proto.html" />
+    <link rel="prev" title="Checksum HTTP filter (proto)" href="../../checksum/v3alpha/checksum.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../../../searchindex.js"
+          data-envoy-search-page="../../../../../../search.html"
+          data-envoy-root="../../../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../../config/config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../../config/filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/filter.html">Filters</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/http/http.html">HTTP filters</a></li>
+      <li class="breadcrumb-item active">Composite (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../../_sources/api-v3/extensions/filters/http/composite/v3/composite.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="composite-proto">
+<span id="envoy-v3-api-file-envoy-extensions-filters-http-composite-v3-composite-proto"></span><h1>Composite (proto)<a class="headerlink" href="#composite-proto" title="Link to this heading"></a></h1>
+<p id="extension-envoy-filters-http-composite">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.filters.http.composite</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension has an unknown security posture and should only be
+used in deployments where both the downstream and upstream are
+trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension categories:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../filter_chain/v3/filter_chain.proto.html#extension-category-envoy-filters-http"><span class="std std-ref">envoy.filters.http</span></a></p></li>
+<li><p><a class="reference internal" href="../../router/v3/router.proto.html#extension-category-envoy-filters-http-upstream"><span class="std std-ref">envoy.filters.http.upstream</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-composite-v3-composite"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite</span></a></p></li>
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-composite-v3-compositeperroute"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.http.composite.v3.CompositePerRoute</span></a></p></li>
+</ul>
+</div>
+<p>Composite Filter <a class="reference internal" href="../../../../../../configuration/http/http_filters/composite_filter.html#config-http-filters-composite"><span class="std std-ref">configuration overview</span></a>.</p>
+<section id="extensions-filters-http-composite-v3-composite">
+<span id="envoy-v3-api-msg-extensions-filters-http-composite-v3-composite"></span><h2>extensions.filters.http.composite.v3.Composite<a class="headerlink" href="#extensions-filters-http-composite-v3-composite" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/composite/v3/composite.proto#L34">[extensions.filters.http.composite.v3.Composite proto]</a></p>
+<p><a class="reference internal" href="../../../../../../configuration/http/http_filters/composite_filter.html#config-http-filters-composite"><span class="std std-ref">Composite filter</span></a> config. The composite filter config
+allows delegating filter handling to another filter as determined by matching on the request
+headers. This makes it possible to use different filters or filter configurations based on the
+incoming request.</p>
+<p>This is intended to be used with
+<a class="reference internal" href="../../../../common/matching/v3/extension_matcher.proto.html#envoy-v3-api-msg-extensions-common-matching-v3-extensionwithmatcher"><span class="std std-ref">ExtensionWithMatcher</span></a>
+where a match tree is specified that indicates (via
+<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-composite-v3-executefilteraction"><span class="std std-ref">ExecuteFilterAction</span></a>)
+which filter configuration to create and delegate to.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;named_filter_chains&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;matcher&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-composite-v3-composite-named-filter-chains">
+<dt>named_filter_chains</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-composite-v3-filterchainconfiguration"><span class="std std-ref">extensions.filters.http.composite.v3.FilterChainConfiguration</span></a>&gt;) Named filter chain definitions that can be referenced from
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-composite-v3-executefilteraction-filter-chain-name"><span class="std std-ref">ExecuteFilterAction.filter_chain_name</span></a>.
+The filter chains are compiled at configuration time and can be referenced by name.
+This is useful when the same filter chain needs to be applied across many routes,
+as it avoids duplicating the filter chain configuration.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-composite-v3-composite-matcher">
+<dt>matcher</dt><dd><p>(<a class="reference internal" href="../../../../../../xds/type/matcher/v3/matcher.proto.html#envoy-v3-api-msg-xds-type-matcher-v3-matcher"><span class="std std-ref">.xds.type.matcher.v3.Matcher</span></a>) The match tree that will be used to select an action to execute. The action type should be
+<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-composite-v3-executefilteraction"><span class="std std-ref">ExecuteFilterAction</span></a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This should only be set when using the Composite filter as in the <a class="reference internal" href="../../../network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-http-filters"><span class="std std-ref">http_filters</span></a>.
+Never set this field when using the Composite filter with the <a class="reference internal" href="../../../../common/matching/v3/extension_matcher.proto.html#envoy-v3-api-msg-extensions-common-matching-v3-extensionwithmatcher"><span class="std std-ref">ExtensionWithMatcher</span></a> which will result in
+undefined behavior.</p>
+</div>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-composite-v3-compositeperroute">
+<span id="envoy-v3-api-msg-extensions-filters-http-composite-v3-compositeperroute"></span><h2>extensions.filters.http.composite.v3.CompositePerRoute<a class="headerlink" href="#extensions-filters-http-composite-v3-compositeperroute" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/composite/v3/composite.proto#L58">[extensions.filters.http.composite.v3.CompositePerRoute proto]</a></p>
+<p>Per-route configuration for the Composite filter.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;matcher&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-composite-v3-compositeperroute-matcher">
+<dt>matcher</dt><dd><p>(<a class="reference internal" href="../../../../../../xds/type/matcher/v3/matcher.proto.html#envoy-v3-api-msg-xds-type-matcher-v3-matcher"><span class="std std-ref">.xds.type.matcher.v3.Matcher</span></a>, <em>REQUIRED</em>) Override of the match tree for this route.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This should only be set when using the Composite filter as in the <a class="reference internal" href="../../../network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-http-filters"><span class="std std-ref">http_filters</span></a>.
+Never set this field when using the Composite filter with the <a class="reference internal" href="../../../../common/matching/v3/extension_matcher.proto.html#envoy-v3-api-msg-extensions-common-matching-v3-extensionwithmatcher"><span class="std std-ref">ExtensionWithMatcher</span></a> which will result in
+undefined behavior.</p>
+</div>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-composite-v3-filterchainconfiguration">
+<span id="envoy-v3-api-msg-extensions-filters-http-composite-v3-filterchainconfiguration"></span><h2>extensions.filters.http.composite.v3.FilterChainConfiguration<a class="headerlink" href="#extensions-filters-http-composite-v3-filterchainconfiguration" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/composite/v3/composite.proto#L77">[extensions.filters.http.composite.v3.FilterChainConfiguration proto]</a></p>
+<p>A list of filter configurations to be called in order. Note that this can be used as the type
+inside of an ECDS <a class="reference internal" href="../../../../../config/core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">TypedExtensionConfig</span></a> extension, which allows a chain of
+filters to be configured dynamically. In that case, the types of all filters in the chain must
+be present in the <a class="reference internal" href="../../../../../config/core/v3/config_source.proto.html#envoy-v3-api-field-config-core-v3-extensionconfigsource-type-urls"><span class="std std-ref">ExtensionConfigSource.type_urls</span></a> field.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;typed_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-composite-v3-filterchainconfiguration-typed-config">
+<dt>typed_config</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>)</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-composite-v3-dynamicconfig">
+<span id="envoy-v3-api-msg-extensions-filters-http-composite-v3-dynamicconfig"></span><h2>extensions.filters.http.composite.v3.DynamicConfig<a class="headerlink" href="#extensions-filters-http-composite-v3-dynamicconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/composite/v3/composite.proto#L82">[extensions.filters.http.composite.v3.DynamicConfig proto]</a></p>
+<p>Configuration for an extension configuration discovery service with name.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;config_discovery&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-composite-v3-dynamicconfig-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The name of the extension configuration. It also serves as a resource name in ExtensionConfigDS.
+The resource type in the <code class="docutils literal notranslate"><span class="pre">DiscoveryRequest</span></code> will be <a class="reference internal" href="../../../../../config/core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">TypedExtensionConfig</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-composite-v3-dynamicconfig-config-discovery">
+<dt>config_discovery</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-extensionconfigsource"><span class="std std-ref">config.core.v3.ExtensionConfigSource</span></a>) Configuration source specifier for an extension configuration discovery
+service. In case of a failure and without the default configuration,
+500(Internal Server Error) will be returned.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-composite-v3-executefilteraction">
+<span id="envoy-v3-api-msg-extensions-filters-http-composite-v3-executefilteraction"></span><h2>extensions.filters.http.composite.v3.ExecuteFilterAction<a class="headerlink" href="#extensions-filters-http-composite-v3-executefilteraction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/composite/v3/composite.proto#L97">[extensions.filters.http.composite.v3.ExecuteFilterAction proto]</a></p>
+<p>Composite match action (see <a class="reference internal" href="../../../../../../intro/arch_overview/advanced/matching/matching_api.html#arch-overview-matching-api"><span class="std std-ref">matching docs</span></a> for more info on match actions).
+This specifies the filter configuration of the filter that the composite filter should delegate filter interactions to.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;typed_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;dynamic_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;filter_chain&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;filter_chain_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;sample_percent&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-composite-v3-executefilteraction-typed-config">
+<dt>typed_config</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Filter specific configuration which depends on the filter being
+instantiated. See the supported filters for further documentation.
+Only one of <code class="docutils literal notranslate"><span class="pre">typed_config</span></code>, <code class="docutils literal notranslate"><span class="pre">dynamic_config</span></code>, <code class="docutils literal notranslate"><span class="pre">filter_chain</span></code>, or <code class="docutils literal notranslate"><span class="pre">filter_chain_name</span></code>
+can be set.</p>
+<div class="admonition tip" id="extension-category-envoy-filters-http">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../a2a/v3/a2a.proto.html#extension-envoy-filters-http-a2a"><span class="std std-ref">envoy.filters.http.a2a</span></a></p></li>
+<li><p><a class="reference internal" href="../../adaptive_concurrency/v3/adaptive_concurrency.proto.html#extension-envoy-filters-http-adaptive-concurrency"><span class="std std-ref">envoy.filters.http.adaptive_concurrency</span></a></p></li>
+<li><p><a class="reference internal" href="../../admission_control/v3/admission_control.proto.html#extension-envoy-filters-http-admission-control"><span class="std std-ref">envoy.filters.http.admission_control</span></a></p></li>
+<li><p><a class="reference internal" href="../../ai_protocol_manager/v3/ai_protocol_manager.proto.html#extension-envoy-filters-http-ai-protocol-manager"><span class="std std-ref">envoy.filters.http.ai_protocol_manager</span></a></p></li>
+<li><p><a class="reference internal" href="../../alternate_protocols_cache/v3/alternate_protocols_cache.proto.html#extension-envoy-filters-http-alternate-protocols-cache"><span class="std std-ref">envoy.filters.http.alternate_protocols_cache</span></a></p></li>
+<li><p><a class="reference internal" href="../../api_key_auth/v3/api_key_auth.proto.html#extension-envoy-filters-http-api-key-auth"><span class="std std-ref">envoy.filters.http.api_key_auth</span></a></p></li>
+<li><p><a class="reference internal" href="../../aws_eventstream_parser/v3/aws_eventstream_parser.proto.html#extension-envoy-filters-http-aws-eventstream-parser"><span class="std std-ref">envoy.filters.http.aws_eventstream_parser</span></a></p></li>
+<li><p><a class="reference internal" href="../../aws_lambda/v3/aws_lambda.proto.html#extension-envoy-filters-http-aws-lambda"><span class="std std-ref">envoy.filters.http.aws_lambda</span></a></p></li>
+<li><p><a class="reference internal" href="../../aws_request_signing/v3/aws_request_signing.proto.html#extension-envoy-filters-http-aws-request-signing"><span class="std std-ref">envoy.filters.http.aws_request_signing</span></a></p></li>
+<li><p><a class="reference internal" href="../../bandwidth_limit/v3/bandwidth_limit.proto.html#extension-envoy-filters-http-bandwidth-limit"><span class="std std-ref">envoy.filters.http.bandwidth_limit</span></a></p></li>
+<li><p><a class="reference internal" href="../../bandwidth_share/v3/bandwidth_share.proto.html#extension-envoy-filters-http-bandwidth-share"><span class="std std-ref">envoy.filters.http.bandwidth_share</span></a></p></li>
+<li><p><a class="reference internal" href="../../basic_auth/v3/basic_auth.proto.html#extension-envoy-filters-http-basic-auth"><span class="std std-ref">envoy.filters.http.basic_auth</span></a></p></li>
+<li><p><a class="reference internal" href="../../body_size_limit/v3/body_size_limit.proto.html#extension-envoy-filters-http-body-size-limit"><span class="std std-ref">envoy.filters.http.body_size_limit</span></a></p></li>
+<li><p><a class="reference internal" href="../../buffer/v3/buffer.proto.html#extension-envoy-filters-http-buffer"><span class="std std-ref">envoy.filters.http.buffer</span></a></p></li>
+<li><p><a class="reference internal" href="../../cache/v3/cache.proto.html#extension-envoy-filters-http-cache"><span class="std std-ref">envoy.filters.http.cache</span></a></p></li>
+<li><p><a class="reference internal" href="../../cache_v2/v3/cache.proto.html#extension-envoy-filters-http-cache-v2"><span class="std std-ref">envoy.filters.http.cache_v2</span></a></p></li>
+<li><p><a class="reference internal" href="../../cdn_loop/v3/cdn_loop.proto.html#extension-envoy-filters-http-cdn-loop"><span class="std std-ref">envoy.filters.http.cdn_loop</span></a></p></li>
+<li><p><a class="reference internal" href="#extension-envoy-filters-http-composite"><span class="std std-ref">envoy.filters.http.composite</span></a></p></li>
+<li><p><a class="reference internal" href="../../compressor/v3/compressor.proto.html#extension-envoy-filters-http-compressor"><span class="std std-ref">envoy.filters.http.compressor</span></a></p></li>
+<li><p><a class="reference internal" href="../../connect_grpc_bridge/v3/config.proto.html#extension-envoy-filters-http-connect-grpc-bridge"><span class="std std-ref">envoy.filters.http.connect_grpc_bridge</span></a></p></li>
+<li><p><a class="reference internal" href="../../cors/v3/cors.proto.html#extension-envoy-filters-http-cors"><span class="std std-ref">envoy.filters.http.cors</span></a></p></li>
+<li><p><a class="reference internal" href="../../credential_injector/v3/credential_injector.proto.html#extension-envoy-filters-http-credential-injector"><span class="std std-ref">envoy.filters.http.credential_injector</span></a></p></li>
+<li><p><a class="reference internal" href="../../csrf/v3/csrf.proto.html#extension-envoy-filters-http-csrf"><span class="std std-ref">envoy.filters.http.csrf</span></a></p></li>
+<li><p><a class="reference internal" href="../../custom_response/v3/custom_response.proto.html#extension-envoy-filters-http-custom-response"><span class="std std-ref">envoy.filters.http.custom_response</span></a></p></li>
+<li><p><a class="reference internal" href="../../decompressor/v3/decompressor.proto.html#extension-envoy-filters-http-decompressor"><span class="std std-ref">envoy.filters.http.decompressor</span></a></p></li>
+<li><p><a class="reference internal" href="../../dynamic_forward_proxy/v3/dynamic_forward_proxy.proto.html#extension-envoy-filters-http-dynamic-forward-proxy"><span class="std std-ref">envoy.filters.http.dynamic_forward_proxy</span></a></p></li>
+<li><p><a class="reference internal" href="../../dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-filters-http-dynamic-modules"><span class="std std-ref">envoy.filters.http.dynamic_modules</span></a></p></li>
+<li><p><a class="reference internal" href="../../ext_authz/v3/ext_authz.proto.html#extension-envoy-filters-http-ext-authz"><span class="std std-ref">envoy.filters.http.ext_authz</span></a></p></li>
+<li><p><a class="reference internal" href="../../ext_proc/v3/processing_mode.proto.html#extension-envoy-filters-http-ext-proc"><span class="std std-ref">envoy.filters.http.ext_proc</span></a></p></li>
+<li><p><a class="reference internal" href="../../fault/v3/fault.proto.html#extension-envoy-filters-http-fault"><span class="std std-ref">envoy.filters.http.fault</span></a></p></li>
+<li><p><a class="reference internal" href="../../file_server/v3/file_server.proto.html#extension-envoy-filters-http-file-server"><span class="std std-ref">envoy.filters.http.file_server</span></a></p></li>
+<li><p><a class="reference internal" href="../../file_system_buffer/v3/file_system_buffer.proto.html#extension-envoy-filters-http-file-system-buffer"><span class="std std-ref">envoy.filters.http.file_system_buffer</span></a></p></li>
+<li><p><a class="reference internal" href="../../filter_chain/v3/filter_chain.proto.html#extension-envoy-filters-http-filter-chain"><span class="std std-ref">envoy.filters.http.filter_chain</span></a></p></li>
+<li><p><a class="reference internal" href="../../gcp_authn/v3/gcp_authn.proto.html#extension-envoy-filters-http-gcp-authn"><span class="std std-ref">envoy.filters.http.gcp_authn</span></a></p></li>
+<li><p><a class="reference internal" href="../../geoip/v3/geoip.proto.html#extension-envoy-filters-http-geoip"><span class="std std-ref">envoy.filters.http.geoip</span></a></p></li>
+<li><p><a class="reference internal" href="../../grpc_field_extraction/v3/config.proto.html#extension-envoy-filters-http-grpc-field-extraction"><span class="std std-ref">envoy.filters.http.grpc_field_extraction</span></a></p></li>
+<li><p><a class="reference internal" href="../../grpc_http1_bridge/v3/config.proto.html#extension-envoy-filters-http-grpc-http1-bridge"><span class="std std-ref">envoy.filters.http.grpc_http1_bridge</span></a></p></li>
+<li><p><a class="reference internal" href="../../grpc_http1_reverse_bridge/v3/config.proto.html#extension-envoy-filters-http-grpc-http1-reverse-bridge"><span class="std std-ref">envoy.filters.http.grpc_http1_reverse_bridge</span></a></p></li>
+<li><p><a class="reference internal" href="../../grpc_json_reverse_transcoder/v3/transcoder.proto.html#extension-envoy-filters-http-grpc-json-reverse-transcoder"><span class="std std-ref">envoy.filters.http.grpc_json_reverse_transcoder</span></a></p></li>
+<li><p><a class="reference internal" href="../../grpc_json_transcoder/v3/transcoder.proto.html#extension-envoy-filters-http-grpc-json-transcoder"><span class="std std-ref">envoy.filters.http.grpc_json_transcoder</span></a></p></li>
+<li><p><a class="reference internal" href="../../grpc_stats/v3/config.proto.html#extension-envoy-filters-http-grpc-stats"><span class="std std-ref">envoy.filters.http.grpc_stats</span></a></p></li>
+<li><p><a class="reference internal" href="../../grpc_web/v3/grpc_web.proto.html#extension-envoy-filters-http-grpc-web"><span class="std std-ref">envoy.filters.http.grpc_web</span></a></p></li>
+<li><p><a class="reference internal" href="../../header_mutation/v3/header_mutation.proto.html#extension-envoy-filters-http-header-mutation"><span class="std std-ref">envoy.filters.http.header_mutation</span></a></p></li>
+<li><p><a class="reference internal" href="../../header_to_metadata/v3/header_to_metadata.proto.html#extension-envoy-filters-http-header-to-metadata"><span class="std std-ref">envoy.filters.http.header_to_metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../../health_check/v3/health_check.proto.html#extension-envoy-filters-http-health-check"><span class="std std-ref">envoy.filters.http.health_check</span></a></p></li>
+<li><p><a class="reference internal" href="../../ip_tagging/v3/ip_tagging.proto.html#extension-envoy-filters-http-ip-tagging"><span class="std std-ref">envoy.filters.http.ip_tagging</span></a></p></li>
+<li><p><a class="reference internal" href="../../json_to_metadata/v3/json_to_metadata.proto.html#extension-envoy-filters-http-json-to-metadata"><span class="std std-ref">envoy.filters.http.json_to_metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../../jwt_authn/v3/config.proto.html#extension-envoy-filters-http-jwt-authn"><span class="std std-ref">envoy.filters.http.jwt_authn</span></a></p></li>
+<li><p><a class="reference internal" href="../../kill_request/v3/kill_request.proto.html#extension-envoy-filters-http-kill-request"><span class="std std-ref">envoy.filters.http.kill_request</span></a></p></li>
+<li><p><a class="reference internal" href="../../local_ratelimit/v3/local_rate_limit.proto.html#extension-envoy-filters-http-local-ratelimit"><span class="std std-ref">envoy.filters.http.local_ratelimit</span></a></p></li>
+<li><p><a class="reference internal" href="../../lua/v3/lua.proto.html#extension-envoy-filters-http-lua"><span class="std std-ref">envoy.filters.http.lua</span></a></p></li>
+<li><p><a class="reference internal" href="../../mcp/v3/mcp.proto.html#extension-envoy-filters-http-mcp"><span class="std std-ref">envoy.filters.http.mcp</span></a></p></li>
+<li><p><a class="reference internal" href="../../mcp_json_rest_bridge/v3/mcp_json_rest_bridge.proto.html#extension-envoy-filters-http-mcp-json-rest-bridge"><span class="std std-ref">envoy.filters.http.mcp_json_rest_bridge</span></a></p></li>
+<li><p><a class="reference internal" href="../../mcp_router/v3/mcp_router.proto.html#extension-envoy-filters-http-mcp-router"><span class="std std-ref">envoy.filters.http.mcp_router</span></a></p></li>
+<li><p><a class="reference internal" href="../../oauth2/v3/oauth.proto.html#extension-envoy-filters-http-oauth2"><span class="std std-ref">envoy.filters.http.oauth2</span></a></p></li>
+<li><p><a class="reference internal" href="../../on_demand/v3/on_demand.proto.html#extension-envoy-filters-http-on-demand"><span class="std std-ref">envoy.filters.http.on_demand</span></a></p></li>
+<li><p><a class="reference internal" href="../../original_src/v3/original_src.proto.html#extension-envoy-filters-http-original-src"><span class="std std-ref">envoy.filters.http.original_src</span></a></p></li>
+<li><p><a class="reference internal" href="../../proto_api_scrubber/v3/config.proto.html#extension-envoy-filters-http-proto-api-scrubber"><span class="std std-ref">envoy.filters.http.proto_api_scrubber</span></a></p></li>
+<li><p><a class="reference internal" href="../../proto_message_extraction/v3/config.proto.html#extension-envoy-filters-http-proto-message-extraction"><span class="std std-ref">envoy.filters.http.proto_message_extraction</span></a></p></li>
+<li><p><a class="reference internal" href="../../rate_limit_quota/v3/rate_limit_quota.proto.html#extension-envoy-filters-http-rate-limit-quota"><span class="std std-ref">envoy.filters.http.rate_limit_quota</span></a></p></li>
+<li><p><a class="reference internal" href="../../ratelimit/v3/rate_limit.proto.html#extension-envoy-filters-http-ratelimit"><span class="std std-ref">envoy.filters.http.ratelimit</span></a></p></li>
+<li><p><a class="reference internal" href="../../rbac/v3/rbac.proto.html#extension-envoy-filters-http-rbac"><span class="std std-ref">envoy.filters.http.rbac</span></a></p></li>
+<li><p><a class="reference internal" href="../../router/v3/router.proto.html#extension-envoy-filters-http-router"><span class="std std-ref">envoy.filters.http.router</span></a></p></li>
+<li><p><a class="reference internal" href="../../set_filter_state/v3/set_filter_state.proto.html#extension-envoy-filters-http-set-filter-state"><span class="std std-ref">envoy.filters.http.set_filter_state</span></a></p></li>
+<li><p><a class="reference internal" href="../../set_metadata/v3/set_metadata.proto.html#extension-envoy-filters-http-set-metadata"><span class="std std-ref">envoy.filters.http.set_metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../../sse_to_metadata/v3/sse_to_metadata.proto.html#extension-envoy-filters-http-sse-to-metadata"><span class="std std-ref">envoy.filters.http.sse_to_metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../../stateful_session/v3/stateful_session.proto.html#extension-envoy-filters-http-stateful-session"><span class="std std-ref">envoy.filters.http.stateful_session</span></a></p></li>
+<li><p><a class="reference internal" href="../../tap/v3/tap.proto.html#extension-envoy-filters-http-tap"><span class="std std-ref">envoy.filters.http.tap</span></a></p></li>
+<li><p><a class="reference internal" href="../../thrift_to_metadata/v3/thrift_to_metadata.proto.html#extension-envoy-filters-http-thrift-to-metadata"><span class="std std-ref">envoy.filters.http.thrift_to_metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../../transform/v3/transform.proto.html#extension-envoy-filters-http-transform"><span class="std std-ref">envoy.filters.http.transform</span></a></p></li>
+<li><p><a class="reference internal" href="../../wasm/v3/wasm.proto.html#extension-envoy-filters-http-wasm"><span class="std std-ref">envoy.filters.http.wasm</span></a></p></li>
+</ul>
+<p>The following extensions are available in <a class="reference internal" href="../../../../../../start/install.html#install-contrib"><span class="std std-ref">contrib</span></a> images only:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../alpn/v3/alpn.proto.html#extension-envoy-filters-http-alpn"><span class="std std-ref">envoy.filters.http.alpn</span></a></p></li>
+<li><p><a class="reference internal" href="../../checksum/v3alpha/checksum.proto.html#extension-envoy-filters-http-checksum"><span class="std std-ref">envoy.filters.http.checksum</span></a></p></li>
+<li><p><a class="reference internal" href="../../dynamo/v3/dynamo.proto.html#extension-envoy-filters-http-dynamo"><span class="std std-ref">envoy.filters.http.dynamo</span></a></p></li>
+<li><p><a class="reference internal" href="../../golang/v3alpha/golang.proto.html#extension-envoy-filters-http-golang"><span class="std std-ref">envoy.filters.http.golang</span></a></p></li>
+<li><p><a class="reference internal" href="../../istio_stats/v3/istio_stats.proto.html#extension-envoy-filters-http-istio-stats"><span class="std std-ref">envoy.filters.http.istio_stats</span></a></p></li>
+<li><p><a class="reference internal" href="../../language/v3alpha/language.proto.html#extension-envoy-filters-http-language"><span class="std std-ref">envoy.filters.http.language</span></a></p></li>
+<li><p><a class="reference internal" href="../../../../../config/contrib/load_balancing_policies/peak_ewma/peak_ewma.html#extension-envoy-filters-http-peak-ewma"><span class="std std-ref">envoy.filters.http.peak_ewma</span></a></p></li>
+<li><p><a class="reference internal" href="../../peer_metadata/v3/peer_metadata.proto.html#extension-envoy-filters-http-peer-metadata"><span class="std std-ref">envoy.filters.http.peer_metadata</span></a></p></li>
+<li><p><a class="reference internal" href="../../sxg/v3alpha/sxg.proto.html#extension-envoy-filters-http-sxg"><span class="std std-ref">envoy.filters.http.sxg</span></a></p></li>
+<li><p><a class="reference internal" href="../../../../tap_sinks/udp_sink/v3alpha/udp_sink.proto.html#extension-envoy-tap-sinks-udp-sink"><span class="std std-ref">envoy.tap_sinks.udp_sink</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-composite-v3-executefilteraction-dynamic-config">
+<dt>dynamic_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-composite-v3-dynamicconfig"><span class="std std-ref">extensions.filters.http.composite.v3.DynamicConfig</span></a>) Dynamic configuration of filter obtained via extension configuration discovery service.
+Only one of <code class="docutils literal notranslate"><span class="pre">typed_config</span></code>, <code class="docutils literal notranslate"><span class="pre">dynamic_config</span></code>, <code class="docutils literal notranslate"><span class="pre">filter_chain</span></code>, or <code class="docutils literal notranslate"><span class="pre">filter_chain_name</span></code>
+can be set.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-composite-v3-executefilteraction-filter-chain">
+<dt>filter_chain</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-composite-v3-filterchainconfiguration"><span class="std std-ref">extensions.filters.http.composite.v3.FilterChainConfiguration</span></a>) An inlined list of filter configurations. The specified filters will be executed in order.
+Only one of <code class="docutils literal notranslate"><span class="pre">typed_config</span></code>, <code class="docutils literal notranslate"><span class="pre">dynamic_config</span></code>, <code class="docutils literal notranslate"><span class="pre">filter_chain</span></code>, or <code class="docutils literal notranslate"><span class="pre">filter_chain_name</span></code>
+can be set.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-composite-v3-executefilteraction-filter-chain-name">
+<dt>filter_chain_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The name of a filter chain defined in
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-composite-v3-composite-named-filter-chains"><span class="std std-ref">Composite.named_filter_chains</span></a>.
+At runtime, if the named filter chain is not found in the Composite filter’s configuration,
+no filter will be applied for this match (the action is silently skipped).
+Only one of <code class="docutils literal notranslate"><span class="pre">typed_config</span></code>, <code class="docutils literal notranslate"><span class="pre">dynamic_config</span></code>, <code class="docutils literal notranslate"><span class="pre">filter_chain</span></code>, or <code class="docutils literal notranslate"><span class="pre">filter_chain_name</span></code>
+can be set.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-composite-v3-executefilteraction-sample-percent">
+<dt>sample_percent</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-runtimefractionalpercent"><span class="std std-ref">config.core.v3.RuntimeFractionalPercent</span></a>) Probability of the action execution. If not specified, this is 100%.
+This allows sampling behavior for the configured actions.
+For example, if
+<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-field-config-core-v3-runtimefractionalpercent-default-value"><span class="std std-ref">default_value</span></a>
+under the <code class="docutils literal notranslate"><span class="pre">sample_percent</span></code> is configured with 30%, a dice roll with that
+probability is done. The underline action will only be executed if the
+dice roll returns positive. Otherwise, the action is skipped.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../checksum/v3alpha/checksum.proto.html" class="btn btn-neutral float-left" title="Checksum HTTP filter (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../compressor/v3/compressor.proto.html" class="btn btn-neutral float-right" title="Compressor (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Composite (proto)</a><ul>
+<li><a class="reference internal" href="#extensions-filters-http-composite-v3-composite">extensions.filters.http.composite.v3.Composite</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-composite-v3-compositeperroute">extensions.filters.http.composite.v3.CompositePerRoute</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-composite-v3-filterchainconfiguration">extensions.filters.http.composite.v3.FilterChainConfiguration</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-composite-v3-dynamicconfig">extensions.filters.http.composite.v3.DynamicConfig</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-composite-v3-executefilteraction">extensions.filters.http.composite.v3.ExecuteFilterAction</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

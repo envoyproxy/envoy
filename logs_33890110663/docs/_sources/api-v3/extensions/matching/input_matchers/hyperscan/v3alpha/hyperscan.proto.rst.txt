@@ -1,0 +1,183 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.proto:
+
+Hyperscan matcher (proto)
+=========================
+
+.. _extension_envoy.matching.input_matchers.hyperscan:
+
+This extension has the qualified name ``envoy.matching.input_matchers.hyperscan``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.input_matchers <extension_category_envoy.matching.input_matchers>`
+
+
+
+
+
+Hyperscan :ref:`configuration overview <config_hyperscan>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan:
+
+extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan
+--------------------------------------------------------------
+
+
+:repo:`[extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan proto] <api/contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.proto#L20>`
+
+`Hyperscan <https://github.com/intel/hyperscan>`_ regex matcher. The matcher uses the Hyperscan
+engine which exploits x86 SIMD instructions to accelerate matching large numbers of regular
+expressions simultaneously across streams of data.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "regexes": []
+  }
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.regexes:
+
+
+regexes
+  (**repeated** :ref:`extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex <envoy_v3_api_msg_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex>`, *REQUIRED*) Specifies a set of regex expressions that the input should match on.
+
+
+.. _envoy_v3_api_msg_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex:
+
+extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex
+--------------------------------------------------------------------
+
+
+:repo:`[extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex proto] <api/contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.proto#L22>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "regex": ...,
+    "id": ...,
+    "caseless": ...,
+    "dot_all": ...,
+    "multiline": ...,
+    "allow_empty": ...,
+    "utf8": ...,
+    "ucp": ...,
+    "combination": ...,
+    "quiet": ...
+  }
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex.regex:
+
+
+regex
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The regex expression.
+
+  The expression must represent only the pattern to be matched, with no delimiters or flags.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex.id:
+
+
+id
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The ID of the regex expression.
+
+  This option is designed to be used on the sub-expressions in logical combinations.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex.caseless:
+
+
+caseless
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Matching will be performed case-insensitively.
+
+  The expression may still use PCRE tokens (notably ``(?i)`` and ``(?-i)``) to switch
+  case-insensitive matching on and off.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex.dot_all:
+
+
+dot_all
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Matching a ``.`` will not exclude newlines.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex.multiline:
+
+
+multiline
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) ``^`` and ``$`` anchors match any newlines in data.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex.allow_empty:
+
+
+allow_empty
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Allow expressions which can match against an empty string.
+
+  This option instructs the compiler to allow expressions that can match against empty buffers,
+  such as ``.?``, ``.*``, ``(a|)``. Since Hyperscan can return every possible match for an expression,
+  such expressions generally execute very slowly.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex.utf8:
+
+
+utf8
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Treat the pattern as a sequence of UTF-8 characters.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex.ucp:
+
+
+ucp
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Use Unicode properties for character classes.
+
+  This option instructs Hyperscan to use Unicode properties, rather than the default ASCII
+  interpretations, for character mnemonics like ``\w`` and ``\s`` as well as the POSIX character
+  classes. It is only meaningful in conjunction with ``utf8``.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex.combination:
+
+
+combination
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Logical combination.
+
+  This option instructs Hyperscan to parse this expression as logical combination syntax.
+  Logical constraints consist of operands, operators and parentheses. The operands are
+  expression indices, and operators can be ``!``, ``&`` or ``|``.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan.Regex.quiet:
+
+
+quiet
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Don’t do any match reporting.
+
+  This option instructs Hyperscan to ignore match reporting for this expression. It is
+  designed to be used on the sub-expressions in logical combinations.
+
+
+

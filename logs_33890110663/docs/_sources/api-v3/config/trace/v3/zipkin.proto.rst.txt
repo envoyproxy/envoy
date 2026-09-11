@@ -1,0 +1,287 @@
+.. _envoy_v3_api_file_envoy/config/trace/v3/zipkin.proto:
+
+Zipkin tracer (proto)
+=====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.trace.v3.ZipkinConfig:
+
+config.trace.v3.ZipkinConfig
+----------------------------
+
+
+:repo:`[config.trace.v3.ZipkinConfig proto] <api/envoy/config/trace/v3/zipkin.proto#L25>`
+
+Configuration for the Zipkin tracer.
+
+.. _extension_envoy.tracers.zipkin:
+
+This extension has the qualified name ``envoy.tracers.zipkin``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers <extension_category_envoy.tracers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.config.trace.v3.ZipkinConfig <envoy_v3_api_msg_config.trace.v3.ZipkinConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "collector_cluster": ...,
+    "collector_endpoint": ...,
+    "trace_id_128bit": ...,
+    "shared_span_context": {...},
+    "collector_endpoint_version": ...,
+    "collector_hostname": ...,
+    "split_spans_for_request": ...,
+    "trace_context_option": ...,
+    "collector_service": {...},
+    "timestamp_trace_ids": ...
+  }
+
+.. _envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_cluster:
+
+
+collector_cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The cluster manager cluster that hosts the Zipkin collectors.
+
+  .. note::
+      This field will be deprecated in future releases in favor of
+      :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`.
+
+      Either this field or ``collector_service`` must be specified.
+
+
+.. _envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_endpoint:
+
+
+collector_endpoint
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The API endpoint of the Zipkin service where the spans will be sent. When
+  using a standard Zipkin installation.
+
+  .. note::
+      This field will be deprecated in future releases in favor of
+      :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`.
+
+      Required when using ``collector_cluster``.
+
+
+.. _envoy_v3_api_field_config.trace.v3.ZipkinConfig.trace_id_128bit:
+
+
+trace_id_128bit
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Determines whether a 128bit trace id will be used when creating a new
+  trace instance. The default value is false, which will result in a 64 bit trace id being used.
+
+
+.. _envoy_v3_api_field_config.trace.v3.ZipkinConfig.shared_span_context:
+
+
+shared_span_context
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Determines whether client and server spans will share the same span context.
+  The default value is true.
+
+
+.. _envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_endpoint_version:
+
+
+collector_endpoint_version
+  (:ref:`config.trace.v3.ZipkinConfig.CollectorEndpointVersion <envoy_v3_api_enum_config.trace.v3.ZipkinConfig.CollectorEndpointVersion>`) Determines the selected collector endpoint version.
+
+
+.. _envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_hostname:
+
+
+collector_hostname
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional hostname to use when sending spans to the collector_cluster. Useful for collectors
+  that require a specific hostname. Defaults to :ref:`collector_cluster <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_cluster>` above.
+
+  .. note::
+      This field will be deprecated in future releases in favor of
+      :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`.
+
+
+.. _envoy_v3_api_field_config.trace.v3.ZipkinConfig.split_spans_for_request:
+
+
+split_spans_for_request
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If this is set to true, then Envoy will be treated as an independent hop in trace chain. A complete span pair will be created for a single
+  request. Server span will be created for the downstream request and client span will be created for the related upstream request.
+  This should be set to true in the following cases:
+
+  * The Envoy Proxy is used as gateway or ingress.
+  * The Envoy Proxy is used as sidecar but inbound traffic capturing or outbound traffic capturing is disabled.
+  * Any case that the :ref:`start_child_span of router <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>` is set to true.
+
+  .. attention::
+
+    If this is set to true, then the
+    :ref:`start_child_span of router <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
+    SHOULD be set to true also to ensure the correctness of trace chain.
+
+    Both this field and ``start_child_span`` are deprecated by the
+    :ref:`spawn_upstream_span <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`.
+    Please use that ``spawn_upstream_span`` field to control the span creation.
+
+
+.. _envoy_v3_api_field_config.trace.v3.ZipkinConfig.trace_context_option:
+
+
+trace_context_option
+  (:ref:`config.trace.v3.ZipkinConfig.TraceContextOption <envoy_v3_api_enum_config.trace.v3.ZipkinConfig.TraceContextOption>`) Determines which trace context format to use for trace header extraction and propagation.
+  This controls both downstream request header extraction and upstream request header injection.
+  Here is the spec for W3C trace headers: https://www.w3.org/TR/trace-context/
+  The default value is USE_B3 to maintain backward compatibility.
+
+
+.. _envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service:
+
+
+collector_service
+  (:ref:`config.core.v3.HttpService <envoy_v3_api_msg_config.core.v3.HttpService>`) HTTP service configuration for the Zipkin collector.
+  When specified, this configuration takes precedence over the legacy fields:
+  collector_cluster, collector_endpoint, and collector_hostname.
+  This provides a complete HTTP service configuration including cluster, URI, timeout, and headers.
+  If not specified, the legacy fields above will be used for backward compatibility.
+
+  Required fields when using collector_service:
+
+  * ``http_uri.cluster`` - Must be specified and non-empty
+  * ``http_uri.uri`` - Must be specified and non-empty
+  * ``http_uri.timeout`` - Optional
+
+  Full URI Support with Automatic Parsing:
+
+  The ``uri`` field supports both path-only and full URI formats:
+
+  .. code-block:: yaml
+
+    tracing:
+      provider:
+        name: envoy.tracers.zipkin
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
+          collector_service:
+            http_uri:
+              # Full URI format - hostname and path are extracted automatically
+              uri: "https://zipkin-collector.example.com/api/v2/spans"
+              cluster: zipkin
+              timeout: 5s
+            request_headers_to_add:
+              - header:
+                  key: "X-Custom-Token"
+                  value: "your-custom-token"
+              - header:
+                  key: "X-Service-ID"
+                  value: "your-service-id"
+
+  URI Parsing Behavior:
+
+  * Full URI: ``"https://zipkin-collector.example.com/api/v2/spans"``
+
+    * Hostname: ``zipkin-collector.example.com`` (sets HTTP ``Host`` header)
+    * Path: ``/api/v2/spans`` (sets HTTP request path)
+
+  * Path only: ``"/api/v2/spans"``
+
+    * Hostname: Uses cluster name as fallback
+    * Path: ``/api/v2/spans``
+
+
+.. _envoy_v3_api_field_config.trace.v3.ZipkinConfig.timestamp_trace_ids:
+
+
+timestamp_trace_ids
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Determines whether trace IDs will include a timestamp in the first 4 bytes.
+  When enabled, trace IDs are generated with the format: [32-bit epoch seconds][32-bit random].
+  The default value is false, which results in fully random trace IDs.
+  For 128-bit trace IDs, the timestamp is encoded in the high 32 bits of the high 64-bit word.
+
+
+.. _envoy_v3_api_enum_config.trace.v3.ZipkinConfig.TraceContextOption:
+
+Enum config.trace.v3.ZipkinConfig.TraceContextOption
+----------------------------------------------------
+
+
+:repo:`[config.trace.v3.ZipkinConfig.TraceContextOption proto] <api/envoy/config/trace/v3/zipkin.proto#L29>`
+
+Available trace context options for handling different trace header formats.
+
+
+
+.. _envoy_v3_api_enum_value_config.trace.v3.ZipkinConfig.TraceContextOption.USE_B3:
+
+
+USE_B3
+  *(DEFAULT)* ⁣Use B3 headers only (default behavior).
+
+
+.. _envoy_v3_api_enum_value_config.trace.v3.ZipkinConfig.TraceContextOption.USE_B3_WITH_W3C_PROPAGATION:
+
+
+USE_B3_WITH_W3C_PROPAGATION
+  ⁣Enable B3 and W3C dual header support:
+  - For downstream: Extract from B3 headers first, fallback to W3C traceparent if B3 is unavailable.
+  - For upstream: Inject both B3 and W3C traceparent headers.
+  When this option is NOT set, only B3 headers are used for both extraction and injection.
+
+
+
+.. _envoy_v3_api_enum_config.trace.v3.ZipkinConfig.CollectorEndpointVersion:
+
+Enum config.trace.v3.ZipkinConfig.CollectorEndpointVersion
+----------------------------------------------------------
+
+
+:repo:`[config.trace.v3.ZipkinConfig.CollectorEndpointVersion proto] <api/envoy/config/trace/v3/zipkin.proto#L41>`
+
+Available Zipkin collector endpoint versions.
+
+
+
+.. _envoy_v3_api_enum_value_config.trace.v3.ZipkinConfig.CollectorEndpointVersion.DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE:
+
+
+DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE
+  *(DEFAULT)* ⁣Zipkin API v1, JSON over HTTP.
+
+
+.. _envoy_v3_api_enum_value_config.trace.v3.ZipkinConfig.CollectorEndpointVersion.HTTP_JSON:
+
+
+HTTP_JSON
+  ⁣Zipkin API v2, JSON over HTTP.
+
+
+.. _envoy_v3_api_enum_value_config.trace.v3.ZipkinConfig.CollectorEndpointVersion.HTTP_PROTO:
+
+
+HTTP_PROTO
+  ⁣Zipkin API v2, protobuf over HTTP.
+
+
+

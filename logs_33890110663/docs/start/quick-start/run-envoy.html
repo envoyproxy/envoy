@@ -1,0 +1,558 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Run Envoy &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=a5c4661c" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/tabs.js?v=3030b3cb"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Configuration: Static" href="configuration-static.html" />
+    <link rel="prev" title="Quick start" href="index.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../start.html">Getting Started</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../install.html">Installing Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Quick start</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Run Envoy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration-static.html">Configuration: Static</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration-dynamic-filesystem.html">Configuration: Dynamic from filesystem</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration-dynamic-control-plane.html">Configuration: Dynamic from control plane</a></li>
+<li class="toctree-l3"><a class="reference internal" href="admin.html">Envoy admin interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="securing.html">Securing Envoy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="next-steps.html">Next steps</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../sandboxes/index.html">Sandboxes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../docker.html">Using the Envoy Docker Image</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../building.html">Building</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../start.html">Getting Started</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Quick start</a></li>
+      <li class="breadcrumb-item active">Run Envoy</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/start/quick-start/run-envoy.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="run-envoy">
+<span id="start-quick-start-run-envoy"></span><h1>Run Envoy<a class="headerlink" href="#run-envoy" title="Link to this heading"></a></h1>
+<p>The following instructions walk through starting Envoy as a system daemon or using
+the Envoy Docker image.</p>
+<section id="check-your-envoy-version">
+<span id="start-quick-start-version"></span><h2>Check your Envoy version<a class="headerlink" href="#check-your-envoy-version" title="Link to this heading"></a></h2>
+<p>Once you have <a class="reference internal" href="../install.html#install"><span class="std std-ref">installed Envoy</span></a>, you can check the version information as follows:</p>
+<div class="sphinx-tabs docutils container">
+<div aria-label="Tabbed content" class="closeable" role="tablist"><button aria-controls="panel-0-0-0" aria-selected="true" class="sphinx-tabs-tab" id="tab-0-0-0" name="0-0" role="tab" tabindex="0">System</button><button aria-controls="panel-0-0-1" aria-selected="false" class="sphinx-tabs-tab" id="tab-0-0-1" name="0-1" role="tab" tabindex="-1">Docker (Linux Image)</button></div><div aria-labelledby="tab-0-0-0" class="sphinx-tabs-panel" id="panel-0-0-0" name="0-0" role="tabpanel" tabindex="0"><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>envoy<span class="w"> </span>--version
+<span class="go">...</span>
+</pre></div>
+</div>
+</div><div aria-labelledby="tab-0-0-1" class="sphinx-tabs-panel" hidden="true" id="panel-0-0-1" name="0-1" role="tabpanel" tabindex="0"><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>envoyproxy/envoy:dev-UNKNOWN<span class="w"> </span><span class="se">\</span>
+<span class="w">          </span>--version
+<span class="go">...</span>
+</pre></div>
+</div>
+</div></div>
+</section>
+<section id="view-the-envoy-command-line-options">
+<span id="start-quick-start-help"></span><h2>View the Envoy command line options<a class="headerlink" href="#view-the-envoy-command-line-options" title="Link to this heading"></a></h2>
+<p>You can view the Envoy <a class="reference internal" href="../../operations/cli.html#operations-cli"><span class="std std-ref">command line options</span></a> with the <code class="docutils literal notranslate"><span class="pre">--help</span></code>
+flag:</p>
+<div class="sphinx-tabs docutils container">
+<div aria-label="Tabbed content" class="closeable" role="tablist"><button aria-controls="panel-1-1-0" aria-selected="true" class="sphinx-tabs-tab" id="tab-1-1-0" name="1-0" role="tab" tabindex="0">System</button><button aria-controls="panel-1-1-1" aria-selected="false" class="sphinx-tabs-tab" id="tab-1-1-1" name="1-1" role="tab" tabindex="-1">Docker (Linux Image)</button></div><div aria-labelledby="tab-1-1-0" class="sphinx-tabs-panel" id="panel-1-1-0" name="1-0" role="tabpanel" tabindex="0"><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>envoy<span class="w"> </span>--help
+<span class="go">...</span>
+</pre></div>
+</div>
+</div><div aria-labelledby="tab-1-1-1" class="sphinx-tabs-panel" hidden="true" id="panel-1-1-1" name="1-1" role="tabpanel" tabindex="0"><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>envoyproxy/envoy:dev-UNKNOWN<span class="w"> </span><span class="se">\</span>
+<span class="w">          </span>--help
+<span class="go">...</span>
+</pre></div>
+</div>
+</div></div>
+</section>
+<section id="run-envoy-with-the-demo-configuration">
+<span id="start-quick-start-config"></span><h2>Run Envoy with the demo configuration<a class="headerlink" href="#run-envoy-with-the-demo-configuration" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">-c</span></code> or <code class="docutils literal notranslate"><span class="pre">--config-path</span></code> flag tells Envoy the path to its initial configuration.</p>
+<p>Envoy will parse the config file according to the file extension, please see the
+<a class="reference internal" href="../../operations/cli.html#cmdoption-c"><code class="xref std std-option docutils literal notranslate"><span class="pre">config</span> <span class="pre">path</span> <span class="pre">command</span> <span class="pre">line</span> <span class="pre">option</span></code></a> for further information.</p>
+<div class="sphinx-tabs docutils container">
+<div aria-label="Tabbed content" class="closeable" role="tablist"><button aria-controls="panel-2-2-0" aria-selected="true" class="sphinx-tabs-tab" id="tab-2-2-0" name="2-0" role="tab" tabindex="0">System</button><button aria-controls="panel-2-2-1" aria-selected="false" class="sphinx-tabs-tab" id="tab-2-2-1" name="2-1" role="tab" tabindex="-1">Docker (Linux Image)</button></div><div aria-labelledby="tab-2-2-0" class="sphinx-tabs-panel" id="panel-2-2-0" name="2-0" role="tabpanel" tabindex="0"><p>To start Envoy as a system daemon <a class="reference download internal" download="" href="../../_downloads/92dcb9714fb6bc288d042029b34c0de4/envoy-demo.yaml"><code class="xref download docutils literal notranslate"><span class="pre">download</span> <span class="pre">the</span> <span class="pre">demo</span> <span class="pre">configuration</span></code></a>, and start
+as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>envoy<span class="w"> </span>-c<span class="w"> </span>envoy-demo.yaml
+<span class="go">...</span>
+</pre></div>
+</div>
+</div><div aria-labelledby="tab-2-2-1" class="sphinx-tabs-panel" hidden="true" id="panel-2-2-1" name="2-1" role="tabpanel" tabindex="0"><p>You can start the Envoy Docker image without specifying a configuration file, and
+it will use the demo config by default.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-p<span class="w"> </span><span class="m">9901</span>:9901<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-p<span class="w"> </span><span class="m">10000</span>:10000<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>envoyproxy/envoy:dev-UNKNOWN
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>To specify a custom configuration you can mount the config into the container, and specify the path with <code class="docutils literal notranslate"><span class="pre">-c</span></code>.</p>
+<p>Assuming you have a custom configuration in the current directory named <code class="docutils literal notranslate"><span class="pre">envoy-custom.yaml</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/envoy-custom.yaml:/envoy-custom.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-p<span class="w"> </span><span class="m">9901</span>:9901<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-p<span class="w"> </span><span class="m">10000</span>:10000<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>envoyproxy/envoy:dev-UNKNOWN<span class="w"> </span><span class="se">\</span>
+<span class="w">          </span>-c<span class="w"> </span>/envoy-custom.yaml
+<span class="go">...</span>
+</pre></div>
+</div>
+</div></div>
+<p>Check Envoy is proxying on <a class="reference external" href="http://localhost:10000">http://localhost:10000</a>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-v<span class="w"> </span>localhost:10000
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>You can exit the server with <code class="docutils literal notranslate"><span class="pre">Ctrl-c</span></code>.</p>
+<p>See the <a class="reference internal" href="admin.html#start-quick-start-admin"><span class="std std-ref">admin quick start guide</span></a> for more information about the Envoy admin interface.</p>
+</section>
+<section id="override-the-default-configuration">
+<span id="start-quick-start-override"></span><h2>Override the default configuration<a class="headerlink" href="#override-the-default-configuration" title="Link to this heading"></a></h2>
+<p>You can provide an override configuration using <a class="reference internal" href="../../operations/cli.html#cmdoption-config-yaml"><code class="xref std std-option docutils literal notranslate"><span class="pre">--config-yaml</span></code></a> which will merge with the main
+configuration.</p>
+<p>This option can only be specified once.</p>
+<p>Save the following snippet to <code class="docutils literal notranslate"><span class="pre">envoy-override.yaml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">admin</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<span class="w">      </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9902</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If you run Envoy inside a Docker container you may wish to use <code class="docutils literal notranslate"><span class="pre">0.0.0.0</span></code>. Exposing the admin interface in this way may give unintended control of your Envoy server. Please see the <a class="reference internal" href="admin.html#start-quick-start-admin-config"><span class="std std-ref">admin section</span></a> for more information.</p>
+</div>
+<p>Next, start the Envoy server using the override configuration:</p>
+<div class="sphinx-tabs docutils container">
+<div aria-label="Tabbed content" class="closeable" role="tablist"><button aria-controls="panel-3-3-0" aria-selected="true" class="sphinx-tabs-tab" id="tab-3-3-0" name="3-0" role="tab" tabindex="0">System</button><button aria-controls="panel-3-3-1" aria-selected="false" class="sphinx-tabs-tab" id="tab-3-3-1" name="3-1" role="tab" tabindex="-1">Docker (Linux Image)</button></div><div aria-labelledby="tab-3-3-0" class="sphinx-tabs-panel" id="panel-3-3-0" name="3-0" role="tabpanel" tabindex="0"><p>On Linux/Mac: run:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>envoy<span class="w"> </span>-c<span class="w"> </span>envoy-demo.yaml<span class="w"> </span>--config-yaml<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>cat<span class="w"> </span>envoy-override.yaml<span class="k">)</span><span class="s2">&quot;</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>On Windows run:</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>On August 31, 2023 the Envoy project ended official Windows support due to a lack of resources.
+We will continue to accept patches related to the Windows build. Until further notice, Windows
+builds are excluded from Envoy CI, as well as the Envoy release and security processes.</p>
+</div>
+<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">$</span> <span class="n">envoy</span> <span class="n">-c</span> <span class="n">envoy-demo</span><span class="p">.</span><span class="n">yaml</span> <span class="p">-</span><span class="n">-config-yaml</span> <span class="s2">&quot;</span><span class="p">$(</span><span class="nb">Get-Content</span> <span class="n">-Raw</span> <span class="n">envoy-override</span><span class="p">.</span><span class="n">yaml</span><span class="p">)</span><span class="s2">&quot;</span>
+<span class="p">...</span>
+</pre></div>
+</div>
+</div><div aria-labelledby="tab-3-3-1" class="sphinx-tabs-panel" hidden="true" id="panel-3-3-1" name="3-1" role="tabpanel" tabindex="0"><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-p<span class="w"> </span><span class="m">9902</span>:9902<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-p<span class="w"> </span><span class="m">10000</span>:10000<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>envoyproxy/envoy:dev-UNKNOWN<span class="w"> </span><span class="se">\</span>
+<span class="w">          </span>-c<span class="w"> </span>/etc/envoy/envoy.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">          </span>--config-yaml<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>cat<span class="w"> </span>envoy-override.yaml<span class="k">)</span><span class="s2">&quot;</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+</div></div>
+<p>The Envoy admin interface should now be available on <a class="reference external" href="http://localhost:9902">http://localhost:9902</a>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-v<span class="w"> </span>localhost:9902
+<span class="go">...</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When merging <code class="docutils literal notranslate"><span class="pre">yaml</span></code> lists (e.g. <a class="reference internal" href="../../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-file-envoy-config-listener-v3-listener-proto"><span class="std std-ref">listeners</span></a>
+or <a class="reference internal" href="../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-file-envoy-config-cluster-v3-cluster-proto"><span class="std std-ref">clusters</span></a>) the merged configurations
+are appended.</p>
+<p>You cannot therefore use an override file to change the configurations of previously specified
+<a class="reference internal" href="../../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-file-envoy-config-listener-v3-listener-proto"><span class="std std-ref">listeners</span></a> or
+<a class="reference internal" href="../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-file-envoy-config-cluster-v3-cluster-proto"><span class="std std-ref">clusters</span></a></p>
+</div>
+</section>
+<section id="validating-your-envoy-configuration">
+<h2>Validating your Envoy configuration<a class="headerlink" href="#validating-your-envoy-configuration" title="Link to this heading"></a></h2>
+<p>You can start Envoy in <a class="reference internal" href="../../operations/cli.html#cmdoption-mode"><code class="xref std std-option docutils literal notranslate"><span class="pre">validate</span> <span class="pre">mode</span></code></a>.</p>
+<p>This allows you to check that Envoy is able to start with your configuration, without actually starting
+or restarting the service, or making any network connections.</p>
+<p>If the configuration is valid the process will print <code class="docutils literal notranslate"><span class="pre">OK</span></code> and exit with a return code of <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+<p>For invalid configuration the process will print the errors and exit with <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+<div class="sphinx-tabs docutils container">
+<div aria-label="Tabbed content" class="closeable" role="tablist"><button aria-controls="panel-4-4-0" aria-selected="true" class="sphinx-tabs-tab" id="tab-4-4-0" name="4-0" role="tab" tabindex="0">System</button><button aria-controls="panel-4-4-1" aria-selected="false" class="sphinx-tabs-tab" id="tab-4-4-1" name="4-1" role="tab" tabindex="-1">Docker (Linux Image)</button></div><div aria-labelledby="tab-4-4-0" class="sphinx-tabs-panel" id="panel-4-4-0" name="4-0" role="tabpanel" tabindex="0"><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>envoy<span class="w"> </span>--mode<span class="w"> </span>validate<span class="w"> </span>-c<span class="w"> </span>my-envoy-config.yaml
+<span class="go">[2020-11-08 12:36:06.543][11][info][main] [source/server/server.cc:583] runtime: layers:</span>
+<span class="go">- name: base</span>
+<span class="go">  static_layer:</span>
+<span class="go">    {}</span>
+<span class="go">- name: admin</span>
+<span class="go">  admin_layer:</span>
+<span class="go">    {}</span>
+<span class="go">[2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:95] loading tracing configuration</span>
+<span class="go">[2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:70] loading 0 static secret(s)</span>
+<span class="go">[2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:76] loading 1 cluster(s)</span>
+<span class="go">[2020-11-08 12:36:06.546][11][info][config] [source/server/configuration_impl.cc:80] loading 1 listener(s)</span>
+<span class="go">[2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration</span>
+<span class="go">configuration &#39;my-envoy-config.yaml&#39; OK</span>
+</pre></div>
+</div>
+</div><div aria-labelledby="tab-4-4-1" class="sphinx-tabs-panel" hidden="true" id="panel-4-4-1" name="4-1" role="tabpanel" tabindex="0"><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/my-envoy-config.yaml:/my-envoy-config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>envoyproxy/envoy:dev-UNKNOWN<span class="w"> </span><span class="se">\</span>
+<span class="w">          </span>--mode<span class="w"> </span>validate<span class="w"> </span><span class="se">\</span>
+<span class="w">          </span>-c<span class="w"> </span>my-envoy-config.yaml
+<span class="go">[2020-11-08 12:36:06.543][11][info][main] [source/server/server.cc:583] runtime: layers:</span>
+<span class="go">- name: base</span>
+<span class="go">  static_layer:</span>
+<span class="go">    {}</span>
+<span class="go">- name: admin</span>
+<span class="go">  admin_layer:</span>
+<span class="go">    {}</span>
+<span class="go">[2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:95] loading tracing configuration</span>
+<span class="go">[2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:70] loading 0 static secret(s)</span>
+<span class="go">[2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:76] loading 1 cluster(s)</span>
+<span class="go">[2020-11-08 12:36:06.546][11][info][config] [source/server/configuration_impl.cc:80] loading 1 listener(s)</span>
+<span class="go">[2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration</span>
+<span class="go">configuration &#39;my-envoy-config.yaml&#39; OK</span>
+</pre></div>
+</div>
+</div></div>
+</section>
+<section id="envoy-logging">
+<h2>Envoy logging<a class="headerlink" href="#envoy-logging" title="Link to this heading"></a></h2>
+<p>By default Envoy system logs are sent to <code class="docutils literal notranslate"><span class="pre">/dev/stderr</span></code>.</p>
+<p>This can be overridden using <a class="reference internal" href="../../operations/cli.html#cmdoption-log-path"><code class="xref std std-option docutils literal notranslate"><span class="pre">--log-path</span></code></a>.</p>
+<div class="sphinx-tabs docutils container">
+<div aria-label="Tabbed content" class="closeable" role="tablist"><button aria-controls="panel-5-5-0" aria-selected="true" class="sphinx-tabs-tab" id="tab-5-5-0" name="5-0" role="tab" tabindex="0">System</button><button aria-controls="panel-5-5-1" aria-selected="false" class="sphinx-tabs-tab" id="tab-5-5-1" name="5-1" role="tab" tabindex="-1">Docker (Linux Image)</button></div><div aria-labelledby="tab-5-5-0" class="sphinx-tabs-panel" id="panel-5-5-0" name="5-0" role="tabpanel" tabindex="0"><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>mkdir<span class="w"> </span>logs
+<span class="gp">$ </span>envoy<span class="w"> </span>-c<span class="w"> </span>envoy-demo.yaml<span class="w"> </span>--log-path<span class="w"> </span>logs/custom.log
+</pre></div>
+</div>
+</div><div aria-labelledby="tab-5-5-1" class="sphinx-tabs-panel" hidden="true" id="panel-5-5-1" name="5-1" role="tabpanel" tabindex="0"><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>mkdir<span class="w"> </span>logs
+<span class="gp">$ </span>chmod<span class="w"> </span>go+rwx<span class="w"> </span>logs/
+<span class="gp">$ </span>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-p<span class="w"> </span><span class="m">10000</span>:10000<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/logs:/logs<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>envoyproxy/envoy:dev-UNKNOWN<span class="w"> </span><span class="se">\</span>
+<span class="w">          </span>-c<span class="w"> </span>/etc/envoy/envoy.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">          </span>--log-path<span class="w"> </span>logs/custom.log
+</pre></div>
+</div>
+</div></div>
+<p><a class="reference internal" href="../../intro/arch_overview/observability/access_logging.html#arch-overview-access-logs"><span class="std std-ref">Access log</span></a> paths can be set for the
+<a class="reference internal" href="admin.html#start-quick-start-admin"><span class="std std-ref">admin interface</span></a>, and for configured
+<a class="reference internal" href="../../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-file-envoy-config-listener-v3-listener-proto"><span class="std std-ref">listeners</span></a>.</p>
+<p>The <a class="reference download internal" download="" href="../../_downloads/92dcb9714fb6bc288d042029b34c0de4/envoy-demo.yaml"><code class="xref download docutils literal notranslate"><span class="pre">demo</span> <span class="pre">configuration</span></code></a> is configured with a
+<a class="reference internal" href="../../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-file-envoy-config-listener-v3-listener-proto"><span class="std std-ref">listener</span></a> that logs access
+to <code class="docutils literal notranslate"><span class="pre">/dev/stdout</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">12</span><span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">13</span><span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+<span class="linenos">14</span><span class="w">          </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress_http</span>
+<span class="hll"><span class="linenos">15</span><span class="w">          </span><span class="nt">access_log</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">16</span><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.access_loggers.stdout</span>
+</span><span class="hll"><span class="linenos">17</span><span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">18</span><span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog</span>
+</span><span class="linenos">19</span><span class="w">          </span><span class="nt">http_filters</span><span class="p">:</span>
+<span class="linenos">20</span><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.router</span>
+<span class="linenos">21</span><span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">22</span><span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span>
+</pre></div>
+</div>
+<p>The default configuration in the Envoy Docker container also logs access in this way.</p>
+<p>Logging to <code class="docutils literal notranslate"><span class="pre">/dev/stderr</span></code> and <code class="docutils literal notranslate"><span class="pre">/dev/stdout</span></code> for system and access logs respectively can
+be useful when running Envoy inside a container as the streams can be separated, and logging requires no
+additional files or directories to be mounted.</p>
+<p>Some Envoy <a class="reference internal" href="../../api-v3/config/config.html#api-v3-config"><span class="std std-ref">filters and extensions</span></a> may also have additional logging capabilities.</p>
+<p>Envoy can be configured to log to <a class="reference internal" href="../../configuration/observability/access_log/usage.html#config-access-log"><span class="std std-ref">different formats</span></a>, and to
+<a class="reference internal" href="../../api-v3/config/accesslog/accesslog.html#api-v3-config-accesslog"><span class="std std-ref">different outputs</span></a> in addition to files and <code class="docutils literal notranslate"><span class="pre">stdout/err</span></code>.</p>
+</section>
+<section id="envoy-networking">
+<h2>Envoy networking<a class="headerlink" href="#envoy-networking" title="Link to this heading"></a></h2>
+<p>By default Envoy can use both IPv4 and IPv6 networks.</p>
+<p>If your environment does not support IPv6 you should disable it.</p>
+<p>This may be the case when using Docker on a non-linux host (see here for more information regarding
+<a class="reference external" href="https://docs.docker.com/config/daemon/ipv6/">IPv6 support in Docker</a>).</p>
+<p>You can disable IPv6 by setting the <code class="docutils literal notranslate"><span class="pre">dns_lookup_family</span></code> to <code class="docutils literal notranslate"><span class="pre">V4_ONLY</span></code> in your configuration as follows:</p>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/92dcb9714fb6bc288d042029b34c0de4/envoy-demo.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy-demo.yaml</span></code></a></span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">34</span><span class="w">  </span><span class="nt">clusters</span><span class="p">:</span>
+<span class="linenos">35</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_envoyproxy_io</span>
+<span class="linenos">36</span><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LOGICAL_DNS</span>
+<span class="linenos">37</span><span class="w">    </span><span class="c1"># Comment out the following line to test on v6 networks</span>
+<span class="hll"><span class="linenos">38</span><span class="w">    </span><span class="nt">dns_lookup_family</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">V4_ONLY</span>
+</span><span class="linenos">39</span><span class="w">    </span><span class="nt">load_assignment</span><span class="p">:</span>
+<span class="linenos">40</span><span class="w">      </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_envoyproxy_io</span>
+<span class="linenos">41</span><span class="w">      </span><span class="nt">endpoints</span><span class="p">:</span>
+<span class="linenos">42</span><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">lb_endpoints</span><span class="p">:</span>
+<span class="linenos">43</span><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="linenos">44</span><span class="w">            </span><span class="nt">address</span><span class="p">:</span>
+<span class="linenos">45</span><span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="debugging-envoy">
+<h2>Debugging Envoy<a class="headerlink" href="#debugging-envoy" title="Link to this heading"></a></h2>
+<p>The log level for Envoy system logs can be set using the <a class="reference internal" href="../../operations/cli.html#cmdoption-l"><code class="xref std std-option docutils literal notranslate"><span class="pre">-l</span> <span class="pre">or</span> <span class="pre">--log-level</span></code></a> option.</p>
+<p>The available log levels are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">trace</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">debug</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">info</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">warning/warn</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">error</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">critical</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">off</span></code></p></li>
+</ul>
+<p>The default  is <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<p>You can also set the log level for specific components using the <a class="reference internal" href="../../operations/cli.html#cmdoption-component-log-level"><code class="xref std std-option docutils literal notranslate"><span class="pre">--component-log-level</span></code></a> option.</p>
+<p>The following example inhibits all logging except for the <code class="docutils literal notranslate"><span class="pre">upstream</span></code> and <code class="docutils literal notranslate"><span class="pre">connection</span></code> components,
+which are set to <code class="docutils literal notranslate"><span class="pre">debug</span></code> and <code class="docutils literal notranslate"><span class="pre">trace</span></code> respectively.</p>
+<div class="sphinx-tabs docutils container">
+<div aria-label="Tabbed content" class="closeable" role="tablist"><button aria-controls="panel-6-6-0" aria-selected="true" class="sphinx-tabs-tab" id="tab-6-6-0" name="6-0" role="tab" tabindex="0">System</button><button aria-controls="panel-6-6-1" aria-selected="false" class="sphinx-tabs-tab" id="tab-6-6-1" name="6-1" role="tab" tabindex="-1">Docker (Linux Image)</button></div><div aria-labelledby="tab-6-6-0" class="sphinx-tabs-panel" id="panel-6-6-0" name="6-0" role="tabpanel" tabindex="0"><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>envoy<span class="w"> </span>-c<span class="w"> </span>envoy-demo.yaml<span class="w"> </span>-l<span class="w"> </span>off<span class="w"> </span>--component-log-level<span class="w"> </span>upstream:debug,connection:trace
+<span class="go">...</span>
+</pre></div>
+</div>
+</div><div aria-labelledby="tab-6-6-1" class="sphinx-tabs-panel" hidden="true" id="panel-6-6-1" name="6-1" role="tabpanel" tabindex="0"><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-p<span class="w"> </span><span class="m">9901</span>:9901<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-p<span class="w"> </span><span class="m">10000</span>:10000<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>envoyproxy/envoy:dev-UNKNOWN<span class="w"> </span><span class="se">\</span>
+<span class="w">          </span>-c<span class="w"> </span>/etc/envoy/envoy.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">          </span>-l<span class="w"> </span>off<span class="w"> </span><span class="se">\</span>
+<span class="w">          </span>--component-log-level<span class="w"> </span>upstream:debug,connection:trace
+<span class="go">...</span>
+</pre></div>
+</div>
+</div></div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>See <code class="docutils literal notranslate"><span class="pre">ALL_LOGGER_IDS</span></code> in <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN//source/common/common/logger.h#L29">logger.h</a> for a list of components.</p>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Quick start" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="configuration-static.html" class="btn btn-neutral float-right" title="Configuration: Static" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Run Envoy</a><ul>
+<li><a class="reference internal" href="#check-your-envoy-version">Check your Envoy version</a></li>
+<li><a class="reference internal" href="#view-the-envoy-command-line-options">View the Envoy command line options</a></li>
+<li><a class="reference internal" href="#run-envoy-with-the-demo-configuration">Run Envoy with the demo configuration</a></li>
+<li><a class="reference internal" href="#override-the-default-configuration">Override the default configuration</a></li>
+<li><a class="reference internal" href="#validating-your-envoy-configuration">Validating your Envoy configuration</a></li>
+<li><a class="reference internal" href="#envoy-logging">Envoy logging</a></li>
+<li><a class="reference internal" href="#envoy-networking">Envoy networking</a></li>
+<li><a class="reference internal" href="#debugging-envoy">Debugging Envoy</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

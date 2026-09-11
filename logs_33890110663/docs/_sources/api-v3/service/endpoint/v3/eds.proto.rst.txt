@@ -1,0 +1,14 @@
+.. _envoy_v3_api_file_envoy/service/endpoint/v3/eds.proto:
+
+:orphan:
+
+EDS (proto)
+===========
+
+
+Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_eds>`
+
+
+
+
+

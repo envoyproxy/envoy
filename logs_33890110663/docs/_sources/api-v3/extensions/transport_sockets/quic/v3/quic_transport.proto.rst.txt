@@ -1,0 +1,111 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/quic/v3/quic_transport.proto:
+
+quic transport (proto)
+======================
+
+.. _extension_envoy.transport_sockets.quic:
+
+This extension has the qualified name ``envoy.transport_sockets.quic``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.transport_sockets.downstream <extension_category_envoy.transport_sockets.downstream>`
+
+  - :ref:`envoy.transport_sockets.upstream <extension_category_envoy.transport_sockets.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport <envoy_v3_api_msg_extensions.transport_sockets.quic.v3.QuicDownstreamTransport>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport <envoy_v3_api_msg_extensions.transport_sockets.quic.v3.QuicUpstreamTransport>`
+
+
+
+The QUIC configurations below provide the transport socket configuration for downstream/upstream QUIC.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.quic.v3.QuicDownstreamTransport:
+
+extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+------------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.quic.v3.QuicDownstreamTransport proto] <api/envoy/extensions/transport_sockets/quic/v3/quic_transport.proto#L22>`
+
+Configuration for Downstream QUIC transport socket. This provides Google's implementation of Google QUIC and IETF QUIC to Envoy.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "downstream_tls_context": {...},
+    "enable_early_data": {...},
+    "enable_resumption": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.quic.v3.QuicDownstreamTransport.downstream_tls_context:
+
+
+downstream_tls_context
+  (:ref:`extensions.transport_sockets.tls.v3.DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`, *REQUIRED*) 
+
+.. _envoy_v3_api_field_extensions.transport_sockets.quic.v3.QuicDownstreamTransport.enable_early_data:
+
+
+enable_early_data
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If false, QUIC will tell TLS to reject any early data and to stop issuing 0-RTT credentials with resumption session tickets. This will prevent clients from sending 0-RTT requests.
+  Default to true.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.quic.v3.QuicDownstreamTransport.enable_resumption:
+
+
+enable_resumption
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If false, TLS session tickets are not issued and accepted by QUIC.
+  Default to true.
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.quic.v3.QuicUpstreamTransport:
+
+extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+----------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.quic.v3.QuicUpstreamTransport proto] <api/envoy/extensions/transport_sockets/quic/v3/quic_transport.proto#L36>`
+
+Configuration for Upstream QUIC transport socket. This provides Google's implementation of Google QUIC and IETF QUIC to Envoy.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "upstream_tls_context": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.quic.v3.QuicUpstreamTransport.upstream_tls_context:
+
+
+upstream_tls_context
+  (:ref:`extensions.transport_sockets.tls.v3.UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`, *REQUIRED*) 
+

@@ -1,0 +1,93 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/connection_limit/v3/connection_limit.proto:
+
+Connection limit (proto)
+========================
+
+.. _extension_envoy.filters.network.connection_limit:
+
+This extension has the qualified name ``envoy.filters.network.connection_limit``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.connection_limit.v3.ConnectionLimit <envoy_v3_api_msg_extensions.filters.network.connection_limit.v3.ConnectionLimit>`
+
+
+
+Connection limit :ref:`configuration overview <config_network_filters_connection_limit>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.connection_limit.v3.ConnectionLimit:
+
+extensions.filters.network.connection_limit.v3.ConnectionLimit
+--------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.connection_limit.v3.ConnectionLimit proto] <api/envoy/extensions/filters/network/connection_limit/v3/connection_limit.proto#L22>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "max_connections": {...},
+    "delay": {...},
+    "runtime_enabled": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.connection_limit.v3.ConnectionLimit.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The prefix to use when emitting :ref:`statistics
+  <config_network_filters_connection_limit_stats>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.connection_limit.v3.ConnectionLimit.max_connections:
+
+
+max_connections
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) The max connections configuration to use for new incoming connections that are processed
+  by the filter's filter chain. When max_connection is reached, the incoming connection
+  will be closed after delay duration.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.connection_limit.v3.ConnectionLimit.delay:
+
+
+delay
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The delay configuration to use for rejecting the connection after some specified time duration
+  instead of immediately rejecting the connection. That way, a malicious user is not able to
+  retry as fast as possible which provides a better DoS protection for Envoy. If this is not present,
+  the connection will be closed immediately.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.connection_limit.v3.ConnectionLimit.runtime_enabled:
+
+
+runtime_enabled
+  (:ref:`config.core.v3.RuntimeFeatureFlag <envoy_v3_api_msg_config.core.v3.RuntimeFeatureFlag>`) Runtime flag that controls whether the filter is enabled or not. If not specified, defaults
+  to enabled.
+
+

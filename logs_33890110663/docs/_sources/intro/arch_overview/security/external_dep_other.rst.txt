@@ -1,0 +1,32 @@
+External dependencies: ``other``
+================================
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `Java rules for Bazel <https://github.com/bazelbuild/rules_java/>`__, `9.3.0 <https://bcr.bazel.build/modules/rules_java/9.3.0/>`__, 2026-07-15, , `Apache-2.0 <https://github.com/bazelbuild/rules_java/blob/9.3.0/LICENSE>`__
+  `Shell script rules for Bazel <https://github.com/bazelbuild/rules_shell>`__, `0.8.0 <https://bcr.bazel.build/modules/rules_shell/0.8.0/>`__, 2026-04-15, , `Apache-2.0 <https://github.com/protocolbuffers/rules_shell/blob/0.8.0/LICENSE>`__
+  `su-exec <https://github.com/ncopa/su-exec>`__, `0.3 <https://bcr.bazel.build/modules/su-exec/0.3/>`__, 2025-10-07, , `MIT <https://github.com/ncopa/su-exec/blob/v0.3/LICENSE>`__
+  `tclap <http://tclap.sourceforge.net>`__, `1.2.5 <https://bcr.bazel.build/modules/tclap/1.2.5/>`__, 2021-11-01, `cpe:2.3:a:tclap_project:tclap:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Atclap_project%3Atclap%3A%2A&search_type=all>`__, `MIT <https://github.com/mirror/tclap/blob/v1.2.5/COPYING>`__
+
+
+envoy.bootstrap.vcl
+-------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `VPP Comms Library <https://fd.io/>`__, `26.02-dev-85abefb.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/vpp-vcl/26.02-dev-85abefb.envoy/>`__, 2026-01-11, , `Apache-2.0 <https://github.com/FDio/vpp/blob/26.02-dev-85abefb.envoy/LICENSE>`__
+
+
+envoy.filters.http.sxg
+----------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `libsxg <https://github.com/google/libsxg>`__, `0.0.0-210708-beaa393.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/libsxg/0.0.0-210708-beaa393.envoy/>`__, 2021-07-08, , `Apache-2.0 <https://github.com/google/libsxg/blob/0.0.0-210708-beaa393.envoy/LICENSE>`__
+

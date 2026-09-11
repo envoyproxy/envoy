@@ -1,0 +1,48 @@
+.. _envoy_v3_api_file_envoy/config/retry/previous_hosts/v2/previous_hosts.proto:
+
+Previous Hosts Predicate (proto)
+================================
+
+.. _extension_envoy.retry_host_predicates.previous_hosts:
+
+This extension has the qualified name ``envoy.retry_host_predicates.previous_hosts``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.retry_host_predicates <extension_category_envoy.retry_host_predicates>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.retry.host.previous_hosts.v3.PreviousHostsPredicate <envoy_v3_api_msg_extensions.retry.host.previous_hosts.v3.PreviousHostsPredicate>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.retry.previous_hosts.v2.PreviousHostsPredicate:
+
+config.retry.previous_hosts.v2.PreviousHostsPredicate
+-----------------------------------------------------
+
+
+:repo:`[config.retry.previous_hosts.v2.PreviousHostsPredicate proto] <api/envoy/config/retry/previous_hosts/v2/previous_hosts.proto#L18>`
+
+
+
+
+

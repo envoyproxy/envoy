@@ -1,0 +1,90 @@
+.. _envoy_v3_api_file_envoy/extensions/http/injected_credentials/generic/v3/generic.proto:
+
+Generic Credential (proto)
+==========================
+
+.. _extension_envoy.http.injected_credentials.generic:
+
+This extension has the qualified name ``envoy.http.injected_credentials.generic``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.http.injected_credentials <extension_category_envoy.http.injected_credentials>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic <envoy_v3_api_msg_extensions.http.injected_credentials.generic.v3.Generic>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.http.injected_credentials.generic.v3.Generic:
+
+extensions.http.injected_credentials.generic.v3.Generic
+-------------------------------------------------------
+
+
+:repo:`[extensions.http.injected_credentials.generic.v3.Generic proto] <api/envoy/extensions/http/injected_credentials/generic/v3/generic.proto#L23>`
+
+Generic extension can be used to inject HTTP Basic Auth, Bearer Token, or any arbitrary credential
+into the proxied requests.
+The credential will be injected into the specified HTTP request header.
+Refer to `RFC 6750: The OAuth 2.0 Authorization Framework: Bearer Token Usage <https://www.rfc-editor.org/rfc/rfc6750>`_ for details.
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "credential": {...},
+    "header": ...,
+    "header_value_prefix": ...
+  }
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.generic.v3.Generic.credential:
+
+
+credential
+  (:ref:`extensions.transport_sockets.tls.v3.SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>`, *REQUIRED*) The SDS configuration for the credential that will be injected to the specified HTTP request header.
+  It must be a generic secret.
+
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.generic.v3.Generic.header:
+
+
+header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The header that will be injected to the HTTP request with the provided credential.
+  If not set, filter will default to: ``Authorization``
+
+
+.. _envoy_v3_api_field_extensions.http.injected_credentials.generic.v3.Generic.header_value_prefix:
+
+
+header_value_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The prefix to prepend to the credential value before injecting it into the header.
+  This is useful for adding a scheme such as ``Bearer `` or ``Basic `` to the credential.
+  For example, if the credential is ``xyz123`` and the prefix is ``Bearer ``, the
+  final header value will be ``Bearer xyz123``.
+  If not set, the raw credential value will be injected without any prefix.
+
+
