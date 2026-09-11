@@ -951,6 +951,235 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
   EXPECT_EQ(2, stats_store_.counter("test.lua.executions").value());
 }
 
+// requestHeaders() returns the original request headers when called from
+// envoy_on_response.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponse) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local req_headers = response_handle:requestHeaders()
+      response_handle:logTrace(req_headers:get(":path"))
+      response_handle:logTrace(req_headers:get("x-custom"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/test"}, {"x-custom", "hello"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"trace", "/test"}, {"trace", "hello"}}), {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// requestHeaders() called twice returns the same cached wrapper without re-invoking the
+// underlying C++ requestHeaders() accessor. The Times(1) constraint is the load-bearing assertion:
+// if caching breaks, a second call to requestHeaders() triggers a gmock over-call failure.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseCached) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local h1 = response_handle:requestHeaders()
+      local h2 = response_handle:requestHeaders()
+      response_handle:logTrace(h1:get(":path"))
+      response_handle:logTrace(h2:get(":method"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/cached"}, {":method", "GET"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  // requestHeaders() must be called exactly once; the second Lua call hits the cached wrapper.
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .Times(1)
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"trace", "/cached"}, {"trace", "GET"}}), {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// requestHeaders() returns nil when no request headers are available.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseNil) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local req_headers = response_handle:requestHeaders()
+      if req_headers == nil then
+        response_handle:logTrace("no request headers")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{}));
+  EXPECT_LOG_CONTAINS("trace", "no request headers", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// The returned handle is writable. The request is already upstream by this point, so a write is
+// only visible to access logging, tracing and later encode-path filters -- but it must actually
+// reach the underlying map, which is what this asserts.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseMutable) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local req_headers = response_handle:requestHeaders()
+      req_headers:add("x-added", "added")
+      req_headers:replace("x-replaced", "new")
+      req_headers:remove("x-removed")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestRequestHeaderMapImpl downstream_headers{
+      {":path", "/"}, {"x-replaced", "old"}, {"x-removed", "gone"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{downstream_headers}));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  EXPECT_EQ("added", downstream_headers.get_("x-added"));
+  EXPECT_EQ("new", downstream_headers.get_("x-replaced"));
+  EXPECT_TRUE(downstream_headers.get(Http::LowerCaseString("x-removed")).empty());
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// The read methods all work on the returned handle, including the multi-value forms, which the
+// single get() in the tests above would not catch.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseReadMethods) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local req_headers = response_handle:requestHeaders()
+      response_handle:headers():add("x-got", req_headers:get("x-dup"))
+      response_handle:headers():add("x-at-index", req_headers:getAtIndex("x-dup", 1))
+      response_handle:headers():add("x-num", req_headers:getNumValues("x-dup"))
+      local seen = 0
+      for key, value in pairs(req_headers) do
+        seen = seen + 1
+      end
+      response_handle:headers():add("x-pairs", seen)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestRequestHeaderMapImpl downstream_headers{{":path", "/"}, {"x-dup", "a"}, {"x-dup", "b"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{downstream_headers}));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  EXPECT_EQ("a,b", response_headers.get_("x-got"));
+  EXPECT_EQ("b", response_headers.get_("x-at-index"));
+  EXPECT_EQ("2", response_headers.get_("x-num"));
+  EXPECT_EQ("3", response_headers.get_("x-pairs"));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// requestHeaders() is not in the request handle API at all -- headers() is already the request
+// headers there -- so Lua raises a nil-method error rather than a custom error message.
+TEST_F(LuaHttpFilterTest, RequestHeadersNotAvailableInRequestHandle) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local req_headers = request_handle:requestHeaders()
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/test"}};
+  EXPECT_LOG_CONTAINS("error", "attempt to call method 'requestHeaders' (a nil value)", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+// requestHeaders() called after a coroutine yield (body() suspends the script until the
+// full body arrives) still returns the correct wrapper. The cache is cleared by onMarkDead() on
+// yield, so requestHeaders() is called exactly once when the script resumes and accesses headers.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseAfterYield) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      response_handle:body()
+      local req_headers = response_handle:requestHeaders()
+      response_handle:logTrace(req_headers:get(":path"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/yield-path"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  // Script yields at body() — requestHeaders() has not been called yet.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
+
+  // Resume after body arrives; requestHeaders() is called once here (cache was cleared on yield).
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_LOG_CONTAINS("trace", "/yield-path", {
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// requestHeaders() works correctly when the response has a body (encodeHeaders does not
+// have end_stream=true). The script runs after headers and accesses request headers normally.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseWithBody) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local req_headers = response_handle:requestHeaders()
+      response_handle:logTrace(req_headers:get(":path"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/with-body"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
+  // end_stream=false: response has a body, but the script doesn't call body() so it completes
+  // during encodeHeaders and does not yield.
+  EXPECT_LOG_CONTAINS("trace", "/with-body", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
 // Response synchronous body.
 TEST_F(LuaHttpFilterTest, ResponseSynchronousBody) {
   const std::string SCRIPT{R"EOF(
@@ -2150,11 +2379,10 @@ TEST_F(LuaHttpFilterTest, RespondInResponsePath) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_LOG_CONTAINS("error",
-                      "[string \"...\"]:3: respond not currently supported in the response path", {
-                        EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-                                  filter_->encodeHeaders(response_headers, true));
-                      });
+  // respond() is not in the response handle API, so Lua raises a nil-method error.
+  EXPECT_LOG_CONTAINS("error", "attempt to call method 'respond' (a nil value)", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
