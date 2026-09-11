@@ -827,10 +827,33 @@ case $CI_TARGET in
     release.signed)
         echo "Signing binary packages..."
         setup_clang_toolchain
+        if [[ -z "${ENVOY_SIGNING_KEY_PATH}" || -z "${ENVOY_SIGNING_PASSPHRASE_PATH}" ]]; then
+            echo "FAIL: ENVOY_SIGNING_KEY_PATH and ENVOY_SIGNING_PASSPHRASE_PATH must be set" >&2
+            exit 1
+        fi
+        KEY_SHA256="$(sha256sum "${ENVOY_SIGNING_KEY_PATH}" | cut -d' ' -f1)"
+        PGP_ARGS=(
+            "--@envoy_toolshed//pgp:key_path=${ENVOY_SIGNING_KEY_PATH}#sha256=${KEY_SHA256}"
+            "--@envoy_toolshed//pgp:passphrase_path=${ENVOY_SIGNING_PASSPHRASE_PATH}"
+        )
         bazel build \
               "${BAZEL_BUILD_OPTIONS[@]}" \
+              "${PGP_ARGS[@]}" \
+              --remote_download_toplevel \
               //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
+        echo "Auditing signing actions..."
+        AUDIT_JSON="$(mktemp)"
+        bazel aquery \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              "${PGP_ARGS[@]}" \
+              --output=jsonproto --include_artifacts=true \
+              "deps(//distribution:signed)" \
+              > "${AUDIT_JSON}"
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_toolshed//pgp/audit:audit -- \
+              --forbid-file "${ENVOY_SIGNING_PASSPHRASE_PATH}" \
+              --aquery-json "${AUDIT_JSON}"
+        rm -f "${AUDIT_JSON}"
         ;;
 
     sizeopt)
