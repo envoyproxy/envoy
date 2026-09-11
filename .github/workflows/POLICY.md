@@ -57,3 +57,49 @@ In this case, it is **essential** to ensure:
 
 - no write permissions in the untrusted job
 - no secrets in the untrusted job
+
+## The `trusted` flag
+
+CI derives a `trusted` flag from the triggering event and actor when a request is created,
+and every downstream workflow re-reads it (via the `env` artifact, see below). Anything
+gated on `trusted` - secrets selection, publishing, cache writes - must handle it correctly:
+
+- Job outputs are **strings**: the string `"false"` is truthy in workflow expressions.
+  Never use `needs.<job>.outputs.trusted` bare - always normalize with `fromJSON()`,
+  guarding against the empty string where the value may be unset:
+
+  ```yaml
+  trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+  ```
+
+- Workflow inputs declared `type: boolean` (eg `inputs.trusted` in reusable workflows) are
+  real booleans and safe to use directly.
+
+## Artifact trust boundary
+
+**Any artifact produced by a job that ran untrusted code is attacker-controlled.**
+
+Artifacts are the only channel crossing from untrusted jobs into credentialed ones (the
+`env` artifact carrying `trusted` and the request data, built docs/binaries/images,
+metadata files). The integrity of that channel *is* the trust boundary of the CI system,
+and the consumer is responsible for policing it:
+
+- Consuming workflows triggered by `workflow_run` must gate every job that can see
+  secrets on:
+  - the triggering run's repository:
+    `github.event.workflow_run.repository.full_name == github.repository`
+  - an allow-list of triggering events (`github.event.workflow_run.event`), which must
+    never include events (eg `pull_request`) whose workflows can be defined in a fork
+
+  either directly in the job's own `if:`, or inherited by needing a gated job. Note that
+  `always()`/`!cancelled()` conditions void `needs`-inheritance - such jobs must carry the
+  guards themselves.
+- Data read from an artifact must never select *where* privileged operations write or
+  *what* they trust: destinations (buckets, registries, repos) must be derived from
+  workflow `vars`/context based on `trusted`, and any artifact-supplied parameters
+  (shas, paths, redirects) must be validated against a strict schema/allow-list before
+  use (see `_upload_gcs.yml` for the pattern).
+- Never look up runs/artifacts by attacker-influenceable keys (eg `head_sha`) - resolve
+  artifacts from the triggering `workflow_run.id` only.
+- Artifact-derived values must not be interpolated into `run:` scripts or `jq` filters
+  with `${{ }}` - pass them via `env:` (shell) or `--arg` (jq).

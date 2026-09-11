@@ -20,7 +20,6 @@
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/quic/core/quic_types.h"
-#include "quiche_platform_impl/quiche_mem_slice_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -185,10 +184,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 
   ENVOY_STREAM_LOG(debug, "Received headers: {}.", *this, header_list.DebugString());
   const bool headers_only = fin_received() && highest_received_byte_offset() == NumBytesConsumed();
-  const bool end_stream =
-      fin ||
-      (headers_only && Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_signal_"
-                                                      "headers_only_to_http1_backend"));
+  const bool end_stream = fin || headers_only;
   ENVOY_STREAM_LOG(debug, "Headers_only: {}, end_stream: {}.", *this, headers_only, end_stream);
   if (end_stream) {
     end_stream_decoded_ = true;
@@ -208,8 +204,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #ifndef ENVOY_ENABLE_UHV
   // These checks are now part of UHV
   if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
-      (filterManagerConnection()->shouldValidateUpstreamHeaders() &&
-       Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus()) ||
+      Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus() ||
       (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(std::nullopt);

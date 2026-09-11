@@ -1018,8 +1018,8 @@ envoy.filters.network.sni_cluster:
 envoy.filters.network.sni_dynamic_forward_proxy:
   categories:
   - envoy.filters.network
-  security_posture: unknown
-  status: alpha
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
   type_urls:
   - envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
 envoy.filters.network.tcp_bandwidth_limit:
@@ -2293,6 +2293,13 @@ envoy.load_balancing_policies.dynamic_modules:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig
+envoy.http.early_header_mutation.dynamic_modules:
+  categories:
+  - envoy.http.early_header_mutation
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.early_header_mutation.dynamic_modules.v3.DynamicModuleEarlyHeaderMutation
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
