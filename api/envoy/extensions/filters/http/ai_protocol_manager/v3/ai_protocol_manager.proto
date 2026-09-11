@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ai_protocol_manager.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/type/ai/v3/api_protocol.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -44,6 +45,11 @@ message AiProtocolManager {
   // Response-side AI protocol processing. When unset, the encode path is a
   // pure passthrough.
   ResponseHandling response_handling = 2;
+
+  // AI filters, in order. They run over a declared AI endpoint's parsed request payload
+  // before it continues down the HTTP filter chain, and require ``request_handling``.
+  // [#extension-category: envoy.filters.ai]
+  repeated config.core.v3.TypedExtensionConfig filters = 3;
 }
 
 // Request-side processing configuration. A route that carries a

@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package envoy.data.ai.v3;
+
+import "envoy/type/ai/v3/api_protocol.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.data.ai.v3";
+option java_outer_classname = "RequestInfoProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/data/ai/v3;aiv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: AI request info]
+
+// Request attributes published as typed dynamic metadata by the :ref:`request info AI
+// filter <envoy_v3_api_msg_extensions.filters.ai.request_info.v3.RequestInfo>`. Values are
+// client-declared and unverified. A value the client sent that Envoy cannot use, such as one
+// of the wrong type, out of range, or a string over 256 bytes, is ignored.
+// [#next-free-field: 7]
+message RequestInfo {
+  // The route's declared wire API. When unspecified, only ``model`` and ``stream`` are read.
+  type.ai.v3.ApiProtocol api_protocol = 1;
+
+  // The requested model.
+  string model = 2;
+
+  // Whether a streamed response was requested.
+  google.protobuf.BoolValue stream = 3;
+
+  // The requested output token cap.
+  google.protobuf.UInt64Value max_output_tokens = 4;
+
+  // Number of messages in the conversation.
+  google.protobuf.UInt32Value message_count = 5;
+
+  // Number of tools declared.
+  google.protobuf.UInt32Value tool_count = 6;
+}

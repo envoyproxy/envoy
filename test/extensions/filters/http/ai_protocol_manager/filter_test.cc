@@ -8,6 +8,7 @@
 #include "envoy/http/codes.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/coroutine/status_macros.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
@@ -93,6 +94,19 @@ public:
     }
     filter_ = std::make_unique<AiProtocolManagerFilter>(
         factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope()));
+    filter_->setDecoderFilterCallbacks(callbacks_);
+  }
+
+  // Parses unconfigured routes too, so a test can show the chain is not run there.
+  void createFilterWithAiFilters(AiFilterFactories ai_filter_factories) {
+    if (filter_ != nullptr) {
+      filter_->onDestroy();
+    }
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
+    proto.mutable_request_handling()->set_parse_unconfigured_routes(true);
+    filter_ = std::make_unique<AiProtocolManagerFilter>(
+        factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
+                                                       std::move(ai_filter_factories)));
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -1243,6 +1257,92 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
   EXPECT_EQ(counterValue("request_parsed"), 1);
   EXPECT_EQ(counterValue("request_parse_error"), 0);
   EXPECT_EQ(counterValue("request_schema_invalid"), 0);
+}
+
+// Rewrites `model` so a test can tell the chain ran ahead of replay.
+class ContextRecordingAiFilter : public AiFilter {
+public:
+  struct Seen {
+    ApiProtocol protocol;
+    std::string path;
+    const StreamInfo::StreamInfo* stream_info;
+  };
+
+  ContextRecordingAiFilter(const AiFilterContext& context, std::vector<Seen>& seen)
+      : context_(context), seen_(seen) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    seen_.push_back({context_.request_protocol,
+                     std::string(context_.request_headers.getPathValue()), &context_.stream_info});
+    request->json()["model"] = "rewritten";
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+
+private:
+  const AiFilterContext context_;
+  std::vector<Seen>& seen_;
+};
+
+TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverDeclaredPayload) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  int built = 0;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    ++built;
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(built, 1);
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].protocol, ApiProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen[0].path, "/chat/completions");
+  EXPECT_EQ(seen[0].stream_info, &callbacks_.stream_info_);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "rewritten");
+  EXPECT_TRUE(injected_end_stream_);
+}
+
+TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  int built = 0;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    ++built;
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(built, 0);
+  EXPECT_TRUE(seen.empty());
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "gpt-4");
+  EXPECT_TRUE(injected_end_stream_);
+}
+
+TEST_F(AiProtocolManagerFilterTest, NullAiFilterIsSkipped) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr { return nullptr; }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string payload = R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
+  EXPECT_TRUE(injected_end_stream_);
 }
 
 // Content-Length header is set to the recalculated length when the filter manager serializes the

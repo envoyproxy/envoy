@@ -2,11 +2,13 @@
 
 #include <memory>
 
+#include "envoy/common/exception.h"
 #include "envoy/data/ai/v3/token_usage.pb.h"
 #include "envoy/http/codes.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
@@ -131,7 +133,7 @@ envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degrade
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-    Stats::Scope& scope)
+    Stats::Scope& scope, AiFilterFactories&& ai_filter_factories)
     : stats_(AiProtocolManagerStats{
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
@@ -158,7 +160,33 @@ FilterConfig::FilterConfig(
                                           max_json_body_size, DefaultMaxJsonBodySize)),
       max_parsed_sse_events_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.response_handling().token_usage().limits(),
-                                          max_parsed_sse_events, DefaultMaxParsedSseEvents)) {}
+                                          max_parsed_sse_events, DefaultMaxParsedSseEvents)),
+      ai_filter_factories_(std::move(ai_filter_factories)) {}
+
+absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
+    const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
+    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
+  if (proto.filters_size() > 0 && !proto.has_request_handling()) {
+    return absl::InvalidArgumentError("ai_protocol_manager: filters require request_handling");
+  }
+  AiFilterFactories factories;
+  for (const auto& entry : proto.filters()) {
+    auto* factory =
+        Config::Utility::getAndCheckFactory<AiFilterConfigFactory>(entry, /*is_optional=*/true);
+    if (factory == nullptr) {
+      return absl::InvalidArgumentError(
+          fmt::format("ai_protocol_manager: unknown AI filter '{}' with type URL '{}'",
+                      entry.name(), Config::Utility::getFactoryType(entry.typed_config())));
+    }
+    const ProtobufTypes::MessagePtr config = factory->createEmptyConfigProto();
+    RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+        entry.typed_config(), context.messageValidationVisitor(), *config));
+    absl::StatusOr<AiFilterFactoryCb> cb = factory->createAiFilterFactory(*config, context, scope);
+    RETURN_IF_NOT_OK_REF(cb.status());
+    factories.push_back(std::move(cb.value()));
+  }
+  return std::make_shared<const FilterConfig>(proto, scope, std::move(factories));
+}
 
 void AiProtocolManagerFilter::onDestroy() {
   if (filter_manager_ != nullptr) {
@@ -402,7 +430,15 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
 
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
-    std::vector<AiFilterPtr> filters;
+    const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
+                                  route_request_protocol_};
+    std::vector<AiFilterSharedPtr> filters;
+    filters.reserve(config_->aiFilterFactories().size());
+    for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
+      if (AiFilterSharedPtr filter = factory(context); filter != nullptr) {
+        filters.push_back(std::move(filter));
+      }
+    }
     // TODO(penguingao): Avoid always passing downstream StreamInfo when constructing
     // FilterManager; when AI Protocol Manager is placed in an upstream filter chain, it should
     // behave differently.
