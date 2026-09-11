@@ -78,7 +78,7 @@ size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view n
     // and make it return a StatusOr instead, so that the exception handling can be removed here.
     TRY_ASSERT_MAIN_THREAD {
       provider = server_context_.secretManager().findOrCreateGenericSecretProvider(
-          sds_config, std::string(name), server_context_, init_manager_);
+          sds_config, std::string(name), server_context_, init_manager_, true);
     }
     END_TRY
     CATCH(const EnvoyException& e, {

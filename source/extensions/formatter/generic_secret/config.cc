@@ -127,7 +127,8 @@ Envoy::Formatter::CommandParserPtr GenericSecretFormatterFactory::createCommandP
     Secret::GenericSecretConfigProviderSharedPtr provider;
     if (secret_config.has_sds_config()) {
       provider = server_context.secretManager().findOrCreateGenericSecretProvider(
-          secret_config.sds_config(), secret_config.name(), server_context, context.initManager());
+          secret_config.sds_config(), secret_config.name(), server_context, context.initManager(),
+          true);
     } else {
       provider =
           server_context.secretManager().findStaticGenericSecretProvider(secret_config.name());
