@@ -162,6 +162,7 @@ envoy_cc_test(
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_config_lib",
         "//source/common/tls:server_context_lib",
+        "//test/common/tls/ocsp/test_data:ocsp_resp_infos",
         "//test/common/tls/test_data:cert_infos",
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
@@ -228,6 +229,26 @@ envoy_cc_test(
         ":ssl_test_utils",
         "//source/common/tls:ssl_socket_lib",
         "//test/mocks/network:io_handle_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "generated_fixtures_test",
+    srcs = [
+        "generated_fixtures_test.cc",
+    ],
+    data = [
+        "//test/common/tls/ocsp/test_data:certs",
+        "//test/common/tls/test_data:certs",
+        "//test/config/integration/certs",
+    ],
+    external_deps = ["ssl"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        ":ssl_test_utils",
+        "//source/common/tls/ocsp:ocsp_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 

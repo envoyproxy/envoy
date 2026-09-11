@@ -98,7 +98,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -386,6 +386,13 @@ message ExternalProcessor {
   //    request smuggling. Thus, please use your own discretion when enabling this feature.
   //
   bool allow_content_length_header = 26;
+
+  // Whether to emit client-side spans for external processing requests.
+  // When set to false, client-side egress spans will not be emitted/exported to trace collectors,
+  // but trace context (e.g. ``traceparent``) will still be propagated to the external processor.
+  //
+  // If unset, defaults to ``true``.
+  google.protobuf.BoolValue emit_client_span = 27;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.
@@ -467,7 +474,7 @@ message ExtProcPerRoute {
 }
 
 // Overrides that may be set on a per-route basis
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message ExtProcOverrides {
   // Set a different processing mode for this route than the default.
   ProcessingMode processing_mode = 1;
@@ -514,4 +521,7 @@ message ExtProcOverrides {
   // :ref:`processing_request_modifier <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_request_modifier>`.
   config.core.v3.TypedExtensionConfig processing_request_modifier = 9
       [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Overrides the filter-level ``emit_client_span`` setting for this route.
+  google.protobuf.BoolValue emit_client_span = 10;
 }

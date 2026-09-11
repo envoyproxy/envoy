@@ -748,11 +748,6 @@ protected:
   // Latched value of the `http2_include_cookies_in_limits` runtime feature, read once per
   // connection instead of on every header field in saveHeader().
   const bool http2_include_cookies_in_limits_ = false;
-#ifndef ENVOY_ENABLE_UHV
-  // Latched value of the `validate_upstream_headers` runtime feature, consulted per encoded
-  // request instead of performing a runtime lookup there.
-  const bool validate_upstream_headers_ = false;
-#endif
 
   // Status for any errors encountered by the nghttp2 callbacks.
   // nghttp2 library uses single return code to indicate callback failure and

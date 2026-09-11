@@ -13,6 +13,7 @@ pub mod cert_validator;
 pub mod cluster;
 pub mod cluster_specifier;
 pub mod dns_resolver;
+pub mod early_header_mutation;
 // Implementation detail. Public so SDK-provided macros (for example, `declare_matcher!`) that
 // expand in user crates can reach the safe helpers; users should not depend on this module
 // directly.
@@ -389,6 +390,10 @@ macro_rules! envoy_log {
         if enabled {
           let message = format!($($arg)*);
           let message_bytes = message.as_bytes();
+          // file! and line! expand to the call site of the outer envoy_log_* macro so the host
+          // reports the module location instead of a location inside Envoy.
+          let source_file = file!();
+          let source_file_bytes = source_file.as_bytes();
           unsafe {
             $crate::abi::envoy_dynamic_module_callback_log(
               level,
@@ -396,6 +401,11 @@ macro_rules! envoy_log {
                 ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
                 length: message_bytes.len(),
               },
+              $crate::abi::envoy_dynamic_module_type_module_buffer {
+                ptr: source_file_bytes.as_ptr() as *const ::std::os::raw::c_char,
+                length: source_file_bytes.len(),
+              },
+              line!(),
             );
           }
         }
@@ -685,6 +695,9 @@ macro_rules! declare_network_filter_init_functions {
 /// - `formatter:` — [`NewFormatterConfigFunction`] for formatters
 /// - `cluster_specifier:` — [`NewClusterSpecifierConfigFunction`] for cluster specifiers
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
+/// - `health_checker:` — [`NewHealthCheckerConfigFunction`] for health checkers
+/// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header
+///   mutations
 ///
 /// # Examples
 ///
@@ -916,6 +929,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HEALTH_CHECKER_CONFIG_FUNCTION,
       $fn,
       "NEW_HEALTH_CHECKER_CONFIG_FUNCTION"
+    );
+  };
+  (@register early_header_mutation : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION,
+      $fn,
+      "NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION"
     );
   };
 }
@@ -1439,6 +1459,29 @@ pub type NewHealthCheckerConfigFunction =
 /// `health_checker:` arm of [`declare_all_init_functions!`] and is not intended to be set directly.
 pub static NEW_HEALTH_CHECKER_CONFIG_FUNCTION: OnceLock<NewHealthCheckerConfigFunction> =
   OnceLock::new();
+
+// =================================================================================================
+// Early Header Mutation Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new early header mutation configuration.
+///
+/// The `name` is the value of `early_header_mutation_name` from the `dynamic_modules` early header
+/// mutation configuration, allowing a single module to dispatch to different implementations. The
+/// `config` is the raw configuration bytes. Returning `None` causes Envoy to reject the early
+/// header mutation configuration.
+pub type NewEarlyHeaderMutationConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+  ) -> Option<Box<dyn early_header_mutation::EarlyHeaderMutationConfig>>;
+
+/// The global factory function for early header mutation configurations. This is set via the
+/// `early_header_mutation:` arm of [`declare_all_init_functions!`] and is not intended to be set
+/// directly.
+pub static NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION: OnceLock<
+  NewEarlyHeaderMutationConfigFunction,
+> = OnceLock::new();
 
 // =================================================================================================
 // Cluster Dynamic Module

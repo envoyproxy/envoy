@@ -21,7 +21,7 @@ bazel_dep(name = "boringssl", version = "0.20260413.0")
 bazel_dep(name = "boringssl-fips", version = "0.20260413.0.envoy")
 bazel_dep(name = "boringssl-source", version = "0.20260413.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy")
-bazel_dep(name = "brotli", version = "1.2.0")
+bazel_dep(name = "brotli", version = "1.2.0.bcr.1")
 bazel_dep(name = "buildifier_prebuilt", version = "8.2.1.1", repo_name = "buildifier")
 bazel_dep(name = "c-ares", version = "1.34.6")
 bazel_dep(name = "cel-cpp", version = "0.14.0.envoy")
@@ -31,7 +31,7 @@ bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "emsdk", version = "4.0.23.envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.4.14.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.4.15.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19.envoy")
 bazel_dep(name = "fmt", version = "12.1.0")
 bazel_dep(name = "gazelle", version = "0.47.0")
@@ -99,7 +99,9 @@ bazel_dep(name = "rules_proto_grpc_cpp", version = "5.8.0")
 bazel_dep(name = "rules_python", version = "2.2.0")
 bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
 bazel_dep(name = "rules_shell", version = "0.8.0")
+bazel_dep(name = "rules_swift", version = "2.5.0.envoy")
 bazel_dep(name = "spdlog", version = "1.16.0")
+bazel_dep(name = "sq", version = "1.4.0.envoy")
 bazel_dep(name = "sql-parser", version = "0.0.0-260715-52e5ad1.envoy")
 bazel_dep(name = "su-exec", version = "0.3")
 bazel_dep(name = "tclap", version = "1.2.5")
@@ -118,7 +120,7 @@ bazel_dep(name = "yaml-cpp", version = "0.8.0")
 bazel_dep(name = "yq.bzl", version = "0.1.1.envoy")
 bazel_dep(name = "zipkin-api", version = "1.0.0.envoy")
 bazel_dep(name = "zlib-ng", version = "2.3.2.envoy")
-bazel_dep(name = "zstd", version = "1.5.7")
+bazel_dep(name = "zstd", version = "1.5.7.bcr.1")
 
 ####################################################################################
 # deps: Dev
@@ -165,8 +167,8 @@ single_version_override(
 
 # git_override(
 #     module_name = "envoy_toolshed",
-#     commit = "9e1dcf88ddb6523306b8fadd3d2c50c96a474426",
-#     remote = "https://github.com/phlax/toolshed",
+#     commit = "0f2dbc8122e776c57901bcd835e9f2526c03cf4d",
+#     remote = "https://github.com/envoyproxy/toolshed",
 #     strip_prefix = "bazel",
 # )
 
@@ -270,7 +272,7 @@ compat = use_extension("@rules_cc//cc:extensions.bzl", "compatibility_proxy")
 use_repo(compat, "cc_compatibility_proxy")
 
 ####################################################################################
-# setup: Languages
+# setup: Languages/toolchains
 ####################################################################################
 
 # Jq/Yq
@@ -410,6 +412,8 @@ buf.toolchains(
     version = "v1.61.0",
 )
 use_repo(buf, "rules_buf_toolchains")
+
+register_toolchains("@envoy_toolshed//pgp:sq_toolchain")
 
 ####################################################################################
 # repo: Extensions
