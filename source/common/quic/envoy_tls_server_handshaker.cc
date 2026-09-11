@@ -17,22 +17,20 @@ EnvoyTlsServerHandshaker::EnvoyTlsServerHandshaker(
     : TlsServerHandshaker(session, crypto_config), pinned_ssl_ctx_(std::move(pinned_ssl_ctx)) {
   SSL_set_ex_data(ssl(), handshakerExDataIndex(), this);
   bool refuse_resumption = disable_resumption;
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_reject_cross_config_session_resumption")) {
+  auto* context = pinnedServerContext();
+  const absl::Span<const uint8_t> session_context_id =
+      context != nullptr ? context->sessionContextId() : absl::Span<const uint8_t>();
+  if (session_context_id.empty()) {
+    // Without a session context id resumption cannot be scoped, so refuse it and force a full
+    // handshake that re-validates the client certificate.
+    refuse_resumption = true;
+  } else {
     // Bind resumption to the matched configuration so a resumed session cannot reuse the client
     // certificate verdict from a different configuration. This mirrors the TCP TLS session id
     // context, set per connection because QUIC shares one `SSL_CTX` per listener.
-    auto* context = pinnedServerContext();
-    const absl::Span<const uint8_t> session_context_id =
-        context != nullptr ? context->sessionContextId() : absl::Span<const uint8_t>();
-    if (!session_context_id.empty()) {
-      const int rc =
-          SSL_set_session_id_context(ssl(), session_context_id.data(), session_context_id.size());
-      RELEASE_ASSERT(rc == 1, "Failed to set the QUIC session id context.");
-    }
-    // When the configuration hash is unavailable the session cannot be scoped, so refuse resumption
-    // and force a full handshake that re-validates the client certificate.
-    refuse_resumption = refuse_resumption || session_context_id.empty();
+    const int rc =
+        SSL_set_session_id_context(ssl(), session_context_id.data(), session_context_id.size());
+    RELEASE_ASSERT(rc == 1, "Failed to set the QUIC session id context.");
   }
   if (refuse_resumption) {
     DisableResumption();

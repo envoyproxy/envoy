@@ -76,8 +76,8 @@ public:
                            HMAC_CTX* hmac_ctx, int encrypt);
   bool hasSessionTicketKeys() const { return !session_ticket_keys_.empty(); }
 
-  // The session context id that scopes session resumption to this configuration, or empty when no
-  // certificate is configured.
+  // The session context id that scopes session resumption to this configuration, or empty when it
+  // is not computed, for example when certificates are supplied dynamically by a selector.
   absl::Span<const uint8_t> sessionContextId() const {
     return session_context_id_.has_value() ? absl::MakeConstSpan(*session_context_id_)
                                            : absl::Span<const uint8_t>();

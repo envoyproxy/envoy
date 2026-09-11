@@ -130,7 +130,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_enable_reset_ssl_after_handsh
 RUNTIME_GUARD(envoy_reloadable_features_quic_fix_defer_logging_miss_for_half_closed_stream);
 RUNTIME_GUARD(envoy_reloadable_features_quic_mtls_resumption_disabled_by_default);
 RUNTIME_GUARD(envoy_reloadable_features_quic_mtls_server_enabled);
-RUNTIME_GUARD(envoy_reloadable_features_quic_reject_cross_config_session_resumption);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
