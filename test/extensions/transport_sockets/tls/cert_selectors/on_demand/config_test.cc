@@ -97,6 +97,24 @@ TEST_F(OnDemandTest, QuicCall) {
   EXPECT_DEATH(selector->findTlsContext("", curve, false, &sni), "Not supported with QUIC");
 }
 
+TEST_F(OnDemandTest, UnboundedCacheGrowthDemonstration) {
+  // Demonstrate ENVOY-TLS-ONDEMAND-CACHE-UNBOUNDED-001: 
+  // Cache grows linearly with unique SNIs and is never bound.
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  auto context_factory = [](Stats::Scope&, Server::Configuration::ServerFactoryContext&, const Ssl::TlsCertificateConfig&, absl::Status&) -> AsyncContextConstSharedPtr { return nullptr; };
+  SecretManager manager(config, factory_context_, std::move(context_factory));
+
+  for (int i = 0; i < 500; ++i) {
+    manager.addCertificateConfig(absl::StrCat("secret_", i), nullptr, factory_context_.initManager());
+  }
+
+  // Verify that cert_active gauge (which tracks map size) is exactly 500, showing no eviction.
+  auto gauge = factory_context_.scope().findGauge(
+      Stats::StatNameManagedStorage("on_demand_secret.cert_active", factory_context_.scope().symbolTable()).statName());
+  ASSERT_TRUE(gauge.has_value());
+  EXPECT_EQ(500, gauge->get().value());
+}
+
 TEST(FilterStateMapper, Derivation) {
   NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
   Ssl::UpstreamTlsCertificateMapperConfigFactory& mapper_factory =
