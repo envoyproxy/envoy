@@ -1456,6 +1456,162 @@ TEST_F(McpFilterTest, ChunkByChunkParsingWithOptionalFields) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer2, true));
 }
 
+// Early termination stops buffering once routing attributes are collected; a
+// large trailing payload in a later chunk is neither parsed nor buffered.
+TEST_F(McpFilterTest, EarlyTerminationStopsBufferingWhenRoutable) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_early_terminate_when_routable(true);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+  filter_->decodeHeaders(headers, false);
+
+  // First chunk carries method + params.name but leaves the root object open.
+  std::string chunk1 =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "mytool", )";
+  Buffer::OwnedImpl buffer1(chunk1);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            Contains(Pair(
+                "params",
+                Property(&Protobuf::Value::struct_value,
+                         Property(&Protobuf::Struct::fields,
+                                  Contains(Pair("name", Property(&Protobuf::Value::string_value,
+                                                                 "mytool"))))))));
+      });
+
+  // Routing attributes are available, so the filter continues without buffering
+  // the remainder of the body.
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer1, false));
+
+  // A large trailing payload arriving later is passed through untouched: parsing
+  // is already complete, so it is neither parsed nor buffered.
+  std::string chunk2 = R"("arguments": {"blob": ")" + std::string(100000, 'x') + R"("}}})";
+  Buffer::OwnedImpl buffer2(chunk2);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer2, true));
+}
+
+// Early termination is skipped when trace context propagation is configured.
+TEST_F(McpFilterTest, EarlyTerminationSkippedWhenTracePropagationConfigured) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_early_terminate_when_routable(true);
+  proto_config.mutable_propagate_trace_context();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+  filter_->decodeHeaders(headers, false);
+
+  std::string chunk1 =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "mytool", )";
+  Buffer::OwnedImpl buffer1(chunk1);
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
+}
+
+// Early termination is skipped when baggage propagation is configured.
+TEST_F(McpFilterTest, EarlyTerminationSkippedWhenBaggagePropagationConfigured) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_early_terminate_when_routable(true);
+  proto_config.mutable_propagate_baggage();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+  filter_->decodeHeaders(headers, false);
+
+  std::string chunk1 =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "mytool", )";
+  Buffer::OwnedImpl buffer1(chunk1);
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
+}
+
+// Early termination is skipped when duplicate-key rejection is enabled.
+TEST_F(McpFilterTest, EarlyTerminationSkippedWhenRejectDuplicateKeys) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_early_terminate_when_routable(true);
+  proto_config.mutable_reject_duplicate_keys()->set_value(true);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+  filter_->decodeHeaders(headers, false);
+
+  std::string chunk1 =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "mytool", )";
+  Buffer::OwnedImpl buffer1(chunk1);
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
+}
+
+// Early termination is skipped in REJECT_NO_MCP mode, which must validate the
+// complete root JSON object.
+TEST_F(McpFilterTest, EarlyTerminationSkippedInRejectMode) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.set_early_terminate_when_routable(true);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+  filter_->decodeHeaders(headers, false);
+
+  std::string chunk1 =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "mytool", )";
+  Buffer::OwnedImpl buffer1(chunk1);
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
+}
+
+// Early termination is skipped when attribute_source is not BODY.
+TEST_F(McpFilterTest, EarlyTerminationSkippedWhenAttributeSourceNotBody) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_early_terminate_when_routable(true);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+  filter_->decodeHeaders(headers, false);
+
+  std::string chunk1 =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "mytool", )";
+  Buffer::OwnedImpl buffer1(chunk1);
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
+}
+
 // Test request body with limit disabled (0 = no limit) allows large bodies
 TEST_F(McpFilterTest, RequestBodyWithDisabledLimitAllowsLargeBodies) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;

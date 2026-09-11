@@ -72,6 +72,7 @@ public:
   envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attributeSource() const {
     return attribute_source_;
   }
+  bool earlyTerminateWhenRoutable() const { return early_terminate_when_routable_; }
   const ParserConfig& parserConfig() const { return parser_config_; }
   bool shouldStoreToDynamicMetadata() const {
     return request_storage_mode_ ==
@@ -100,6 +101,7 @@ private:
   const uint32_t max_request_body_size_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attribute_source_;
+  const bool early_terminate_when_routable_;
   const std::string metadata_namespace_;
   ParserConfig parser_config_;
   McpFilterStats stats_;
@@ -177,6 +179,9 @@ private:
   bool shouldStoreToDynamicMetadata() const;
   bool shouldStoreToFilterState() const;
   bool rejectDuplicateKeys() const;
+  // Whether buffering may stop once routing attributes are collected (see .cc
+  // for gating). Non-const because it resolves the latched traffic mode.
+  bool canEarlyTerminate();
   const McpOverrideConfig* routeOverride() const;
 
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);

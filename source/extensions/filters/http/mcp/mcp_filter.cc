@@ -133,6 +133,7 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
                                  : 8192), // Default: 8KB
       request_storage_mode_(proto_config.request_storage_mode()),
       attribute_source_(proto_config.attribute_source()),
+      early_terminate_when_routable_(proto_config.early_terminate_when_routable()),
       metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
@@ -303,6 +304,18 @@ bool McpFilter::rejectDuplicateKeys() const {
   return config_->rejectDuplicateKeys();
 }
 
+bool McpFilter::canEarlyTerminate() {
+  // Stop buffering once the routing attributes (method + name/uri) are collected.
+  // Disabled for REJECT_NO_MCP mode, reject_duplicate_keys, trace/baggage
+  // propagation, and non-BODY attribute_source, which all need the rest of the
+  // body. Single-chunk bodies still take isParsingComplete() (last-key-wins);
+  // malformed content in the unparsed tail is not validated at this hop.
+  return config_->earlyTerminateWhenRoutable() && !shouldRejectRequest() &&
+         config_->attributeSource() == envoy::extensions::filters::http::mcp::v3::Mcp::BODY &&
+         !rejectDuplicateKeys() && !config_->propagateTraceContext().has_value() &&
+         !config_->propagateBaggage().has_value();
+}
+
 bool McpFilter::needsBody() const {
   if (config_->attributeSource() != envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS) {
     return true;
@@ -432,6 +445,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
 
   const uint32_t max_size = getMaxRequestBodySize();
   uint32_t bytes_parsed_in_this_call = 0;
+  const bool early_terminate = canEarlyTerminate();
 
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     const char* start = static_cast<const char*>(slice.mem_);
@@ -454,6 +468,18 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
 
       if (parser_->isParsingComplete()) {
         ENVOY_LOG(debug, "mcp parse complete: found all fields");
+        return completeParsing();
+      }
+
+      // Stop buffering once routing attributes are collected, even if the root
+      // object is still open, to avoid buffering a large trailing payload.
+      if (early_terminate && parser_->hasAllRequiredFields()) {
+        ENVOY_LOG(debug, "mcp early termination: routing attributes collected at {} bytes",
+                  bytes_parsed_);
+        // Finalize extraction into metadata; the still-open root object's
+        // partial-parse error is expected and intentionally ignored.
+        const absl::Status finalize_status = parser_->finishParse();
+        ENVOY_LOG(trace, "mcp early termination finalize status: {}", finalize_status.message());
         return completeParsing();
       }
     }
