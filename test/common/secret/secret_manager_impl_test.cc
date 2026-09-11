@@ -428,7 +428,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
       }));
 
   auto secret_provider = secret_manager->findOrCreateGenericSecretProvider(
-      config_source, "encryption_key", secret_context.server_context_, init_manager);
+      config_source, "encryption_key", secret_context.server_context_, init_manager, true);
 
   const std::string yaml = R"EOF(
 name: "encryption_key"
@@ -645,7 +645,7 @@ dynamic_active_secrets:
   // Add a dynamic generic secret provider.
   time_system_.setSystemTime(std::chrono::milliseconds(1234567900000));
   auto generic_secret_provider = secret_manager->findOrCreateGenericSecretProvider(
-      config_source, "signing_key", secret_context.server_context_, init_manager);
+      config_source, "signing_key", secret_context.server_context_, init_manager, true);
 
   const std::string generic_secret_yaml = R"EOF(
 name: "signing_key"
@@ -826,7 +826,7 @@ dynamic_warming_secrets:
 
   time_system_.setSystemTime(std::chrono::milliseconds(1234567900000));
   auto generic_secret_provider = secret_manager->findOrCreateGenericSecretProvider(
-      config_source, "signing_key", secret_context.server_context_, init_manager);
+      config_source, "signing_key", secret_context.server_context_, init_manager, true);
   init_target_handle->initialize(init_watcher);
   const std::string config_dump_with_generic_secret = R"EOF(
 dynamic_warming_secrets:

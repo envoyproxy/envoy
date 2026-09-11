@@ -56,7 +56,8 @@ public:
                Server::Configuration::ServerFactoryContext&, Init::Manager& init_manager));
   MOCK_METHOD(GenericSecretConfigProviderSharedPtr, findOrCreateGenericSecretProvider,
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
-               Server::Configuration::ServerFactoryContext&, OptRef<Init::Manager> init_manager));
+               Server::Configuration::ServerFactoryContext&, OptRef<Init::Manager> init_manager,
+               bool warm));
 };
 
 class MockSecretCallbacks : public SecretCallbacks {
