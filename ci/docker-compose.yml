@@ -63,6 +63,8 @@ x-envoy-build-base: &envoy-build-base
   - DOCKERHUB_PASSWORD
   - ENVOY_DOCKER_SAVE_IMAGE
   - ENVOY_PUBLISH_DRY_RUN
+  - ENVOY_SIGNING_KEY_PATH
+  - ENVOY_SIGNING_PASSPHRASE_PATH
   - ENVOY_TARBALL_DIR
   - GCS_ARTIFACT_BUCKET
   - GCS_REDIRECT_PATH
@@ -97,14 +99,6 @@ services:
     volumes:
     - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build
     - ${SOURCE_DIR:-..}:/source
-    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}
-
-  envoy-build-gpg:
-    <<: *envoy-build-base
-    volumes:
-    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build
-    - ${SOURCE_DIR:-..}:/source
-    - ${ENVOY_GPG_DIR-${HOME}/.gnupg}:/build/.gnupg
     - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}
 
   envoy-build-dind:
