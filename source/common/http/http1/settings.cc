@@ -11,8 +11,8 @@ namespace Http {
 namespace Http1 {
 
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
-                                 Server::Configuration::CommonFactoryContext& context,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor) {
+                                 Server::Configuration::GenericFactoryContext& context,
+                                 absl::Status& creation_status) {
   Http1Settings ret;
   ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, true);
   ret.accept_http_10_ = config.accept_http_10();
@@ -25,7 +25,8 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
     std::vector<Matchers::StringMatcherPtr> matchers;
     matchers.reserve(config.ignore_http_11_upgrade_size());
     for (const auto& matcher : config.ignore_http_11_upgrade()) {
-      matchers.emplace_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
+      matchers.emplace_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(
+          matcher, context.serverFactoryContext()));
     }
     ret.ignore_upgrade_matchers_ =
         std::make_shared<const std::vector<Matchers::StringMatcherPtr>>(std::move(matchers));
@@ -38,10 +39,18 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
         Config::Utility::getAndCheckFactory<Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig>(
             config.header_key_format().stateful_formatter());
     auto header_formatter_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
-        config.header_key_format().stateful_formatter().typed_config(), validation_visitor,
-        factory);
+        config.header_key_format().stateful_formatter().typed_config(),
+        context.messageValidationVisitor(), factory);
+    auto formatter_factory_or_error =
+        factory.createFactoryFromProto(*header_formatter_config, context);
+    if (!formatter_factory_or_error.ok()) {
+      // Return default settings rather than the half-populated ones, so a caller that stores the
+      // result before checking the status cannot end up using a partially configured protocol.
+      creation_status = formatter_factory_or_error.status();
+      return {};
+    }
     ret.header_key_format_ = Http1Settings::HeaderKeyFormat::StatefulFormatter;
-    ret.stateful_header_key_formatter_ = factory.createFromProto(*header_formatter_config);
+    ret.stateful_header_key_formatter_ = std::move(formatter_factory_or_error.value());
   }
 
   ret.allow_custom_methods_ = config.allow_custom_methods();
@@ -50,11 +59,13 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
 }
 
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
-                                 Server::Configuration::CommonFactoryContext& context,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 const Protobuf::BoolValue& hcm_stream_error,
-                                 bool validate_scheme) {
-  Http1Settings ret = parseHttp1Settings(config, context, validation_visitor);
+                                 Server::Configuration::GenericFactoryContext& context,
+                                 const Protobuf::BoolValue& hcm_stream_error, bool validate_scheme,
+                                 absl::Status& creation_status) {
+  Http1Settings ret = parseHttp1Settings(config, context, creation_status);
+  if (!creation_status.ok()) {
+    return {};
+  }
   ret.validate_scheme_ = validate_scheme;
 
   if (config.has_override_stream_error_on_invalid_http_message()) {
