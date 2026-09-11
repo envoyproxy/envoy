@@ -33,14 +33,16 @@ TEST(MultiHealthCheckerFactoryTest, CreateFromValidConfig) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.health_checkers.multi.v3.Multi
         health_checks:
-        - health_check:
+        - name: first
+          health_check:
             timeout: 1s
             interval: 1s
             unhealthy_threshold: 2
             healthy_threshold: 2
             http_health_check:
               path: /healthcheck
-        - health_check:
+        - name: second
+          health_check:
             timeout: 1s
             interval: 1s
             unhealthy_threshold: 2
@@ -82,13 +84,15 @@ public:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.health_checkers.multi.v3.Multi
         health_checks:
-        - health_check:
+        - name: first
+          health_check:
             timeout: 1s
             interval: 1s
             unhealthy_threshold: 1
             healthy_threshold: 1
             tcp_health_check: {}
-        - health_check:
+        - name: second
+          health_check:
             timeout: 1s
             interval: 1s
             unhealthy_threshold: 1
@@ -433,6 +437,12 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   FakeHealthCheckerFactory fake_factory_;
   Registry::InjectFactory<Server::Configuration::CustomHealthCheckerFactory> inject_factory_;
+
+  uint64_t gaugeValue(const std::string& name) {
+    auto gauge = cluster_->info_->stats_store_.findGaugeByString(name);
+    ASSERT(gauge.has_value());
+    return gauge->get().value();
+  }
   std::shared_ptr<MultiHealthChecker> health_checker_;
 };
 
@@ -450,16 +460,23 @@ TEST_F(MultiHealthCheckerDegradedTest, OneDegradedSetsAggregate) {
   checker_b->reportResult(host, false, false);
   EXPECT_FALSE(host->healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
   EXPECT_FALSE(host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+  EXPECT_EQ(0, gaugeValue("health_check.degraded"));
 
+  // Degraded but not failed: both healthy and degraded (matching base HC semantics).
   checker_a->reportResult(host, false, true);
   EXPECT_TRUE(host->healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
   EXPECT_FALSE(host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+  EXPECT_EQ(1, gaugeValue("health_check.degraded"));
 
   checker_b->reportResult(host, false, false);
   EXPECT_TRUE(host->healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
 
   checker_a->reportResult(host, false, false);
   EXPECT_FALSE(host->healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+  EXPECT_EQ(0, gaugeValue("health_check.degraded"));
 }
 
 TEST_F(MultiHealthCheckerDegradedTest, BothDegradedClearOneStillDegraded) {
@@ -491,18 +508,27 @@ TEST_F(MultiHealthCheckerDegradedTest, FailedAndDegradedCoexist) {
   auto* checker_a = fake_factory_.instances_[0];
   auto* checker_b = fake_factory_.instances_[1];
 
+  // Failed and degraded: not healthy, but still degraded.
   checker_a->reportResult(host, true, false);
   checker_b->reportResult(host, false, true);
   EXPECT_TRUE(host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_TRUE(host->healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
+  EXPECT_EQ(0, gaugeValue("health_check.healthy"));
+  EXPECT_EQ(1, gaugeValue("health_check.degraded"));
 
+  // Clear failure: now healthy and degraded (overlap).
   checker_a->reportResult(host, false, false);
   EXPECT_FALSE(host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_TRUE(host->healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+  EXPECT_EQ(1, gaugeValue("health_check.degraded"));
 
+  // Clear degraded: only healthy.
   checker_b->reportResult(host, false, false);
   EXPECT_FALSE(host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_FALSE(host->healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+  EXPECT_EQ(0, gaugeValue("health_check.degraded"));
 }
 
 // When the host starts with PENDING and only one sub-checker clears it,
@@ -570,6 +596,61 @@ TEST_F(MultiHealthCheckerDegradedTest, CheckerReportsWithPendingSet) {
   checker_b->reportResult(host, false, false);
   EXPECT_EQ(1, callback_count);
   EXPECT_FALSE(host->healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC));
+}
+
+// Pending-but-not-failed hosts count as healthy in the gauge (matching `HealthCheckerImplBase`
+// semantics).
+TEST_F(MultiHealthCheckerDegradedTest, PendingHostCountsAsHealthyInGauge) {
+  setup();
+  auto host = Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  host->healthFlagSet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {host};
+  health_checker_->start();
+
+  // Host starts pending but not failed, so it counts as healthy.
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+  EXPECT_EQ(0, gaugeValue("health_check.degraded"));
+
+  auto* checker_a = fake_factory_.instances_[0];
+  auto* checker_b = fake_factory_.instances_[1];
+
+  // Both checkers report success, clearing pending. Still healthy.
+  checker_a->reportResult(host, false, false);
+  checker_b->reportResult(host, false, false);
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+  EXPECT_EQ(0, gaugeValue("health_check.degraded"));
+
+  // One checker fails. No longer healthy.
+  checker_a->reportResult(host, true, false);
+  EXPECT_EQ(0, gaugeValue("health_check.healthy"));
+  EXPECT_EQ(0, gaugeValue("health_check.degraded"));
+
+  // Recovery.
+  checker_a->reportResult(host, false, false);
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+  EXPECT_EQ(0, gaugeValue("health_check.degraded"));
+}
+
+// Destruction decrements the gauges for all tracked hosts.
+TEST_F(MultiHealthCheckerDegradedTest, DestructorDecrementsGauges) {
+  setup();
+  auto host = Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {host};
+  health_checker_->start();
+
+  auto* checker_a = fake_factory_.instances_[0];
+  auto* checker_b = fake_factory_.instances_[1];
+
+  // Make host healthy and degraded (both gauges incremented).
+  checker_a->reportResult(host, false, true);
+  checker_b->reportResult(host, false, false);
+  EXPECT_EQ(1, gaugeValue("health_check.healthy"));
+  EXPECT_EQ(1, gaugeValue("health_check.degraded"));
+
+  // Destroy the health checker. Gauges should return to 0.
+  health_checker_.reset();
+  EXPECT_EQ(0, gaugeValue("health_check.healthy"));
+  EXPECT_EQ(0, gaugeValue("health_check.degraded"));
 }
 
 } // namespace

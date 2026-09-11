@@ -27,10 +27,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   checker configured here are used.
 message Multi {
   message HealthCheck {
-    // Optional name for this sub-checker's metrics. If set, stats for this
-    // sub-checker will be emitted under ``health_check.name.<name>.{attempt,success,...}``
-    // instead of the default ``health_check.{attempt,success,...}``.
-    string name = 1;
+    // Name for this sub-checker's metrics. Stats for this sub-checker will be
+    // emitted under ``health_check.name.<name>.{attempt,success,...}``.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // Full health check configuration for this sub-checker.
     config.core.v3.HealthCheck health_check = 2 [(validate.rules).message = {required: true}];

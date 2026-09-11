@@ -33,7 +33,7 @@ public:
   }
 
   void addMultiTcpHealthCheck(envoy::config::cluster::v3::Cluster* cluster,
-                              const std::string& name1 = "", const std::string& name2 = "") {
+                              const std::string& name1, const std::string& name2) {
     auto* health_check = cluster->add_health_checks();
     health_check->mutable_timeout()->set_seconds(30);
     health_check->mutable_interval()->CopyFrom(
@@ -49,9 +49,7 @@ public:
     envoy::extensions::health_checkers::multi::v3::Multi multi_config;
 
     auto* sub1 = multi_config.add_health_checks();
-    if (!name1.empty()) {
-      sub1->set_name(name1);
-    }
+    sub1->set_name(name1);
     auto* hc1 = sub1->mutable_health_check();
     hc1->mutable_timeout()->set_seconds(30);
     hc1->mutable_interval()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(100));
@@ -63,9 +61,7 @@ public:
     hc1->mutable_tcp_health_check()->add_receive()->set_text("506F6E6731");
 
     auto* sub2 = multi_config.add_health_checks();
-    if (!name2.empty()) {
-      sub2->set_name(name2);
-    }
+    sub2->set_name(name2);
     auto* hc2 = sub2->mutable_health_check();
     hc2->mutable_timeout()->set_seconds(30);
     hc2->mutable_interval()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(100));
@@ -79,7 +75,8 @@ public:
     std::ignore = custom->mutable_typed_config()->PackFrom(multi_config);
   }
 
-  void initializeWithStaticCluster(const std::string& name1 = "", const std::string& name2 = "") {
+  void initializeWithStaticCluster(const std::string& name1 = "first",
+                                   const std::string& name2 = "second") {
     use_lds_ = false;
     defer_listener_finalization_ = true;
 
@@ -135,7 +132,7 @@ public:
           ->mutable_path_config_source()
           ->set_path(eds_helper_.edsPath());
 
-      addMultiTcpHealthCheck(cluster);
+      addMultiTcpHealthCheck(cluster, "first", "second");
     });
 
     HttpIntegrationTest::initialize();
@@ -167,6 +164,8 @@ TEST_P(MultiHealthCheckIntegrationTest, BothSubCheckersPass) {
 
   test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
   test_server_->waitForGauge("cluster.cluster_1.membership_total", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.health_check.healthy", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.health_check.degraded", Eq(0));
 }
 
 // One sub-checker times out: host stays unhealthy.
@@ -179,24 +178,9 @@ TEST_P(MultiHealthCheckIntegrationTest, OneSubCheckerTimeout) {
 
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_1.health_check.name.second.health_check.failure",
+                               Ge(1));
   test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(0));
-}
-
-// Without names, both sub-checkers share the cluster stats scope.
-TEST_P(MultiHealthCheckIntegrationTest, StatsWithoutName) {
-  initializeWithStaticCluster();
-
-  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
-  RELEASE_ASSERT(result, result.message());
-  result = hc_connections_[1]->write("Pong1Pong2");
-  RELEASE_ASSERT(result, result.message());
-
-  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
-
-  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Ge(2));
-  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(2));
-  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Eq(0));
 }
 
 // With names, each sub-checker gets its own stats scope.

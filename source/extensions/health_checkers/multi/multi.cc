@@ -25,7 +25,11 @@ constexpr uint32_t kActiveHcFlagMask =
 MultiHealthChecker::MultiHealthChecker(Upstream::Cluster& cluster,
                                        const envoy::config::core::v3::HealthCheck& config,
                                        Server::Configuration::ServerFactoryContext& server_context)
-    : cluster_(cluster) {
+    : cluster_(cluster), stat_name_pool_(cluster.info()->statsScope().symbolTable()),
+      healthy_gauge_(cluster.info()->statsScope().gaugeFromStatName(
+          stat_name_pool_.add("health_check.healthy"), Stats::Gauge::ImportMode::Accumulate)),
+      degraded_gauge_(cluster.info()->statsScope().gaugeFromStatName(
+          stat_name_pool_.add("health_check.degraded"), Stats::Gauge::ImportMode::Accumulate)) {
 
   const auto& any_config = config.custom_health_check().typed_config();
   envoy::extensions::health_checkers::multi::v3::Multi multi_config;
@@ -35,16 +39,9 @@ MultiHealthChecker::MultiHealthChecker(Upstream::Cluster& cluster,
     const auto& entry = multi_config.health_checks(i);
     const auto& sub_config = entry.health_check();
 
-    Stats::ScopeSharedPtr checker_scope;
-    Stats::Scope* scope;
-    if (!entry.name().empty()) {
-      std::vector<Stats::TagStringView> tags{{"name", entry.name()}};
-      checker_scope = cluster.info()->statsScope().createScopeWithTaggedName(
-          "health_check", tags, absl::StrCat("health_check.name.", entry.name(), "."));
-      scope = checker_scope.get();
-    } else {
-      scope = &cluster.info()->statsScope();
-    }
+    std::vector<Stats::TagStringView> tags{{"name", entry.name()}};
+    auto checker_scope = cluster.info()->statsScope().createScopeWithTaggedName(
+        "health_check", tags, absl::StrCat("health_check.name.", entry.name(), "."));
 
     // Build flag callbacks so this sub-checker operates on local per-host state
     // instead of the real host's flags.
@@ -68,7 +65,7 @@ MultiHealthChecker::MultiHealthChecker(Upstream::Cluster& cluster,
     };
 
     auto checker_or_error = Upstream::HealthCheckerFactory::create(
-        sub_config, cluster, server_context, *scope, std::move(flag_callbacks));
+        sub_config, cluster, server_context, *checker_scope, std::move(flag_callbacks));
     THROW_IF_NOT_OK(checker_or_error.status());
 
     PerCheckerData data;
@@ -91,6 +88,21 @@ MultiHealthChecker::MultiHealthChecker(Upstream::Cluster& cluster,
       });
 }
 
+MultiHealthChecker::~MultiHealthChecker() {
+  for (const auto& [_, state] : host_states_) {
+    adjustGauges(state, &Stats::Gauge::dec);
+  }
+}
+
+void MultiHealthChecker::adjustGauges(const PerHostState& state, void (Stats::Gauge::*op)()) {
+  if (isGaugeHealthy(state)) {
+    (healthy_gauge_.*op)();
+  }
+  if (isGaugeDegraded(state)) {
+    (degraded_gauge_.*op)();
+  }
+}
+
 void MultiHealthChecker::addHostCheckCompleteCb(HostStatusCb callback) {
   callbacks_.push_back(std::move(callback));
 }
@@ -99,7 +111,7 @@ void MultiHealthChecker::start() {
   // Initialize host flags for all existing hosts.
   for (const auto& host_set : cluster_.prioritySet().hostSetsPerPriority()) {
     for (const auto& host : host_set->hosts()) {
-      initializeHostFlags(host);
+      initializeHost(host);
     }
   }
 
@@ -109,7 +121,7 @@ void MultiHealthChecker::start() {
   }
 }
 
-void MultiHealthChecker::initializeHostFlags(const Upstream::HostSharedPtr& host) {
+void MultiHealthChecker::initializeHost(const Upstream::HostSharedPtr& host) {
   // Initialize per-checker local flags to match what the host currently has for active HC flags.
   uint32_t initial_flags = host->healthFlagsGetAll() & kActiveHcFlagMask;
   for (auto& data : checkers_) {
@@ -125,18 +137,25 @@ void MultiHealthChecker::initializeHostFlags(const Upstream::HostSharedPtr& host
       host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC) ? all_bits : 0;
   state.degraded_bits =
       host->healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC) ? all_bits : 0;
+
+  adjustGauges(host_states_[host.get()], &Stats::Gauge::inc);
 }
 
 void MultiHealthChecker::onClusterMemberUpdate(const Upstream::HostVector& hosts_added,
                                                const Upstream::HostVector& hosts_removed) {
   for (const auto& host : hosts_added) {
-    initializeHostFlags(host);
+    initializeHost(host);
   }
   for (const auto& host : hosts_removed) {
+    auto state_it = host_states_.find(host.get());
+    ASSERT(state_it != host_states_.end());
+    if (state_it != host_states_.end()) {
+      adjustGauges(state_it->second, &Stats::Gauge::dec);
+      host_states_.erase(state_it);
+    }
     for (auto& data : checkers_) {
       data.host_flags.erase(host.get());
     }
-    host_states_.erase(host.get());
   }
 }
 
@@ -195,6 +214,23 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, Upstream::HostS
     host->healthFlagSet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
   } else {
     host->healthFlagClear(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
+  }
+
+  // Update aggregate gauges based on state transitions.
+  // Matches base health checker semantics: healthy = not failed, degraded = degraded.
+  if (was_aggregate_failed != now_aggregate_failed) {
+    if (now_aggregate_failed) {
+      healthy_gauge_.dec();
+    } else {
+      healthy_gauge_.inc();
+    }
+  }
+  if (was_aggregate_degraded != now_aggregate_degraded) {
+    if (now_aggregate_degraded) {
+      degraded_gauge_.inc();
+    } else {
+      degraded_gauge_.dec();
+    }
   }
 
   // Don't fire callbacks while all checkers are still pending initial checks.

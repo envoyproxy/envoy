@@ -10,6 +10,7 @@
 #include "envoy/upstream/health_checker.h"
 
 #include "source/common/common/callback_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -22,6 +23,7 @@ class MultiHealthChecker : public Upstream::HealthChecker {
 public:
   MultiHealthChecker(Upstream::Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                      Server::Configuration::ServerFactoryContext& server_context);
+  ~MultiHealthChecker() override;
 
   // Upstream::HealthChecker
   void addHostCheckCompleteCb(HostStatusCb callback) override;
@@ -45,9 +47,16 @@ private:
                        Upstream::HealthTransition changed_state, Upstream::HealthState result);
   void onClusterMemberUpdate(const Upstream::HostVector& hosts_added,
                              const Upstream::HostVector& hosts_removed);
-  void initializeHostFlags(const Upstream::HostSharedPtr& host);
+  void initializeHost(const Upstream::HostSharedPtr& host);
+
+  static bool isGaugeHealthy(const PerHostState& state) { return state.fail_bits == 0; }
+  static bool isGaugeDegraded(const PerHostState& state) { return state.degraded_bits != 0; }
+  void adjustGauges(const PerHostState& state, void (Stats::Gauge::*op)());
 
   Upstream::Cluster& cluster_;
+  Stats::StatNamePool stat_name_pool_;
+  Stats::Gauge& healthy_gauge_;
+  Stats::Gauge& degraded_gauge_;
   std::vector<PerCheckerData> checkers_;
   absl::node_hash_map<const Upstream::Host*, PerHostState> host_states_;
   std::vector<HostStatusCb> callbacks_;
