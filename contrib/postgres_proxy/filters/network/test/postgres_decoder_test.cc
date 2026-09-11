@@ -27,11 +27,15 @@ public:
   MOCK_METHOD(void, incNotices, (NoticeType), (override));
   MOCK_METHOD(void, incErrors, (ErrorType), (override));
   MOCK_METHOD(void, processQuery, (const std::string&), (override));
+  MOCK_METHOD(bool, authorizationEnabled, (), (const, override));
+  MOCK_METHOD(bool, authorizeStartup, (), (override));
+  MOCK_METHOD(void, rejectStartup, (absl::string_view policy_id), (override));
   MOCK_METHOD(bool, onSSLRequest, (), (override));
   MOCK_METHOD(bool, shouldEncryptUpstream, (), (const));
   MOCK_METHOD(void, sendUpstream, (Buffer::Instance&));
   MOCK_METHOD(bool, encryptUpstream, (bool, Buffer::Instance&));
   MOCK_METHOD(void, verifyDownstreamSSL, (), (override));
+  MOCK_METHOD(bool, shouldPassthroughSSL, (), (const, override));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -122,6 +126,41 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   ASSERT_THAT(decoder_->getAttributes().at("database"), "testdb");
   // This attribute should not be found
   ASSERT_THAT(decoder_->getAttributes().find("no"), decoder_->getAttributes().end());
+}
+
+TEST_F(PostgresProxyDecoderTest, AuthorizesBeforeUpstreamSSL) {
+  decoder_->state(DecoderImpl::State::InitState);
+  ON_CALL(callbacks_, authorizationEnabled()).WillByDefault(testing::Return(true));
+  const std::string attributes = "user\0postgres\0database\0testdb\0\0"s;
+  data_.writeBEInt<uint32_t>(8 + attributes.size());
+  data_.writeBEInt<uint32_t>(0x00030000);
+  data_.add(attributes);
+  testing::InSequence s;
+  EXPECT_CALL(callbacks_, authorizeStartup()).WillOnce(testing::Invoke([this]() {
+    EXPECT_THAT(decoder_->getAttributes().at("user"), "postgres");
+    EXPECT_THAT(decoder_->getAttributes().at("database"), "testdb");
+    return true;
+  }));
+  EXPECT_CALL(callbacks_, shouldEncryptUpstream()).WillOnce(testing::Return(true));
+  EXPECT_CALL(callbacks_, sendUpstream(testing::_));
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::NegotiatingUpstreamSSL);
+}
+
+TEST_F(PostgresProxyDecoderTest, RejectedStartupStopDecoding) {
+  decoder_->state(DecoderImpl::State::InitState);
+  ON_CALL(callbacks_, authorizationEnabled()).WillByDefault(testing::Return(true));
+  const std::string attributes = "user\0postgres\0\0"s;
+  data_.writeBEInt<uint32_t>(8 + attributes.size());
+  data_.writeBEInt<uint32_t>(0x00030000);
+  data_.add(attributes);
+  EXPECT_CALL(callbacks_, authorizeStartup()).WillOnce(testing::Return(false));
+  EXPECT_CALL(callbacks_, shouldEncryptUpstream()).Times(0);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::RejectedState);
+  data_.add("more data");
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
+  ASSERT_THAT(0, data_.length());
 }
 
 // Test verifies that when Startup message does not carry
