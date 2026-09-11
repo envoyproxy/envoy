@@ -12,6 +12,7 @@
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
@@ -26,22 +27,59 @@ namespace Extensions {
 namespace TransportSockets {
 namespace ProxyProtocol {
 
+absl::StatusOr<TlvFormatterVectorSharedPtr>
+parseDynamicTLVs(const ProxyProtocolConfig& config,
+                 Server::Configuration::TransportSocketFactoryContext& context) {
+  auto dynamic_tlvs = std::make_shared<std::vector<TlvFormatter>>();
+  for (const auto& entry : config.added_tlvs()) {
+    const bool has_value = !entry.value().empty();
+    const bool has_format_string = entry.has_format_string();
+    if (has_value && has_format_string) {
+      return absl::InvalidArgumentError(
+          "Invalid TLV configuration: only one of 'value' or 'format_string' may be set.");
+    }
+    if (!has_value && !has_format_string) {
+      return absl::InvalidArgumentError(
+          "Invalid TLV configuration: one of 'value' or 'format_string' must be set.");
+    }
+    if (has_format_string) {
+      auto formatter_or_error =
+          Formatter::SubstitutionFormatStringUtils::fromProtoConfig(entry.format_string(), context);
+      if (!formatter_or_error.ok()) {
+        return absl::InvalidArgumentError(absl::StrCat("Failed to parse TLV format string: ",
+                                                       formatter_or_error.status().ToString()));
+      }
+      dynamic_tlvs->push_back(
+          TlvFormatter{static_cast<uint8_t>(entry.type()), std::move(formatter_or_error.value())});
+    }
+  }
+  return dynamic_tlvs;
+}
+
 UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
     Network::TransportSocketPtr&& transport_socket,
     Network::TransportSocketOptionsConstSharedPtr options, ProxyProtocolConfig config,
-    const UpstreamProxyProtocolStats& stats)
+    const UpstreamProxyProtocolStats& stats, TlvFormatterVectorSharedPtr dynamic_tlvs)
     : PassthroughSocket(std::move(transport_socket)), options_(options), version_(config.version()),
       stats_(stats),
       pass_all_tlvs_(config.has_pass_through_tlvs() ? config.pass_through_tlvs().match_type() ==
                                                           ProxyProtocolPassThroughTLVs::INCLUDE_ALL
-                                                    : false) {
+                                                    : false),
+      dynamic_tlvs_(std::move(dynamic_tlvs)) {
+  // parseDynamicTLVs always supplies a valid pointer, relied on by buildCustomTLVs.
+  ASSERT(dynamic_tlvs_ != nullptr);
   if (config.has_pass_through_tlvs() &&
       config.pass_through_tlvs().match_type() == ProxyProtocolPassThroughTLVs::INCLUDE) {
     for (const auto& tlv_type : config.pass_through_tlvs().tlv_type()) {
       pass_through_tlvs_.insert(0xFF & tlv_type);
     }
   }
+  // Entries with a format_string are evaluated per connection, so only the static entries are
+  // collected here.
   for (const auto& entry : config.added_tlvs()) {
+    if (entry.has_format_string()) {
+      continue;
+    }
     added_tlvs_.push_back(Network::ProxyProtocolTLV{
         static_cast<uint8_t>(entry.type()),
         std::vector<unsigned char>(entry.value().begin(), entry.value().end())});
@@ -148,9 +186,9 @@ void UpstreamProxyProtocolSocket::onConnected() {
 
 UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
     Network::UpstreamTransportSocketFactoryPtr transport_socket_factory, ProxyProtocolConfig config,
-    Stats::Scope& scope)
+    Stats::Scope& scope, TlvFormatterVectorSharedPtr dynamic_tlvs)
     : PassthroughFactory(std::move(transport_socket_factory)), config_(config),
-      stats_(generateUpstreamProxyProtocolStats(scope)) {}
+      stats_(generateUpstreamProxyProtocolStats(scope)), dynamic_tlvs_(std::move(dynamic_tlvs)) {}
 
 Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr options,
@@ -160,7 +198,7 @@ Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportS
     return nullptr;
   }
   return std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket), options, config_,
-                                                       stats_);
+                                                       stats_, dynamic_tlvs_);
 }
 
 void UpstreamProxyProtocolSocketFactory::hashKey(
@@ -226,15 +264,38 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
     }
   }
 
+  // Config-level TLVs are the static entries plus any dynamic entries evaluated from a format
+  // string against this connection's stream info. Configs without dynamic entries use the static
+  // list directly to avoid a copy.
+  std::vector<Network::ProxyProtocolTLV> combined_tlvs;
+  const std::vector<Network::ProxyProtocolTLV>* config_tlvs = &added_tlvs_;
+  if (!dynamic_tlvs_->empty()) {
+    combined_tlvs.reserve(added_tlvs_.size() + dynamic_tlvs_->size());
+    for (const auto& tlv : added_tlvs_) {
+      combined_tlvs.push_back(tlv);
+    }
+    const auto& stream_info = callbacks_->connection().streamInfo();
+    for (const auto& tlv_formatter : *dynamic_tlvs_) {
+      const std::string value = tlv_formatter.formatter->format({}, stream_info);
+      // A TLV value must be at least one byte, so skip formatters that produce an empty string.
+      if (value.empty()) {
+        continue;
+      }
+      combined_tlvs.push_back(Network::ProxyProtocolTLV{
+          tlv_formatter.type, std::vector<unsigned char>(value.begin(), value.end())});
+    }
+    config_tlvs = &combined_tlvs;
+  }
+
   // If host-level parse failed or was not present, we still read config-level TLVs.
   if (runtime_allow_duplicate_tlvs) {
-    for (const auto& tlv : added_tlvs_) {
+    for (const auto& tlv : *config_tlvs) {
       if (!host_level_tlv_types.contains(tlv.type)) {
         custom_tlvs.push_back(tlv);
       }
     }
   } else {
-    for (const auto& tlv : added_tlvs_) {
+    for (const auto& tlv : *config_tlvs) {
       if (host_level_tlv_types.contains(tlv.type)) {
         ENVOY_LOG_EVERY_POW_2_MISC(info, "Skipping duplicate TLV type from added_tlvs {}",
                                    tlv.type);
