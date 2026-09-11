@@ -75,6 +75,56 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
   GlobalTlsStores::clear();
 }
 
+TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithReportingInterval) {
+  std::string filter_config_yaml = R"EOF(
+  rlqs_server:
+    envoy_grpc:
+      cluster_name: "rate_limit_quota_server"
+  domain: test
+  reporting_interval: 1s
+  bucket_matchers:
+    matcher_list:
+      matchers:
+        predicate:
+          single_predicate:
+            input:
+              name: envoy.matching.inputs.request_headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: environment
+            value_match:
+              exact: staging
+        on_match:
+          action:
+            name: rate_limit_quota
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+              bucket_id_builder:
+                bucket_id_builder:
+                  "name":
+                      string_value: "prod"
+              reporting_interval: 60s
+  )EOF";
+  envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+
+  auto mock_stream_client = std::make_unique<RateLimitTestClient>();
+  mock_stream_client->expectClientCreationWithFactory();
+
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+
+  RateLimitQuotaFilterFactory factory;
+  std::string stats_prefix = "test";
+  auto cb_or = factory.createFilterFactoryFromProto(filter_config, stats_prefix,
+                                                    mock_stream_client->context_);
+  ASSERT_TRUE(cb_or.ok()) << cb_or.status();
+  Http::FilterFactoryCb cb = std::move(cb_or).value();
+  cb(filter_callback);
+
+  GlobalTlsStores::clear();
+}
+
 TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidMatcher) {
   std::string filter_config_yaml = R"EOF(
   rlqs_server:
