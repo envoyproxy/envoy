@@ -28,14 +28,20 @@ struct TlvFormatter {
   Formatter::FormatterPtr formatter;
 };
 
-// Dynamic TLV formatters are parsed once at config load and shared across all connections.
-using TlvFormatterVectorSharedPtr = std::shared_ptr<const std::vector<TlvFormatter>>;
+// The parsed config-level added TLVs, shared across all connections. Static entries are emitted
+// as-is and dynamic entries are evaluated per connection.
+struct AddedTlvs {
+  std::vector<Network::ProxyProtocolTLV> static_tlvs;
+  std::vector<TlvFormatter> dynamic_tlvs;
+};
+using AddedTlvsConstSharedPtr = std::shared_ptr<const AddedTlvs>;
 
-// Parses the format_string entries in the added TLVs into formatters, validating that each entry
-// sets exactly one of value or format_string.
-absl::StatusOr<TlvFormatterVectorSharedPtr>
-parseDynamicTLVs(const ProxyProtocolConfig& config,
-                 Server::Configuration::TransportSocketFactoryContext& context);
+// Parses the added TLVs into static values and dynamic formatters, requiring each entry to set
+// exactly one of value or format_string. Falls back to reading only value when the runtime guard
+// is disabled.
+absl::StatusOr<AddedTlvsConstSharedPtr>
+parseTLVs(const ProxyProtocolConfig& config,
+          Server::Configuration::TransportSocketFactoryContext& context);
 
 #define ALL_PROXY_PROTOCOL_TRANSPORT_SOCKET_STATS(COUNTER)                                         \
   /* Upstream events counter. */                                                                   \
@@ -54,7 +60,7 @@ public:
   UpstreamProxyProtocolSocket(Network::TransportSocketPtr&& transport_socket,
                               Network::TransportSocketOptionsConstSharedPtr options,
                               ProxyProtocolConfig config, const UpstreamProxyProtocolStats& stats,
-                              TlvFormatterVectorSharedPtr dynamic_tlvs);
+                              AddedTlvsConstSharedPtr tlvs);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
@@ -77,15 +83,14 @@ private:
   const UpstreamProxyProtocolStats& stats_;
   const bool pass_all_tlvs_;
   absl::flat_hash_set<uint8_t> pass_through_tlvs_;
-  std::vector<Envoy::Network::ProxyProtocolTLV> added_tlvs_;
-  TlvFormatterVectorSharedPtr dynamic_tlvs_;
+  AddedTlvsConstSharedPtr tlvs_;
 };
 
 class UpstreamProxyProtocolSocketFactory : public PassthroughFactory {
 public:
   UpstreamProxyProtocolSocketFactory(
       Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
-      ProxyProtocolConfig config, Stats::Scope& scope, TlvFormatterVectorSharedPtr dynamic_tlvs);
+      ProxyProtocolConfig config, Stats::Scope& scope, AddedTlvsConstSharedPtr tlvs);
 
   // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr
@@ -102,7 +107,7 @@ public:
 private:
   ProxyProtocolConfig config_;
   UpstreamProxyProtocolStats stats_;
-  TlvFormatterVectorSharedPtr dynamic_tlvs_;
+  AddedTlvsConstSharedPtr tlvs_;
 };
 
 } // namespace ProxyProtocol

@@ -51,7 +51,7 @@ public:
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
     proxy_protocol_socket_ = std::make_unique<UpstreamProxyProtocolSocket>(
         std::move(inner_socket), socket_options, config, stats_,
-        parseDynamicTLVs(config, factory_context_).value());
+        parseTLVs(config, factory_context_).value());
     proxy_protocol_socket_->setTransportSocketCallbacks(transport_callbacks_);
     proxy_protocol_socket_->onConnected();
   }
@@ -907,7 +907,7 @@ TEST_F(ProxyProtocolTest, TLVWithValueAndFormatStringRejected) {
   added_tlv->set_type(0x96);
   added_tlv->set_value("moredata");
   added_tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string("dynamic");
-  auto result = parseDynamicTLVs(config, factory_context_);
+  auto result = parseTLVs(config, factory_context_);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().message(),
             "Invalid TLV configuration: only one of 'value' or 'format_string' may be set.");
@@ -919,7 +919,7 @@ TEST_F(ProxyProtocolTest, TLVWithNeitherValueNorFormatStringRejected) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
   auto added_tlv = config.add_added_tlvs();
   added_tlv->set_type(0x96);
-  auto result = parseDynamicTLVs(config, factory_context_);
+  auto result = parseTLVs(config, factory_context_);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().message(),
             "Invalid TLV configuration: one of 'value' or 'format_string' must be set.");
@@ -933,10 +933,84 @@ TEST_F(ProxyProtocolTest, TLVWithInvalidFormatStringRejected) {
   added_tlv->set_type(0x96);
   added_tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
       "%INVALID_COMMAND%");
-  auto result = parseDynamicTLVs(config, factory_context_);
+  auto result = parseTLVs(config, factory_context_);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(std::string(result.status().message()),
               testing::HasSubstr("Failed to parse TLV format string"));
+}
+
+// Test verifies that with the runtime guard disabled, an entry uses only the static value and its
+// format_string is ignored.
+TEST_F(ProxyProtocolTest, V2FormatStringDisabledUsesStaticValue) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.proxy_protocol_added_tlvs_format_string", "false"}});
+
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
+  auto dst_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv6Instance("1:100:200:3::", 2));
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {}};
+  Network::TransportSocketOptionsConstSharedPtr socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+          std::optional<Network::ProxyProtocolData>(proxy_proto_data));
+
+  absl::flat_hash_set<uint8_t> pass_through_tlvs{};
+  std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
+      {0x96, {'l', 'e', 'g', 'a', 'c', 'y'}},
+  };
+  Buffer::OwnedImpl expected_buff{};
+  EXPECT_TRUE(Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, false,
+                                                      pass_through_tlvs, custom_tlvs));
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  auto added_tlv = config.add_added_tlvs();
+  added_tlv->set_type(0x96);
+  added_tlv->set_value("legacy");
+  added_tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string("dynamic");
+  initialize(config, socket_options);
+
+  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return {length, Api::IoError::none()};
+      }));
+  auto msg = Buffer::OwnedImpl("some data");
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
+
+  auto resp = proxy_protocol_socket_->doWrite(msg, false);
+  EXPECT_EQ(resp.bytes_processed_, expected_buff.length());
+}
+
+// Test verifies that with the runtime guard disabled, configurations that are otherwise rejected
+// are accepted and parsed as static entries.
+TEST_F(ProxyProtocolTest, FormatStringDisabledSkipsValidation) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.proxy_protocol_added_tlvs_format_string", "false"}});
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  auto both_set = config.add_added_tlvs();
+  both_set->set_type(0x96);
+  both_set->set_value("legacy");
+  both_set->mutable_format_string()->mutable_text_format_source()->set_inline_string("dynamic");
+  auto neither_set = config.add_added_tlvs();
+  neither_set->set_type(0x97);
+
+  auto result = parseTLVs(config, factory_context_);
+  ASSERT_TRUE(result.ok());
+  const auto& tlvs = *result.value();
+  EXPECT_TRUE(tlvs.dynamic_tlvs.empty());
+  ASSERT_EQ(tlvs.static_tlvs.size(), 2);
+  EXPECT_EQ(tlvs.static_tlvs[0].type, 0x96);
+  EXPECT_EQ(std::string(tlvs.static_tlvs[0].value.begin(), tlvs.static_tlvs[0].value.end()),
+            "legacy");
+  EXPECT_EQ(tlvs.static_tlvs[1].type, 0x97);
+  EXPECT_TRUE(tlvs.static_tlvs[1].value.empty());
 }
 
 // Test verifies a host-metadata TLV takes precedence over a dynamic config TLV of the same type.
@@ -1520,7 +1594,7 @@ public:
     inner_factory_ = inner_factory.get();
     factory_ = std::make_unique<UpstreamProxyProtocolSocketFactory>(
         std::move(inner_factory), ProxyProtocolConfig(), *stats_store_.rootScope(),
-        std::make_shared<std::vector<TlvFormatter>>());
+        std::make_shared<AddedTlvs>());
   }
 
   NiceMock<Network::MockTransportSocketFactory>* inner_factory_;
