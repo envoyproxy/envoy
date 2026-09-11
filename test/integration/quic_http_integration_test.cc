@@ -634,7 +634,7 @@ void QuicHttpIntegrationTestBase::testReliableStreamResetBodyDelivery(bool enabl
   // Unblock client->server writes and pump simulated time so QUIC's own retransmission/write
   // alarms get a chance to run and flush whatever is actually left to send, mirroring the
   // approach used by DeferredLoggingWithRetransmission below.
-  socket_swap.write_matcher_->setWriteOverride(nullptr);
+  socket_swap.write_matcher_->setWriteOverride(Api::IoError::none());
   timeSystem().advanceTimeWait(std::chrono::milliseconds(500 * TIMEOUT_FACTOR));
 
   if (enable) {
