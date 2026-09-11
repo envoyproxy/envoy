@@ -218,7 +218,8 @@ TEST(CommonAbiImplTest, LogIgnoresOffAndOutOfRangeLevels) {
                                     {message.data(), message.size()}, {file.data(), file.size()},
                                     1);
   EXPECT_FALSE(sink.captured_);
-  // A value further outside the enum range would be undefined behavior to load, so use one past Off.
+  // A value further outside the enum range would be undefined behavior to load, so use one past
+  // Off.
   const auto out_of_range =
       static_cast<envoy_dynamic_module_type_log_level>(envoy_dynamic_module_type_log_level_Off + 1);
   envoy_dynamic_module_callback_log(out_of_range, {message.data(), message.size()},
