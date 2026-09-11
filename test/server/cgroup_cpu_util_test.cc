@@ -230,8 +230,7 @@ TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_V1) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::parseMountInfoLine(line);
   ASSERT_TRUE(mount_opt.has_value());
-  const auto& mount_point = mount_opt.value();
-  EXPECT_EQ(mount_point, "/sys/fs/cgroup/cpu");
+  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup/cpu");
 }
 
 TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_V2) {
@@ -239,8 +238,7 @@ TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_V2) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::parseMountInfoLine(line);
   ASSERT_TRUE(mount_opt.has_value());
-  const auto& mount_point = mount_opt.value();
-  EXPECT_EQ(mount_point, "/sys/fs/cgroup");
+  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup");
 }
 
 TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_V1NoCPU) {
@@ -248,8 +246,7 @@ TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_V1NoCPU) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::parseMountInfoLine(line);
   ASSERT_TRUE(mount_opt.has_value());
-  const auto& mount_point = mount_opt.value();
-  EXPECT_EQ(mount_point, "/sys/fs/cgroup/memory");
+  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup/memory");
 }
 
 TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_Escaped) {
@@ -258,8 +255,7 @@ TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_Escaped) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::parseMountInfoLine(line);
   ASSERT_TRUE(mount_opt.has_value());
-  const auto& mount_point = mount_opt.value();
-  EXPECT_EQ(mount_point, "/sys/fs/cgroup/tab\ttab"); // Unescaped
+  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup/tab\ttab"); // Unescaped
 }
 
 TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_NotCgroup) {
@@ -313,7 +309,9 @@ TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_V1) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
   ASSERT_TRUE(mount_opt.has_value());
-  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup/cpu"); // Should return v1 CPU mount point
+  EXPECT_EQ(mount_opt.value().mount_point,
+            "/sys/fs/cgroup/cpu"); // Should return v1 CPU mount point
+  EXPECT_EQ(mount_opt.value().root, "/");
 }
 
 TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_V2) {
@@ -327,7 +325,8 @@ TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_V2) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
   ASSERT_TRUE(mount_opt.has_value());
-  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup"); // Should return v2 mount point
+  EXPECT_EQ(mount_opt.value().mount_point, "/sys/fs/cgroup"); // Should return v2 mount point
+  EXPECT_EQ(mount_opt.value().root, "/");
 }
 
 TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_ControllerNameContainingCpu) {
@@ -338,7 +337,8 @@ TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_ControllerNameContainingCpu) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
   ASSERT_TRUE(mount_opt.has_value());
-  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup");
+  EXPECT_EQ(mount_opt.value().mount_point, "/sys/fs/cgroup");
+  EXPECT_EQ(mount_opt.value().root, "/");
 }
 
 TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_Mixed_V1Wins) {
@@ -357,7 +357,8 @@ TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_Mixed_V1Wins) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
   ASSERT_TRUE(mount_opt.has_value());
-  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup/cpu"); // v1 CPU takes precedence over v2
+  EXPECT_EQ(mount_opt.value().mount_point, "/sys/fs/cgroup/cpu"); // v1 CPU takes precedence over v2
+  EXPECT_EQ(mount_opt.value().root, "/");
 }
 
 TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_V2Escaped) {
@@ -371,7 +372,18 @@ TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_V2Escaped) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
   ASSERT_TRUE(mount_opt.has_value());
-  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup/tab\ttab"); // Should be unescaped
+  EXPECT_EQ(mount_opt.value().mount_point, "/sys/fs/cgroup/tab\ttab"); // Should be unescaped
+  EXPECT_EQ(mount_opt.value().root, "/");
+}
+
+TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_NonRoot) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 /kubepods.slice/pod123 /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n");
+
+  auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
+  ASSERT_TRUE(mount_opt.has_value());
+  EXPECT_EQ(mount_opt.value().mount_point, "/sys/fs/cgroup");
+  EXPECT_EQ(mount_opt.value().root, "/kubepods.slice/pod123");
 }
 
 // =============================================================================
@@ -775,6 +787,40 @@ TEST_F(CgroupCpuUtilTest, DetectorImpl_V2DetectedLimitLogged) {
   EXPECT_LOG_CONTAINS("debug", "cgroup CPU limit detected: 2", { detector.logResult(); });
   // Result is consumed; a second logResult() is a no-op.
   EXPECT_NO_LOGS({ detector.logResult(); });
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_V2DetectedLimitWithNonRootMount) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 /kubepods.slice/pod123 /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n");
+  fs_.setFileContents("/proc/self/cgroup", "0::/kubepods.slice/pod123/containerA\n");
+  fs_.setFileContents("/sys/fs/cgroup/containerA/cpu.max", "250000 100000\n");
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  ASSERT_TRUE(limit.has_value());
+  EXPECT_EQ(limit.value(), 2U);
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_NonRootMountRequiresPathBoundary) {
+  fs_.setFileContents("/proc/self/cgroup", "0::/kubepods.slice/pod1234/containerA\n");
+  CgroupMount mount;
+  mount.mount_point = "/sys/fs/cgroup";
+  mount.root = "/kubepods.slice/pod123";
+
+  auto cgroup_info = CgroupCpuUtil::TestUtil::constructCgroupPath(mount, fs_);
+  EXPECT_FALSE(cgroup_info.has_value());
+}
+
+TEST_F(CgroupCpuUtilTest, ConstructCgroupPath_NonRootMountRootItself) {
+  fs_.setFileContents("/proc/self/cgroup", "0::/kubepods.slice/pod123\n");
+  CgroupMount mount;
+  mount.mount_point = "/sys/fs/cgroup";
+  mount.root = "/kubepods.slice/pod123";
+
+  auto cgroup_info = CgroupCpuUtil::TestUtil::constructCgroupPath(mount, fs_);
+  ASSERT_TRUE(cgroup_info.has_value());
+  EXPECT_EQ(cgroup_info.value().full_path, "/sys/fs/cgroup");
+  EXPECT_EQ(cgroup_info.value().version, "v2");
 }
 
 TEST_F(CgroupCpuUtilTest, DetectorImpl_V1DetectedLimit) {
