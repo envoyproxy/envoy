@@ -336,6 +336,7 @@ private:
   // The load stats reporter, lazily created.
   std::unique_ptr<Upstream::LoadStatsReporter> lrs_server_;
   bool first_stream_request_{true};
+  OptRef<Upstream::ClusterManager> cluster_manager_;
 
   // Helper function for looking up and potentially allocating a new ApiState.
   ApiState& apiStateFor(absl::string_view type_url);

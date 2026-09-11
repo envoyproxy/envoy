@@ -149,8 +149,8 @@ public:
          std::unique_ptr<CustomConfigValidators>&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, OptRef<XdsConfigTracker> xds_config_tracker,
          OptRef<XdsResourcesDelegate> xds_resources_delegate,
-         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory)
-      PURE;
+         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory,
+         OptRef<Upstream::ClusterManager> cluster_manager) PURE;
 };
 
 } // namespace Config

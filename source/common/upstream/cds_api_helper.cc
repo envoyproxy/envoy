@@ -18,6 +18,8 @@ std::pair<uint32_t, std::vector<std::string>>
 CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                              const std::string& system_version_info) {
+  auto batch = cm_.createSourceBatch();
+
   // A cluster update pauses sending EDS and LEDS requests.
   const std::vector<std::string> paused_xds_types{
       Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),

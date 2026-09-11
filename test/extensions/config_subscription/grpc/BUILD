@@ -62,6 +62,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:load_stats_reporter_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:resources_lib",

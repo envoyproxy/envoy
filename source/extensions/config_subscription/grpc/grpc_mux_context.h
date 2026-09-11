@@ -9,6 +9,7 @@
 #include "envoy/grpc/async_client.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/stats/scope.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/config/utility.h"
 
@@ -34,6 +35,7 @@ struct GrpcMuxContext {
   // A factory method that allows a GrpcMux lazily create a Load-Stats-Reporter
   // if needed.
   std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory_;
+  OptRef<Upstream::ClusterManager> cluster_manager_{};
 };
 
 } // namespace Config
