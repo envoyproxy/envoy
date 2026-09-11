@@ -8,6 +8,8 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
+import "test/proto/sensitive.proto";
+
 enum TestEnum {
   TEST_ENUM_UNSPECIFIED = 0;
   ALPHA = 1;
@@ -67,7 +69,10 @@ message TestMessage {
   google.protobuf.Any any = 52;
   repeated google.protobuf.Any repeated_any = 53;
   google.protobuf.Struct structured = 54;
+  google.protobuf.Value value = 55;
+  google.protobuf.ListValue list_value = 56;
 
   TestNested nested = 60;
   repeated TestNested repeated_nested = 61;
+  envoy.test.Sensitive sensitive = 62;
 }
