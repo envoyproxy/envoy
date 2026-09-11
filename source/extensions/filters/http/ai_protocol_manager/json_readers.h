@@ -109,6 +109,17 @@ struct JsonKeyValues {
   const std::string Type{"type"};
   const std::string Role{"role"};
   const std::string Delta{"delta"};
+  const std::string Stream{"stream"};
+  const std::string MaxTokens{"max_tokens"};
+  const std::string MaxCompletionTokens{"max_completion_tokens"};
+  const std::string MaxOutputTokens{"max_output_tokens"};
+  const std::string MaxOutputTokensCamel{"maxOutputTokens"};
+  const std::string GenerationConfig{"generationConfig"};
+  const std::string GenerationConfigSnake{"generation_config"};
+  const std::string Messages{"messages"};
+  const std::string Input{"input"};
+  const std::string Contents{"contents"};
+  const std::string Tools{"tools"};
 };
 using JsonKeys = ConstSingleton<JsonKeyValues>;
 

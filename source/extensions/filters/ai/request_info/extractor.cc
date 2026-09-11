@@ -3,7 +3,6 @@
 #include <string>
 #include <utility>
 
-#include "source/common/singleton/const_singleton.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 
@@ -16,6 +15,7 @@ namespace AiFilters {
 namespace RequestInfo {
 
 using HttpFilters::AiProtocolManager::ApiProtocol;
+using HttpFilters::AiProtocolManager::JsonKeys;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::MaxStringValueSize;
 using HttpFilters::AiProtocolManager::NullPolicy;
@@ -27,22 +27,6 @@ using HttpFilters::AiProtocolManager::readString;
 
 namespace {
 
-struct KeyValues {
-  const std::string Model{"model"};
-  const std::string Stream{"stream"};
-  const std::string MaxTokens{"max_tokens"};
-  const std::string MaxCompletionTokens{"max_completion_tokens"};
-  const std::string MaxOutputTokens{"max_output_tokens"};
-  const std::string MaxOutputTokensCamel{"maxOutputTokens"};
-  const std::string GenerationConfig{"generationConfig"};
-  const std::string GenerationConfigSnake{"generation_config"};
-  const std::string Messages{"messages"};
-  const std::string Input{"input"};
-  const std::string Contents{"contents"};
-  const std::string Tools{"tools"};
-};
-using Keys = ConstSingleton<KeyValues>;
-
 // These APIs document null as "unset", so a null limit is absent, not malformed.
 std::optional<uint64_t> readLimit(const nlohmann::json& json, const std::string& key,
                                   bool& malformed) {
@@ -50,40 +34,40 @@ std::optional<uint64_t> readLimit(const nlohmann::json& json, const std::string&
 }
 
 void readCommon(const nlohmann::json& json, RequestAttributes& attrs) {
-  if (auto model = readString(json, Keys::get().Model, attrs.malformed); model.has_value()) {
+  if (auto model = readString(json, JsonKeys::get().Model, attrs.malformed); model.has_value()) {
     attrs.model = std::move(model).value();
   }
-  attrs.stream = readBool(json, Keys::get().Stream, attrs.malformed);
+  attrs.stream = readBool(json, JsonKeys::get().Stream, attrs.malformed);
 }
 
 void readOpenAiChatCompletions(const nlohmann::json& json, RequestAttributes& attrs) {
   readCommon(json, attrs);
-  attrs.max_output_tokens = readLimit(json, Keys::get().MaxCompletionTokens, attrs.malformed);
+  attrs.max_output_tokens = readLimit(json, JsonKeys::get().MaxCompletionTokens, attrs.malformed);
   if (!attrs.max_output_tokens.has_value()) {
-    attrs.max_output_tokens = readLimit(json, Keys::get().MaxTokens, attrs.malformed);
+    attrs.max_output_tokens = readLimit(json, JsonKeys::get().MaxTokens, attrs.malformed);
   }
-  attrs.message_count = readArrayLength(json, Keys::get().Messages, attrs.malformed);
-  attrs.tool_count = readArrayLength(json, Keys::get().Tools, attrs.malformed);
+  attrs.message_count = readArrayLength(json, JsonKeys::get().Messages, attrs.malformed);
+  attrs.tool_count = readArrayLength(json, JsonKeys::get().Tools, attrs.malformed);
 }
 
 void readOpenAiResponses(const nlohmann::json& json, RequestAttributes& attrs) {
   readCommon(json, attrs);
-  attrs.max_output_tokens = readLimit(json, Keys::get().MaxOutputTokens, attrs.malformed);
+  attrs.max_output_tokens = readLimit(json, JsonKeys::get().MaxOutputTokens, attrs.malformed);
   // A string `input`, inline or offloaded, is the shorthand for one user message.
-  if (const auto input = json.find(Keys::get().Input);
+  if (const auto input = json.find(JsonKeys::get().Input);
       input != json.end() && (input->is_string() || JsonWithExtBuf::isExternalRef(*input))) {
     attrs.message_count = 1;
   } else {
-    attrs.message_count = readArrayLength(json, Keys::get().Input, attrs.malformed);
+    attrs.message_count = readArrayLength(json, JsonKeys::get().Input, attrs.malformed);
   }
-  attrs.tool_count = readArrayLength(json, Keys::get().Tools, attrs.malformed);
+  attrs.tool_count = readArrayLength(json, JsonKeys::get().Tools, attrs.malformed);
 }
 
 void readAnthropicMessages(const nlohmann::json& json, RequestAttributes& attrs) {
   readCommon(json, attrs);
-  attrs.max_output_tokens = readLimit(json, Keys::get().MaxTokens, attrs.malformed);
-  attrs.message_count = readArrayLength(json, Keys::get().Messages, attrs.malformed);
-  attrs.tool_count = readArrayLength(json, Keys::get().Tools, attrs.malformed);
+  attrs.max_output_tokens = readLimit(json, JsonKeys::get().MaxTokens, attrs.malformed);
+  attrs.message_count = readArrayLength(json, JsonKeys::get().Messages, attrs.malformed);
+  attrs.tool_count = readArrayLength(json, JsonKeys::get().Tools, attrs.malformed);
 }
 
 // `.../models/{model}:generateContent` or `:streamGenerateContent`, which Vertex nests too.
@@ -122,20 +106,22 @@ void readGeminiGenerateContent(const nlohmann::json& json, absl::string_view pat
                                RequestAttributes& attrs) {
   readGeminiTarget(path, attrs);
   // Gemini's proto3 JSON accepts snake_case field names alongside camelCase.
-  const nlohmann::json* config = readObject(json, Keys::get().GenerationConfig, attrs.malformed,
+  const nlohmann::json* config = readObject(json, JsonKeys::get().GenerationConfig, attrs.malformed,
                                             NullPolicy::AllowNullAsAbsent);
   if (config == nullptr) {
-    config = readObject(json, Keys::get().GenerationConfigSnake, attrs.malformed,
+    config = readObject(json, JsonKeys::get().GenerationConfigSnake, attrs.malformed,
                         NullPolicy::AllowNullAsAbsent);
   }
   if (config != nullptr) {
-    attrs.max_output_tokens = readLimit(*config, Keys::get().MaxOutputTokensCamel, attrs.malformed);
+    attrs.max_output_tokens =
+        readLimit(*config, JsonKeys::get().MaxOutputTokensCamel, attrs.malformed);
     if (!attrs.max_output_tokens.has_value()) {
-      attrs.max_output_tokens = readLimit(*config, Keys::get().MaxOutputTokens, attrs.malformed);
+      attrs.max_output_tokens =
+          readLimit(*config, JsonKeys::get().MaxOutputTokens, attrs.malformed);
     }
   }
-  attrs.message_count = readArrayLength(json, Keys::get().Contents, attrs.malformed);
-  attrs.tool_count = readArrayLength(json, Keys::get().Tools, attrs.malformed);
+  attrs.message_count = readArrayLength(json, JsonKeys::get().Contents, attrs.malformed);
+  attrs.tool_count = readArrayLength(json, JsonKeys::get().Tools, attrs.malformed);
 }
 
 } // namespace
