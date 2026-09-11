@@ -15971,6 +15971,184 @@ bool envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes(
     envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
+// =============================================================================
+// ========================= HTTP Header Formatter =============================
+// =============================================================================
+
+// =============================================================================
+// HTTP Header Formatter Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_header_formatter_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleHeaderFormatterConfig class in Envoy. This is passed to the module when creating a
+ * new in-module header formatter configuration and may be used to access the header formatter
+ * configuration-scoped information in the future.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_header_formatter_config_module_ptr in
+ * the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_header_formatter_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_header_formatter_config_module_ptr is a pointer to an in-module header
+ * formatter configuration created by envoy_dynamic_module_on_header_formatter_config_new. Exactly
+ * one configuration is created per configured stateful_formatter entry, on the main thread, and it
+ * is shared by every per-message formatter instance it produces on every worker thread. It is
+ * therefore used concurrently and must be treated as read-only after creation.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. It can be
+ * released when envoy_dynamic_module_on_header_formatter_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_header_formatter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_header_formatter_envoy_ptr is a raw pointer to the
+ * DynamicModuleHeaderFormatter class in Envoy. This is passed to the module when creating a new
+ * in-module formatter instance for a single HTTP/1 message.
+ *
+ * This is passed to every per-message hook: envoy_dynamic_module_on_header_formatter_new,
+ * envoy_dynamic_module_on_header_formatter_process_key and
+ * envoy_dynamic_module_on_header_formatter_format. Header formatting happens in the codec, below
+ * the filter chain, so no callback takes this pointer today - the logging callbacks a module uses
+ * here are the module-wide ones. It is passed so that per-message information may be exposed
+ * through it in the future.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_header_formatter_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer, and it can be accessed by the module until the formatter
+ * instance is destroyed, i.e. envoy_dynamic_module_on_header_formatter_destroy is called for the
+ * corresponding module pointer.
+ */
+typedef void* envoy_dynamic_module_type_header_formatter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_header_formatter_module_ptr is a pointer to an in-module header
+ * formatter instance created by envoy_dynamic_module_on_header_formatter_new. One instance is
+ * created per HTTP/1 message being decoded, and every hook taking it is called by the single worker
+ * thread that owns that message. Unlike the configuration it may therefore hold mutable state
+ * without synchronization, which is what makes the formatter "stateful": keys observed while
+ * decoding a request can be replayed when encoding the response on the same connection.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. It can be
+ * released when envoy_dynamic_module_on_header_formatter_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_header_formatter_module_ptr;
+
+// =============================================================================
+// HTTP Header Formatter Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_header_formatter_config_new is called on the main thread when an HTTP/1
+ * ``stateful_formatter`` referencing a dynamic module is configured, i.e. once per configured
+ * entry.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleHeaderFormatterConfig object for the
+ * module to interact with Envoy.
+ * @param name is the header formatter name used to select an implementation within the module. The
+ * buffer is owned by Envoy and is only valid for the duration of this call, so a module that needs
+ * the name later must copy it.
+ * @param config is the configuration bytes for the header formatter, owned by Envoy and valid for
+ * the duration of this call only.
+ * @return envoy_dynamic_module_type_header_formatter_config_module_ptr is the pointer to the
+ * in-module header formatter configuration. Returning nullptr causes Envoy to reject the
+ * configuration.
+ */
+envoy_dynamic_module_type_header_formatter_config_module_ptr
+envoy_dynamic_module_on_header_formatter_config_new(
+    envoy_dynamic_module_type_header_formatter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_header_formatter_config_destroy is called when the header formatter
+ * configuration is destroyed in Envoy, which happens once the listener or cluster owning the
+ * protocol options that reference it has been drained and removed and every connection still using
+ * it has closed. Every formatter instance created from the configuration has already been
+ * destroyed at that point.
+ *
+ * This is always called on the main thread. A formatter can outlive the configuration that
+ * produced it - it is owned by a header map, which a straggler connection may hold past the
+ * removal of the listener - so the last reference to the configuration is frequently released by a
+ * worker thread. Envoy defers the destruction to the main thread dispatcher in that case, so a
+ * module may tear down main-thread-affine state here.
+ *
+ * @param config_module_ptr is a pointer to the in-module header formatter configuration.
+ */
+void envoy_dynamic_module_on_header_formatter_config_destroy(
+    envoy_dynamic_module_type_header_formatter_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_header_formatter_new is called to create a formatter instance for a
+ * single HTTP/1 message. Envoy creates one instance each time it begins decoding a message, on the
+ * worker thread owning the connection, so this is called concurrently against the one shared
+ * configuration and must be thread-safe.
+ *
+ * @param config_module_ptr is the pointer to the in-module header formatter configuration.
+ * @param formatter_envoy_ptr is the pointer to the DynamicModuleHeaderFormatter object of the
+ * corresponding formatter instance.
+ * @return envoy_dynamic_module_type_header_formatter_module_ptr is the pointer to the in-module
+ * formatter instance. Returning nullptr makes Envoy fall back to its default header casing for
+ * that message rather than failing the request.
+ */
+envoy_dynamic_module_type_header_formatter_module_ptr envoy_dynamic_module_on_header_formatter_new(
+    envoy_dynamic_module_type_header_formatter_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_header_formatter_envoy_ptr formatter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_header_formatter_destroy is called when the formatter instance for a
+ * message is destroyed, on the same worker thread that created it.
+ *
+ * @param formatter_module_ptr is the pointer to the in-module formatter instance.
+ */
+void envoy_dynamic_module_on_header_formatter_destroy(
+    envoy_dynamic_module_type_header_formatter_module_ptr formatter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_header_formatter_process_key is called for each header key the HTTP/1
+ * codec receives on the wire, with the original casing as sent by the peer. It gives the module the
+ * chance to remember the original spelling so that
+ * envoy_dynamic_module_on_header_formatter_format can restore it on the way out.
+ *
+ * Note that this is called for received headers only. Headers that Envoy itself adds never reach
+ * this hook, and format is still called for them.
+ *
+ * @param formatter_envoy_ptr is the pointer to the DynamicModuleHeaderFormatter object of the
+ * corresponding formatter instance.
+ * @param formatter_module_ptr is the pointer to the in-module formatter instance.
+ * @param key is the header key as received. The buffer is owned by Envoy and is only valid for the
+ * duration of this call, so a module that needs the key later must copy it.
+ */
+void envoy_dynamic_module_on_header_formatter_process_key(
+    envoy_dynamic_module_type_header_formatter_envoy_ptr formatter_envoy_ptr,
+    envoy_dynamic_module_type_header_formatter_module_ptr formatter_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key);
+
+/**
+ * envoy_dynamic_module_on_header_formatter_format is called for each header key Envoy is about to
+ * serialize, to decide the casing written on the wire.
+ *
+ * @param formatter_envoy_ptr is the pointer to the DynamicModuleHeaderFormatter object of the
+ * corresponding formatter instance.
+ * @param formatter_module_ptr is the pointer to the in-module formatter instance.
+ * @param key is the lower-cased header key Envoy holds internally. The buffer is owned by Envoy and
+ * is only valid for the duration of this call.
+ * @param result is where the module writes the formatted key. The buffer is owned by the module.
+ * Envoy copies it only after this hook has returned, so it must outlive the call; keeping it valid
+ * until the next call into the module on the same thread satisfies that.
+ * @return true when result was populated, false to make Envoy serialize the key unchanged. A module
+ * that only wants to rewrite some keys should return false for the rest rather than echoing them
+ * back.
+ */
+bool envoy_dynamic_module_on_header_formatter_format(
+    envoy_dynamic_module_type_header_formatter_envoy_ptr formatter_envoy_ptr,
+    envoy_dynamic_module_type_header_formatter_module_ptr formatter_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_module_buffer* result);
+
 #ifdef __cplusplus
 }
 #endif

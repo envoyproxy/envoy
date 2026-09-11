@@ -4,6 +4,8 @@ licenses(["notice"])  # Apache 2
 
 test_program(name = "early_header_mutation_integration_test")
 
+test_program(name = "header_formatter_integration_test")
+
 test_program(name = "http")
 
 test_program(name = "http_integration_test")

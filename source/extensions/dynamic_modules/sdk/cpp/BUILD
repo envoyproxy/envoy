@@ -8,12 +8,14 @@ cc_library(
     srcs = [
         "sdk.cc",
         "sdk_early_header_mutation.cc",
+        "sdk_header_formatter.cc",
         "sdk_listener.cc",
         "sdk_network.cc",
     ],
     hdrs = [
         "sdk.h",
         "sdk_early_header_mutation.h",
+        "sdk_header_formatter.h",
         "sdk_listener.h",
         "sdk_network.h",
     ],
@@ -32,6 +34,7 @@ cc_library(
     srcs = [
         "sdk_internal.cc",
         "sdk_internal_early_header_mutation.cc",
+        "sdk_internal_header_formatter.cc",
         "sdk_internal_listener.cc",
         "sdk_internal_network.cc",
     ],

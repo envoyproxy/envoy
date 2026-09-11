@@ -90,6 +90,8 @@ go_library(
     srcs = [
         "sdk/go/shared/early_header_mutation.go",
         "sdk/go/shared/early_header_mutation_api.go",
+        "sdk/go/shared/header_formatter.go",
+        "sdk/go/shared/header_formatter_api.go",
         "sdk/go/shared/http.go",
         "sdk/go/shared/http_api.go",
         "sdk/go/shared/listener_api.go",
@@ -133,6 +135,7 @@ go_library(
     name = "go_sdk_abi",
     srcs = [
         "sdk/go/abi/early_header_mutation.go",
+        "sdk/go/abi/header_formatter.go",
         "sdk/go/abi/internal.go",
         "sdk/go/abi/listener.go",
         "sdk/go/abi/network.go",

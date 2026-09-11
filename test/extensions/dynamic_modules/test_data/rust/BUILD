@@ -14,6 +14,7 @@ package(default_visibility = [
     "//test/extensions/formatter/dynamic_modules:__pkg__",
     "//test/extensions/health_checkers/dynamic_modules:__pkg__",
     "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",
+    "//test/extensions/http/header_formatters/dynamic_modules:__pkg__",
     "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
@@ -88,3 +89,5 @@ test_program(name = "stat_sink_integration_test")
 test_program(name = "transport_socket_integration_test")
 
 test_program(name = "early_header_mutation_integration_test")
+
+test_program(name = "header_formatter_integration_test")

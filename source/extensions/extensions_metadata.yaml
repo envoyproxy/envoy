@@ -1257,6 +1257,13 @@ envoy.http.original_ip_detection.xff:
   status: stable
   type_urls:
   - envoy.extensions.http.original_ip_detection.xff.v3.XffConfig
+envoy.http.stateful_header_formatters.dynamic_modules:
+  categories:
+  - envoy.http.stateful_header_formatters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.header_formatters.dynamic_modules.v3.DynamicModuleHeaderFormatter
 envoy.http.stateful_header_formatters.preserve_case:
   categories:
   - envoy.http.stateful_header_formatters
