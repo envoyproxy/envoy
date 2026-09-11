@@ -3529,7 +3529,7 @@ TEST(SubstitutionFormatterTest, RequestHeaderSha256Formatter) {
   EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
               ProtoEq(ValueUtil::stringValue(expected_digest)));
 
-  for (const std::string& command : {
+  for (const absl::string_view command : {
            "%REQUEST_HEADER_SHA256(authorization?x-request-id)%",
            "%REQ_SHA256(authorization?x-request-id)%",
        }) {
