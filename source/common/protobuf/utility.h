@@ -630,6 +630,16 @@ public:
   static void redact(Protobuf::Message& message);
 
   /**
+   * Redacts every field of `message`.
+   */
+  static void redactAll(Protobuf::Message& message);
+
+  /**
+   * Whether `field` is annotated `udpa.annotations.sensitive`.
+   */
+  static bool isSensitiveField(const Protobuf::FieldDescriptor& field);
+
+  /**
    * Sanitizes a string to contain only valid UTF-8. Invalid UTF-8 characters will be replaced. If
    * the input string is valid UTF-8, it will be returned unmodified.
    */

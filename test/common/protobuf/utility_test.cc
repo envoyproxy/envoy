@@ -510,6 +510,32 @@ insensitive_repeated_string:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+// redactAll() redacts every field, annotated or not, as redact() does under a sensitive field.
+TEST_F(ProtobufUtilityTest, RedactAll) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_string: This field should be redacted.
+insensitive_string: This field should be redacted too.
+insensitive_int: 1
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_string: '[redacted]'
+insensitive_string: '[redacted]'
+)EOF",
+                            expected);
+
+  MessageUtil::redactAll(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, IsSensitiveField) {
+  const Protobuf::Descriptor& descriptor = *envoy::test::Sensitive::descriptor();
+  EXPECT_TRUE(MessageUtil::isSensitiveField(*descriptor.FindFieldByName("sensitive_string")));
+  EXPECT_FALSE(MessageUtil::isSensitiveField(*descriptor.FindFieldByName("insensitive_string")));
+}
+
 // Fields that are values in a sensitive map should be redacted.
 TEST_F(ProtobufUtilityTest, RedactMap) {
   envoy::test::Sensitive actual, expected;
