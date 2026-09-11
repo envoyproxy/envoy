@@ -48,8 +48,9 @@ public:
   // Appends owned `data` to the store, taking ownership; `cb` fires once the bytes
   // are durable. The caller issues at most one write at a time -- it will not call
   // write() again until `cb` fires -- so an implementation needs no write queue of
-  // its own and can apply back-pressure simply by deferring `cb`.
-  virtual void write(Buffer::InstancePtr data, WriteCallback cb) PURE;
+  // its own and can apply back-pressure simply by deferring `cb`. If `end_stream`
+  // is true, this is the final write for the buffer.
+  virtual void write(Buffer::InstancePtr data, bool end_stream, WriteCallback cb) PURE;
 
   // Reads `length` bytes starting at absolute byte offset `offset`. It is an
   // error to request a range that extends past the current length(). `cb`

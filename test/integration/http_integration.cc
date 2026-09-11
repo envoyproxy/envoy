@@ -378,7 +378,6 @@ void HttpIntegrationTest::useAccessLog(
 }
 
 HttpIntegrationTest::~HttpIntegrationTest() {
-  Http::HeaderUtility::disable_request_header_validation_for_tests_ = false;
   // Make sure any open streams have been closed. If there's an open stream, the decoder will
   // be out of scope, and so open streams result in writing to freed memory.
   if (codec_client_) {
@@ -386,6 +385,11 @@ HttpIntegrationTest::~HttpIntegrationTest() {
         << "test requires explicit cleanupUpstreamAndDownstream";
   }
   cleanupUpstreamAndDownstream();
+  // Reset last, once the connections are torn down. The server's workers outlive this destructor
+  // (`test_server_` belongs to the base class), so they may still read the flag; it is atomic for
+  // that reason.
+  Http::HeaderUtility::disable_request_header_validation_for_tests_.store(
+      false, std::memory_order_relaxed);
 }
 
 void HttpIntegrationTest::initialize() {

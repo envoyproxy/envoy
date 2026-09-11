@@ -92,7 +92,7 @@ public:
                                        AiRequestPropagator propagate_request,
                                        LocalReplier) override {
     ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
-    req->request_index().json()["model"] = target_model_;
+    req->json()["model"] = target_model_;
     co_return co_await std::move(propagate_request)(std::move(req));
   }
 
@@ -131,7 +131,7 @@ public:
                                        AiRequestPropagator propagate_request,
                                        LocalReplier) override {
     ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
-    req->request_index().json()["temperature"] = 0.5;
+    req->json()["temperature"] = 0.5;
     co_return co_await std::move(propagate_request)(std::move(req));
   }
 };
@@ -142,8 +142,8 @@ public:
                                        AiRequestPropagator propagate_request,
                                        LocalReplier) override {
     ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
-    EXPECT_DOUBLE_EQ(req->request_index().json()["temperature"].get<double>(), 0.5);
-    req->request_index().json()["temperature"] = 0.9;
+    EXPECT_DOUBLE_EQ(req->json()["temperature"].get<double>(), 0.5);
+    req->json()["temperature"] = 0.9;
     co_return co_await std::move(propagate_request)(std::move(req));
   }
 };
