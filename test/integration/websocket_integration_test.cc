@@ -284,7 +284,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketRejectsUpstreamWithoutMatchingAccept) 
       upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
@@ -305,7 +305,8 @@ TEST_P(WebsocketIntegrationTest, WebSocketRejectsUpstreamWithoutMatchingAccept) 
   EXPECT_EQ(response_->headers().Connection(), nullptr);
   EXPECT_EQ(response_->headers().Upgrade(), nullptr);
   EXPECT_TRUE(response_->headers().get(Http::Headers::get().SecWebSocketAccept).empty());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("websocket_handshake_invalid_accept"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("UPE websocket_handshake_invalid_accept"));
 
   test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
   test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(0));
@@ -318,6 +319,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketInvalidHandshakeRetriesAnotherHost) {
     return;
   }
 
+  useAccessLog("%RESPONSE_FLAGS%");
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   config_helper_.addConfigModifier(setRouteRetryOn5xxPolicy());
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -386,6 +388,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketInvalidHandshakeRetriesAnotherHost) {
   sendBidirectionalData();
   codec_client_->close();
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::Not(HasSubstr("UPE")));
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketAcceptValidationCanBeDisabled) {
