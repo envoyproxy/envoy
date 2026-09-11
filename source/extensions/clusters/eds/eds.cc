@@ -43,6 +43,8 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
   } else {
     initialize_phase_ = InitializePhase::Secondary;
   }
+  zero_initial_fetch_timeout_ =
+      Config::Utility::configSourceInitialFetchTimeout(eds_config).count() == 0;
   const auto resource_name = resource_type_helper_.getResourceName();
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions")) {
