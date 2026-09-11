@@ -56,7 +56,9 @@ McpRouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   return McpRouterStats{MCP_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-template <typename Config> std::vector<McpBackendConfig> parseBackends(const Config& config) {
+template <typename Config>
+std::vector<McpBackendConfig> parseBackends(const Config& config,
+                                            Server::Configuration::CommonFactoryContext& context) {
   std::vector<McpBackendConfig> result;
   for (const auto& server : config.servers()) {
     McpBackendConfig backend;
@@ -67,6 +69,7 @@ template <typename Config> std::vector<McpBackendConfig> parseBackends(const Con
     backend.timeout =
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(mcp_cluster, timeout, 5000));
     backend.host_rewrite_literal = mcp_cluster.host_rewrite_literal();
+    backend.header_forwarding = parseHeaderForwarding(server.header_forwarding(), context);
     result.push_back(std::move(backend));
   }
   return result;
@@ -77,7 +80,7 @@ McpRouterConfigImpl::McpRouterConfigImpl(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope,
     Server::Configuration::ServerFactoryContext& context)
-    : backends_(parseBackends(proto_config)),
+    : backends_(parseBackends(proto_config, context)),
       default_backend_name_(backends_.size() == 1 ? backends_[0].name : ""),
       factory_context_(context), lazy_initialization_(proto_config.lazy_initialization()),
       session_identity_(parseSessionIdentity(proto_config)),
@@ -96,7 +99,8 @@ const McpBackendConfig* McpRouterConfigImpl::findBackend(const std::string& name
 McpRouterClusterConfigImpl::McpRouterClusterConfigImpl(
     const envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig& proto_config,
     McpRouterConfigSharedPtr base_config)
-    : base_config_(std::move(base_config)), backends_(parseBackends(proto_config)),
+    : base_config_(std::move(base_config)),
+      backends_(parseBackends(proto_config, base_config_->factoryContext())),
       default_backend_name_(backends_.size() == 1 ? backends_[0].name : "") {}
 
 const McpBackendConfig* McpRouterClusterConfigImpl::findBackend(const std::string& name) const {
