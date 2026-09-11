@@ -47,7 +47,7 @@ public:
       const std::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
                               AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
-      Stats::Scope& stats_scope, Upstream::HealthFlagCallbacks health_flag_callbacks = {});
+      Stats::Scope& stats_scope, Upstream::HealthFlagCallbacks health_flag_callbacks);
 
   static const NetworkFilters::Common::Redis::RespValue& pingHealthCheckRequest() {
     static HealthCheckRequest* request = new HealthCheckRequest();

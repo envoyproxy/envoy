@@ -33,14 +33,23 @@ enum class HealthTransition {
  * state instead of real host flags.
  */
 struct HealthFlagCallbacks {
-  std::function<bool(const Host&, Host::HealthFlag)> get =
-      [](const Host& host, Host::HealthFlag flag) { return host.healthFlagGet(flag); };
-  std::function<void(Host&, Host::HealthFlag)> set = [](Host& host, Host::HealthFlag flag) {
-    host.healthFlagSet(flag);
-  };
-  std::function<void(Host&, Host::HealthFlag)> clear = [](Host& host, Host::HealthFlag flag) {
-    host.healthFlagClear(flag);
-  };
+  using HealthFlagGet = std::function<bool(const Host&, Host::HealthFlag)>;
+  using HealthFlagSet = std::function<void(Host&, Host::HealthFlag)>;
+  using HealthFlagClear = std::function<void(Host&, Host::HealthFlag)>;
+
+  HealthFlagGet get;
+  HealthFlagSet set;
+  HealthFlagClear clear;
+
+  // Define this explicitly instead of using the default constructor so that it is opt-in, to avoid
+  // accidental incorrect uses of the default.
+  static HealthFlagCallbacks defaultCallbacks() {
+    return HealthFlagCallbacks{
+        [](const Host& host, Host::HealthFlag flag) { return host.healthFlagGet(flag); },
+        [](Host& host, Host::HealthFlag flag) { host.healthFlagSet(flag); },
+        [](Host& host, Host::HealthFlag flag) { host.healthFlagClear(flag); },
+    };
+  }
 };
 
 /**

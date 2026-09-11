@@ -210,7 +210,7 @@ void TcpHealthCheckFuzz::allocTcpHealthCheckerFromProto(
   health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
       *cluster_, config, context_.mainThreadDispatcher(), context_.runtime(),
       context_.api().randomGenerator(), HealthCheckEventLoggerPtr(event_logger_storage_.release()),
-      cluster_->info()->statsScope());
+      cluster_->info()->statsScope(), Upstream::HealthFlagCallbacks::defaultCallbacks());
   ENVOY_LOG_MISC(trace, "Created Tcp Health Checker");
 }
 
@@ -327,7 +327,7 @@ void GrpcHealthCheckFuzz::allocGrpcHealthCheckerFromProto(
   health_checker_ = std::make_shared<NiceMock<TestGrpcHealthCheckerImpl>>(
       *cluster_, config, context_.mainThreadDispatcher(), context_.runtime(),
       context_.api().randomGenerator(), HealthCheckEventLoggerPtr(event_logger_storage_.release()),
-      cluster_->info()->statsScope());
+      cluster_->info()->statsScope(), Upstream::HealthFlagCallbacks::defaultCallbacks());
   ENVOY_LOG_MISC(trace, "Created Test Grpc Health Checker");
 }
 

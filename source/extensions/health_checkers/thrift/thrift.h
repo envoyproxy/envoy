@@ -28,7 +28,7 @@ public:
                       Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                       Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
                       ClientFactory& client_factory, Stats::Scope& stats_scope,
-                      Upstream::HealthFlagCallbacks health_flag_callbacks = {});
+                      Upstream::HealthFlagCallbacks health_flag_callbacks);
 
 protected:
   envoy::data::core::v3::HealthCheckerType healthCheckerType() const override {

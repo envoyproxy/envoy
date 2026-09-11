@@ -4400,7 +4400,8 @@ public:
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
         *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
-        HealthCheckEventLoggerPtr(event_logger_storage_.release()), cluster_->info()->statsScope());
+        HealthCheckEventLoggerPtr(event_logger_storage_.release()), cluster_->info()->statsScope(),
+        Upstream::HealthFlagCallbacks::defaultCallbacks());
   }
 
   void setupData(unsigned int unhealthy_threshold = 2) {
@@ -5057,7 +5058,8 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  HealthCheckerFactoryContextImpl context(cluster, server_context, server_context.scope());
+  HealthCheckerFactoryContextImpl context(cluster, server_context, server_context.scope(),
+                                          HealthFlagCallbacks::defaultCallbacks());
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a
@@ -5168,7 +5170,8 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  HealthCheckerFactoryContextImpl context(cluster, server_context, server_context.scope());
+  HealthCheckerFactoryContextImpl context(cluster, server_context, server_context.scope(),
+                                          HealthFlagCallbacks::defaultCallbacks());
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a

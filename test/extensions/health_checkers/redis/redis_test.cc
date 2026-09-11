@@ -65,7 +65,8 @@ public:
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
-        std::nullopt, cluster_->info()->statsScope());
+        std::nullopt, cluster_->info()->statsScope(),
+        Upstream::HealthFlagCallbacks::defaultCallbacks());
   }
 
   void setupWithAuth() {
@@ -102,7 +103,8 @@ public:
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
-        std::nullopt, cluster_->info()->statsScope());
+        std::nullopt, cluster_->info()->statsScope(),
+        Upstream::HealthFlagCallbacks::defaultCallbacks());
   }
 
   void setupAlwaysLogHealthCheckFailures() {
@@ -127,7 +129,8 @@ public:
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
-        std::nullopt, cluster_->info()->statsScope());
+        std::nullopt, cluster_->info()->statsScope(),
+        Upstream::HealthFlagCallbacks::defaultCallbacks());
   }
 
   void setupExistsHealthcheck() {
@@ -152,7 +155,8 @@ public:
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
-        std::nullopt, cluster_->info()->statsScope());
+        std::nullopt, cluster_->info()->statsScope(),
+        Upstream::HealthFlagCallbacks::defaultCallbacks());
   }
 
   void setupExistsHealthcheckWithAuth() {
@@ -190,7 +194,8 @@ public:
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
-        std::nullopt, cluster_->info()->statsScope());
+        std::nullopt, cluster_->info()->statsScope(),
+        Upstream::HealthFlagCallbacks::defaultCallbacks());
   }
 
   void setupDontReuseConnection() {
@@ -215,7 +220,8 @@ public:
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
-        std::nullopt, cluster_->info()->statsScope());
+        std::nullopt, cluster_->info()->statsScope(),
+        Upstream::HealthFlagCallbacks::defaultCallbacks());
   }
 
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
@@ -828,7 +834,8 @@ TEST(RedisHealthCheckerIamAuthTest, CheckTokenIsRetrieved) {
       *cluster, health_check_config, redis_config, dispatcher, runtime,
       Upstream::HealthCheckEventLoggerPtr(event_logger_), *api,
       NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_, aws_iam_config,
-      mock_authenticator, cluster->info()->statsScope());
+      mock_authenticator, cluster->info()->statsScope(),
+      Upstream::HealthFlagCallbacks::defaultCallbacks());
   health_checker->start();
   delete (cluster);
 }

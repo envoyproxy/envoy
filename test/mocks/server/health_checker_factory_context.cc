@@ -25,7 +25,7 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
     return cluster_.info()->statsScope();
   }));
   ON_CALL(*this, healthFlagCallbacks())
-      .WillByDefault(testing::Return(Upstream::HealthFlagCallbacks{}));
+      .WillByDefault(testing::Return(Upstream::HealthFlagCallbacks::defaultCallbacks()));
 }
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;

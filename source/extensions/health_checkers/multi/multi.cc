@@ -39,8 +39,9 @@ MultiHealthChecker::MultiHealthChecker(Upstream::Cluster& cluster,
     Stats::Scope* scope;
     if (!entry.name().empty()) {
       std::vector<Stats::TagStringView> tags{{"name", entry.name()}};
-      checker_scope = cluster.info()->statsScope().createScopeWithTaggedName("health_check", tags,
-                                                                             absl::string_view{});
+      checker_scope = cluster.info()->statsScope().createScopeWithTaggedName(
+          "health_check", tags,
+          absl::StrCat("health_check.name.", entry.name(), "."));
       scope = checker_scope.get();
     } else {
       scope = &cluster.info()->statsScope();
@@ -218,8 +219,6 @@ void MultiHealthChecker::onCheckerResult(uint32_t checker_index, Upstream::HostS
     cb(host, aggregate_transition, aggregate_result);
   }
 }
-
-// Factory implementation
 
 Upstream::HealthCheckerSharedPtr MultiHealthCheckerFactory::createCustomHealthChecker(
     const envoy::config::core::v3::HealthCheck& config,

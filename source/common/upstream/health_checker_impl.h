@@ -55,7 +55,7 @@ public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster,
                                   Server::Configuration::ServerFactoryContext& server_context,
                                   Stats::Scope& stats_scope,
-                                  HealthFlagCallbacks health_flag_callbacks = {})
+                                  HealthFlagCallbacks health_flag_callbacks)
       : cluster_(cluster), runtime_(server_context.runtime()),
         dispatcher_(server_context.mainThreadDispatcher()),
         validation_visitor_(server_context.messageValidationVisitor()),
@@ -118,7 +118,7 @@ public:
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
          Upstream::Cluster& cluster, Server::Configuration::ServerFactoryContext& server_context,
          OptRef<Stats::Scope> stats_scope = std::nullopt,
-         HealthFlagCallbacks health_flag_callbacks = {});
+         HealthFlagCallbacks health_flag_callbacks = HealthFlagCallbacks::defaultCallbacks());
 };
 
 /**

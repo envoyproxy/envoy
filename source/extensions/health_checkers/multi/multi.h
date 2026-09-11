@@ -50,7 +50,7 @@ private:
   Upstream::Cluster& cluster_;
   std::vector<PerCheckerData> checkers_;
   absl::node_hash_map<const Upstream::Host*, PerHostState> host_states_;
-  std::list<HostStatusCb> callbacks_;
+  std::vector<HostStatusCb> callbacks_;
   Common::CallbackHandlePtr member_update_cb_;
 };
 
