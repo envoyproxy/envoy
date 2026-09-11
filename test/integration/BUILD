@@ -3263,6 +3263,7 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         ":quic_http_integration_test_lib",
         "//source/common/quic:quic_ssl_connection_info_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ]),
 )

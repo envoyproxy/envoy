@@ -6,6 +6,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -28,6 +29,7 @@
 #include "source/common/tls/stats.h"
 
 #include "absl/synchronization/mutex.h"
+#include "absl/types/span.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
@@ -74,6 +76,13 @@ public:
                            HMAC_CTX* hmac_ctx, int encrypt);
   bool hasSessionTicketKeys() const { return !session_ticket_keys_.empty(); }
 
+  // The session context id that scopes session resumption to this configuration, or empty when no
+  // certificate is configured.
+  absl::Span<const uint8_t> sessionContextId() const {
+    return session_context_id_.has_value() ? absl::MakeConstSpan(*session_context_id_)
+                                           : absl::Span<const uint8_t>();
+  }
+
 protected:
   ServerContextImpl(
       Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
@@ -92,6 +101,7 @@ private:
 
   Ssl::TlsCertificateSelectorPtr tls_certificate_selector_;
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
+  std::optional<SessionContextID> session_context_id_;
 
 protected:
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;

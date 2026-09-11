@@ -7,6 +7,7 @@
 
 #include "test/integration/quic_http_integration_test.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -26,7 +27,8 @@ public:
   void setupServerWithClientCertValidation(const std::string& client_ca_cert = "cacert.pem",
                                            const std::string& server_cert = "servercert.pem",
                                            const std::string& server_key = "serverkey.pem",
-                                           bool require_client_cert = true) {
+                                           bool require_client_cert = true,
+                                           bool enable_resumption = false) {
     config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* transport_socket = bootstrap.mutable_static_resources()
                                    ->mutable_listeners(0)
@@ -37,6 +39,10 @@ public:
       auto unpack_result =
           MessageUtil::unpackTo(*transport_socket->mutable_typed_config(), quic_config);
       ASSERT_TRUE(unpack_result.ok());
+
+      // Early data requires resumption, so keep the two consistent.
+      quic_config.mutable_enable_early_data()->set_value(enable_resumption);
+      quic_config.mutable_enable_resumption()->set_value(enable_resumption);
 
       auto* tls_context = quic_config.mutable_downstream_tls_context();
       tls_context->mutable_require_client_certificate()->set_value(require_client_cert);
@@ -449,6 +455,67 @@ TEST_P(QuicMtlsIntegrationTest, PeerCertificateSanMatcherCoverage) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   codec_client_->close();
+}
+
+// A session established under one certificate validation configuration cannot be resumed under a
+// different one. Resumption succeeds while the configuration is unchanged, but once the trust
+// anchor changes the cached session is refused and a full handshake re-validates the client
+// certificate. Without this scoping a resumed connection would silently reuse the previous
+// validation verdict.
+TEST_P(QuicMtlsIntegrationTest, MtlsResumptionScopedToValidationConfig) {
+  concurrency_ = 1;
+  setupServerWithClientCertValidation("cacert.pem", "servercert.pem", "serverkey.pem",
+                                      /*require_client_cert=*/true, /*enable_resumption=*/true);
+  initialize();
+
+  // The first connection completes a full handshake and validates the client certificate.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+  auto* first_session = static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_FALSE(first_session->IsResumption());
+  codec_client_->close();
+
+  // The second connection resumes the session while the configuration is unchanged.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+  auto* second_session = static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_TRUE(second_session->IsResumption());
+  codec_client_->close();
+
+  // Change the trust anchor to one that does not sign the client certificate.
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+  new_config_helper.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* transport_socket = bootstrap.mutable_static_resources()
+                                 ->mutable_listeners(0)
+                                 ->mutable_filter_chains(0)
+                                 ->mutable_transport_socket();
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
+    ASSERT_TRUE(MessageUtil::unpackTo(*transport_socket->mutable_typed_config(), quic_config).ok());
+    quic_config.mutable_downstream_tls_context()
+        ->mutable_common_tls_context()
+        ->mutable_validation_context()
+        ->mutable_trusted_ca()
+        ->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+    ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(quic_config));
+  });
+  new_config_helper.setLds("1");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", testing::Ge(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", testing::Ge(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", testing::Eq(0));
+
+  // The cached session was scoped to the previous trust anchor, so resumption is refused, and the
+  // full handshake re-validates the client certificate against the new trust anchor and rejects it.
+  EXPECT_LOG_CONTAINS("debug", "QUIC client certificate validation rejected",
+                      { expectConnectionFailure(""); });
 }
 
 } // namespace Quic
