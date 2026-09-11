@@ -285,7 +285,7 @@ bool UpstreamCodecFilter::CodecBridge::hasValidGeneratedWebsocketHandshakeHeader
 }
 
 void UpstreamCodecFilter::CodecBridge::rejectInvalidGeneratedWebsocketHandshake() {
-  filter_.callbacks_->streamInfo().setResponseFlag(
+  filter_.callbacks_->upstreamCallbacks()->upstreamStreamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::UpstreamProtocolError);
   const absl::string_view response_code_details =
       StreamInfo::ResponseCodeDetails::get().WebsocketHandshakeInvalidAccept;

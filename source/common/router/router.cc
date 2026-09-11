@@ -2072,6 +2072,10 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
           : StreamInfo::ResponseCodeDetails::get().ViaUpstream;
   callbacks_->streamInfo().setResponseCodeDetails(response_code_details);
 
+  if (upstream_request.streamInfo().hasResponseFlag(
+          StreamInfo::CoreResponseFlag::UpstreamProtocolError)) {
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError);
+  }
   callbacks_->streamInfo().setResponseCode(response_code);
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;
