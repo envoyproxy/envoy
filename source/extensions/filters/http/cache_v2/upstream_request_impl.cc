@@ -1,6 +1,6 @@
 #include "source/extensions/filters/http/cache_v2/upstream_request_impl.h"
 
-#include "range_utils.h"
+#include "source/extensions/filters/http/cache_v2/range_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,6 +51,7 @@ void UpstreamRequestImpl::getHeaders(GetHeadersCallback&& cb) {
 
 void UpstreamRequestImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
+  stream_pos_ = RangeUtils::rangeFromHeaders(*headers).begin();
   headers_ = std::move(headers);
   end_stream_after_headers_ = end_stream;
   return maybeDeliverHeaders();
@@ -174,14 +175,6 @@ void UpstreamRequestImpl::sendHeaders(Http::RequestHeaderMapPtr request_headers)
   // would have bypassed cache lookup and insertion, so this class wouldn't
   // be instantiated. So end_stream will always be true.
   stream_->sendHeaders(*request_headers_, /*end_stream=*/true);
-  std::optional<absl::string_view> range_header = RangeUtils::getRangeHeader(*request_headers_);
-  if (range_header) {
-    std::optional<std::vector<RawByteRange>> ranges =
-        RangeUtils::parseRangeHeader(range_header.value(), 1);
-    if (ranges) {
-      stream_pos_ = ranges.value().front().firstBytePos();
-    }
-  }
 }
 
 template <class... Ts> struct Overloaded : Ts... {
