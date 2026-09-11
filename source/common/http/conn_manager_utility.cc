@@ -369,6 +369,7 @@ void ConnectionManagerUtility::cleanInternalHeaders(
   // the block above.
   request_headers.removeEnvoyRetriableStatusCodes();
   request_headers.removeEnvoyRetriableHeaderNames();
+  request_headers.removeEnvoyInternalRedirectOn();
   request_headers.removeEnvoyRetryOn();
   request_headers.removeEnvoyRetryGrpcOn();
   request_headers.removeEnvoyMaxRetries();
