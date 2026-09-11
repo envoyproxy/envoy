@@ -243,6 +243,8 @@ private:
   absl::flat_hash_map<std::string, std::unique_ptr<LoadShedPointImpl>> loadshed_points_;
 
   Event::ScaledTimerTypeMapConstSharedPtr timer_minimums_;
+  absl::flat_hash_map<std::string, Event::ScaledTimerTypeMapConstSharedPtr>
+      timer_minimums_by_action_;
 
   absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>
       state_updates_to_flush_;
