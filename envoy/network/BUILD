@@ -137,6 +137,7 @@ envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     deps = [
+        ":address_interface",
         ":listen_socket_interface",
         ":listener_filter_buffer_interface",
         ":transport_socket_interface",

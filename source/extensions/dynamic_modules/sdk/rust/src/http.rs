@@ -2013,7 +2013,10 @@ pub trait EnvoyHttpFilter {
   ///
   /// The returned span can be used to add tags, logs, or spawn child spans.
   /// The active span is managed by Envoy and should not be finished by the module.
-  fn get_active_span<'a>(&'a self) -> Option<Box<dyn EnvoySpan + 'a>>;
+  ///
+  /// The span may be stored and used in a later event hook on the same worker thread. Do not use
+  /// the active span after the stream has ended and do not move a span to another thread.
+  fn get_active_span(&self) -> Option<Box<dyn EnvoySpan>>;
 
   /// Create a child span from the active span with the given operation name.
   ///
@@ -2022,7 +2025,44 @@ pub trait EnvoyHttpFilter {
   ///
   /// The returned child span must be finished by calling [`EnvoyChildSpan::finish`]
   /// when done. Failing to finish the span will result in incomplete trace data.
-  fn spawn_child_span<'a>(&'a self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + 'a>>;
+  ///
+  /// The child span is owned by the module, so it may be stored and finished in a later event hook
+  /// on the same worker thread. This is how a span can cover off-thread work, by keeping it in the
+  /// filter and finishing it from [`HttpFilter::on_scheduled`]. Do not move a span to another
+  /// thread.
+  ///
+  /// ```
+  /// use abi::*;
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  /// use std::cell::RefCell;
+  ///
+  /// struct MyFilter {
+  ///   active_span: RefCell<Option<Box<dyn EnvoySpan>>>,
+  ///   child_span: RefCell<Option<Box<dyn EnvoyChildSpan>>>,
+  /// }
+  /// impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MyFilter {
+  ///   fn on_request_headers(
+  ///     &self,
+  ///     envoy_filter: &mut EHF,
+  ///     _end_of_stream: bool,
+  ///   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+  ///     // Keep the active and child spans so on_scheduled can use them after off-thread work.
+  ///     *self.active_span.borrow_mut() = envoy_filter.get_active_span();
+  ///     *self.child_span.borrow_mut() = envoy_filter.spawn_child_span("off_thread_work");
+  ///     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  ///   }
+  ///   fn on_scheduled(&self, envoy_filter: &mut EHF, _event_id: u64) {
+  ///     if let Some(span) = self.active_span.borrow().as_ref() {
+  ///       span.set_tag("completed", "true");
+  ///     }
+  ///     if let Some(mut child) = self.child_span.borrow_mut().take() {
+  ///       child.finish();
+  ///     }
+  ///     envoy_filter.continue_decoding();
+  ///   }
+  /// }
+  /// ```
+  fn spawn_child_span(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan>>;
 
   // ------------------- Cluster/Upstream Information methods -------------------------
 
@@ -2139,7 +2179,9 @@ pub trait EnvoyHttpFilter {
 /// This trait provides methods to interact with a tracing span, such as setting tags,
 /// logging events, and spawning child spans.
 ///
-/// The span is managed by Envoy and should not be finished by the module.
+/// The span is managed by Envoy and should not be finished by the module. A span may be stored and
+/// used in a later event hook on the same worker thread. Do not use a span after the stream has
+/// ended or move it to another thread.
 pub trait EnvoySpan {
   /// Set a tag on this span.
   ///
@@ -2199,7 +2241,7 @@ pub trait EnvoySpan {
   /// Create a child span with the given operation name.
   ///
   /// The child span must be finished by calling [`EnvoyChildSpan::finish`] when done.
-  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + '_>>;
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan>>;
 }
 
 /// Implementation of [`EnvoySpan`] that wraps the raw span pointer from Envoy.
@@ -2324,7 +2366,7 @@ impl EnvoySpan for EnvoySpanImpl {
     }
   }
 
-  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + '_>> {
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan>> {
     let raw_ptr = unsafe {
       abi::envoy_dynamic_module_callback_http_span_spawn_child(
         self.filter_ptr,
@@ -2347,7 +2389,9 @@ impl EnvoySpan for EnvoySpanImpl {
 /// Trait representing a child tracing span created by the module.
 ///
 /// Child spans are owned by the module and must be finished by calling
-/// [`EnvoyChildSpan::finish`] when done.
+/// [`EnvoyChildSpan::finish`] when done. A child span may be stored and finished in a later event
+/// hook on the same worker thread, for example to cover off-thread work. Do not move a span to
+/// another thread.
 pub trait EnvoyChildSpan {
   /// Set a tag on this span.
   fn set_tag(&self, key: &str, value: &str);
@@ -2365,7 +2409,7 @@ pub trait EnvoyChildSpan {
   fn set_baggage(&self, key: &str, value: &str);
 
   /// Create a child span from this span with the given operation name.
-  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + '_>>;
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan>>;
 
   /// Finish and release this span.
   ///
@@ -2431,7 +2475,7 @@ impl EnvoyChildSpan for EnvoyChildSpanImpl {
     }
   }
 
-  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + '_>> {
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan>> {
     let raw_ptr = unsafe {
       abi::envoy_dynamic_module_callback_http_span_spawn_child(
         self.filter_ptr,
@@ -4009,7 +4053,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     unsafe { abi::envoy_dynamic_module_callback_http_set_buffer_limit(self.raw_ptr, limit) }
   }
 
-  fn get_active_span<'a>(&'a self) -> Option<Box<dyn EnvoySpan + 'a>> {
+  fn get_active_span(&self) -> Option<Box<dyn EnvoySpan>> {
     let raw_ptr = unsafe { abi::envoy_dynamic_module_callback_http_get_active_span(self.raw_ptr) };
     if raw_ptr.is_null() {
       None
@@ -4021,7 +4065,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn spawn_child_span<'a>(&'a self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + 'a>> {
+  fn spawn_child_span(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan>> {
     // Get the active span pointer directly.
     let span_ptr = unsafe { abi::envoy_dynamic_module_callback_http_get_active_span(self.raw_ptr) };
     if span_ptr.is_null() {

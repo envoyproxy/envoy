@@ -98,11 +98,18 @@ def dockerhub_envoy_role(
     return [pnode], []
 
 
+def _blank_permalink_icon(app):
+    # sphinx_rtd_theme overwrites this with a Font Awesome glyph when it loads,
+    # after conf.py has run; the stylesheet draws the `#` itself.
+    app.config.html_permalinks_icon = ''
+
+
 def setup(app):
     app.add_config_value('release_level', '', 'env')
     app.add_config_value('substitutions', [], 'html')
     app.add_directive('substitution-code-block', SubstitutionCodeBlock)
     app.add_role('dockerhub_envoy', dockerhub_envoy_role)
+    app.connect('builder-inited', _blank_permalink_icon)
 
 
 missing_config = (
@@ -310,16 +317,6 @@ html_favicon = 'favicon.ico'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-# A published copy of the docs knows its own version, but not what has been
-# released since it was built, so the version list cannot be baked in here.
-# Whoever assembles the site can inject it by overriding `envoy_versions` with
-# a list of {'name': ..., 'url': ...}; until then the menu degrades to a single
-# link to the version index.
-html_context = {
-    'envoy_versions': [],
-    'envoy_versions_url': '/docs/',
-}
-
 # envoy.css carries the design tokens and must load first; the component
 # modules below are listed separately so each is a parallel <link> rather than
 # an @import waterfall. See docs/root/_static/css/envoy/.
@@ -394,6 +391,12 @@ html_js_files = [
 
 # This is the file name suffix for HTML files (e.g. ".xhtml").
 #html_file_suffix = None
+
+# `.html` by default so builds render straight from disk or an object store
+# (PR previews, local dev). envoy-website builds with
+# `--@envoy-docs//:pretty_links`, which exports an empty suffix, and serves
+# `/foo` from `foo.html` itself.
+html_link_suffix = os.environ.get("ENVOY_DOCS_LINK_SUFFIX", ".html")
 
 # Language to be used for generating the HTML full-text search index.
 # Sphinx supports the following languages:

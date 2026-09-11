@@ -173,6 +173,13 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni,
     cert_matched_sni = &unused;
   }
 
+  // Certificate-level tls_params are deliberately not consulted here. They are applied to the
+  // per-connection SSL object once a certificate is chosen, so a certificate whose params cannot
+  // serve this client fails the handshake rather than being skipped. Skipping it instead would
+  // require evaluating each candidate's effective protocol range, ciphers, groups and signature
+  // algorithms against the ClientHello, which findTlsContext does not receive (it is also the QUIC
+  // entry point, where there is no ClientHello).
+
   // selected_ctx represents the final selected certificate, it should meet all requirements or pick
   // a candidate.
   const Ssl::TlsContext* selected_ctx = nullptr;

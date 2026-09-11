@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/oauth2/filter.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <memory>
 #include <string>
@@ -30,6 +31,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "absl/types/span.h"
 #include "openssl/mem.h"
 #include "openssl/rand.h"
 
@@ -125,9 +127,9 @@ authScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos
 // Transforms the proto list into encoded resource params
 // Takes care of percentage encoding http and https is needed
 std::string encodeResourceList(const Protobuf::RepeatedPtrField<std::string>& resources_protos) {
-  std::string result = "";
+  std::string result;
   for (const auto& resource : resources_protos) {
-    result += "&resource=" + Http::Utility::PercentEncoding::urlEncode(resource);
+    absl::StrAppend(&result, "&resource=", Http::Utility::PercentEncoding::urlEncode(resource));
   }
   return result;
 }
@@ -198,19 +200,19 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
 }
 
 // Helper function to get SameSite attribute string from proto enum.
-std::string
+absl::string_view
 getSameSiteString(envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite same_site) {
   switch (same_site) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
       CookieConfig_SameSite_STRICT:
-    return std::string(SameSiteStrict);
+    return SameSiteStrict;
   case envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
       CookieConfig_SameSite_LAX:
-    return std::string(SameSiteLax);
+    return SameSiteLax;
   case envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
       CookieConfig_SameSite_NONE:
-    return std::string(SameSiteNone);
+    return SameSiteNone;
   case envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
       CookieConfig_SameSite_DISABLED:
     return EMPTY_STRING;
@@ -230,65 +232,56 @@ Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
   return query_params;
 }
 
-std::string encodeHmacHexBase64(const std::vector<uint8_t>& secret, absl::string_view domain,
-                                absl::string_view expires, absl::string_view token = "",
-                                absl::string_view id_token = "",
-                                absl::string_view refresh_token = "") {
-  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  const auto hmac_payload =
-      absl::StrJoin({domain, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
-  std::string encoded_hmac;
-  absl::Base64Escape(Hex::encode(crypto_util.getSha256Hmac(secret, hmac_payload)), &encoded_hmac);
-  return encoded_hmac;
+absl::Span<const uint8_t> secretSpan(absl::string_view secret) {
+  return {reinterpret_cast<const uint8_t*>(secret.data()), secret.size()};
+}
+
+std::string base64Encode(absl::Span<const uint8_t> bytes) {
+  std::string encoded;
+  absl::Base64Escape(absl::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()),
+                     &encoded);
+  return encoded;
+}
+
+// The payload the OAuth cookie HMAC is computed over.
+std::string cookieHmacPayload(absl::string_view domain, absl::string_view expires,
+                              absl::string_view token, absl::string_view id_token,
+                              absl::string_view refresh_token) {
+  return absl::StrJoin({domain, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
 }
 
 // Generates a SHA256 HMAC from a secret and a message and returns the result as a base64 encoded
 // string.
-std::string generateHmacBase64(const std::vector<uint8_t>& secret, absl::string_view message) {
-  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, message);
-  std::string hmac_string(hmac_result.begin(), hmac_result.end());
-  std::string base64_encoded_hmac;
-  absl::Base64Escape(hmac_string, &base64_encoded_hmac);
-  return base64_encoded_hmac;
+std::string generateHmacBase64(absl::string_view secret, absl::string_view message) {
+  return base64Encode(
+      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Hmac(secretSpan(secret), message));
 }
 
-std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_view domain,
+std::string encodeHmacBase64(absl::string_view secret, absl::string_view domain,
                              absl::string_view expires, absl::string_view token = "",
                              absl::string_view id_token = "",
                              absl::string_view refresh_token = "") {
-  std::string hmac_payload =
-      absl::StrJoin({domain, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
-  return generateHmacBase64(secret, hmac_payload);
-}
-
-std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view domain,
-                       absl::string_view expires, absl::string_view token = "",
-                       absl::string_view id_token = "", absl::string_view refresh_token = "") {
-  return encodeHmacBase64(secret, domain, expires, token, id_token, refresh_token);
+  return generateHmacBase64(secret,
+                            cookieHmacPayload(domain, expires, token, id_token, refresh_token));
 }
 
 // Generates a CSRF token that can be used to prevent CSRF attacks.
 // The token is in the format of <nonce>.<hmac(nonce)> recommended by
 // https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#signed-double-submit-cookie-recommended
 std::string generateCsrfToken(absl::string_view hmac_secret, absl::string_view random_string) {
-  std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
-  std::string hmac = generateHmacBase64(hmac_secret_vec, random_string);
-  std::string csrf_token = fmt::format("{}.{}", random_string, hmac);
-  return csrf_token;
+  return absl::StrCat(random_string, ".", generateHmacBase64(hmac_secret, random_string));
 }
 
 // validate the csrf token hmac to prevent csrf token forgery
-bool validateCsrfTokenHmac(const std::string& hmac_secret, const std::string& csrf_token) {
-  size_t pos = csrf_token.find('.');
-  if (pos == std::string::npos) {
+bool validateCsrfTokenHmac(absl::string_view hmac_secret, absl::string_view csrf_token) {
+  const size_t pos = csrf_token.find('.');
+  if (pos == absl::string_view::npos) {
     return false;
   }
 
-  std::string token = std::string(csrf_token.substr(0, pos));
-  std::string hmac = std::string(csrf_token.substr(pos + 1));
-  std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
-  return safeStringViewEqual(generateHmacBase64(hmac_secret_vec, token), hmac);
+  const absl::string_view token = csrf_token.substr(0, pos);
+  const absl::string_view hmac = csrf_token.substr(pos + 1);
+  return safeStringViewEqual(generateHmacBase64(hmac_secret, token), hmac);
 }
 
 // Generates a PKCE code verifier with 32 octets of randomness.
@@ -370,6 +363,8 @@ std::string encodeState(absl::string_view original_request_url, const absl::stri
 // AES-GCM specifies a 96-bit (12 byte) IV as the canonical size, which is also OpenSSL's default.
 constexpr size_t Aes256GcmIvLength = 12;
 constexpr size_t Aes256GcmTagLength = 16;
+// AES-CBC uses a 16 byte IV, prepended to the legacy ciphertexts.
+constexpr size_t Aes256CbcIvLength = 16;
 
 // Algorithm marker prepended to ciphertexts so decrypt() can dispatch without having to "try
 // then fall back." '.' is not part of the base64url alphabet, so a prefix like "gcm." can never
@@ -379,102 +374,94 @@ constexpr absl::string_view kGcmPrefix = "gcm.";
 
 std::string encryptCbc(absl::string_view plaintext, absl::string_view secret,
                        Random::RandomGenerator& random) {
-  // Generate the key from the secret using SHA-256
-  std::vector<unsigned char> key(SHA256_DIGEST_LENGTH); // AES-256 requires 256-bit (32 bytes) key
+  // Generate the key from the secret using SHA-256. AES-256 requires a 256-bit (32 byte) key.
+  std::array<unsigned char, SHA256_DIGEST_LENGTH> key;
   SHA256(reinterpret_cast<const unsigned char*>(secret.data()), secret.size(), key.data());
 
-  // Generate a random IV
-  MemBlockBuilder<uint64_t> mem_block(4);
-  // create 2 random uint64_t values to fill the buffer because AES-256-CBC requires 16 bytes IV
+  // The output buffer holds the IV followed by the ciphertext, so that it can be base64url encoded
+  // in place without a second copy to concatenate the two.
+  std::string combined(Aes256CbcIvLength + plaintext.size() + EVP_MAX_BLOCK_LENGTH, '\0');
+  auto* iv = reinterpret_cast<unsigned char*>(combined.data());
+  auto* out = iv + Aes256CbcIvLength;
+
+  // Generate a random IV. Two random uint64_t values fill the 16 bytes AES-256-CBC requires.
+  MemBlockBuilder<uint64_t> mem_block(2);
   for (size_t i = 0; i < 2; i++) {
     mem_block.appendOne(random.random());
   }
-
   std::unique_ptr<uint64_t[]> data = mem_block.release();
-  const unsigned char* raw_data = reinterpret_cast<const unsigned char*>(data.get());
-
-  // AES uses 16-byte IV
-  std::vector<unsigned char> iv(16);
-  iv.assign(raw_data, raw_data + 16);
+  const auto* random_bytes = reinterpret_cast<const unsigned char*>(data.get());
+  std::copy(random_bytes, random_bytes + Aes256CbcIvLength, iv);
 
   EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
   RELEASE_ASSERT(ctx, "Failed to create context");
 
-  std::vector<unsigned char> ciphertext(plaintext.size() + EVP_MAX_BLOCK_LENGTH);
   int len = 0, ciphertext_len = 0;
 
   // Initialize encryption operation
-  int result = EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data());
+  int result = EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv);
   RELEASE_ASSERT(result == 1, "Encryption initialization failed");
 
   // Encrypt the plaintext
-  result = EVP_EncryptUpdate(ctx, ciphertext.data(), &len,
-                             reinterpret_cast<const unsigned char*>((plaintext.data())),
-                             plaintext.size());
+  result = EVP_EncryptUpdate(
+      ctx, out, &len, reinterpret_cast<const unsigned char*>((plaintext.data())), plaintext.size());
   RELEASE_ASSERT(result == 1, "Encryption update failed");
 
   ciphertext_len += len;
 
   // Finalize encryption
-  result = EVP_EncryptFinal_ex(ctx, ciphertext.data() + len, &len);
+  result = EVP_EncryptFinal_ex(ctx, out + len, &len);
   RELEASE_ASSERT(result == 1, "Encryption finalization failed");
 
   ciphertext_len += len;
 
   EVP_CIPHER_CTX_free(ctx);
 
-  // AES uses 16-byte IV
-  ciphertext.resize(ciphertext_len);
-
-  // Prepend the IV to the ciphertext
-  std::vector<unsigned char> combined(iv.size() + ciphertext.size());
-  std::copy(iv.begin(), iv.end(), combined.begin());
-  std::copy(ciphertext.begin(), ciphertext.end(), combined.begin() + iv.size());
-
   // Base64Url encode the IV + ciphertext
-  return Base64Url::encode(reinterpret_cast<const char*>(combined.data()), combined.size());
+  return Base64Url::encode(combined.data(), Aes256CbcIvLength + ciphertext_len);
 }
 
 DecryptResult decryptCbc(absl::string_view encrypted, absl::string_view secret) {
   // Every return below sets is_gcm=false: this whole function is the legacy CBC path.
-  std::string decoded = Base64Url::decode(encrypted);
-  std::vector<unsigned char> combined(decoded.begin(), decoded.end());
+  const std::string decoded = Base64Url::decode(encrypted);
 
-  if (combined.size() <= 16) {
+  if (decoded.size() <= Aes256CbcIvLength) {
     return {"", "Invalid encrypted data"};
   }
 
-  // Extract the IV (first 16 bytes)
-  std::vector<unsigned char> iv(combined.begin(), combined.begin() + 16);
-
-  // Extract the ciphertext (remaining bytes)
-  std::vector<unsigned char> ciphertext(combined.begin() + 16, combined.end());
-
-  // Generate the key from the secret using SHA-256
-  std::vector<unsigned char> key(SHA256_DIGEST_LENGTH);
+  // Generate the key from the secret using SHA-256. AES-256 requires a 256-bit (32 byte) key.
+  std::array<unsigned char, SHA256_DIGEST_LENGTH> key;
   SHA256(reinterpret_cast<const unsigned char*>(secret.data()), secret.size(), key.data());
+
+  // The IV is the first 16 bytes and the ciphertext the rest; both are read in place out of
+  // `decoded` rather than copied into separate buffers.
+  const auto* iv = reinterpret_cast<const unsigned char*>(decoded.data());
+  const unsigned char* ciphertext = iv + Aes256CbcIvLength;
+  const size_t ciphertext_len = decoded.size() - Aes256CbcIvLength;
 
   EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
   RELEASE_ASSERT(ctx, "Failed to create context");
 
-  std::vector<unsigned char> plaintext(ciphertext.size() + EVP_MAX_BLOCK_LENGTH);
+  // Decrypt straight into the string that is returned to the caller.
+  std::string plaintext(ciphertext_len + EVP_MAX_BLOCK_LENGTH, '\0');
+  auto* out = reinterpret_cast<unsigned char*>(plaintext.data());
   int len = 0, plaintext_len = 0;
 
   // Initialize decryption operation
-  if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data()) != 1) {
+  if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv) != 1) {
     EVP_CIPHER_CTX_free(ctx);
     return {"", "failed to initialize decryption"};
   }
 
   // Decrypt the ciphertext
-  if (EVP_DecryptUpdate(ctx, plaintext.data(), &len, ciphertext.data(), ciphertext.size()) != 1) {
+  if (EVP_DecryptUpdate(ctx, out, &len, ciphertext, ciphertext_len) != 1) {
     EVP_CIPHER_CTX_free(ctx);
     return {"", "failed to decrypt data"};
   }
   plaintext_len += len;
 
   // Finalize decryption
-  if (EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len) != 1) {
+  if (EVP_DecryptFinal_ex(ctx, out + len, &len) != 1) {
     EVP_CIPHER_CTX_free(ctx);
     return {"", "failed to finalize decryption"};
   }
@@ -486,7 +473,7 @@ DecryptResult decryptCbc(absl::string_view encrypted, absl::string_view secret) 
   // Resize to actual plaintext length
   plaintext.resize(plaintext_len);
 
-  return {std::string(plaintext.begin(), plaintext.end()), std::nullopt};
+  return {std::move(plaintext), std::nullopt};
 }
 
 } // namespace
@@ -502,62 +489,59 @@ std::string encrypt(absl::string_view plaintext, absl::string_view secret,
     return encryptCbc(plaintext, secret, random);
   }
 
-  // Generate the key from the secret using SHA-256
-  std::vector<unsigned char> key(SHA256_DIGEST_LENGTH); // AES-256 requires 256-bit (32 bytes) key
+  // Generate the key from the secret using SHA-256. AES-256 requires a 256-bit (32 byte) key.
+  std::array<unsigned char, SHA256_DIGEST_LENGTH> key;
   SHA256(reinterpret_cast<const unsigned char*>(secret.data()), secret.size(), key.data());
 
-  // Generate a random IV
+  // The output buffer is laid out as IV || ciphertext || tag so that it can be base64url encoded
+  // in one go, without copying the three pieces together afterwards.
+  std::string combined(
+      Aes256GcmIvLength + plaintext.size() + EVP_MAX_BLOCK_LENGTH + Aes256GcmTagLength, '\0');
+  auto* iv = reinterpret_cast<unsigned char*>(combined.data());
+  auto* out = iv + Aes256GcmIvLength;
+
+  // Generate a random IV.
   MemBlockBuilder<uint64_t> mem_block(2);
   for (size_t i = 0; i < 2; i++) {
     mem_block.appendOne(random.random());
   }
 
   std::unique_ptr<uint64_t[]> data = mem_block.release();
-  const unsigned char* raw_data = reinterpret_cast<const unsigned char*>(data.get());
-
-  std::vector<unsigned char> iv(raw_data, raw_data + Aes256GcmIvLength);
+  const auto* random_bytes = reinterpret_cast<const unsigned char*>(data.get());
+  std::copy(random_bytes, random_bytes + Aes256GcmIvLength, iv);
 
   EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
   RELEASE_ASSERT(ctx, "Failed to create context");
 
-  std::vector<unsigned char> ciphertext(plaintext.size() + EVP_MAX_BLOCK_LENGTH);
-  std::vector<unsigned char> tag(Aes256GcmTagLength);
   int len = 0, ciphertext_len = 0;
 
   // Initialize encryption operation
-  int result = EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), nullptr, key.data(), iv.data());
+  int result = EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), nullptr, key.data(), iv);
   RELEASE_ASSERT(result == 1, "Encryption initialization failed");
 
   // Encrypt the plaintext
-  result = EVP_EncryptUpdate(ctx, ciphertext.data(), &len,
-                             reinterpret_cast<const unsigned char*>((plaintext.data())),
-                             plaintext.size());
+  result = EVP_EncryptUpdate(
+      ctx, out, &len, reinterpret_cast<const unsigned char*>((plaintext.data())), plaintext.size());
   RELEASE_ASSERT(result == 1, "Encryption update failed");
 
   ciphertext_len += len;
 
   // Finalize encryption
-  result = EVP_EncryptFinal_ex(ctx, ciphertext.data() + len, &len);
+  result = EVP_EncryptFinal_ex(ctx, out + len, &len);
   RELEASE_ASSERT(result == 1, "Encryption finalization failed");
 
   ciphertext_len += len;
-  result = EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, tag.size(), tag.data());
+  // Append the authentication tag directly after the ciphertext.
+  result = EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, Aes256GcmTagLength, out + ciphertext_len);
   RELEASE_ASSERT(result == 1, "Encryption tag finalization failed");
 
   EVP_CIPHER_CTX_free(ctx);
 
-  ciphertext.resize(ciphertext_len);
-
-  // Prepend the IV and append the authentication tag.
-  std::vector<unsigned char> combined(iv.size() + ciphertext.size() + tag.size());
-  std::copy(iv.begin(), iv.end(), combined.begin());
-  std::copy(ciphertext.begin(), ciphertext.end(), combined.begin() + iv.size());
-  std::copy(tag.begin(), tag.end(), combined.begin() + iv.size() + ciphertext.size());
-
   // Base64Url encode the IV + ciphertext + tag and prepend the algorithm marker so future
   // decrypts can dispatch without trial decryption.
-  return absl::StrCat(kGcmPrefix, Base64Url::encode(reinterpret_cast<const char*>(combined.data()),
-                                                    combined.size()));
+  return absl::StrCat(
+      kGcmPrefix,
+      Base64Url::encode(combined.data(), Aes256GcmIvLength + ciphertext_len + Aes256GcmTagLength));
 }
 
 DecryptResult decrypt(absl::string_view encrypted, absl::string_view secret) {
@@ -585,53 +569,53 @@ DecryptResult decrypt(absl::string_view encrypted, absl::string_view secret) {
 
   // Decode the Base64Url-encoded input
   std::string decoded = Base64Url::decode(encrypted.substr(kGcmPrefix.size()));
-  std::vector<unsigned char> combined(decoded.begin(), decoded.end());
 
   // Every return below sets is_gcm=true: we already committed to the GCM path on the marker.
-  if (combined.size() <= Aes256GcmIvLength + Aes256GcmTagLength) {
+  if (decoded.size() <= Aes256GcmIvLength + Aes256GcmTagLength) {
     return {"", "Invalid encrypted data", /*is_gcm=*/true};
   }
 
-  // Extract the IV (first 12 bytes)
-  std::vector<unsigned char> iv(combined.begin(), combined.begin() + Aes256GcmIvLength);
-
-  // Extract the ciphertext and authentication tag.
-  std::vector<unsigned char> ciphertext(combined.begin() + Aes256GcmIvLength,
-                                        combined.end() - Aes256GcmTagLength);
-  std::vector<unsigned char> tag(combined.end() - Aes256GcmTagLength, combined.end());
-
-  // Generate the key from the secret using SHA-256
-  std::vector<unsigned char> key(SHA256_DIGEST_LENGTH);
+  // Generate the key from the secret using SHA-256. AES-256 requires a 256-bit (32 byte) key.
+  std::array<unsigned char, SHA256_DIGEST_LENGTH> key;
   SHA256(reinterpret_cast<const unsigned char*>(secret.data()), secret.size(), key.data());
+
+  // The buffer is IV || ciphertext || tag; all three are read in place rather than copied into
+  // separate buffers.
+  auto* iv = reinterpret_cast<unsigned char*>(decoded.data());
+  const unsigned char* ciphertext = iv + Aes256GcmIvLength;
+  const size_t ciphertext_len = decoded.size() - Aes256GcmIvLength - Aes256GcmTagLength;
+  unsigned char* tag = iv + Aes256GcmIvLength + ciphertext_len;
 
   EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
   RELEASE_ASSERT(ctx, "Failed to create context");
 
-  std::vector<unsigned char> plaintext(ciphertext.size() + EVP_MAX_BLOCK_LENGTH);
+  // Decrypt straight into the string that is returned to the caller.
+  std::string plaintext(ciphertext_len + EVP_MAX_BLOCK_LENGTH, '\0');
+  auto* out = reinterpret_cast<unsigned char*>(plaintext.data());
   int len = 0;
   int plaintext_len = 0;
 
   // Initialize decryption operation. 12-byte IV is the GCM default so no set IV length call is
   // needed.
-  if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), nullptr, key.data(), iv.data()) != 1) {
+  if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), nullptr, key.data(), iv) != 1) {
     EVP_CIPHER_CTX_free(ctx);
     return {"", "failed to initialize decryption"};
   }
 
   // Decrypt the GCM ciphertext
-  if (EVP_DecryptUpdate(ctx, plaintext.data(), &len, ciphertext.data(), ciphertext.size()) != 1) {
+  if (EVP_DecryptUpdate(ctx, out, &len, ciphertext, ciphertext_len) != 1) {
     EVP_CIPHER_CTX_free(ctx);
     return {"", "failed to decrypt data"};
   }
   plaintext_len += len;
 
-  if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, tag.size(), tag.data()) != 1) {
+  if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, Aes256GcmTagLength, tag) != 1) {
     EVP_CIPHER_CTX_free(ctx);
     return {"", "failed to set decryption tag"};
   }
 
   // Finalize decryption
-  if (EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len) != 1) {
+  if (EVP_DecryptFinal_ex(ctx, out + len, &len) != 1) {
     EVP_CIPHER_CTX_free(ctx);
     return {"", "failed to finalize decryption"};
   }
@@ -643,7 +627,7 @@ DecryptResult decrypt(absl::string_view encrypted, absl::string_view secret) {
   // Resize to actual plaintext length
   plaintext.resize(plaintext_len);
 
-  return {std::string(plaintext.begin(), plaintext.end()), std::nullopt, /*is_gcm=*/true};
+  return {std::move(plaintext), std::nullopt, /*is_gcm=*/true};
 }
 
 FilterConfig::FilterConfig(
@@ -814,7 +798,7 @@ bool FilterConfig::shouldUseRefreshToken(
 }
 
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
-                                      const std::string& secret) {
+                                      absl::string_view secret) {
   const auto& cookies = Http::Utility::parseCookies(headers, [this](absl::string_view key) -> bool {
     return key == cookie_names_.oauth_expires_ || key == cookie_names_.bearer_token_ ||
            key == cookie_names_.oauth_hmac_ || key == cookie_names_.id_token_ ||
@@ -828,7 +812,7 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
   hmac_ = findValue(cookies, cookie_names_.oauth_hmac_);
   host_ = std::string(headers.Host()->value().getStringView());
 
-  secret_.assign(secret.begin(), secret.end());
+  secret_ = std::string(secret);
 }
 
 bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const { return !refresh_token_.empty(); }
@@ -838,12 +822,21 @@ bool OAuth2CookieValidator::hmacIsValid() const {
   if (!cookie_domain_.empty()) {
     cookie_domain = cookie_domain_;
   }
-  return (safeStringViewEqual(encodeHmacBase64(secret_, cookie_domain, expires_, access_token_,
-                                               id_token_, refresh_token_),
-                              hmac_) ||
-          safeStringViewEqual(encodeHmacHexBase64(secret_, cookie_domain, expires_, access_token_,
-                                                  id_token_, refresh_token_),
-                              hmac_));
+
+  // The HMAC is by far the expensive part here and both accepted encodings are derived from the
+  // same digest, so compute it once and compare the current encoding first.
+  const std::vector<uint8_t> hmac = Envoy::Common::Crypto::UtilitySingleton::get().getSha256Hmac(
+      secretSpan(secret_),
+      cookieHmacPayload(cookie_domain, expires_, access_token_, id_token_, refresh_token_));
+
+  if (safeStringViewEqual(base64Encode(hmac), hmac_)) {
+    return true;
+  }
+
+  // Cookies issued by older versions carry the base64 of the hex representation of the digest.
+  std::string legacy_hmac;
+  absl::Base64Escape(Hex::encode(hmac), &legacy_hmac);
+  return safeStringViewEqual(legacy_hmac, hmac_);
 }
 
 bool OAuth2CookieValidator::timestampIsValid() const {
@@ -888,11 +881,19 @@ void OAuth2Filter::resolveAndSetActiveConfig() {
 
   config_ = config;
   validator_ = validator_factory_(time_source_, *config_);
+  // The OAuth client is created lazily by oauthClient(): requests that are served from a valid
+  // cookie, or that are rejected before the token exchange, never talk to the token endpoint.
+  oauth_client_.reset();
+}
 
-  oauth_client_ = oauth_client_factory_(*config_);
-  oauth_client_->setCallbacks(*this);
-  ASSERT(decoder_callbacks_ != nullptr);
-  oauth_client_->setDecoderFilterCallbacks(*decoder_callbacks_);
+OAuth2Client& OAuth2Filter::oauthClient() {
+  if (oauth_client_ == nullptr) {
+    oauth_client_ = oauth_client_factory_(*config_);
+    oauth_client_->setCallbacks(*this);
+    ASSERT(decoder_callbacks_ != nullptr);
+    oauth_client_->setDecoderFilterCallbacks(*decoder_callbacks_);
+  }
+  return *oauth_client_;
 }
 
 /**
@@ -962,12 +963,15 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   ASSERT(path_header != nullptr);
   const absl::string_view path_str = path_header->value().getStringView();
   const bool redirect_from_auth_server = config_->redirectPathMatcher().match(path_str);
+  // Remember the result so that the failure paths, which can run asynchronously, do not have to
+  // run the path matcher again.
+  is_redirect_path_ = redirect_from_auth_server;
 
   // Save the request headers for later modification if needed.
   request_headers_ = &headers;
 
   // We should check if this is a sign out request.
-  if (config_->signoutPath().match(path_header->value().getStringView())) {
+  if (config_->signoutPath().match(path_str)) {
     return signOutUser(headers);
   }
 
@@ -1041,9 +1045,10 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
                                              client_credential.status().message()));
         return Http::FilterHeadersStatus::StopIteration;
       }
-      oauth_client_->asyncRefreshAccessToken(validator_->refreshToken(), config_->clientId(),
-                                             client_credential.value(), config_->authType());
-      const auto state = oauth_client_->getState();
+      OAuth2Client& oauth_client = oauthClient();
+      oauth_client.asyncRefreshAccessToken(validator_->refreshToken(), config_->clientId(),
+                                           client_credential.value(), config_->authType());
+      const auto state = oauth_client.getState();
       if (state == OAuth2Client::OAuthState::FailureContinue) {
         return Http::FilterHeadersStatus::Continue;
       } else if (state == OAuth2Client::OAuthState::FailureStop) {
@@ -1085,7 +1090,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   const auto redirect_uri =
       config_->redirectUri().format({&headers}, decoder_callbacks_->streamInfo());
 
-  std::optional<std::string> encrypted_code_verifier =
+  const std::optional<std::string> encrypted_code_verifier =
       readCookieValueWithSuffix(headers, config_->cookieNames().code_verifier_, result.flow_id_);
   if (!encrypted_code_verifier.has_value()) {
     sendUnauthorizedResponse("Code verifier cookie is missing in the request");
@@ -1102,7 +1107,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   if (!decrypt_result.is_gcm) {
     config_->stats().oauth_legacy_cbc_decrypt_.inc();
   }
-  std::string code_verifier = decrypt_result.plaintext;
+  const std::string code_verifier = std::move(decrypt_result.plaintext);
 
   auto client_credential = getClientCredential();
   if (!client_credential.ok()) {
@@ -1110,9 +1115,10 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
                                          client_credential.status().message()));
     return Http::FilterHeadersStatus::StopIteration;
   }
-  oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), client_credential.value(),
-                                     redirect_uri, code_verifier, config_->authType());
-  const auto state = oauth_client_->getState();
+  OAuth2Client& oauth_client = oauthClient();
+  oauth_client.asyncGetAccessToken(auth_code_, config_->clientId(), client_credential.value(),
+                                   redirect_uri, code_verifier, config_->authType());
+  const auto state = oauth_client.getState();
   if (state == OAuth2Client::OAuthState::FailureContinue) {
     return Http::FilterHeadersStatus::Continue;
   } else if (state == OAuth2Client::OAuthState::FailureStop) {
@@ -1125,7 +1131,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
 absl::StatusOr<std::string> OAuth2Filter::getClientCredential() {
   if (config_->authType() != AuthType::PrivateKeyJwt) {
-    return config_->clientSecret();
+    // The credential is returned by value, so the shared secret is copied exactly once here.
+    return std::string(config_->clientSecret());
   }
 
   auto assertion_result = ClientAssertion::create(
@@ -1257,7 +1264,7 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
     config_->stats().oauth_legacy_cbc_decrypt_.inc();
   }
 
-  return decrypt_result.plaintext;
+  return std::move(decrypt_result.plaintext);
 }
 
 void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
@@ -1489,19 +1496,13 @@ void OAuth2Filter::updateTokens(const std::string& access_token, const std::stri
 }
 
 std::string OAuth2Filter::getEncodedToken() const {
-  auto token_secret = config_->hmacSecret();
-  std::vector<uint8_t> token_secret_vec(token_secret.begin(), token_secret.end());
-  std::string encoded_token;
-
   absl::string_view domain = host_;
   if (!config_->cookieDomain().empty()) {
     domain = config_->cookieDomain();
   }
 
-  encoded_token =
-      encodeHmac(token_secret_vec, domain, new_expires_, access_token_, id_token_, refresh_token_);
-
-  return encoded_token;
+  return encodeHmacBase64(config_->hmacSecret(), domain, new_expires_, access_token_, id_token_,
+                          refresh_token_);
 }
 
 std::string
@@ -1564,7 +1565,6 @@ std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
                             "The id token is not a JWT or exp claim is omitted, even though it is "
                             "required by the OpenID Connect 1.0 specification. "
                             "The lifetime of the id token will be aligned with the access token");
-    return std::to_string(expires_in.count());
   }
   return std::to_string(expires_in.count());
 }
@@ -1806,12 +1806,9 @@ void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
 bool OAuth2Filter::shouldAllowFailed(const Http::RequestHeaderMap& headers) const {
   // Never allow failed for OAuth callback endpoint - callback requests must always return 401
   // on failure since the callback path is "hosted" by Envoy itself and shouldn't reach upstream.
-  const Http::HeaderEntry* path_header = headers.Path();
-  if (path_header != nullptr) {
-    const absl::string_view path = path_header->value().getStringView();
-    if (config_->redirectPathMatcher().match(path)) {
-      return false;
-    }
+  // The match itself was already computed in decodeHeaders().
+  if (is_redirect_path_) {
+    return false;
   }
 
   return Http::HeaderUtility::matchAnyHeader(headers, config_->allowFailedMatchers());
@@ -1868,7 +1865,7 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
     auto stateVal = query_parameters.getFirstValue(queryParamsState);
     if (stateVal.has_value()) {
       CallbackValidationResult result = validateState(headers, stateVal.value());
-      flow_id = result.flow_id_;
+      flow_id = std::move(result.flow_id_);
     }
     return {false, "", "", flow_id,
             fmt::format("OAuth server returned an error: {}", query_parameters.toString())};
@@ -1887,7 +1884,7 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   // URL or the CSRF token. Decode the state parameter to get the original request URL and the
   // CSRF token.
   CallbackValidationResult result = validateState(headers, stateVal.value());
-  result.auth_code_ = codeVal.value();
+  result.auth_code_ = std::move(codeVal.value());
   return result;
 }
 

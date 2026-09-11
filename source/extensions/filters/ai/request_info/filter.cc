@@ -62,7 +62,7 @@ Coroutine::Task<absl::Status> RequestInfoFilter::decode(AiRequestReceiver receiv
                                                         AiRequestPropagator propagate_request,
                                                         LocalReplier) {
   ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
-  publish(request->request_index().json());
+  publish(request->json());
   co_return co_await std::move(propagate_request)(std::move(request));
 }
 
