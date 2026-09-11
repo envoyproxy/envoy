@@ -229,6 +229,7 @@ private:
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
   bool skip_body_parsing_{false};
+  bool use_new_spec_semantics_{false};
   std::string header_method_;
   std::string header_name_;
   std::optional<std::string> protocol_version_;
