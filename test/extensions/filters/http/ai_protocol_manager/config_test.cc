@@ -23,6 +23,8 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 namespace {
 
+// The factory builds a stream filter (the filter wires both decode and encode
+// paths, so it registers as a stream filter rather than a decoder-only filter).
 TEST(AiProtocolManagerConfigTest, CreatesStreamFilterFromProto) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -36,6 +38,8 @@ TEST(AiProtocolManagerConfigTest, CreatesStreamFilterFromProto) {
   cb(filter_callbacks);
 }
 
+// The empty (default) config proto produced by the factory yields a working
+// filter factory too.
 TEST(AiProtocolManagerConfigTest, CreatesStreamFilterFromEmptyProto) {
   AiProtocolManagerFilterConfigFactory factory;
   auto empty_proto = factory.createEmptyConfigProto();
@@ -53,6 +57,8 @@ TEST(AiProtocolManagerConfigTest, CreatesStreamFilterFromEmptyProto) {
   cb(filter_callbacks);
 }
 
+// The factory is registered under its well-known name and resolvable from the
+// HTTP filter factory registry.
 TEST(AiProtocolManagerConfigTest, IsRegistered) {
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
@@ -61,15 +67,21 @@ TEST(AiProtocolManagerConfigTest, IsRegistered) {
   EXPECT_EQ(factory->name(), "envoy.filters.http.ai_protocol_manager");
 }
 
+// The filter is a dual factory: it is also registered in the upstream HTTP
+// filter registry so it can be placed in upstream filter chains.
 TEST(AiProtocolManagerConfigTest, IsRegisteredAsUpstreamFilter) {
   Server::Configuration::UpstreamHttpFilterConfigFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::UpstreamHttpFilterConfigFactory>::getFactory(
           "envoy.filters.http.ai_protocol_manager");
   ASSERT_NE(factory, nullptr);
+  // The upstream registration resolves to the dual factory itself, not merely a
+  // same-named factory.
   EXPECT_THAT(factory, testing::WhenDynamicCastTo<AiProtocolManagerFilterConfigFactory*>(
                            testing::NotNull()));
 }
 
+// A token-usage limits config with an out-of-range cap is rejected by proto
+// validation.
 TEST(AiProtocolManagerConfigTest, RejectsOversizedEventCap) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
   proto_config.mutable_response_handling()
@@ -84,7 +96,7 @@ TEST(AiProtocolManagerConfigTest, RejectsOversizedEventCap) {
                EnvoyException);
 }
 
-// Zero does not mean unbounded; there is no way to disable a cap.
+// An explicit zero cap is rejected: there is no way to disable the bound.
 TEST(AiProtocolManagerConfigTest, RejectsZeroCaps) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   AiProtocolManagerFilterConfigFactory factory;
@@ -120,6 +132,8 @@ TEST(AiProtocolManagerConfigTest, RejectsZeroCaps) {
   }
 }
 
+// The parser's inline-string threshold comes from the request-handling config,
+// falling back to the parser's own default when unset.
 TEST(AiProtocolManagerConfigTest, InlineStringThresholdDefaultsAndOverrides) {
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
   {
@@ -140,7 +154,9 @@ TEST(AiProtocolManagerConfigTest, InlineStringThresholdDefaultsAndOverrides) {
   }
 }
 
-// Too low offloads schema-fixed-size strings; too high defeats the offload.
+// The threshold is bounded on both ends: a value under the floor offloads
+// strings a payload schema fixes in size, and an unbounded value would defeat
+// the offload it gates.
 TEST(AiProtocolManagerConfigTest, RejectsOutOfRangeInlineStringThreshold) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   AiProtocolManagerFilterConfigFactory factory;
@@ -155,7 +171,10 @@ TEST(AiProtocolManagerConfigTest, RejectsOutOfRangeInlineStringThreshold) {
   }
 }
 
-// The upstream role installs the full filter, request offload included (#46385).
+// Creating the filter from an upstream factory context yields the same stream
+// filter as the downstream path (see #46385: the upstream role installs the
+// full filter, request offload included, with the caveats documented for that
+// placement).
 TEST(AiProtocolManagerConfigTest, CreatesStreamFilterFromUpstreamContext) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
   proto_config.mutable_response_handling()->mutable_token_usage();
@@ -170,6 +189,8 @@ TEST(AiProtocolManagerConfigTest, CreatesStreamFilterFromUpstreamContext) {
   cb(filter_callbacks);
 }
 
+// The per-route config proto is accepted and yields a RouteConfig carrying the
+// declared request and response wire APIs.
 TEST(AiProtocolManagerConfigTest, CreatesRouteSpecificConfig) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto_config;
   proto_config.mutable_request()->set_api_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
@@ -191,6 +212,8 @@ TEST(AiProtocolManagerConfigTest, CreatesRouteSpecificConfig) {
                             ApiProtocol::AnthropicMessages))));
 }
 
+// Without a response declaration the response side inherits the request API;
+// without a request declaration the route is response-only.
 TEST(AiProtocolManagerConfigTest, RouteConfigResponseFallsBackToRequestProtocol) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AiProtocolManagerFilterConfigFactory factory;
@@ -224,6 +247,8 @@ TEST(AiProtocolManagerConfigTest, RouteConfigResponseFallsBackToRequestProtocol)
   }
 }
 
+// The route config proto the factory hands the config subsystem is the per-route
+// message, not the filter-level one.
 TEST(AiProtocolManagerConfigTest, EmptyRouteConfigProtoIsPerRouteMessage) {
   AiProtocolManagerFilterConfigFactory factory;
   auto empty_proto = factory.createEmptyRouteConfigProto();
@@ -235,7 +260,9 @@ TEST(AiProtocolManagerConfigTest, EmptyRouteConfigProtoIsPerRouteMessage) {
       nullptr);
 }
 
-// Presence alone scopes response inspection to the route; no wire API is required.
+// Per-route presence alone declares the route an AI endpoint: an empty
+// per-route config is valid (it scopes response inspection to the route
+// without declaring a wire API).
 TEST(AiProtocolManagerConfigTest, EmptyRouteConfigIsValid) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto_config;
   TestUtility::validate(proto_config);

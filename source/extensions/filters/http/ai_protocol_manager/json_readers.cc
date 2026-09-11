@@ -20,7 +20,9 @@ std::optional<uint64_t> readCount(const nlohmann::json& json, absl::string_view 
   if (value.is_null() && null_policy == NullPolicy::AllowNullAsAbsent) {
     return std::nullopt;
   }
-  // JsonWithExtBufParser stores a literal as unsigned only above INT64_MAX.
+  // JsonWithExtBufParser stores any literal that fits int64 as a *signed*
+  // integer (is_number_unsigned() is true only above INT64_MAX), so probe the
+  // signed representation first.
   if (value.is_number_integer()) {
     if (value.is_number_unsigned()) {
       const uint64_t count = value.get<uint64_t>();
@@ -39,7 +41,8 @@ std::optional<uint64_t> readCount(const nlohmann::json& json, absl::string_view 
   }
   if (value.is_number_float()) {
     const double as_double = value.get<double>();
-    // Range-check before the cast: an out-of-range double-to-uint64_t conversion is undefined.
+    // Range-check before the float-to-integer cast: converting an
+    // out-of-range double to uint64_t is undefined behavior.
     if (!std::isfinite(as_double) || as_double < 0 ||
         as_double > static_cast<double>(MaxSafeCount) || std::trunc(as_double) != as_double) {
       malformed = true;

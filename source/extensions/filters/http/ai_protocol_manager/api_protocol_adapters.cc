@@ -15,7 +15,9 @@ namespace AiProtocolManager {
 
 namespace {
 
-// Keeps AdapterRegistry::get() total, so callers never null-check.
+// The Unspecified protocol: no schema, no usage, no terminal events. Keeping
+// it a real adapter makes AdapterRegistry::get() total, so callers never
+// null-check.
 class NullAdapter : public ApiProtocolAdapter {
 public:
   ApiProtocol protocol() const override { return ApiProtocol::Unspecified; }
@@ -27,8 +29,10 @@ protected:
   void extractUsageInto(const nlohmann::json&, ExtractionResult&) const override {}
 };
 
-// Chat Completions and Responses share one usage shape under different key names; Responses
-// streaming events nest the payload under `response`.
+// OpenAI: Chat Completions and Responses API. The two dialects share one
+// usage structure with renamed keys; they never mix in one document, so
+// reading either name from the same usage object is unambiguous. Responses
+// API streaming lifecycle events nest the payload under `response`.
 class OpenAiAdapterBase : public ApiProtocolAdapter {
 public:
   // OpenAI's native counts are already inclusive.
@@ -89,7 +93,8 @@ class OpenAiChatCompletionsAdapter : public OpenAiAdapterBase {
 public:
   ApiProtocol protocol() const override { return ApiProtocol::OpenAiChatCompletions; }
   const PayloadSchema* schema() const override {
-    // Leaked so no exit-time destructor is registered.
+    // Construct-on-first-use: schemas are non-trivially destructible, so a
+    // plain function-local static would register an exit-time destructor.
     static const PayloadSchema* openai_schema = new PayloadSchema(OpenAI::createPayloadSchema());
     return openai_schema;
   }
@@ -102,13 +107,17 @@ public:
   ApiProtocol protocol() const override { return ApiProtocol::OpenAiResponses; }
   const PayloadSchema* schema() const override { return nullptr; }
   bool isTerminalEvent(const nlohmann::json& json) const override {
-    // These events also carry the usage, so callers extractUsage() first.
+    // Terminal lifecycle events; also the usage carriers, so callers
+    // extractUsage() first.
     const auto type = readString(json, "type");
     return type.has_value() && isOpenAiResponsesTerminalEventType(type.value());
   }
 };
 
-// `message_start` nests a Message under `message`; `message_delta` usage is cumulative.
+// Anthropic Messages API. Non-streaming responses and `message_delta` events
+// carry `usage` at the root; `message_start` nests a Message object (with
+// `model` and the input-side usage) under `message`. `message_delta` counts
+// are cumulative, which the caller's last-wins merge handles.
 class AnthropicMessagesAdapter : public ApiProtocolAdapter {
 public:
   ApiProtocol protocol() const override { return ApiProtocol::AnthropicMessages; }
@@ -132,7 +141,9 @@ protected:
   void extractUsageInto(const nlohmann::json& json, ExtractionResult& result) const override {
     bool& malformed = result.malformed;
     TokenUsage& usage = result.usage;
-    // Anthropic can send `event: error` after a 200; the terminal usage then never arrives.
+    // Anthropic documents `event: error` after a 200 has streamed: the
+    // terminal usage update never arrives, so the accumulation so far must
+    // not publish as complete.
     if (const auto type = readString(json, "type"); type.has_value() && type.value() == "error") {
       result.stream_error = true;
       return;
@@ -149,10 +160,13 @@ protected:
       return;
     }
 
-    // Native counts only: summing per event would let a partial update regress last-wins merge.
+    // Native counts only: the disjoint input/cache buckets are summed once,
+    // in canonicalizeUsage() -- summing per event would let a partial update
+    // regress the accumulated value via last-wins merge.
     usage.input_tokens = readCount(*usage_node, "input_tokens", malformed);
-    // `output_tokens` already includes thinking tokens.
+    // `output_tokens` already includes thinking tokens (inclusive).
     usage.output_tokens = readCount(*usage_node, "output_tokens", malformed);
+    // No total_tokens in this dialect; computed at finalize.
     usage.cached_input_tokens = readCount(*usage_node, "cache_read_input_tokens", malformed);
     usage.cache_creation_input_tokens =
         readCount(*usage_node, "cache_creation_input_tokens", malformed);
@@ -165,8 +179,10 @@ protected:
   }
 };
 
-// `usageMetadata` snapshots are cumulative; `cachedContentTokenCount` is a subset of
-// `promptTokenCount`.
+// Gemini generateContent / streamGenerateContent. Every chunk is a
+// GenerateContentResponse; `usageMetadata` snapshots are cumulative (last
+// wins). `cachedContentTokenCount` is a subset of `promptTokenCount`, so it
+// maps to cached_input_tokens without any arithmetic.
 class GeminiGenerateContentAdapter : public ApiProtocolAdapter {
 public:
   ApiProtocol protocol() const override { return ApiProtocol::GeminiGenerateContent; }
@@ -198,8 +214,8 @@ protected:
       return;
     }
 
-    // Native counts only; the adjuncts are summed in canonicalizeUsage(), after the last
-    // cumulative snapshot merges.
+    // Native counts only; the tool-use and thoughts adjuncts are summed in at
+    // canonicalizeUsage(), after the last cumulative snapshot merged.
     usage.input_tokens = readCount(*usage_node, "promptTokenCount", malformed);
     usage.output_tokens = readCount(*usage_node, "candidatesTokenCount", malformed);
     usage.total_tokens = readCount(*usage_node, "totalTokenCount", malformed);
@@ -212,6 +228,8 @@ protected:
 } // namespace
 
 const ApiProtocolAdapter& AdapterRegistry::get(ApiProtocol protocol) {
+  // Construct-on-first-use: adapters have virtual destructors, so plain
+  // function-local statics would register exit-time destructors.
   switch (protocol) {
   case ApiProtocol::OpenAiChatCompletions:
     CONSTRUCT_ON_FIRST_USE(OpenAiChatCompletionsAdapter);
@@ -234,9 +252,14 @@ bool isOpenAiResponsesTerminalEventType(absl::string_view event_type) {
          event_type == "response.incomplete";
 }
 
-// Not delegated per adapter: markers are checked from most to least distinctive across dialects.
+// Detection stays centralized rather than delegated per adapter: the marker
+// checks are ordered from most to least structurally distinctive across
+// dialects, and that cross-adapter ordering is part of the detection
+// contract.
 ApiProtocol AdapterRegistry::detect(const nlohmann::json& json) {
-  // Checked by value shape so a foreign `candidates` string cannot lock the stream.
+  // Gemini markers, validated by value shape: a foreign document with e.g. a
+  // `candidates` *string* must not lock the stream. Real candidates lists are
+  // non-empty arrays of objects.
   if (const auto it = json.find("candidates");
       it != json.end() && it->is_array() && !it->empty() && it->front().is_object()) {
     return ApiProtocol::GeminiGenerateContent;
@@ -248,6 +271,8 @@ ApiProtocol AdapterRegistry::detect(const nlohmann::json& json) {
     return ApiProtocol::GeminiGenerateContent;
   }
 
+  // OpenAI Chat Completions and non-streaming Responses discriminate on
+  // `object`; Responses streaming events discriminate on `type` ("response.*").
   if (const auto object = readString(json, "object"); object.has_value()) {
     if (absl::StartsWith(object.value(), "chat.completion")) {
       return ApiProtocol::OpenAiChatCompletions;
@@ -262,8 +287,10 @@ ApiProtocol AdapterRegistry::detect(const nlohmann::json& json) {
     if (absl::StartsWith(type_view, "response.")) {
       return ApiProtocol::OpenAiResponses;
     }
-    // Bare `type` strings are generic, so require companion structure; a real stream presents
-    // message_start or a full Message before any usage, so skipping bare events loses nothing.
+    // Anthropic markers need their documented companion structure: bare
+    // `type` strings are generic, and a genuine stream always presents
+    // message_start (nested Message) or a non-streaming Message (role/usage)
+    // before any usage, so skipping the bare event types loses nothing.
     bool discard = false;
     if (type_view == "message") {
       if (readString(json, "role").has_value() || readObject(json, "usage", discard) != nullptr) {
@@ -279,6 +306,7 @@ ApiProtocol AdapterRegistry::detect(const nlohmann::json& json) {
         return ApiProtocol::AnthropicMessages;
       }
     }
+    // `message_stop`/`content_block_*` carry no structure and no usage.
   }
 
   return ApiProtocol::Unspecified;
