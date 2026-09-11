@@ -284,6 +284,19 @@ TEST_P(UpstreamRequestWithRangeHeaderTest, RangeHeaderSkipsToExpectedStreamPos) 
   http_callbacks_->onComplete();
 }
 
+TEST_P(UpstreamRequestWithRangeHeaderTest, IgnoredRangeReturnsEntireBody) {
+  response_headers_.setStatus("200");
+  http_callbacks_->onHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
+                             false);
+
+  testing::StrictMock<MockFunction<void(Buffer::InstancePtr, EndStream)>> body_cb;
+  upstream_request_->getBody(AdjustedByteRange{0, 5}, body_cb.AsStdFunction());
+  EXPECT_CALL(body_cb, Call(Pointee(BufferString("hello")), EndStream::End));
+  Buffer::OwnedImpl data{"hello"};
+  http_callbacks_->onData(data, true);
+  http_callbacks_->onComplete();
+}
+
 class UpstreamRequestWithSmallBuffersTest : public UpstreamRequestTest {
 protected:
   int bufferLimit() const override { return 3; }
