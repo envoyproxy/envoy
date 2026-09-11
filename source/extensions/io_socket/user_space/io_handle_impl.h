@@ -128,10 +128,7 @@ public:
           (receive_data_end_stream_ ? Event::FileReadyType::Closed : 0));
     }
   }
-  void onPeerDestroy() override {
-    peer_handle_ = nullptr;
-    sent_eof_ = true;
-  }
+  void onPeerDestroy() override;
   void onPeerBufferLowWatermark() override {
     if (user_file_event_) {
       user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
@@ -183,6 +180,11 @@ private:
   // pending data to drain.
   bool receive_data_end_stream_{false};
   bool receive_data_reset_{false};
+  // Set by onPeerDestroy() when the peer fully closed (close(), not shutdown(WR)). Reads drain
+  // pending data first, then report ECONNRESET where they would report EOF. This is how a full
+  // peer close is distinguished from a write half-close, which real sockets cannot signal on the
+  // read side.
+  bool receive_data_reset_after_drain_{false};
 
   // The buffer owned by this socket. This buffer is populated by the write operations of the peer
   // socket and drained by read operations of this socket.
