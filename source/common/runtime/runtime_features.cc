@@ -63,7 +63,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_lrs_server_self_ads);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
-// Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
+// Ignore the automated "remove this flag" issue: never remove this before 2027/10. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
