@@ -505,6 +505,11 @@ public:
     }
   }
 
+  // With |enable|, both peers advertise reliable stream reset. Client body written before a local
+  // abort is then blocked from leaving the host; after writes resume, RESET_STREAM_AT retransmits
+  // that body while a hard RST_STREAM does not.
+  void testReliableStreamResetBodyDelivery(bool enable);
+
 protected:
   quic::ParsedQuicVersionVector supported_versions_;
   EnvoyQuicConnectionHelper conn_helper_;

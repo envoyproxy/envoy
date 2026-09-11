@@ -587,6 +587,80 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   codec_client_->close();
 }
 
+void QuicHttpIntegrationTestBase::testReliableStreamResetBodyDelivery(bool enable) {
+  // Install the test socket interface before sockets are created so client writes can be blocked.
+  SocketInterfaceSwap socket_swap(Network::Socket::Type::Datagram);
+
+  client_quic_options_.mutable_enable_reliable_stream_reset()->set_value(enable);
+  config_helper_.addConfigModifier([enable](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_udp_listener_config()
+        ->mutable_quic_options()
+        ->mutable_quic_protocol_options()
+        ->mutable_enable_reliable_stream_reset()
+        ->set_value(enable);
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto* quic_session = static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  ASSERT_NE(quic_session, nullptr);
+  EXPECT_EQ(enable, quic_session->config()->SupportsReliableStreamReset());
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"}});
+  auto& encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Let headers reach the upstream so the stream exists before body/reset are held back.
+  // Do not use waitForNextUpstreamRequest(); it waits for end_stream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Black-hole client->server datagrams, so that STREAM data for the body never leaves the host
+  // before the local abort. On resume, only RESET_STREAM_AT continues retransmitting that body.
+  socket_swap.write_matcher_->setDestinationPort(lookupPort("http"));
+  socket_swap.write_matcher_->setWriteReturnsEgain();
+
+  const std::string body(16 * 1024, 'a');
+  codec_client_->sendData(encoder, body, /*end_stream=*/false);
+  codec_client_->sendReset(encoder);
+
+  // Unblock client->server writes and pump simulated time so QUIC's own retransmission/write
+  // alarms get a chance to run and flush whatever is actually left to send, mirroring the
+  // approach used by DeferredLoggingWithRetransmission below.
+  socket_swap.write_matcher_->setWriteOverride(nullptr);
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(500 * TIMEOUT_FACTOR));
+
+  if (enable) {
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, body));
+    EXPECT_EQ(body, upstream_request_->body().toString());
+  } else {
+    // Hard RST_STREAM drops retransmission of the lost body, so the upstream must not see it.
+    EXPECT_FALSE(upstream_request_->waitForData(*dispatcher_, body,
+                                                std::chrono::milliseconds(500 * TIMEOUT_FACTOR)));
+    EXPECT_EQ(0, upstream_request_->body().length());
+  }
+
+  ASSERT_TRUE(response->waitForReset());
+
+  // Tear down while the test socket interface is still installed.
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(QuicHttpIntegrationTest, ReliableStreamResetDeliversBodyAfterLoss) {
+  testReliableStreamResetBodyDelivery(/*enable=*/true);
+}
+
+TEST_P(QuicHttpIntegrationTest, HardResetDropsBodyAfterLoss) {
+  testReliableStreamResetBodyDelivery(/*enable=*/false);
+}
+
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
   // The test client uses Envoy's HTTP/3 codec, which validates the headers it encodes. Turn that
   // off so the invalid header reaches the server codec under test.
