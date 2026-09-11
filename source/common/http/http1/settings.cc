@@ -49,6 +49,8 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
       creation_status = formatter_factory_or_error.status();
       return {};
     }
+    // The factory should never return a nullptr when the creation is successful.
+    ASSERT(formatter_factory_or_error.value() != nullptr);
     ret.header_key_format_ = Http1Settings::HeaderKeyFormat::StatefulFormatter;
     ret.stateful_header_key_formatter_ = std::move(formatter_factory_or_error.value());
   }

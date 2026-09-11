@@ -5,6 +5,7 @@
 #include "source/common/config/utility.h"
 #include "source/extensions/upstreams/http/config.h"
 
+#include "test/common/http/header_formatter_test_utils.h"
 #include "test/extensions/upstreams/http/config.pb.h"
 #include "test/extensions/upstreams/http/config.pb.validate.h"
 #include "test/mocks/http/header_validator.h"
@@ -22,8 +23,10 @@ namespace Extensions {
 namespace Upstreams {
 namespace Http {
 
+using ::Envoy::StatusHelpers::HasStatus;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::ContainsRegex;
+using ::testing::Eq;
 using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
 using ::testing::Not;
@@ -119,6 +122,37 @@ TEST_F(ConfigTest, KvStoreConcurrencyFail) {
       ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, context_).status().message(),
       ContainsRegex("(?s)options has key value store but Envoy has concurrency = 2 "
                     ":.*key_value_store_config {\n}\n"));
+}
+
+// A stateful header formatter that rejects its configuration must fail cluster protocol options
+// creation rather than leaving the cluster with silently defaulted HTTP/1 settings.
+TEST_F(ConfigTest, StatefulFormatterCreationFailureIsPropagated) {
+  ::Envoy::Http::RejectingStatefulFormatterFactoryConfig factory;
+  Registry::InjectFactory<::Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig> registered(
+      factory);
+
+  ::Envoy::Http::useRejectingStatefulFormatter(
+      *options_.mutable_explicit_http_config()->mutable_http_protocol_options());
+
+  EXPECT_THAT(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, context_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        Eq(::Envoy::Http::RejectingStatefulFormatterFactoryConfig::kError)));
+}
+
+TEST_F(ConfigTest, LegacyStatefulFormatterCreationFailureIsPropagated) {
+  ::Envoy::Http::RejectingStatefulFormatterFactoryConfig factory;
+  Registry::InjectFactory<::Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig> registered(
+      factory);
+
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  ::Envoy::Http::useRejectingStatefulFormatter(http1_options);
+
+  EXPECT_THAT(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
+                  http1_options, envoy::config::core::v3::Http2ProtocolOptions(),
+                  envoy::config::core::v3::HttpProtocolOptions(), std::nullopt, false, false,
+                  context_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        Eq(::Envoy::Http::RejectingStatefulFormatterFactoryConfig::kError)));
 }
 
 namespace {

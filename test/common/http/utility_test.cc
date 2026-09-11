@@ -13,16 +13,21 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 
+#include "test/common/http/header_formatter_test_utils.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatus;
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
+using testing::Eq;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 
@@ -818,9 +823,57 @@ TEST(HttpUtility, StatefulFormatterDeprecatedFactoryOverloadStillReached) {
   absl::Status creation_status = absl::OkStatus();
   auto settings = Http1::parseHttp1Settings(http1_options, context, creation_status);
 
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_THAT(creation_status, IsOk());
   EXPECT_EQ(Http1Settings::HeaderKeyFormat::StatefulFormatter, settings.header_key_format_);
   EXPECT_NE(nullptr, settings.stateful_header_key_formatter_);
+}
+
+// A formatter that rejects its configuration must have the failure reported through
+// creation_status, and parseHttp1Settings() must return default settings rather than the
+// half-populated ones it had built before it reached the formatter.
+TEST(HttpUtility, StatefulFormatterCreationFailureIsPropagated) {
+  RejectingStatefulFormatterFactoryConfig factory;
+  Registry::InjectFactory<StatefulHeaderKeyFormatterFactoryConfig> registered(factory);
+
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  // Set a field that is populated before the formatter is created, so that default settings can be
+  // told apart from partially populated ones.
+  http1_options.set_allow_chunked_length(true);
+  useRejectingStatefulFormatter(http1_options);
+
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  auto settings = Http1::parseHttp1Settings(http1_options, context, creation_status);
+
+  EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                         Eq(RejectingStatefulFormatterFactoryConfig::kError)));
+  EXPECT_EQ(Http1Settings::HeaderKeyFormat::Default, settings.header_key_format_);
+  EXPECT_EQ(nullptr, settings.stateful_header_key_formatter_);
+  EXPECT_FALSE(settings.allow_chunked_length_);
+}
+
+TEST(HttpUtility, StatefulFormatterCreationFailureIsPropagatedWithHcmOverload) {
+  RejectingStatefulFormatterFactoryConfig factory;
+  Registry::InjectFactory<StatefulHeaderKeyFormatterFactoryConfig> registered(factory);
+
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  http1_options.set_allow_chunked_length(true);
+  useRejectingStatefulFormatter(http1_options);
+
+  Protobuf::BoolValue hcm_value;
+  hcm_value.set_value(true);
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  auto settings =
+      Http1::parseHttp1Settings(http1_options, context, hcm_value, true, creation_status);
+
+  EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                         Eq(RejectingStatefulFormatterFactoryConfig::kError)));
+  EXPECT_EQ(Http1Settings::HeaderKeyFormat::Default, settings.header_key_format_);
+  EXPECT_EQ(nullptr, settings.stateful_header_key_formatter_);
+  EXPECT_FALSE(settings.allow_chunked_length_);
+  EXPECT_FALSE(settings.validate_scheme_);
+  EXPECT_FALSE(settings.stream_error_on_invalid_http_message_);
 }
 
 TEST(HttpUtility, AllowCustomMethods) {
