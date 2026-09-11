@@ -157,6 +157,19 @@ TEST_F(IsCacheableResponseTest, ResponsePrivate) {
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
 }
 
+TEST_F(IsCacheableResponseTest, StorageDirectivesAreCaseInsensitive) {
+  response_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-age=600");
+  ASSERT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
+
+  for (const absl::string_view directive : {"private", "Private", "PRIVATE", "pRiVaTe", "no-store",
+                                            "No-Store", "NO-STORE", "nO-sToRe"}) {
+    SCOPED_TRACE(directive);
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
+                                      absl::StrCat("max-age=600, ", directive));
+    EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
+  }
+}
+
 TEST_F(IsCacheableResponseTest, EmptyVary) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
   response_headers_.setCopy(Http::CustomHeaders::get().Vary, "");
