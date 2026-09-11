@@ -54,7 +54,6 @@ rules:
   EXPECT_TRUE(factory.createFilterFactoryFromProto(config, context).ok());
 }
 
-
 } // namespace
 } // namespace PostgresProxy
 } // namespace NetworkFilters

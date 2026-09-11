@@ -182,7 +182,6 @@ policies:
   ASSERT_THAT(filter_->onData(data, false), Network::FilterStatus::StopIteration);
 }
 
-
 TEST_F(PostgresRbacTest, DenyRuleRecordsMatchedPolicyID) {
   rules(R"EOF(
 action: DENY
@@ -214,7 +213,7 @@ TEST_F(PostgresRbacTest, DenySSLPassthrough) {
 
 TEST_F(PostgresRbacTest, AllowSSLPassthrough) {
   rules("action: LOG\npolicies: {}\n");
-  
+
   Buffer::OwnedImpl data;
   data.writeBEInt<uint32_t>(8);
   data.writeBEInt<uint32_t>(80877103);
@@ -244,7 +243,6 @@ policies:
   ASSERT_THAT(config_->stats_.authorization_denied_.value(), 1);
   ASSERT_THAT(config_->stats_.authorization_allowed_.value(), 0);
 }
-
 
 } // namespace
 } // namespace PostgresProxy

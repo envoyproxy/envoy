@@ -826,7 +826,8 @@ public:
     ssl_request.writeBEInt<uint32_t>(8);
     ssl_request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_CODE);
     ASSERT_TRUE(client->write(ssl_request.toString()));
-    client->waitForData("S", true);
+    ASSERT_TRUE(client->waitForData(1, TestUtility::DefaultTimeout));
+    ASSERT_THAT(client->data(), "S");
     enableClientTls(client);
 
     using namespace std::literals::string_literals;
@@ -878,7 +879,8 @@ TEST_P(RbacPostgresIntegrationTest, DenialDoesNotOpenDeferredUpstream) {
   ssl_request.writeBEInt<uint32_t>(8);
   ssl_request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_CODE);
   ASSERT_TRUE(client->write(ssl_request.toString()));
-  client->waitForData("S", true);
+  ASSERT_TRUE(client->waitForData(1, TestUtility::DefaultTimeout));
+  ASSERT_THAT(client->data(), "S");
   enableClientTls(client);
   using namespace std::literals::string_literals;
   const std::string attributes = "user\0postgres\0database\0testdb\0\0"s;

@@ -4,10 +4,10 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/common/assert.h"
+#include "source/extensions/filters/common/rbac/utility.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "contrib/postgres_proxy/filters/network/source/postgres_decoder.h"
-#include "source/extensions/filters/common/rbac/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -295,12 +295,13 @@ bool PostgresFilter::authorizeStartup() {
   for (const auto& [key, val] : decoder_->getAttributes()) {
     fields[key].set_string_value(val);
   }
-  
+
   auto& info = read_callbacks_->connection().streamInfo();
   info.setDynamicMetadata(NetworkFilterNames::get().PostgresProxy, metadata);
   std::string log_policy_id;
-  const bool allowed = config_->engine_->handleAction(read_callbacks_->connection(), info, &log_policy_id);
-  
+  const bool allowed =
+      config_->engine_->handleAction(read_callbacks_->connection(), info, &log_policy_id);
+
   if (!allowed) {
     rejectStartup(log_policy_id);
     return false;
@@ -311,12 +312,14 @@ bool PostgresFilter::authorizeStartup() {
 
 void PostgresFilter::rejectStartup(absl::string_view log_policy_id) {
   config_->stats_.authorization_denied_.inc();
-  
+
   // send error response to downstream client
-  auto response = encoder_->buildErrorResponse("FATAL", "connection denied by Envoy proxy: rbac denied", "28000");
+  auto response = encoder_->buildErrorResponse(
+      "FATAL", "connection denied by Envoy proxy: rbac denied", "28000");
   write_callbacks_->injectWriteDataToFilterChain(response, false);
   // close downstream client connection
-  read_callbacks_->connection().streamInfo().setConnectionTerminationDetails(Filters::Common::RBAC::responseDetail(log_policy_id));
+  read_callbacks_->connection().streamInfo().setConnectionTerminationDetails(
+      Filters::Common::RBAC::responseDetail(log_policy_id));
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 

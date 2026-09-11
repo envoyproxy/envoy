@@ -138,9 +138,11 @@ public:
   bool authorizationEnabled() const override { return config_->engine_ != nullptr; }
   bool authorizeStartup() override;
   void rejectStartup(absl::string_view log_policy_id) override;
-  bool shouldPassthroughSSL() const override { return config_->downstream_ssl_ ==
-          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE &&
-      !config_->terminate_ssl_; }
+  bool shouldPassthroughSSL() const override {
+    return config_->downstream_ssl_ == envoy::extensions::filters::network::postgres_proxy::
+                                           v3alpha::PostgresProxy::DISABLE &&
+           !config_->terminate_ssl_;
+  }
 
   void closeConn();
   bool isSwitchedToTls() { return switched_to_tls_; };
