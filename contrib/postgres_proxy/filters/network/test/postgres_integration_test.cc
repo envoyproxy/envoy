@@ -1,4 +1,3 @@
-#include <cstdio>
 #include <format>
 
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
@@ -811,7 +810,7 @@ public:
     ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     auto config = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(tls, context);
     auto factory = *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
-        std::move(config), *manager, *client_store_.rootScope());
+        std::move(config), *manager, server_factory_context_.serverScope());
     auto* connection = dynamic_cast<Network::ConnectionImpl*>(client->connection());
     connection->transportSocket() = factory->createTransportSocket(
         nullptr, connection->streamInfo().upstreamInfo()->upstreamHost());
@@ -819,28 +818,17 @@ public:
   }
 
   void checkAuthorization(const std::string& identity, bool allowed) {
-    auto checkpoint = [](const char* stage) {
-      std::fprintf(stderr, "RBAC test: %s\n", stage);
-      std::fflush(stderr);
-    };
-    checkpoint("before initialize");
     initializeRbac(identity);
-    checkpoint("initialized");
     auto client = makeTcpConnection(lookupPort("listener_0"));
-    checkpoint("client created");
     FakeRawConnectionPtr upstream;
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
-    checkpoint("upstream connected");
     Buffer::OwnedImpl ssl_request;
     ssl_request.writeBEInt<uint32_t>(8);
     ssl_request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_CODE);
     ASSERT_TRUE(client->write(ssl_request.toString()));
-    checkpoint("SSLRequest written");
     ASSERT_TRUE(client->waitForData(1, TestUtility::DefaultTimeout));
     ASSERT_THAT(client->data(), "S");
-    checkpoint("received SSL acceptance S");
     enableClientTls(client);
-    checkpoint("client TLS socket installed");
 
     using namespace std::literals::string_literals;
     const std::string attributes = "user\0postgres\0database\0testdb\0\0"s;
@@ -849,36 +837,25 @@ public:
     startup.writeBEInt<uint32_t>(0x00030000);
     startup.add(attributes);
     ASSERT_TRUE(client->write(startup.toString()));
-    checkpoint("StartupMessage written");
     if (allowed) {
       std::string received;
       ASSERT_TRUE(upstream->waitForData(startup.length(), &received));
-      checkpoint("upstream received StartupMessage");
       ASSERT_THAT(received, startup.toString());
       test_server_->waitForCounter("postgres.postgres_stats.authorization_allowed", Eq(1));
-      checkpoint("authorization allowed counter verified");
       client->close();
-      checkpoint("client closed");
     } else {
       client->waitForData("28000", false);
-      checkpoint("received denial response");
       client->waitForDisconnect();
-      checkpoint("client disconnected");
       ASSERT_THAT(client->data(), testing::HasSubstr("28000"));
       test_server_->waitForCounter("postgres.postgres_stats.authorization_denied", Eq(1));
-      checkpoint("authorization denied counter verified");
     }
     ASSERT_TRUE(upstream->waitForDisconnect());
-    checkpoint("upstream disconnected");
     if (!allowed) {
       std::string received;
       ASSERT_TRUE(upstream->waitForData(0, &received));
       ASSERT_THAT(received, "");
-      checkpoint("upstream received no denied data");
     }
   }
-
-  Stats::IsolatedStoreImpl client_store_;
 };
 
 TEST_P(RbacPostgresIntegrationTest, AllowsValidatedUriSan) {
