@@ -291,6 +291,7 @@ TEST_P(LoadAwareLocalityIntegrationTest, EwmaDampensSpike) {
 }
 
 TEST_P(LoadAwareLocalityIntegrationTest, ThreeLocalityDistribution) {
+  setDeterministicSeed(12345);
   initializeConfig(/*variance_threshold=*/0.1, /*remote_probe_fraction=*/0.1,
                    /*weight_update_period_seconds=*/10, /*smoothing_time_constant_seconds=*/1,
                    /*remote_zones=*/{"zone-b", "zone-c"});
@@ -303,11 +304,12 @@ TEST_P(LoadAwareLocalityIntegrationTest, ThreeLocalityDistribution) {
   const uint64_t zone_b = zoneTraffic(usage, 1);
   const uint64_t zone_c = zoneTraffic(usage, 2);
 
-  EXPECT_GT(zone_a, 0u);
-  EXPECT_GT(zone_b, 0u);
-  EXPECT_GT(zone_c, 0u);
-  EXPECT_GT(zone_b, zone_c);
-  EXPECT_GT(zone_c, zone_a);
+  constexpr double request_count = 400.0;
+  constexpr double total_weight = 0.4 + 1.4 + 1.0;
+  constexpr double tolerance = 20.0;
+  EXPECT_NEAR(zone_a, (0.4 / total_weight) * request_count, tolerance);
+  EXPECT_NEAR(zone_b, (1.4 / total_weight) * request_count, tolerance);
+  EXPECT_NEAR(zone_c, (1.0 / total_weight) * request_count, tolerance);
 }
 
 } // namespace
