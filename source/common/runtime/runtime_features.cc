@@ -179,6 +179,9 @@ RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_response);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
+// This is only needed if sharing c-ares query cache across dns clusters.
+// Disabled by default for now to prevent behavior changes.
+FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
 
@@ -315,10 +318,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
 // validated in production. When disabled, QUIC retains zlib-only compression while TCP TLS has
 // no certificate compression.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
-
-// DnsFilter created resolver on the worker thread which could lead to race when sharing resolvers
-// Do not turn this on if DnsFilter is used or until the race is fixed
-FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

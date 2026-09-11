@@ -19,7 +19,8 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
                                Server::Configuration::ServerFactoryContext& server_context,
                                LazyCreateDnsResolver dns_resolver_fn,
                                Outlier::EventLoggerSharedPtr outlier_event_logger,
-                               bool added_via_api) {
+                               bool added_via_api,
+                               OptRef<ClusterDnsResolverCache> dns_resolver_cache) {
   std::string cluster_name;
   std::string cluster_config_type_name;
 
@@ -75,7 +76,8 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   }
 
   ClusterFactoryContextImpl context(server_context, dns_resolver_fn,
-                                    std::move(outlier_event_logger), added_via_api);
+                                    std::move(outlier_event_logger), added_via_api,
+                                    dns_resolver_cache);
   return factory->create(cluster, context);
 }
 
@@ -85,9 +87,12 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
   // We make this a shared pointer to deal with the distinct ownership
   // scenarios that can exist: in one case, we pass in the "default"
   // DNS resolver that is owned by the Server::Instance. In the case
-  // where 'dns_resolvers' is specified, we have per-cluster DNS
-  // resolvers that are created here but ownership resides with
-  // StrictDnsClusterImpl/LogicalDnsCluster.
+  // where the cluster configures its own resolver, the resolver is
+  // created here and kept alive by the clusters using it. Note that it
+  // is not necessarily one resolver per cluster: it may be shared with
+  // other clusters configured identically. The cache that hands it out
+  // holds only a weak reference, so the resolver is released once the
+  // last cluster using it goes away.
   if ((cluster.has_typed_dns_resolver_config() &&
        !(cluster.typed_dns_resolver_config().typed_config().type_url().empty())) ||
       (cluster.has_dns_resolution_config() &&
@@ -97,9 +102,7 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDnsResolverFactoryFromProto(cluster, typed_dns_resolver_config);
-    auto& server_context = context.serverFactoryContext();
-    return dns_resolver_factory.createDnsResolver(server_context.mainThreadDispatcher(),
-                                                  server_context.api(), typed_dns_resolver_config);
+    return context.sharedDnsResolver(dns_resolver_factory, typed_dns_resolver_config);
   }
 
   return context.dnsResolver();
@@ -111,9 +114,7 @@ absl::StatusOr<Network::DnsResolverSharedPtr> ClusterFactoryImplBase::selectDnsR
   if (typed_dns_resolver_config.has_typed_config()) {
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-    auto& server_context = context.serverFactoryContext();
-    return dns_resolver_factory.createDnsResolver(server_context.mainThreadDispatcher(),
-                                                  server_context.api(), typed_dns_resolver_config);
+    return context.sharedDnsResolver(dns_resolver_factory, typed_dns_resolver_config);
   }
   return context.dnsResolver();
 }
