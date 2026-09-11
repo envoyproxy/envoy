@@ -21,8 +21,7 @@ class MultiHealthCheckIntegrationTest : public Event::TestUsingSimulatedTime,
                                         public HttpIntegrationTest {
 public:
   MultiHealthCheckIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(),
-                            ConfigHelper::httpProxyConfig()) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(), ConfigHelper::httpProxyConfig()) {}
 
   void TearDown() override {
     for (auto& conn : hc_connections_) {
@@ -80,8 +79,7 @@ public:
     std::ignore = custom->mutable_typed_config()->PackFrom(multi_config);
   }
 
-  void initializeWithStaticCluster(const std::string& name1 = "",
-                                   const std::string& name2 = "") {
+  void initializeWithStaticCluster(const std::string& name1 = "", const std::string& name2 = "") {
     use_lds_ = false;
     defer_listener_finalization_ = true;
 
@@ -127,19 +125,18 @@ public:
         host_upstream_->localAddress()->ip()->port());
     eds_helper_.setEds({cla});
 
-    config_helper_.addConfigModifier(
-        [this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
-          cluster->set_name("cluster_1");
-          cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
-          cluster->mutable_connect_timeout()->set_seconds(5);
-          cluster->mutable_eds_cluster_config()
-              ->mutable_eds_config()
-              ->mutable_path_config_source()
-              ->set_path(eds_helper_.edsPath());
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+      cluster->set_name("cluster_1");
+      cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
+      cluster->mutable_connect_timeout()->set_seconds(5);
+      cluster->mutable_eds_cluster_config()
+          ->mutable_eds_config()
+          ->mutable_path_config_source()
+          ->set_path(eds_helper_.edsPath());
 
-          addMultiTcpHealthCheck(cluster);
-        });
+      addMultiTcpHealthCheck(cluster);
+    });
 
     HttpIntegrationTest::initialize();
 
