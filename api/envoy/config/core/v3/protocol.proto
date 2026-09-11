@@ -57,7 +57,7 @@ message QuicKeepAliveSettings {
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message QuicProtocolOptions {
   // Config for QUIC connection migration across network interfaces, i.e. cellular to WIFI, upon
   // network change events from the platform, i.e. the current network gets
@@ -184,6 +184,20 @@ message QuicProtocolOptions {
   // Communication with Network Elements) and process SCONE packets.
   // If not present, the QUICHE default behavior will be used.
   google.protobuf.BoolValue enable_scone = 13;
+
+  // If true, an upstream HTTP/3 connection will accept streams initiated by the server which
+  // belong to a negotiated WebTransport session, instead of rejecting them as a protocol violation.
+  //
+  // Only bidirectional streams are accepted for now. Server-initiated bidirectional streams which
+  // are not WebTransport data streams are still rejected by the HTTP/3 layer.
+  //
+  // This option is only honored on upstream (cluster) connections and is ignored when set on a
+  // listener. It additionally requires the ``envoy.reloadable_features.quic_support_web_transport``
+  // runtime feature to be enabled.
+  //
+  // Defaults to false.
+  bool accept_server_initiated_streams = 14
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 message UpstreamHttpProtocolOptions {
