@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["extractor.cc"],
     hdrs = ["extractor.h"],
     deps = [
+        "//source/common/singleton:const_singleton",
         "//source/extensions/filters/http/ai_protocol_manager:json_readers_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//source/extensions/filters/http/ai_protocol_manager:token_usage_lib",

@@ -622,13 +622,13 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentLengthOverCapFailsExtraction)
   Http::TestResponseHeaderMapImpl headers{
       {":status", "200"}, {"content-type", "application/json"}, {"content-length", "100"}};
   EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
-  sendData(std::string(100, 'x'), true);
+  sendData(std::string(100, 'x'), true); // Passes through untouched, uninspected.
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
   EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
   EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   EXPECT_EQ(counterValue("response_body_too_large"), 1);
-  EXPECT_EQ(counterValue("response_parse_error"), 0);
+  EXPECT_EQ(counterValue("response_parse_error"), 0); // Never buffered or parsed.
   EXPECT_EQ(counterValue("token_usage_failed"), 1);
 }
 
@@ -696,7 +696,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ExtractionFailurePublishesStatusOnly
   EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
   EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
   EXPECT_EQ(typed->model(), "gpt-4o");
-  EXPECT_FALSE(typed->has_total_tokens());
+  EXPECT_FALSE(typed->has_total_tokens()); // No counts recovered.
   EXPECT_FALSE(typed->has_input_tokens());
 }
 
@@ -762,7 +762,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, DuplicatePublicationSkipped) {
            "\"completion_tokens\":4,\"total_tokens\":7}}",
            true);
 
-  EXPECT_TRUE(typed_metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty()); // No second write.
   EXPECT_EQ(counterValue("token_usage_duplicate"), 1);
   EXPECT_EQ(counterValue("token_usage_found"), 0);
 }
