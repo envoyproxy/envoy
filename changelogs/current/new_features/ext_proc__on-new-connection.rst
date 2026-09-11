@@ -1,0 +1,1 @@
+Added support for ``process_new_connection`` event handling in the network external processing filter, allowing external processors to receive connection attributes and metadata on connection establishment and inject dynamic metadata or control connection lifecycle before payload streaming.
