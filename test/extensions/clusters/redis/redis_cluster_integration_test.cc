@@ -474,6 +474,9 @@ TEST_P(RedisClusterIntegrationTest, SingleSlotPrimaryReplicaHostnames) {
 
   // foo hashes to slot 12182 which is in upstream 0
   simpleRequestAndResponse(0, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+
+  // Stop worker threads before os_calls restores the process-wide syscall singleton.
+  test_server_.reset();
 }
 
 // This test sends a simple "get foo" command from a fake
