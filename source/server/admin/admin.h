@@ -373,7 +373,7 @@ private:
       socket_create_ = true;
       return socket_;
     }
-    Network::ListenSocketFactoryPtr clone() const override { return nullptr; }
+    Network::ListenSocketFactoryPtr clone(uint32_t) const override { return nullptr; }
     void closeAllSockets() override {}
     absl::Status doFinalPreWorkerInit() override { return absl::OkStatus(); }
 

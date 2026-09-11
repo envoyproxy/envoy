@@ -451,7 +451,7 @@ TEST_P(AdminInstanceTest, Overrides) {
 
   peer.overloadManager().scaledTimerFactory();
 
-  peer.socketFactory().clone();
+  peer.socketFactory().clone(0);
   peer.socketFactory().closeAllSockets();
   ASSERT_OK(peer.socketFactory().doFinalPreWorkerInit());
 
