@@ -264,9 +264,7 @@ absl::Status ProcessorState::handleHeaderContinue() {
   } else if (body_mode_ == ProcessingMode::STREAMED ||
              body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
     sendBufferedDataInStreamedMode(false);
-    if (body_mode_ == ProcessingMode::STREAMED) {
-      continueIfNecessary();
-    }
+    injectHeadersToFilterChain(false);
     return absl::OkStatus();
   } else if (body_mode_ == ProcessingMode::BUFFERED_PARTIAL) {
     return handleBufferedPartialMode();

@@ -296,6 +296,18 @@ TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
 // Test Ext_Proc filter and WebSocket configuration combination.
 TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcCombo) { websocketExtProcTest(); }
 
+TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcComboFullDuplexStreamed) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(
+      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED);
+  websocketExtProcTest();
+}
+
+TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcComboStreamed) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(
+      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::STREAMED);
+  websocketExtProcTest();
+}
+
 // Regression test: with a STREAMED request body mode, a WebSocket upgrade must not deadlock.
 // handleHeaderContinue() leaves header iteration paused in streamed mode and normally relies on a
 // subsequent body chunk to resume it, but on an upgrade the client will not send any frame until

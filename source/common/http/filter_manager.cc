@@ -507,6 +507,15 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
+void ActiveStreamDecoderFilter::injectDecodedHeadersToFilterChain(RequestHeaderMap& headers,
+                                                                  bool end_stream) {
+  (void)headers;
+  if (!headers_continued_) {
+    headers_continued_ = true;
+    doHeaders(end_stream);
+  }
+}
+
 OptRef<WebTransportSession> ActiveStreamDecoderFilter::webTransportSession() {
   return parent_.webTransportSession();
 }
@@ -2050,6 +2059,17 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
   }
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
+}
+
+void ActiveStreamEncoderFilter::injectEncodedHeadersToFilterChain(ResponseHeaderMapPtr&& headers,
+                                                                  bool end_stream) {
+  if (headers != nullptr) {
+    parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
+  }
+  if (!headers_continued_) {
+    headers_continued_ = true;
+    doHeaders(end_stream);
+  }
 }
 
 ResponseTrailerMap& ActiveStreamEncoderFilter::addEncodedTrailers() {
