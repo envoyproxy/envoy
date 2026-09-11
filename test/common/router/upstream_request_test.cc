@@ -366,7 +366,8 @@ TEST_F(UpstreamRequestTest, RejectsInvalidGeneratedWebsocketHandshake) {
     const std::string key = upstream.headers_->get_(Http::Headers::get().SecWebSocketKey);
 
     EXPECT_CALL(router_filter_interface_.callbacks_.stream_info_,
-                setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError));
+                setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError))
+        .Times(0);
     EXPECT_CALL(router_filter_interface_.callbacks_.stream_info_,
                 setResponseCodeDetails(
                     StreamInfo::ResponseCodeDetails::get().WebsocketHandshakeInvalidAccept));
@@ -385,6 +386,8 @@ TEST_F(UpstreamRequestTest, RejectsInvalidGeneratedWebsocketHandshake) {
                                         {"sec-websocket-accept", WebSocket::computeAccept(key)}});
     mutate(*response_headers);
     upstream_request_->upstreamToDownstream().decodeHeaders(std::move(response_headers), false);
+    EXPECT_TRUE(upstream_request_->streamInfo().hasResponseFlag(
+        StreamInfo::CoreResponseFlag::UpstreamProtocolError));
     upstream_request_.reset();
   }
 }
