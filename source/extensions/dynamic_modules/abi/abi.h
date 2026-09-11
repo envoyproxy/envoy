@@ -29,11 +29,8 @@
 // This is the ABI version that we bump the minor version at least once for any ABI changes in same
 // Envoy release cycle to indicate the ABI change.
 //
-// Break change in the ABI is not allowed except the ABI has not been released yet.
-//
-// Until we reach v1.0, we only guarantee backward
-// compatibility in the next minor version. For example, v0.1.y is guaranteed to be compatible with
-// v0.2.x, but not with v0.3.x.
+// Until we reach v1.0, the ABI is experimental and any version change may be breaking, so a module
+// must be rebuilt against the exact Envoy version it runs with.
 //
 // This is used only for tracking the ABI version of dynamic modules and emitting warnings when
 // there's a mismatch.
@@ -44,7 +41,7 @@
 // SDK downstream users.
 // 2. In the future, after the stable ABI is established, we may want to decouple the ABI version
 // from Envoy's versioning scheme.
-#define ENVOY_DYNAMIC_MODULES_ABI_VERSION "v0.1.0"
+#define ENVOY_DYNAMIC_MODULES_ABI_VERSION "v0.2.0"
 
 #ifdef __cplusplus
 #include <cstddef>
@@ -386,6 +383,8 @@ typedef enum envoy_dynamic_module_type_attribute_id {
   envoy_dynamic_module_type_attribute_id_XdsFilterChainName,
   // health_check
   envoy_dynamic_module_type_attribute_id_HealthCheck,
+  // upstream.server_name
+  envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
 } envoy_dynamic_module_type_attribute_id;
 
 /**
@@ -478,11 +477,16 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
  * of the standard Envoy logging stream under [dynamic_modules] Id.
  *
  * @param level is the log level of the message.
- * @param message is the log message to be logged.
+ * @param message is the log message to be logged. The buffer is only read during the call.
+ * @param source_file is the module source file of the log statement, used to report the actual
+ * location instead of a location inside Envoy. The buffer is only read during the call.
+ * @param source_line is the line number of the log statement within source_file.
  *
  */
 void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
-                                       envoy_dynamic_module_type_module_buffer message);
+                                       envoy_dynamic_module_type_module_buffer message,
+                                       envoy_dynamic_module_type_module_buffer source_file,
+                                       uint32_t source_line);
 
 /**
  * envoy_dynamic_module_callback_log_enabled is called by the module to check if the log level is
@@ -9505,6 +9509,40 @@ typedef enum {
 typedef void* envoy_dynamic_module_type_cluster_config_envoy_ptr;
 
 /**
+ * envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr is an opaque handle to one child
+ * counter of a cluster counter vec, already resolved for a specific label-value tuple.
+ *
+ * Incrementing a counter vec by id resolves its label values on every call, which allocates and
+ * rebuilds the tagged stat name each time. A module on a per-request path resolves the tuple once
+ * with envoy_dynamic_module_callback_cluster_config_resolve_counter_vec and then increments by
+ * handle, which allocates nothing.
+ *
+ * OWNERSHIP: Envoy owns the pointer. It stays valid until
+ * envoy_dynamic_module_on_cluster_config_destroy is called for the owning configuration.
+ */
+typedef void* envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr is an opaque handle to one child gauge
+ * of a cluster gauge vec, already resolved for a specific label-value tuple. See
+ * envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr for why this exists.
+ *
+ * OWNERSHIP: Envoy owns the pointer. It stays valid until
+ * envoy_dynamic_module_on_cluster_config_destroy is called for the owning configuration.
+ */
+typedef void* envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr is an opaque handle to one child
+ * histogram of a cluster histogram vec, already resolved for a specific label-value tuple. See
+ * envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr for why this exists.
+ *
+ * OWNERSHIP: Envoy owns the pointer. It stays valid until
+ * envoy_dynamic_module_on_cluster_config_destroy is called for the owning configuration.
+ */
+typedef void* envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr;
+
+/**
  * envoy_dynamic_module_type_cluster_config_module_ptr is a pointer to an in-module cluster
  * configuration corresponding to an Envoy cluster configuration. The config is responsible for
  * creating new cluster instances.
@@ -10066,6 +10104,30 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
 envoy_dynamic_module_type_cluster_host_envoy_ptr
 envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts writes every healthy host pointer at
+ * the given priority level into a module-owned array, in the same order
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host reports. It reads the whole partition
+ * in one ABI crossing instead of one crossing per host.
+ *
+ * Nothing is written unless every healthy host fits, so a caller whose buffer is too small sizes
+ * the retry from hosts_size_out rather than acting on a partial partition.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
+ * @param priority is the priority level.
+ * @param hosts_out is the array to fill, owned by the module. May be null only when hosts_capacity
+ * is zero.
+ * @param hosts_capacity is the number of elements hosts_out can hold.
+ * @param hosts_size_out is set to the number of healthy hosts at this priority level, whether or
+ * not they fit. Set to zero when the priority level does not exist. Must not be null.
+ * @return true when every healthy host was written, false when the priority level does not exist or
+ * hosts_capacity is smaller than hosts_size_out.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* hosts_out, size_t hosts_capacity,
+    size_t* hosts_size_out);
 
 // =============================================================================
 // Cluster LB Host Information Callbacks
@@ -10634,6 +10696,113 @@ envoy_dynamic_module_callback_cluster_config_increment_counter(
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value);
 
+// ------------------ Cluster resolved metric handles ------------------------
+//
+// The id-plus-label-values callbacks above resolve the label tuple on every call, which allocates
+// per label value and rebuilds the tagged stat name. A module writing metrics on a per-request path
+// resolves each tuple once through the callbacks below and then records by handle, which allocates
+// nothing and builds no name. The handles stay valid until the owning configuration is destroyed,
+// so a module resolves them once per configuration and keeps them.
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_resolve_counter_vec resolves one label-value tuple
+ * of a previously defined counter vec to a handle.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the counter vec previously defined using the config.
+ * @param label_values is the label values to resolve, one per label name given when the counter
+ * vec was defined.
+ * @param label_values_length is the number of label values. **IT MUST MATCH THE LABEL NAMES GIVEN
+ * WHEN THE COUNTER WAS DEFINED.**
+ * @param counter_ptr receives the handle. Must not be null. Left untouched on failure.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_counter_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr* counter_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec resolves one label-value tuple of
+ * a previously defined gauge vec to a handle. See
+ * envoy_dynamic_module_callback_cluster_config_resolve_counter_vec for the parameter and return
+ * contract.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr* gauge_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec resolves one label-value tuple
+ * of a previously defined histogram vec to a handle. See
+ * envoy_dynamic_module_callback_cluster_config_resolve_counter_vec for the parameter and return
+ * contract.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr* histogram_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_counter_add adds to a resolved counter. Safe from
+ * any thread. A null handle is ignored.
+ *
+ * @param counter_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_counter_vec.
+ * @param value is the amount to add.
+ */
+void envoy_dynamic_module_callback_cluster_metric_counter_add(
+    envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr counter_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_gauge_set sets a resolved gauge. Safe from any
+ * thread. A null handle is ignored.
+ *
+ * @param gauge_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec.
+ * @param value is the amount to set.
+ */
+void envoy_dynamic_module_callback_cluster_metric_gauge_set(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_gauge_add adds to a resolved gauge. Safe from any
+ * thread. A null handle is ignored.
+ *
+ * @param gauge_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec.
+ * @param value is the amount to add.
+ */
+void envoy_dynamic_module_callback_cluster_metric_gauge_add(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_gauge_sub subtracts from a resolved gauge. Safe from
+ * any thread. A null handle is ignored.
+ *
+ * @param gauge_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec.
+ * @param value is the amount to subtract.
+ */
+void envoy_dynamic_module_callback_cluster_metric_gauge_sub(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_histogram_record records a value on a resolved
+ * histogram. Safe to call from any Envoy worker or main thread. A null handle is ignored.
+ *
+ * @param histogram_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec.
+ * @param value is the value to record.
+ */
+void envoy_dynamic_module_callback_cluster_metric_histogram_record(
+    envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr histogram_envoy_ptr,
+    uint64_t value);
+
 /**
  * envoy_dynamic_module_callback_cluster_config_define_gauge is called by the module during
  * initialization to create a template for generating Stats::Gauges with the given name and
@@ -11004,6 +11173,27 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_strin
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch sets multiple
+ * string-valued dynamic metadata entries on the request under a single namespace in one call. It is
+ * equivalent to calling
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string once per entry but
+ * resolves the namespace and merges into the metadata struct only once. Existing entries with the
+ * same key are overwritten. Within a single call, a later entry overwrites an earlier entry with
+ * the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ * @return true if the values were set, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
 /**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
@@ -15205,6 +15395,88 @@ bool envoy_dynamic_module_callback_cluster_specifier_set_route_action_override(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name);
 
+// ------------------- Cluster Specifier Callbacks - Route Metadata ------------
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number sets the number value
+ * of the route metadata under the given namespace and key. The entry is layered onto the metadata
+ * of the matched route, so consumers that read route metadata, such as the rate limit ROUTE_ENTRY
+ * action or the METADATA(ROUTE) formatter, observe it. An existing entry with the same namespace
+ * and key is overwritten, while the other entries of the matched route stay in effect.
+ *
+ * The metadata takes effect only when the select call reports a decision. A select that reports
+ * none changes nothing, and a decision that sets no metadata drops what an earlier decision set.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the number value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string sets the string value
+ * of the route metadata under the given namespace and key. It behaves like
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number but stores a string.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the string value to set. Envoy copies the buffer.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool sets the bool value of
+ * the route metadata under the given namespace and key. It behaves like
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number but stores a bool.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the bool value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct merges a serialized
+ * google.protobuf.Struct into the route metadata under the given namespace. Existing entries with
+ * the same key are overwritten, while the others stay in effect. If the buffer does not parse as a
+ * google.protobuf.Struct, this is a no-op.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata sets the typed route
+ * metadata under the given namespace from a serialized google.protobuf.Any, replacing an existing
+ * entry, so a typed metadata factory registered for the namespace can parse it out of
+ * typedMetadata(). If the buffer does not parse as a google.protobuf.Any, this is a no-op.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param serialized_any is the serialized google.protobuf.Any value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
 // =============================================================================
 // Cluster Specifier Callbacks - Metrics
 // =============================================================================
@@ -15380,6 +15652,326 @@ envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
     envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value);
+
+// =============================================================================
+// ========================= Early Header Mutation =============================
+// =============================================================================
+
+// =============================================================================
+// Early Header Mutation Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleEarlyHeaderMutation class in Envoy. This is passed to the module when creating a new
+ * in-module early header mutation configuration and may be used to access the early header mutation
+ * configuration-scoped information in the future.
+ *
+ * This has 1:1 correspondence with
+ * envoy_dynamic_module_type_early_header_mutation_config_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_early_header_mutation_config_module_ptr is a pointer to an in-module
+ * early header mutation configuration created by
+ * envoy_dynamic_module_on_early_header_mutation_config_new. Exactly one configuration is created
+ * per configured extension entry, and it is shared by every request handled by every worker thread.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_early_header_mutation_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_early_header_mutation_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr is a raw pointer to the Envoy
+ * context of a single early header mutation. It provides read and write access to the request
+ * headers and read access to the stream info through the early header mutation callbacks.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is only valid during the
+ * envoy_dynamic_module_on_early_header_mutation_mutate callback on the worker thread handling the
+ * request, and it refers to storage that Envoy reuses once the callback returns. The module must
+ * not store this pointer, share it across threads, or use it after the callback returns.
+ */
+typedef void* envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr;
+
+// =============================================================================
+// Early Header Mutation Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_early_header_mutation_config_new is called on the main thread when an
+ * early header mutation extension referencing this module is configured. The module should parse
+ * the configuration and return a pointer to the in-module early header mutation configuration.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleEarlyHeaderMutation object for the
+ * corresponding config.
+ * @param name is the early header mutation name used to select an implementation within the module.
+ * @param config is the configuration bytes for the early header mutation.
+ * @return envoy_dynamic_module_type_early_header_mutation_config_module_ptr is the pointer to the
+ * in-module early header mutation configuration. Returning nullptr indicates a failure to
+ * initialize, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_early_header_mutation_config_module_ptr
+envoy_dynamic_module_on_early_header_mutation_config_new(
+    envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_early_header_mutation_config_destroy is called when the early header
+ * mutation configuration is destroyed, which happens when the listener owning the connection
+ * manager configuration that references it is drained and removed.
+ *
+ * @param config_module_ptr is the pointer to the in-module early header mutation configuration.
+ */
+void envoy_dynamic_module_on_early_header_mutation_config_destroy(
+    envoy_dynamic_module_type_early_header_mutation_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_early_header_mutation_mutate is called once per request to rewrite the
+ * request headers, before routing, tracing, request ID generation, x-forwarded-for handling and any
+ * HTTP filter runs.
+ *
+ * This may be called concurrently on multiple worker threads with the same in-module configuration,
+ * so the module must treat the configuration as read-only and avoid shared mutable state.
+ *
+ * Only the request headers exist at this point. The stream info is read-only: the connection-level
+ * attributes and any dynamic metadata or filter state published by listener or network filters are
+ * available, while the route, the response and every upstream attribute are not yet populated and
+ * their getters return false.
+ *
+ * @param config_module_ptr is the pointer to the in-module early header mutation configuration.
+ * @param envoy_ptr is the pointer to the Envoy early header mutation context, valid only during
+ * this call.
+ * @return true to continue to the next early header mutation extension in the configured chain,
+ * false to stop the chain. This is not a success or failure signal: the mutations the module has
+ * already made are kept either way, and returning false only suppresses the extensions configured
+ * after this one. When this is the last or only extension in the chain, the return value has no
+ * effect.
+ */
+bool envoy_dynamic_module_on_early_header_mutation_mutate(
+    envoy_dynamic_module_type_early_header_mutation_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr);
+
+// =============================================================================
+// Early Header Mutation Callbacks
+// =============================================================================
+
+// ------------------ Early Header Mutation Callbacks - Headers ----------------
+// Only the request headers exist at this point in the request lifecycle, so these callbacks take no
+// header type and always operate on the request header map.
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_headers_size is called by the module to
+ * get the number of request headers.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @return the number of request headers.
+ */
+size_t envoy_dynamic_module_callback_early_header_mutation_get_headers_size(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_headers is called by the module to get
+ * all request headers.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param result_headers is the array to store the headers. The module must ensure that the array
+ * has enough space to store all headers, i.e. at least
+ * envoy_dynamic_module_callback_early_header_mutation_get_headers_size entries. Envoy does not
+ * bounds check the array, so passing a shorter one is undefined behavior. The buffers in the
+ * entries are owned by Envoy and are invalidated by any of the header setter callbacks below.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_headers(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_header_value is called by the module to
+ * get the value of a request header with the given key.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the key of the header.
+ * @param result is the pointer to the buffer where the header value will be stored. It is set to a
+ * null buffer of length zero when the key does not exist or the index is out of range. The buffer
+ * is owned by Envoy and is invalidated by any of the header setter callbacks below.
+ * @param index is the index of the header value in the case of multiple values for the same key,
+ * zero for the first value.
+ * @param total_count_out, when non-null, receives the total number of values for the key.
+ * @return true if the header exists at the given index, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_header_value(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_set_header is called by the module to set the
+ * value of the request header with the given key. If the header does not exist, it will be created.
+ * If the header already exists, all existing values will be removed and the new value will be set.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the key of the header. An empty key is rejected.
+ * @param value is the value of the header. An empty value sets the header to an empty string; use
+ * envoy_dynamic_module_callback_early_header_mutation_remove_header to remove a header.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that this only sets the header on the underlying Envoy object. The connection manager and
+ * the subsequent filters may still rewrite or drop it, so returning true does not guarantee that
+ * the header reaches the upstream. In particular, the connection manager sanitizes the
+ * ``connection``,
+ * ``upgrade``, ``te`` and ``x-forwarded-for`` headers right after this hook runs.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_set_header(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_add_header is called by the module to add a
+ * value to the request header with the given key, preserving any existing values. If the header
+ * does not exist, it will be created.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the key of the header. An empty key is rejected.
+ * @param value is the value to add.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_add_header(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_remove_header is called by the module to
+ * remove all values of the request header with the given key.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the key of the header to remove. An empty key is rejected.
+ * @return true if the operation is successful, false otherwise. Removing a key that does not exist
+ * is successful.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_remove_header(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
+// ----------- Early Header Mutation Callbacks - Generic Attributes ------------
+// The attribute callbacks share the envoy_dynamic_module_type_attribute_id enum with the access
+// logger. Early header mutation runs before routing and before the upstream request, so the route,
+// response and upstream attributes are not populated yet and the getters return false for them.
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_attribute_string is called by the module
+ * to get a string attribute value from the stream info. If the attribute is not found, not
+ * supported or is not a string, this returns false.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the buffer where the string value will be stored. The buffer is
+ * owned by Envoy and is valid until the end of the current event hook.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_attribute_string(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_attribute_int is called by the module to
+ * get an integer attribute value from the stream info. If the attribute is not found, not supported
+ * or is not an integer, this returns false.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_attribute_int(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_attribute_bool is called by the module to
+ * get a boolean attribute value from the stream info. If the attribute is not found, not supported
+ * or is not a boolean, this returns false.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the boolean value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_attribute_bool(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+// -------- Early Header Mutation Callbacks - Metadata and Dynamic State -------
+// The stream info is read-only at this point in the request lifecycle, so only getters are exposed.
+// A module that needs to publish state for later extensions should do so from an HTTP filter.
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata is called by the module
+ * to get a string value from dynamic metadata by filter name and key path.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result is the pointer to the buffer where the string value will be stored. Only string
+ * values are returned. The buffer is owned by Envoy and is valid until the end of the current event
+ * hook.
+ * @return true if a string value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_number is called by the
+ * module to get a number value from dynamic metadata by filter name and key path.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result is the pointer to the variable where the number value will be stored.
+ * @return true if a number value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, double* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_bool is called by the
+ * module to get a boolean value from dynamic metadata by filter name and key path.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result is the pointer to the variable where the boolean value will be stored.
+ * @return true if a boolean value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes is called by the
+ * module to get a bytes value from the filter state. Only objects stored as
+ * Envoy::Router::StringAccessor, which is what the dynamic module filter state setters create, are
+ * readable through this callback.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the filter state key to look up.
+ * @param result is the pointer to the buffer where the bytes value will be stored. The buffer is
+ * owned by Envoy and is valid until the end of the current event hook.
+ * @return true if the key exists and holds a readable value, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
 #ifdef __cplusplus
 }

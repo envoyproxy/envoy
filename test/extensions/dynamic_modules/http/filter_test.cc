@@ -874,6 +874,51 @@ TEST_P(DynamicModuleHttpLanguageTests, SpanCallbacks) {
   filter->onDestroy();
 }
 
+TEST_P(DynamicModuleHttpLanguageTests, SpanAcrossCallbacks) {
+  const std::string filter_name = "span_across_callbacks";
+  const std::string filter_config = "";
+
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
+  EXPECT_OK(dynamic_module);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_store.createScope(""), context);
+  ASSERT_OK(filter_config_or_status);
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_store.symbolTable(), 0);
+  filter->initializeInModuleFilter();
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<Tracing::MockSpan> span;
+  auto* child_span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(callbacks, activeSpan()).WillRepeatedly(testing::ReturnRef(span));
+  EXPECT_CALL(span, spawnChild_(_, "child", _)).WillOnce(testing::Return(child_span));
+  Http::TestRequestHeaderMapImpl request_headers{{}};
+  EXPECT_CALL(callbacks, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+  filter->setDecoderFilterCallbacks(callbacks);
+
+  // The first event hook spawns and stores the child span. It must not be tagged or finished yet.
+  EXPECT_CALL(*child_span, setTag(_, _)).Times(0);
+  EXPECT_CALL(*child_span, finishSpan()).Times(0);
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+  EXPECT_EQ(request_headers.get_("x-span-stored"), "true");
+  testing::Mock::VerifyAndClearExpectations(child_span);
+
+  // The stored child span is finished in a later event hook, proving it outlived the first one.
+  EXPECT_CALL(*child_span, setTag("child-key", "child-value"));
+  EXPECT_CALL(*child_span, finishSpan());
+  Http::TestRequestTrailerMapImpl request_trailers{};
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
+
+  filter->onDestroy();
+}
+
 TEST_P(DynamicModuleHttpLanguageTests, ClusterCallbacks) {
   const std::string filter_name = "cluster_callbacks";
   const std::string filter_config = "";

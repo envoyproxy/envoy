@@ -3,6 +3,10 @@ load("//compat/openssl:bazel/rules.bzl", "patched_bssl_filegroup")
 
 licenses(["notice"])  # Apache 2
 
+# The BoringSSL test data is provided by the @boringssl-source repository. bzlmod
+# materialises external repos under their canonical (`+`-suffixed) name.
+_BORINGSSL_TEST_DATA_ENV = {"BORINGSSL_TEST_DATA_ROOT": "./external/boringssl-source+"}
+
 # Create rules for processing BoringSSL test files. This creates one genrule
 # per test file, which copies that file from BoringSSL, applying any necessary
 # patches. This also creates a filegroup called :patched_bssl_tests which
@@ -20,6 +24,8 @@ patched_bssl_filegroup(
         "crypto/rand/rand_test.cc",
         "crypto/rsa/rsa_test.cc",
         "crypto/stack/stack_test.cc",
+        "crypto/test/der_trailing_data.cc",
+        "crypto/test/der_trailing_data.h",
         "crypto/test/file_test.cc",
         "crypto/test/file_test.h",
         "crypto/test/file_test_gtest.cc",
@@ -29,8 +35,6 @@ patched_bssl_filegroup(
         "crypto/test/test_data.h",
         "crypto/test/test_util.cc",
         "crypto/test/test_util.h",
-        "crypto/test/der_trailing_data.h",
-        "crypto/test/der_trailing_data.cc",
         "crypto/x509/x509_test.cc",
         "ssl/ssl_c_test.c",
         "ssl/ssl_test.cc",
@@ -73,11 +77,9 @@ cc_test(
         ":patched_bssl_tests",
     ],
     data = [
-        "@boringssl//:test_data",
+        "@boringssl-source//:test_data",
     ],
-    env = {
-        "BORINGSSL_TEST_DATA_ROOT": "./external/boringssl",
-    },
+    env = _BORINGSSL_TEST_DATA_ENV,
     includes = [
         ".",
     ],
@@ -100,11 +102,9 @@ cc_test(
         ":patched_bssl_tests",
     ],
     data = [
-        "@boringssl//:test_data",
+        "@boringssl-source//:test_data",
     ],
-    env = {
-        "BORINGSSL_TEST_DATA_ROOT": "./external/boringssl",
-    },
+    env = _BORINGSSL_TEST_DATA_ENV,
     includes = [
         ".",
     ],

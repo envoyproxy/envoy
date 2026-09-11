@@ -50,6 +50,7 @@ envoy_extension_cc_dyn_module_test(
     extension_names = ["envoy.router.cluster_specifier_plugin.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/extensions/formatter/metadata:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/router/cluster_specifiers/dynamic_modules:config",
         "//test/integration:http_integration_lib",

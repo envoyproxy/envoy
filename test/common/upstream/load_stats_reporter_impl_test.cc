@@ -557,11 +557,9 @@ TEST_F(LoadStatsReporterImplTest, RemoteStreamGracefulClose) {
 
 // Validate that when rq_active is non-zero, a load report is sent even if rq_issued is 0.
 TEST_F(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
-  // Keep this test when deprecating the runtime flag.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.report_load_for_non_zero_stats", "false"},
-       {"envoy.reloadable_features.report_load_when_rq_active_is_non_zero", "true"}});
+      {{"envoy.reloadable_features.report_load_for_non_zero_stats", "false"}});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
@@ -616,8 +614,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
 TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.report_load_when_rq_active_is_non_zero", "false"},
-       {"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
+      {{"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
@@ -671,8 +668,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
 TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.report_load_when_rq_active_is_non_zero", "false"},
-       {"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
+      {{"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
@@ -726,8 +722,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
 TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsCustomMetric) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.report_load_when_rq_active_is_non_zero", "false"},
-       {"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
+      {{"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});

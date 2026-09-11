@@ -120,6 +120,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
+        "//source/common/network:address_lib",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
@@ -129,6 +130,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
@@ -162,7 +164,11 @@ envoy_cc_dyn_module_test(
     },
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/registry",
+        "//envoy/server:tracer_config_interface",
+        "//envoy/tracing:trace_driver_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",

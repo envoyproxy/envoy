@@ -129,8 +129,6 @@ protected:
   };
   void initialize(std::string&& yaml, bool is_upstream_filter = false) {
     scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.ext_proc_stream_close_optimization", "true"}});
-    scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.ext_proc_return_stop_iteration", "true"}});
@@ -1796,7 +1794,7 @@ TEST_F(HttpFilterTest, StreamingDataSmallChunk) {
   request_headers_.setMethod("POST");
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(true, std::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   const uint32_t chunk_number = 20;
   sendChunkRequestData(chunk_number, true);
@@ -1846,7 +1844,7 @@ TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
   request_headers_.setMethod("POST");
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(true, std::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   Buffer::OwnedImpl req_data("foo");
   const uint32_t chunk_number = 20;
@@ -1898,7 +1896,7 @@ TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
   request_headers_.setMethod("POST");
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(true, std::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   const uint32_t chunk_number = 20;
   sendChunkRequestData(chunk_number, true);
@@ -2188,7 +2186,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_TRUE(last_request_.has_protocol_config());
-  processRequestHeaders(true, std::nullopt);
+  processRequestHeaders(false, std::nullopt);
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
   // Test content-length header is removed in request in streamed mode.
   EXPECT_EQ(request_headers_.ContentLength(), nullptr);
@@ -2296,7 +2294,7 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
 
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(true, std::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   bool decoding_watermarked = false;
   setUpDecodingWatermarking(decoding_watermarked);
@@ -3709,7 +3707,7 @@ TEST_F(HttpFilterTest, StreamedBodyCallbackWithEmptyQueue) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   // Handle headers response to establish the gRPC stream and initialize stream_callbacks_.
-  processRequestHeaders(true, std::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   // Manually transition decoding_state_ to StreamedBodyCallback while the chunk_queue_ is empty.
   auto& decoding_state = const_cast<ProcessorState&>(filter_->decodingState());
@@ -3935,6 +3933,28 @@ TEST_F(OverrideTest, ClusterMetadataNamespacesOverride) {
   ASSERT_TRUE(merged_route.untypedClusterMetadataForwardingNamespaces().has_value());
   EXPECT_THAT(*merged_route.untypedClusterMetadataForwardingNamespaces(),
               ElementsAre("more_specific_untyped_ns_2"));
+}
+
+TEST_F(OverrideTest, EmitClientSpanMerge) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_emit_client_span()->set_value(false);
+
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()->mutable_emit_client_span()->set_value(true);
+
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
+  FilterConfigPerRoute merged_route(route1, route2);
+
+  ASSERT_TRUE(merged_route.emitClientSpan().has_value());
+  EXPECT_TRUE(*merged_route.emitClientSpan());
+
+  // Empty more specific inherits from less specific.
+  ExtProcPerRoute empty_cfg;
+  FilterConfigPerRoute empty_route(empty_cfg, builder_, factory_context_);
+  FilterConfigPerRoute merged_inherited(route1, empty_route);
+  ASSERT_TRUE(merged_inherited.emitClientSpan().has_value());
+  EXPECT_FALSE(*merged_inherited.emitClientSpan());
 }
 
 // Verify that attempts to change headers that are not allowed to be changed
@@ -5836,7 +5856,7 @@ TEST_F(HttpFilterTest, SaveResponseTrailers) {
   request_headers_.setMethod("POST");
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(true, std::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   const uint32_t chunk_number = 20;
   sendChunkRequestData(chunk_number, true);
@@ -5960,7 +5980,7 @@ TEST_F(HttpFilterTest, DontSaveProcessingResponse) {
   request_headers_.setMethod("POST");
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(true, std::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   const uint32_t chunk_number = 20;
   sendChunkRequestData(chunk_number, true);
@@ -6749,6 +6769,81 @@ TEST_F(HttpFilterTest, LocalResponseStarted) {
   )EOF");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_FALSE(FilterAccessor::decodingState(*filter_).localResponseStarted());
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, EmitClientSpanDefault) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  EXPECT_CALL(*client_ptr_, start(_, _, _, _))
+      .WillOnce(Invoke(
+          [this](ExternalProcessorCallbacks& callbacks,
+                 const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                 const Envoy::Http::AsyncClient::StreamOptions& options,
+                 Envoy::Http::StreamFilterSidestreamWatermarkCallbacks& watermark_callbacks) {
+            EXPECT_EQ(std::nullopt, options.sampled_);
+            return doStart(callbacks, config_with_hash_key, options, watermark_callbacks);
+          }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, std::nullopt);
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, EmitClientSpanDisabled) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  emit_client_span: false
+  )EOF");
+
+  EXPECT_CALL(*client_ptr_, start(_, _, _, _))
+      .WillOnce(Invoke(
+          [this](ExternalProcessorCallbacks& callbacks,
+                 const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                 const Envoy::Http::AsyncClient::StreamOptions& options,
+                 Envoy::Http::StreamFilterSidestreamWatermarkCallbacks& watermark_callbacks) {
+            EXPECT_EQ(std::make_optional(false), options.sampled_);
+            return doStart(callbacks, config_with_hash_key, options, watermark_callbacks);
+          }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, std::nullopt);
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, EmitClientSpanPerRouteOverride) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  emit_client_span: true
+  )EOF");
+
+  envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute route_proto;
+  route_proto.mutable_overrides()->mutable_emit_client_span()->set_value(false);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  EXPECT_CALL(*client_ptr_, start(_, _, _, _))
+      .WillOnce(Invoke(
+          [this](ExternalProcessorCallbacks& callbacks,
+                 const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                 const Envoy::Http::AsyncClient::StreamOptions& options,
+                 Envoy::Http::StreamFilterSidestreamWatermarkCallbacks& watermark_callbacks) {
+            EXPECT_EQ(std::make_optional(false), options.sampled_);
+            return doStart(callbacks, config_with_hash_key, options, watermark_callbacks);
+          }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, std::nullopt);
   filter_->onDestroy();
 }
 

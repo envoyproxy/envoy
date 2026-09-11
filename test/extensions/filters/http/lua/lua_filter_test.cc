@@ -17,6 +17,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/status_utility.h"
@@ -3426,6 +3427,117 @@ TEST_F(LuaHttpFilterTest, LuaFilterContextIsReadWithGet) {
       });
 }
 
+// Writes a module for a script to require, and returns the search pattern that finds it.
+std::string writeFilterTestModule() {
+  TestEnvironment::writeStringToFileForTest("lua_filter_test_module.lua", R"EOF(
+    local m = {}
+    function m.value()
+      return "from_the_module"
+    end
+    return m
+  )EOF");
+  return TestEnvironment::temporaryPath("?.lua");
+}
+
+const std::string REQUIRE_MODULE_SCRIPT{R"EOF(
+  local m = require("lua_filter_test_module")
+  function envoy_on_request(request_handle)
+    request_handle:headers():add("module_value", m.value())
+  end
+)EOF"};
+
+// A filter-level package path lets the default source code require a module from it.
+TEST_F(LuaHttpFilterTest, PackagePathsFromFilterConfig) {
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(REQUIRE_MODULE_SCRIPT);
+  proto_config.add_package_paths(writeFilterTestModule());
+
+  setupConfig(proto_config, {});
+  setupFilter();
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ("from_the_module", request_headers.get_("module_value"));
+}
+
+// The same script without a package path is rejected when the configuration is loaded, rather than
+// failing once per request.
+TEST(LuaHttpFilterConfigTest, PackagePathsAbsentIsAConfigError) {
+  writeFilterTestModule();
+
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Api::MockApi> api;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(REQUIRE_MODULE_SCRIPT);
+
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua", 1,
+               creation_status);
+  EXPECT_THAT(creation_status,
+              StatusHelpers::HasStatusMessage(
+                  testing::AllOf(testing::HasSubstr("script load error"),
+                                 testing::HasSubstr("module 'lua_filter_test_module' not found"))));
+}
+
+// A script from the source_codes map is a separate VM from default_source_code's, and gets the
+// filter-level patterns as well.
+TEST_F(LuaHttpFilterTest, PackagePathsForNamedSourceCode) {
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(R"EOF(
+    function envoy_on_request(request_handle)
+    end
+  )EOF");
+  envoy::config::core::v3::DataSource named_source;
+  named_source.set_inline_string(REQUIRE_MODULE_SCRIPT);
+  proto_config.mutable_source_codes()->insert({"named.lua", named_source});
+  proto_config.add_package_paths(writeFilterTestModule());
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  per_route_proto_config.set_name("named.lua");
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_config_.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ("from_the_module", request_headers.get_("module_value"));
+}
+
+// A route's inline source code gets its own VM, so it needs its own package path; the filter-level
+// one does not reach it.
+TEST_F(LuaHttpFilterTest, PackagePathsFromPerRouteConfig) {
+  const std::string pattern = writeFilterTestModule();
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(R"EOF(
+    function envoy_on_request(request_handle)
+    end
+  )EOF");
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  per_route_proto_config.mutable_source_code()->set_inline_string(REQUIRE_MODULE_SCRIPT);
+  per_route_proto_config.add_package_paths(pattern);
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_config_.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ("from_the_module", request_headers.get_("module_value"));
+}
+
 // Test whether the route can directly reuse the Lua code in the global configuration.
 TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   const std::string SCRIPT_FOR_ROUTE_ONE{R"EOF(
@@ -3555,6 +3667,51 @@ TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
   EXPECT_LOG_CONTAINS("trace", "H4sIAAAAAAAA/8pIzcnJL88vykkBBAAA//+tIOv5CgAAAA==", {
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
   });
+}
+
+TEST_F(LuaHttpFilterTest, LuaFilterBase64Decode) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:base64Decode("Zm9vYmFy"))
+
+      -- Round trips with base64Escape.
+      request_handle:logTrace(request_handle:base64Decode(request_handle:base64Escape("round trip")))
+
+      -- Binary data survives, including embedded NULs: Lua strings are length counted, so the
+      -- length is the observable property rather than the content.
+      local nuls = request_handle:base64Decode("AGEA")
+      request_handle:logTrace("nul length " .. #nuls)
+
+      -- The empty string is valid base64 and decodes to the empty string, not nil.
+      local empty = request_handle:base64Decode("")
+      request_handle:logTrace("empty is nil: " .. tostring(empty == nil) .. " length " .. #empty)
+    end
+
+    function envoy_on_response(response_handle)
+      -- Invalid base64 yields nil rather than raising.
+      response_handle:logTrace("bad chars: " .. tostring(response_handle:base64Decode("!!!!")))
+      response_handle:logTrace("bad length: " .. tostring(response_handle:base64Decode("a")))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"trace", "foobar"},
+                                  {"trace", "round trip"},
+                                  {"trace", "nul length 3"},
+                                  {"trace", "empty is nil: false length 0"}}),
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->decodeHeaders(request_headers, true)));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"trace", "bad chars: nil"}, {"trace", "bad length: nil"}}),
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->encodeHeaders(response_headers, true)));
 }
 
 TEST_F(LuaHttpFilterTest, Timestamp_ReturnsFormatSet) {

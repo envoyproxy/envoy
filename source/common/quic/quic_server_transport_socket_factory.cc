@@ -16,23 +16,51 @@ absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
 QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
-  auto quic_transport = MessageUtil::downcastAndValidate<
+  auto& quic_transport = MessageUtil::downcastAndValidate<
       const envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport&>(
       config, context.messageValidationVisitor());
+
   absl::StatusOr<std::unique_ptr<Extensions::TransportSockets::Tls::ServerContextConfigImpl>>
       server_config_or_error = Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
           quic_transport.downstream_tls_context(), context, server_names, true);
   RETURN_IF_NOT_OK(server_config_or_error.status());
   auto server_config = std::move(server_config_or_error.value());
-  // TODO(RyanTheOptimist): support TLS client authentication.
+  // QUIC client certificate authentication is gated by a runtime guard so it can be disabled to
+  // restore the prior "not supported" startup error. A client certificate requirement also needs a
+  // trust anchor and must not use `ACCEPT_UNTRUSTED`, since either would let the server accept any
+  // client certificate.
   if (server_config->requireClientCertificate()) {
-    return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_mtls_server_enabled")) {
+      return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");
+    }
+    const auto* validation_ctx = server_config->certificateValidationContext();
+    if (validation_ctx == nullptr || validation_ctx->caCert().empty()) {
+      return absl::InvalidArgumentError(
+          "QUIC downstream TLS context requires a client certificate but no "
+          "validation_context.trusted_ca is configured");
+    }
+    if (validation_ctx->trustChainVerification() ==
+        envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+            ACCEPT_UNTRUSTED) {
+      return absl::InvalidArgumentError(
+          "QUIC downstream TLS context requires a client certificate but "
+          "validation_context.trust_chain_verification is ACCEPT_UNTRUSTED, which would "
+          "silently accept any client certificate");
+    }
   }
 
+  // QUIC does not re-validate the client certificate on session resumption: a resumed connection
+  // reuses the verdict of the original handshake until the ticket expires. Resumption and early
+  // data therefore default to off on filter chains that require a client certificate. Operators
+  // can still opt into resumption explicitly.
+  const bool default_resumption =
+      !(server_config->requireClientCertificate() &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_mtls_resumption_disabled_by_default"));
   const bool enable_early_data =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true);
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, default_resumption);
   const bool enable_resumption =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_resumption, true);
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_resumption, default_resumption);
 
   if (!enable_resumption && enable_early_data) {
     return absl::InvalidArgumentError(

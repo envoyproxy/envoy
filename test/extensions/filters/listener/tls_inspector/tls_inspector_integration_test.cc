@@ -190,7 +190,8 @@ typed_config:
     // Set up the SSL client.
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("echo"));
-    context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+    context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
     Network::TransportSocketPtr transport_socket;
     if (ssl_client) {
       transport_socket =
@@ -271,8 +272,8 @@ TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
       false, false, false);
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("echo"));
-  context_ =
-      Ssl::createClientSslTransportSocketFactory(/*ssl_options=*/{}, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(
+      /*ssl_options=*/{}, *context_manager_, *api_, &server_factory_context_.serverScope());
   auto transport_socket_factory = std::make_unique<Network::RawBufferSocketFactory>();
   Network::TransportSocketPtr transport_socket =
       transport_socket_factory->createTransportSocket(nullptr, nullptr);
@@ -381,7 +382,8 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanGrow) {
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   const std::string really_long_sni(absl::StrCat(std::string(240, 'a'), ".foo.com"));
   ssl_options.setSni(really_long_sni);
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
   Network::TransportSocketPtr transport_socket = context_->createTransportSocket(
       std::make_shared<Network::TransportSocketOptionsImpl>(
           absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"envoyalpn"}),
@@ -420,7 +422,8 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanStartBig) {
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   const std::string really_long_sni(absl::StrCat(std::string(240, 'a'), ".foo.com"));
   ssl_options.setSni(really_long_sni);
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
   Network::TransportSocketPtr transport_socket = context_->createTransportSocket(
       std::make_shared<Network::TransportSocketOptionsImpl>(
           absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{}),
@@ -479,7 +482,8 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintWithMalformedClientHello) {
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   ssl_options.setSni("example.com");
 
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("echo"));
 
@@ -542,7 +546,8 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintWithSpecialALPN) {
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   ssl_options.setSni("example.com");
 
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("echo"));
 
@@ -597,7 +602,8 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintWithMinimalExtensions) {
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   // No SNI set
 
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("echo"));
 
@@ -634,7 +640,8 @@ TEST_P(TlsInspectorIntegrationTest, SniCapturedOnFilterChainNotFound) {
 
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setSni(test_sni);
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
 
   // Use ALPN that doesn't match the filter chain.
   Network::TransportSocketPtr transport_socket = context_->createTransportSocket(

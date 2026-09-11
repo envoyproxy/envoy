@@ -9,7 +9,6 @@
 
 #include "source/common/common/logger.h"
 
-#include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
@@ -23,6 +22,15 @@ void setReason(CgroupDetectionDiagnostic* diag, absl::string_view message, bool 
     diag->message = std::string(message);
     diag->is_error = is_error;
   }
+}
+
+bool containsToken(absl::string_view value, absl::string_view token) {
+  for (absl::string_view item : absl::StrSplit(value, ',')) {
+    if (item == token) {
+      return true;
+    }
+  }
+  return false;
 }
 } // namespace
 
@@ -179,7 +187,7 @@ std::optional<CgroupPathInfo> CgroupCpuUtil::getCurrentCgroupPath(Filesystem::In
     }
 
     // Priority handling: If v1 hierarchy + containsCPU(): Return immediately (v1 wins)
-    if (absl::StrContains(controllers, "cpu")) {
+    if (containsToken(controllers, "cpu")) {
       // Found cgroup v1 with CPU controller - return immediately (highest priority)
       return CgroupPathInfo{std::string(path), "v1"};
     }
@@ -516,7 +524,7 @@ std::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Instan
     absl::string_view super_options = line;
 
     // v1 hierarchy - check for CPU controller
-    if (absl::StrContains(super_options, "cpu")) {
+    if (containsToken(super_options, "cpu")) {
       // Found a v1 CPU controller. This must be the only one, so we're done
       return mount_point; // Return immediately - v1 CPU wins
     }

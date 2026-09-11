@@ -464,14 +464,9 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   readFromClientSockets();
 }
 
-class MockNonDispatchedUdpPacketHandler : public Network::NonDispatchedUdpPacketHandler {
-public:
-  MOCK_METHOD(void, handle, (uint32_t worker_index, const Network::UdpRecvData& packet));
-};
-
 TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
   initialize();
-  MockNonDispatchedUdpPacketHandler mock_packet_forwarding;
+  Network::MockNonDispatchedUdpPacketHandler mock_packet_forwarding;
   Network::ExtraShutdownListenerOptions options;
   options.non_dispatched_udp_packet_handler_ = mock_packet_forwarding;
   quic_listener_->shutdownListener(options);
@@ -786,7 +781,8 @@ public:
 
   MOCK_METHOD(QuicPacketWriterPtr, createQuicPacketWriter,
               (Network::IoHandle & io_handle, Stats::Scope& scope,
-               Envoy::Event::Dispatcher& dispatcher, absl::AnyInvocable<void()> on_can_write_cb),
+               Envoy::Event::Dispatcher& dispatcher, absl::AnyInvocable<void()> on_can_write_cb,
+               uint32_t worker_index),
               (override));
 };
 
@@ -801,9 +797,9 @@ TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreation) {
 
   // Expect createQuicPacketWriter to be called, and return our dummy writer.
   FakeQuicPacketWriter* raw_writer = nullptr;
-  EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _))
+  EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _, _))
       .WillOnce(Invoke([&raw_writer](Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
-                                     absl::AnyInvocable<void()>) -> QuicPacketWriterPtr {
+                                     absl::AnyInvocable<void()>, uint32_t) -> QuicPacketWriterPtr {
         auto writer = std::make_unique<FakeQuicPacketWriter>();
         raw_writer = writer.get();
         return writer;
@@ -827,7 +823,7 @@ TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreationNullWriter) {
       .WillRepeatedly(Return(&quic_packet_writer_factory));
 
   // Expect createQuicPacketWriter to return nullptr.
-  EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _))
+  EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _, _))
       .Times(testing::AnyNumber())
       .WillRepeatedly(testing::InvokeWithoutArgs([]() -> QuicPacketWriterPtr { return nullptr; }));
 

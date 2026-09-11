@@ -1,13 +1,84 @@
+#include <atomic>
+
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/tracer_config.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "source/common/common/base64.h"
 #include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/logging.h"
 
 namespace Envoy {
+
+namespace {
+
+// Counts child spans named "off_thread_work" that were finished, so SpanAcrossCallbacks can confirm
+// a span spawned in on_request_headers was finished from a later event hook.
+std::atomic<uint32_t>& offThreadWorkSpansFinished() {
+  static std::atomic<uint32_t> counter{0};
+  return counter;
+}
+
+// A minimal tracer that keeps the active span non-null so a module can spawn and finish real child
+// spans. Only the child operation name matters here, so every other method is a no-op.
+class TestTracerSpan : public Tracing::Span {
+public:
+  explicit TestTracerSpan(std::string operation) : operation_(std::move(operation)) {}
+  void setOperation(absl::string_view operation) override { operation_ = std::string(operation); }
+  void setTag(absl::string_view, absl::string_view) override {}
+  void log(SystemTime, const std::string&) override {}
+  void finishSpan() override {
+    if (operation_ == "off_thread_work") {
+      offThreadWorkSpansFinished().fetch_add(1);
+    }
+  }
+  void injectContext(Tracing::TraceContext&, const Tracing::UpstreamContext&) override {}
+  Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
+                              SystemTime) override {
+    return std::make_unique<TestTracerSpan>(name);
+  }
+  void setSampled(bool) override {}
+  bool exportedSpan() const override { return false; }
+  bool useLocalDecision() const override { return false; }
+  std::string getBaggage(absl::string_view) override { return ""; }
+  void setBaggage(absl::string_view, absl::string_view) override {}
+  std::string getTraceId() const override { return ""; }
+  std::string getSpanId() const override { return ""; }
+
+private:
+  std::string operation_;
+};
+
+class TestTracerDriver : public Tracing::Driver {
+public:
+  Tracing::SpanPtr startSpan(const Tracing::Config&, Tracing::TraceContext&,
+                             const StreamInfo::StreamInfo&, const std::string& operation_name,
+                             Tracing::Decision) override {
+    return std::make_unique<TestTracerSpan>(operation_name);
+  }
+};
+
+class TestTracerFactory : public Server::Configuration::TracerFactory {
+public:
+  Tracing::DriverSharedPtr
+  createTracerDriver(const Protobuf::Message&,
+                     Server::Configuration::TracerFactoryContext&) override {
+    return std::make_shared<TestTracerDriver>();
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  std::string name() const override { return "envoy.tracers.dynamic_modules_test"; }
+};
+
+REGISTER_FACTORY(TestTracerFactory, Server::Configuration::TracerFactory);
+
+} // namespace
 
 class DynamicModulesIntegrationTest : public testing::TestWithParam<std::string>,
                                       public HttpIntegrationTest {
@@ -257,6 +328,84 @@ TEST_P(DynamicModulesIntegrationTest, LogLevel) {
                         .get(Http::LowerCaseString("x-log-error-enabled"))[0]
                         ->value()
                         .getStringView());
+}
+
+// The log callback reports the module source location of the log statement rather than a location
+// inside Envoy. This exercises each SDK's call-site capture end to end.
+TEST_P(DynamicModulesIntegrationTest, LogReportsModuleSourceLocation) {
+#ifdef __APPLE__
+  if (GetParam() == "go") {
+    GTEST_SKIP() << "Go module deadlocks server teardown on macOS, see #46905";
+  }
+#endif
+  const std::string expected_source_file = GetParam() == "go"    ? "http_integration_test.go"
+                                           : GetParam() == "cpp" ? "http_integration_test.cc"
+                                                                 : "http_integration_test.rs";
+
+  initializeFilter("passthrough");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  Envoy::LogLevelSetter save_levels(spdlog::level::info);
+  Envoy::StartStopRecording recording(Envoy::GetLogSink());
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+
+  // The passthrough filter logs from on_request_headers. That line must carry the module source
+  // location instead of a location inside Envoy.
+  bool found = false;
+  for (const std::string& message : recording.messages()) {
+    if (message.find("on_request_headers called") == std::string::npos) {
+      continue;
+    }
+    found = true;
+    EXPECT_NE(std::string::npos, message.find(expected_source_file)) << message;
+    EXPECT_EQ(std::string::npos, message.find("abi_impl.cc")) << message;
+  }
+  EXPECT_TRUE(found);
+}
+
+// A `direct_response` route is served as a local reply. The module did not send it, so its
+// response callbacks must still run. Regression test for the C++ SDK, which set the same
+// `local_reply_sent_` flag on the local-reply notification that it sets when the module itself
+// calls `sendLocalResponse()`, and then skipped every response callback for the stream.
+TEST_P(DynamicModulesIntegrationTest, ResponseCallbacksOnLocalReply) {
+#ifdef __APPLE__
+  if (GetParam() == "go") {
+    // Not this test: with a Go module loaded, ~IntegrationTestServer never returns, because the
+    // exiting server thread runs macOS pthread key destructors and one of them enters the Go
+    // runtime and does not come back. The request itself succeeds. See #46905. Scoped to Apple
+    // platforms because Go is the only SDK here whose runtime installs key destructors and this
+    // has not been seen on Linux.
+    GTEST_SKIP() << "Go module deadlocks server teardown on macOS, see #46905";
+  }
+#endif
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->clear_route();
+        auto* direct_response = route->mutable_direct_response();
+        direct_response->set_status(200);
+        direct_response->mutable_body()->set_inline_string("ok");
+      });
+  initializeFilter("local_reply_response_headers");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("called", response->headers()
+                          .get(Http::LowerCaseString("on-response-headers"))[0]
+                          ->value()
+                          .getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, HeaderCallbacks) { runHeaderCallbacksTest(false); }
@@ -702,6 +851,36 @@ TEST_P(DynamicModulesIntegrationTest, Scheduler) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+// A module spawns a child span in on_request_headers, does off-thread work, and finishes the span
+// from the scheduled event hook. The request completes and the tracer confirms the span was
+// finished, proving a span can outlive the event hook that created it.
+TEST_P(DynamicModulesIntegrationTest, SpanAcrossCallbacks) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* tracing = hcm.mutable_tracing();
+        // Always trace so the active span is present and the module can spawn a child span.
+        tracing->mutable_random_sampling()->set_value(100.0);
+        auto* provider = tracing->mutable_provider();
+        provider->set_name("envoy.tracers.dynamic_modules_test");
+        std::ignore = provider->mutable_typed_config()->PackFrom(Protobuf::Struct());
+      });
+  const uint32_t before = offThreadWorkSpansFinished().load();
+  initializeFilter("span_across_callbacks");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_GE(offThreadWorkSpansFinished().load(), before + 1);
 }
 
 // Regression test for the shared continue-flag wedge. The upstream replies complete at headers

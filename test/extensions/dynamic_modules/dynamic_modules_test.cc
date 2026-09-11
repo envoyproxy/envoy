@@ -8,6 +8,7 @@
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/worker_index.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/init/mocks.h"
@@ -662,6 +663,31 @@ TEST(DynamicModuleStats, IncrementConfigLoadFailure) {
   // An absent context is a no-op (the context-less caller path).
   incrementLoadFailure(std::nullopt, "my-filter", ModuleLoadErrorStat);
   EXPECT_EQ(2U, failureCounter(scope, ModuleLoadErrorStat, "my-filter"));
+}
+
+// A well-formed `worker_{index}` dispatcher name yields its index.
+TEST(ParseWorkerIndexFromDispatcherName, WellFormedName) {
+  EXPECT_EQ(0U, parseWorkerIndexFromDispatcherName("worker_0"));
+  EXPECT_EQ(7U, parseWorkerIndexFromDispatcherName("worker_7"));
+  EXPECT_EQ(42U, parseWorkerIndexFromDispatcherName("worker_42"));
+}
+
+// A name whose index cannot be parsed falls back to zero.
+TEST(ParseWorkerIndexFromDispatcherName, UnparsableIndexFallsBackToZero) {
+  EXPECT_ENVOY_BUG(EXPECT_EQ(0U, parseWorkerIndexFromDispatcherName("worker_notanumber")),
+                   "failed to parse worker index from name");
+}
+
+// An index that overflows `uint32_t` falls back to zero.
+TEST(ParseWorkerIndexFromDispatcherName, OverflowingIndexFallsBackToZero) {
+  EXPECT_ENVOY_BUG(EXPECT_EQ(0U, parseWorkerIndexFromDispatcherName("worker_4294967296")),
+                   "failed to parse worker index from name");
+}
+
+// A name with no separator trips the format check and falls back to zero.
+TEST(ParseWorkerIndexFromDispatcherName, NameWithoutSeparatorFallsBackToZero) {
+  EXPECT_ENVOY_BUG(EXPECT_EQ(0U, parseWorkerIndexFromDispatcherName("noseparator")),
+                   "worker name is not in expected format");
 }
 
 } // namespace DynamicModules

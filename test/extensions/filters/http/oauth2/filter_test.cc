@@ -146,7 +146,7 @@ public:
 
   MOCK_METHOD(bool, canUpdateTokenByRefreshToken, (), (const));
   MOCK_METHOD(bool, isValid, (), (const));
-  MOCK_METHOD(void, setParams, (const Http::RequestHeaderMap& headers, const std::string& secret));
+  MOCK_METHOD(void, setParams, (const Http::RequestHeaderMap& headers, absl::string_view secret));
 };
 
 class MockOAuth2Client : public OAuth2Client {
@@ -417,6 +417,34 @@ public:
     auto* pass_through_matcher = p.add_pass_through_matcher();
     pass_through_matcher->set_name(":method");
     pass_through_matcher->mutable_string_match()->set_exact("OPTIONS");
+
+    auto credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+
+    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+
+    auto secret_reader = std::make_shared<MockSecretReader>();
+    return makeFilterConfig(p, secret_reader).value();
+  }
+
+  // Builds a minimal valid config whose retry_policy carries `retry_on` and three retries. Used to
+  // pin down which retry conditions the OAuth server requests end up with.
+  FilterConfigSharedPtr getConfigWithRetryPolicy(const std::string& retry_on) {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
+    p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+
+    auto* retry_policy = p.mutable_retry_policy();
+    retry_policy->mutable_num_retries()->set_value(3);
+    retry_policy->set_retry_on(retry_on);
 
     auto credentials = p.mutable_credentials();
     credentials->set_client_id(TEST_CLIENT_ID);
@@ -738,6 +766,40 @@ TEST_F(OAuth2Test, InvalidAuthorizationEndpoint) {
                   "OAuth2 filter: invalid authorization endpoint URL 'INVALID_URL' in config."));
 }
 
+// A configured retry_on reaches the parsed policy instead of being overridden by the filter.
+TEST_F(OAuth2Test, RetryPolicyRespectsConfiguredRetryOn) {
+  auto config = getConfigWithRetryPolicy("connect-failure,refused-stream");
+
+  ASSERT_NE(config->retryPolicy(), nullptr);
+  EXPECT_EQ(config->retryPolicy()->retryOn(), Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE |
+                                                  Router::RetryPolicy::RETRY_ON_REFUSED_STREAM);
+  EXPECT_EQ(config->retryPolicy()->numRetries(), 3);
+}
+
+// With the guard off, the legacy hardcoded conditions still override the configured retry_on.
+TEST_F(OAuth2Test, RetryPolicyLegacyRetryOnOverride) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.oauth2_client_retries_respect_user_retry_on", "false"}});
+
+  auto config = getConfigWithRetryPolicy("connect-failure,refused-stream");
+
+  ASSERT_NE(config->retryPolicy(), nullptr);
+  EXPECT_EQ(config->retryPolicy()->retryOn(), Router::RetryPolicy::RETRY_ON_5XX |
+                                                  Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR |
+                                                  Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE |
+                                                  Router::RetryPolicy::RETRY_ON_RESET);
+}
+
+// A retry_policy that omits retry_on no longer inherits the legacy conditions, so nothing is
+// retried: num_retries on its own does not enable retries.
+TEST_F(OAuth2Test, RetryPolicyWithoutRetryOnRetriesNothing) {
+  auto config = getConfigWithRetryPolicy("");
+
+  ASSERT_NE(config->retryPolicy(), nullptr);
+  EXPECT_EQ(config->retryPolicy()->retryOn(), 0);
+}
+
 // Verifies that the OAuth config is created with a default value for auth_scopes field when it is
 // not set in proto/yaml.
 TEST_F(OAuth2Test, DefaultAuthScope) {
@@ -816,20 +878,48 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
 }
 
 TEST_F(OAuth2Test, OnDestroyCancelsOAuthClient) {
+  // The OAuth client is created lazily, so drive a request that actually reaches the token
+  // endpoint before checking that onDestroy() cancels it.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken(_, _, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_CALL(*oauth_client_, cancel());
+  filter_->onDestroy();
+}
+
+// The OAuth client is only created when the filter actually needs to talk to the token endpoint;
+// a request that is served straight from a valid cookie must not create one.
+TEST_F(OAuth2Test, OAuthClientNotCreatedWhenNotNeeded) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/anypath"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Cookie.get(), "OauthHMAC=some_oauth_hmac_value"},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=some_oauth_expires_value"},
-      {Http::Headers::get().Cookie.get(), "RefreshToken=some_refresh_token_value"},
-      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=some_oauth_nonce_value"},
-      {Http::Headers::get().Cookie.get(),
-       "CodeVerifier.00000000075bcd15=some_code_verifier_value"}};
+  };
+
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
-  EXPECT_CALL(*oauth_client_, cancel());
+  // No client was created, so there is nothing to cancel on teardown.
+  EXPECT_CALL(*oauth_client_, cancel()).Times(0);
   filter_->onDestroy();
 }
 

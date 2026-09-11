@@ -65,8 +65,8 @@ jobs:
             tar -czf coverage.tar.gz generated/coverage
       target: mobile-coverage
       timeout-minutes: 120
-      upload-name: coverage.tar.gz
-      upload-path: mobile/coverage.tar.gz
+      uploads: |
+        coverage.tar.gz: ${{ github.workspace }}/mobile/coverage.tar.gz
 
   request:
     secrets:

@@ -1,17 +1,12 @@
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC = "REPOSITORY_LOCATIONS_SPEC")
-load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
-load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
-load("@envoy_toolshed//dependency:macros.bzl", "updater")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
 load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(":deprecated_features.bzl", "check_removed_fips_define", "check_removed_wasm_defines")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
 
@@ -30,7 +25,6 @@ exports_files([
     "gen_sh_test_runner.sh",
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
-    "repository_locations.bzl",
     "deps.yaml",
     "gazelle.patch",
     "googleapis.patch",
@@ -38,20 +32,6 @@ exports_files([
     "exported_symbols.txt",
     "exported_symbols_apple.txt",
 ])
-
-# TODO(phlax): Cleanup once bzlmod migration is complete
-bool_flag(
-    name = "enable_bzlmod",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "bzlmod_mode",
-    flag_values = {
-        ":enable_bzlmod": "True",
-    },
-    visibility = ["//visibility:public"],
-)
 
 sh_library(
     name = "volatile_env",
@@ -555,6 +535,19 @@ label_flag(
     build_setting_default = "@boringssl//:crypto",
 )
 
+# wee8 engine: envoy_toolshed prebuilt by default, source for configs the
+# prebuilt is incompatible with (gcc libstdc++ ABI; sanitizers need instrumented deps).
+alias(
+    name = "wee8_engine",
+    actual = select({
+        ":gcc_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":asan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":msan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":tsan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        "//conditions:default": "@envoy_toolshed//v8:wee8",
+    }),
+)
+
 bool_flag(
     name = "fips",
     build_setting_default = False,
@@ -966,52 +959,8 @@ alias(
     actual = "@bazel_tools//src/conditions:windows",
 )
 
-json_data(
-    name = "legacy_all_repository_locations_version_info",
-    data = merge_dicts(
-        load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
-        load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
-    ),
-)
-
 json_merge(
-    name = "legacy_all_repository_locations",
-    srcs = [":legacy_all_repository_locations_version_info"],
-    filter = """
-    .[0] as $versions
-    | .[1] as $metadata1
-    | .[2] as $metadata2
-    | ($metadata1 * $metadata2) as $metadata
-    | $metadata
-    | keys
-    | reduce .[] as $k ({};
-        ([$k,
-          ($metadata[$k].apparent_name // empty),
-          ($k | gsub("-"; "_")),
-          ($k | gsub("_"; "-"))]
-         | map(select($versions[.] != null))
-         | first) as $vkey
-        | . + {($k): (
-          (if $vkey then $versions[$vkey] else {} end) + $metadata[$k]
-          | .version as $ver
-          | if .license_url and $ver then
-              .license_url |= (
-                gsub("{version}"; $ver)
-                | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
-                | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
-              )
-            else . end
-        )}
-      )
-    """,
-    yaml_srcs = [
-        ":deps.yaml",
-        "@envoy_api//bazel:deps.yaml",
-    ],
-)
-
-json_merge(
-    name = "bzlmod_all_repository_locations",
+    name = "all_repository_locations",
     srcs = [
         "@envoy_mod_graph//:deps.json",
     ],
@@ -1025,13 +974,12 @@ json_merge(
         if $modules[$dep] then
           ($modules[$dep] + {module_name: $dep})
         elif ($dep | startswith("com_google_")) and $modules[$dep | sub("^com_google_"; "")] then
-          (($dep | sub("^com_google_"; "")) as $module_name | $modules[$module_name] + {module_name: $module_name})
-        else
-          ($dep | gsub("_"; "-")) as $module_name
-          | if $modules[$module_name] then
-              ($modules[$module_name] + {module_name: $module_name})
-            else null end
-        end;
+          (($dep | sub("^com_google_"; "")) as $m | $modules[$m] + {module_name: $m})
+        elif $modules[$dep | gsub("_"; "-")] then
+          ($dep | gsub("_"; "-")) as $m | $modules[$m] + {module_name: $m}
+        elif ($metadata[$dep].apparent_name // null) as $a | $a and $modules[$a] then
+          ($metadata[$dep].apparent_name) as $m | $modules[$m] + {module_name: $m}
+        else null end;
       def dependency_source($dep):
         module_source($dep);
       $metadata
@@ -1066,10 +1014,6 @@ py_test(
     srcs = ["all_repository_locations_test.py"],
     args = ["$(location :all_repository_locations)"],
     data = [":all_repository_locations"],
-    target_compatible_with = select({
-        ":bzlmod_mode": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
 )
 
 # A dependency required by python protobuf
@@ -1079,31 +1023,6 @@ py_test(
 cc_library(
     name = "python_headers",
     visibility = ["//visibility:public"],
-)
-
-# These can be run as follows:
-#
-# $ bazel run //bazel:update ENVOY_DEP NEW_VERSION
-# $ bazel run //bazel:api-update API_DEP NEW_VERSION
-updater(
-    name = "update",
-    data = ["//tools/dependency:check"],
-    dependencies = "//tools/dependency:filtered-dependencies",
-    post_script = ":version_update_post.sh",
-    pydict = True,
-    tags = ["skip_on_windows"],
-    version_file = ":repository_locations.bzl",
-)
-
-updater(
-    name = "api-update",
-    data = ["//tools/dependency:check"],
-    dependencies = "@envoy_api//bazel:legacy_repository_locations",
-    post_script = ":version_update_post.sh",
-    pydict = True,
-    tags = ["skip_on_windows"],
-    version_file = "@envoy_api//bazel:repository_locations.bzl",
-    version_path_replace = "external/envoy_api:api",
 )
 
 cc_library(
@@ -1173,12 +1092,4 @@ config_setting(
 alias(
     name = "cpp_runfiles",
     actual = "@bazel_tools//tools/cpp/runfiles",
-)
-
-alias(
-    name = "all_repository_locations",
-    actual = select({
-        ":bzlmod_mode": ":bzlmod_all_repository_locations",
-        "//conditions:default": ":legacy_all_repository_locations",
-    }),
 )

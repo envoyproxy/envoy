@@ -24,6 +24,11 @@ envoy_cc_library(
         "-Wno-unused-parameter",
     ],
     deps = [
+        # abseil is excluded from the prebuilt wee8; supply it at the consumer.
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/synchronization",
         "@proxy-wasm-cpp-host//:base_lib",
         "@proxy-wasm-cpp-host//:v8_lib",
     ],

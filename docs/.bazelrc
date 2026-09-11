@@ -2,3 +2,4 @@
 try-import ../.bazelrc
 
 common --@proxy-wasm-cpp-host//bazel:engine=disabled
+build --@rules_rust//rust/settings:extra_exec_rustc_flags=-Clink-self-contained=no

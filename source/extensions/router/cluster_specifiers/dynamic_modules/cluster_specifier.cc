@@ -6,6 +6,7 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/protobuf/utility.h"
@@ -186,6 +187,36 @@ void DynamicModuleRouteEntry::refreshRouteCluster(const Http::RequestHeaderMap& 
   // The new selection replaces the previous one, so properties the module left unset on this call
   // fall back to the matched route.
   selection_ = std::move(context.selection);
+  // Layer the module metadata onto the matched route so both metadata accessors observe it. It is
+  // rebuilt from scratch here, so a decision that sets none drops what an earlier one set.
+  if (selection_.route_metadata.filter_metadata().empty() &&
+      selection_.route_metadata.typed_filter_metadata().empty()) {
+    active_metadata_pack_ = nullptr;
+  } else {
+    envoy::config::core::v3::Metadata merged = DelegatingRouteEntry::metadata();
+    // Merge per namespace so an entry replaces only its own key while the other keys of the matched
+    // route stay in effect. A top-level merge would replace the whole namespace instead.
+    for (const auto& [name, fields] : selection_.route_metadata.filter_metadata()) {
+      (*merged.mutable_filter_metadata())[name].MergeFrom(fields);
+    }
+    for (const auto& [name, typed] : selection_.route_metadata.typed_filter_metadata()) {
+      (*merged.mutable_typed_filter_metadata())[name] = typed;
+    }
+    // Building the pack runs the registered typed metadata factories, which can throw on
+    // module-supplied input, so fall back to the matched route rather than let it reach the worker.
+    TRY_NEEDS_AUDIT {
+      metadata_packs_.push_back(std::make_unique<Envoy::Router::RouteMetadataPack>(merged));
+      active_metadata_pack_ = metadata_packs_.back().get();
+    }
+    END_TRY
+    CATCH(const EnvoyException& e, {
+      ENVOY_LOG_EVERY_POW_2(warn,
+                            "dynamic module route metadata rejected by a typed metadata factory, "
+                            "using the matched route instead: {}",
+                            e.what());
+      active_metadata_pack_ = nullptr;
+    });
+  }
   ENVOY_LOG(debug, "dynamic module selected cluster '{}'", clusterName());
 }
 

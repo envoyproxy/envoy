@@ -33,6 +33,7 @@ kt_android_library(
     custom_package = "io.envoyproxy.envoymobile",
     manifest = "EnvoyManifest.xml",
     visibility = ["//visibility:public"],
+    exports = [":envoy_interfaces_lib"],
     deps = [
         ":envoy_interfaces_lib",
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",

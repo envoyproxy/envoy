@@ -49,7 +49,12 @@ forwarded for the upstream to interpret differently. Parsing is incremental and 
 stream, so an invalid payload fails as soon as the offending byte arrives rather
 than after the whole upload. Oversized string values are left in the external
 buffer and referenced by offset, so a large prompt does not reappear in
-per-stream memory.
+per-stream memory. What counts as oversized is
+:ref:`inline_string_threshold_bytes
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestParsingLimits.inline_string_threshold_bytes>`,
+1KiB by default -- large enough that ordinary metadata stays inline and small
+enough that conversation content does not. A declared API whose payload schema
+pins its own threshold uses that instead.
 
 Upon stream completion, the parsed document is validated against the payload
 schema of the route's declared :ref:`wire API
@@ -341,6 +346,29 @@ namespace alone is not sufficient:
       typed:
       - envoy.ai.token_usage
 
+When the external processor only needs token usage metadata, streaming response body
+bytes across gRPC can be avoided. Configuring :ref:`usage_signal
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.usage_signal>`
+to ``SYNTHESIZE_TRAILERS`` adds empty response trailers at end of stream if none exist.
+A downstream ``ext_proc`` filter with ``response_trailer_mode: SEND`` and
+``response_body_mode: NONE`` receives the token usage metadata in ``metadata_context``
+without streaming response body bytes:
+
+.. code-block:: yaml
+
+  # Upstream filter chain:
+  response_handling:
+    token_usage:
+      usage_signal: SYNTHESIZE_TRAILERS
+
+.. code-block:: yaml
+
+  # Downstream ext_proc:
+  processing_mode:
+    response_header_mode: SKIP
+    response_body_mode: NONE
+    response_trailer_mode: SEND
+
 Upstream (cluster) installation
 -------------------------------
 
@@ -396,6 +424,12 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
+  request_parsed, Counter, "A held request payload was parsed into a document, and passed its payload schema where the declared API has one."
+  request_parse_error, Counter, A declared AI endpoint's payload was not well-formed JSON and was rejected with a 400.
+  request_schema_invalid, Counter, "A declared AI endpoint's payload parsed but violated its API's payload schema, and was rejected with a 400."
+  request_passthrough, Counter, "A payload on an unconfigured route failed to parse under :ref:`parse_unconfigured_routes <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>` and was forwarded unchanged; never a request failure."
+  request_external_buffer_error, Counter, The external buffer failed irrecoverably on the request path and the stream was answered with a 500.
+  response_external_buffer_error, Counter, The external buffer failed irrecoverably on the response path and the stream was answered with a 500.
   token_usage_found, Counter, A response yielded token usage and metadata was written (includes ``PARTIAL`` records).
   token_usage_partial, Counter, A published record was flagged ``extraction_status: PARTIAL``.
   token_usage_failed, Counter, A status-only record was published (``extraction_status: FAILED``; no counts recovered).
@@ -409,3 +443,4 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   response_body_too_large, Counter, A JSON response exceeded ``max_json_body_size``; extraction skipped.
   sse_event_too_large, Counter, Pending or complete SSE event data exceeded ``max_sse_event_size``; that entire event was skipped.
   unsupported_content_encoding, Counter, The response carried a non-identity ``content-encoding``; extraction skipped.
+  usage_trailers_synthesized, Counter, Empty response trailers were synthesized at end of stream to carry token usage to a downstream consumer.

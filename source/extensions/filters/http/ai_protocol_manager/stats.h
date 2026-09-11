@@ -11,6 +11,12 @@ namespace AiProtocolManager {
  * All stats for the AI Protocol Manager filter. @see stats_macros.h
  */
 #define ALL_AI_PROTOCOL_MANAGER_STATS(COUNTER)                                                     \
+  COUNTER(request_parsed)                                                                          \
+  COUNTER(request_parse_error)                                                                     \
+  COUNTER(request_schema_invalid)                                                                  \
+  COUNTER(request_passthrough)                                                                     \
+  COUNTER(request_external_buffer_error)                                                           \
+  COUNTER(response_external_buffer_error)                                                          \
   COUNTER(token_usage_found)                                                                       \
   COUNTER(token_usage_partial)                                                                     \
   COUNTER(token_usage_failed)                                                                      \
@@ -23,7 +29,8 @@ namespace AiProtocolManager {
   COUNTER(sse_event_too_large)                                                                     \
   COUNTER(sse_incomplete_event)                                                                    \
   COUNTER(sse_event_budget_exhausted)                                                              \
-  COUNTER(unsupported_content_encoding)
+  COUNTER(unsupported_content_encoding)                                                            \
+  COUNTER(usage_trailers_synthesized)
 
 struct AiProtocolManagerStats {
   ALL_AI_PROTOCOL_MANAGER_STATS(GENERATE_COUNTER_STRUCT)
