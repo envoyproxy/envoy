@@ -266,6 +266,9 @@ public:
   virtual bool pausedForGenericUpgrade() const PURE;
   virtual void setPausedForGenericUpgrade(bool value) PURE;
 
+  // Returns a generated WebSocket key if this upstream attempt needs one.
+  virtual OptRef<const std::string> websocketKeyForUpstream() { return {}; }
+
   // Disable the route timeout after websocket upgrade completes successfully.
   // This should only be used by the upstream codec filter.
   virtual void disableRouteTimeoutForWebsocketUpgrade() PURE;
