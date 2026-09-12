@@ -836,6 +836,70 @@ TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedInvalidEscapes) {
   EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
 }
 
+// Verify that a literal 'x' before an \xHH escape does not cause a false-positive
+// hex-digit completion check (issue #46642: the old code scanned 3 characters back
+// for the escape marker, colliding with a user-supplied literal 'x').
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedHexEscapeLiteralXBefore) {
+  // Input: "x\x41" → literal 'x', then \x41 = 'A' → "xA"
+  RespValue unescaped;
+  unescaped.type(RespType::BulkString);
+  unescaped.asString() = "x\x41"; // "x" + byte 0x41 = 'A'
+
+  buffer_.add("\"x\\x41\"\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
+}
+
+// Verify that a truncated \x escape (one hex digit, then end of quoted string)
+// does not crash. Regression test for issue #46642.
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedHexEscapeTruncated) {
+  // Input: "x\x4" → three chars: 'x', 'x' (incomplete escape marker), '4' (only hex digit)
+  RespValue unescaped;
+  unescaped.type(RespType::BulkString);
+  unescaped.asString() = "xx4";
+
+  buffer_.add("\"x\\x4\"\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
+}
+
+// Verify that an \x escape at the start of a quoted string (no preceding chars)
+// does not cause an out-of-bounds read. Regression test for issue #46642.
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedHexEscapeAtStart) {
+  // Input: "\x4" → two chars: 'x' (incomplete escape marker), '4' (only hex digit)
+  RespValue unescaped;
+  unescaped.type(RespType::BulkString);
+  unescaped.asString() = "x4";
+
+  buffer_.add("\"\\x4\"\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
+}
+
+// Verify that multiple consecutive \xHH escapes decode correctly.
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedHexEscapeMultiple) {
+  // Input: "\x41\x42\x43" → "ABC"
+  RespValue unescaped;
+  unescaped.type(RespType::BulkString);
+  unescaped.asString() = "ABC";
+
+  buffer_.add("\"\\x41\\x42\\x43\"\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
+}
+
 TEST_F(RedisEncoderDecoderImplTest, InlineCommandSingleQuotedCommand) {
   RespValue echo;
   echo.type(RespType::BulkString);

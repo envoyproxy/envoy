@@ -704,7 +704,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         throw ProtocolError("unbalanced quotes in request");
       } else if (buffer[0] == 'x') {
         state_ = State::InlineStringQuotedEscapeHex;
-        pending_value_stack_.front().value_->asString().push_back(buffer[0]);
+        inline_hex_digits_.clear();
       } else {
         char c;
         switch (buffer[0]) {
@@ -742,18 +742,34 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
     case State::InlineStringQuotedEscapeHex: {
       ENVOY_LOG(trace, "parse slice: InlineStringQuotedEscapeHex: {}", buffer[0]);
 
+      auto& s = pending_value_stack_.front().value_->asString();
       if (!std::isxdigit(buffer[0])) {
+        // A non-hex digit terminates a (possibly incomplete) \xHH escape. Redis
+        // treats the escape marker literally: emit ``x`` followed by any hex digits
+        // already seen, then reprocess the current byte in the quoted-string state.
+        s.push_back('x');
+        s += inline_hex_digits_;
+        inline_hex_digits_.clear();
         state_ = State::InlineStringQuoted;
-        break;
+        break; // do not consume buffer[0]; reprocess in InlineStringQuoted
       }
 
-      auto& s = pending_value_stack_.front().value_->asString();
-      ASSERT((!s.empty() && s.back() == 'x') || (s.size() > 1 && s[s.size() - 2] == 'x'));
-      s.push_back(buffer[0]);
-      if (s[s.size() - 3] == 'x') {
-        char c = static_cast<char>(std::stoul(&s[s.size() - 2], nullptr, 16));
-        s.resize(s.size() - 3);
-        s.push_back(c);
+      inline_hex_digits_.push_back(buffer[0]);
+      if (inline_hex_digits_.size() == 2) {
+        // Convert the two hex digits to a single byte.
+        auto hex_val = [](char c) -> int {
+          if (c >= '0' && c <= '9') {
+            return c - '0';
+          }
+          if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+          }
+          return c - 'A' + 10;
+        };
+        const char byte = static_cast<char>((hex_val(inline_hex_digits_[0]) << 4) |
+                                             hex_val(inline_hex_digits_[1]));
+        s.push_back(byte);
+        inline_hex_digits_.clear();
         state_ = State::InlineStringQuoted;
       }
 
