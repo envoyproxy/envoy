@@ -47,6 +47,8 @@ public:
   SystemTime timestamp() const { return timestamp_; }
   bool requiresValidation(const Http::ResponseHeaderMap& response_headers,
                           SystemTime::duration age) const;
+  bool hasIfNoneMatch() const;
+  bool ifNoneMatch(const Http::ResponseHeaderMap& response_headers) const;
   std::optional<std::vector<RawByteRange>> parseRange() const;
   bool isRangeRequest() const;
 

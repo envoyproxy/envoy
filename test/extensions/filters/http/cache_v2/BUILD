@@ -9,6 +9,15 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_extension_cc_test(
+    name = "etag_utils_test",
+    srcs = ["etag_utils_test.cc"],
+    extension_names = ["envoy.filters.http.cache_v2"],
+    deps = [
+        "//source/extensions/filters/http/cache_v2:etag_utils_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "mocks",
     srcs = ["mocks.cc"],

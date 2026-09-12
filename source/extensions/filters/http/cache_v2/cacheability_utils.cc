@@ -25,9 +25,9 @@ const absl::flat_hash_set<absl::string_view>& cacheableStatusCodes() {
 
 const std::vector<const Http::LowerCaseString*>& conditionalHeaders() {
   // As defined by: https://httpwg.org/specs/rfc7232.html#preconditions.
-  CONSTRUCT_ON_FIRST_USE(
-      std::vector<const Http::LowerCaseString*>, &Http::CustomHeaders::get().IfNoneMatch,
-      &Http::CustomHeaders::get().IfModifiedSince, &Http::CustomHeaders::get().IfRange);
+  CONSTRUCT_ON_FIRST_USE(std::vector<const Http::LowerCaseString*>,
+                         &Http::CustomHeaders::get().IfModifiedSince,
+                         &Http::CustomHeaders::get().IfRange);
 }
 } // namespace
 
@@ -35,9 +35,7 @@ absl::Status CacheabilityUtils::canServeRequestFromCache(const Http::RequestHead
   const absl::string_view method = headers.getMethodValue();
   const Http::HeaderValues& header_values = Http::Headers::get();
 
-  // Check if the request contains any conditional headers other than if-unmodified-since
-  // or if-match.
-  // For now, requests with conditional headers bypass the CacheFilter.
+  // For now, requests with unsupported conditional headers bypass the CacheFilter.
   // This behavior does not cause any incorrect results, but may reduce the cache effectiveness.
   // If needed to be handled properly refer to:
   // https://httpwg.org/specs/rfc7234.html#validation.received

@@ -144,10 +144,10 @@ TEST_F(CacheFilterTest, PassThroughIfRequestHasBody) {
   EXPECT_THAT(decoder_callbacks_.details(), Eq(""));
 }
 
-TEST_F(CacheFilterTest, PassThroughIfCacheabilityIsNo) {
+TEST_F(CacheFilterTest, PassThroughIfConditionalHeaderIsUnsupported) {
   auto filter = makeFilter(mock_cache_);
   EXPECT_CALL(stats(), incForStatus(CacheEntryStatus::Uncacheable));
-  request_headers_.addCopy(Http::CustomHeaders::get().IfNoneMatch, "1");
+  request_headers_.addCopy(Http::CustomHeaders::get().IfRange, "1");
   EXPECT_THAT(filter->decodeHeaders(request_headers_, true),
               Eq(Http::FilterHeadersStatus::Continue));
   EXPECT_THAT(filter->encodeHeaders(response_headers_, true),

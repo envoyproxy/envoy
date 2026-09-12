@@ -13,6 +13,13 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "etag_utils_lib",
+    srcs = ["etag_utils.cc"],
+    hdrs = ["etag_utils.h"],
+    deps = ["@abseil-cpp//absl/strings:string_view"],
+)
+
+envoy_cc_library(
     name = "http_source_interface",
     hdrs = ["http_source.h"],
     deps = [
@@ -50,6 +57,7 @@ envoy_cc_library(
         "cache_sessions.h",
     ],
     deps = [
+        ":etag_utils_lib",
         ":http_cache_lib",
         ":stats",
         ":upstream_request_lib",

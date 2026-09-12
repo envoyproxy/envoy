@@ -111,8 +111,8 @@ Seconds calculateAge(const Http::ResponseHeaderMap& response_headers, SystemTime
 // Create a resource key from headers and cluster name.
 Key makeKey(const Http::RequestHeaderMap& request_headers, absl::string_view cluster_name);
 
-// Adds required conditional headers for cache validation to the request headers
-// according to the previous response headers.
+// Replaces downstream conditional headers with the validators required to validate the cached
+// response.
 void injectValidationHeaders(Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap& old_response_headers);
 

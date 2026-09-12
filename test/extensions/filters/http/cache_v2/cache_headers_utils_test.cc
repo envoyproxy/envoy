@@ -924,12 +924,28 @@ TEST(InjectValidationHeaders, InjectsIfModifiedSince) {
   EXPECT_THAT(request_headers, ContainsHeader("if-modified-since", mod_time));
 }
 
-TEST(InjectValidationHeaders, InjectsIfNoneMatchFromEtag) {
+TEST(InjectValidationHeaders, ReplacesDownstreamIfNoneMatchWithOnlyCachedEtag) {
   Http::TestResponseHeaderMapImpl old_response_headers;
   old_response_headers.setInline(CacheCustomHeaders::etag(), "\"strong-etag-value\"");
   Http::TestRequestHeaderMapImpl request_headers;
+  request_headers.setInline(CacheCustomHeaders::ifNoneMatch(), "\"downstream-etag-value\"");
+  request_headers.addCopy(Http::CustomHeaders::get().IfNoneMatch,
+                          "\"another-downstream-etag-value\"");
   CacheHeadersUtils::injectValidationHeaders(request_headers, old_response_headers);
   EXPECT_THAT(request_headers, ContainsHeader("if-none-match", "\"strong-etag-value\""));
+}
+
+TEST(InjectValidationHeaders, RemovesDownstreamIfNoneMatchWhenCachedResponseHasNoEtag) {
+  Http::TestResponseHeaderMapImpl old_response_headers;
+  constexpr absl::string_view mod_time = "Fri, 01 Aug 2025 09:25:10 GMT";
+  old_response_headers.setInline(CacheCustomHeaders::lastModified(), mod_time);
+  Http::TestRequestHeaderMapImpl request_headers;
+  request_headers.setInline(CacheCustomHeaders::ifNoneMatch(), "\"downstream-etag-value\"");
+
+  CacheHeadersUtils::injectValidationHeaders(request_headers, old_response_headers);
+
+  EXPECT_EQ(request_headers.getInline(CacheCustomHeaders::ifNoneMatch()), nullptr);
+  EXPECT_THAT(request_headers, ContainsHeader("if-modified-since", mod_time));
 }
 
 TEST(InjectValidationHeaders, FallsBackToDateWhenLastModifiedMissing) {

@@ -5,6 +5,7 @@
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/cache_v2/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache_v2/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache_v2/etag_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -38,6 +39,22 @@ std::optional<std::vector<RawByteRange>> ActiveLookupRequest::parseRange() const
 
 bool ActiveLookupRequest::isRangeRequest() const {
   return RangeUtils::getRangeHeader(*request_headers_).has_value();
+}
+
+bool ActiveLookupRequest::hasIfNoneMatch() const {
+  return request_headers_->getInline(CacheCustomHeaders::ifNoneMatch()) != nullptr;
+}
+
+bool ActiveLookupRequest::ifNoneMatch(const Http::ResponseHeaderMap& response_headers) const {
+  const Http::HeaderEntry* value = request_headers_->getInline(CacheCustomHeaders::ifNoneMatch());
+  if (value == nullptr) {
+    return false;
+  }
+
+  const Http::HeaderEntry* etag = response_headers.getInline(CacheCustomHeaders::etag());
+  const absl::string_view etag_value =
+      etag == nullptr ? absl::string_view{} : etag->value().getStringView();
+  return EtagUtils::ifNoneMatch(value->value().getStringView(), etag_value);
 }
 
 void ActiveLookupRequest::initializeRequestCacheControl(
