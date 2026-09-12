@@ -1,3 +1,5 @@
+#include <functional>
+
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
@@ -123,6 +125,60 @@ public:
     const std::string failure_reason(codec_client_->connection()->transportFailureReason());
     EXPECT_FALSE(failure_reason.empty());
     EXPECT_THAT(failure_reason, testing::HasSubstr(expected_error_contains));
+  }
+
+  // Opens a new connection and sends a request, asserting a 200 response.
+  void sendRequestAndExpectSuccess() {
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+
+  void expectResumption(bool expected) {
+    EXPECT_EQ(expected,
+              static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->IsResumption());
+  }
+
+  // Completes a full mTLS handshake, then verifies that a second connection resumes the cached
+  // session while the configuration is unchanged.
+  void establishAndResumeMtlsSession() {
+    sendRequestAndExpectSuccess();
+    expectResumption(false);
+    codec_client_->close();
+
+    sendRequestAndExpectSuccess();
+    expectResumption(true);
+    codec_client_->close();
+  }
+
+  // Applies an in-place LDS update that mutates the downstream client certificate validation
+  // context, then waits for the previous filter chain to drain.
+  void updateDownstreamValidationContext(
+      std::function<
+          void(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>
+          mutate) {
+    ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+    new_config_helper.addConfigModifier(
+        [mutate](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* transport_socket = bootstrap.mutable_static_resources()
+                                       ->mutable_listeners(0)
+                                       ->mutable_filter_chains(0)
+                                       ->mutable_transport_socket();
+          envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
+          ASSERT_TRUE(
+              MessageUtil::unpackTo(*transport_socket->mutable_typed_config(), quic_config).ok());
+          mutate(*quic_config.mutable_downstream_tls_context()
+                      ->mutable_common_tls_context()
+                      ->mutable_validation_context());
+          ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(quic_config));
+        });
+    new_config_helper.setLds("1");
+    test_server_->waitForCounter("listener_manager.listener_in_place_updated", testing::Ge(1));
+    test_server_->waitForGauge("listener_manager.total_filter_chains_draining", testing::Ge(1));
+    test_server_->waitForGauge("listener_manager.total_filter_chains_draining", testing::Eq(0));
   }
 };
 
@@ -468,54 +524,44 @@ TEST_P(QuicMtlsIntegrationTest, MtlsResumptionScopedToValidationConfig) {
                                       /*require_client_cert=*/true, /*enable_resumption=*/true);
   initialize();
 
-  // The first connection completes a full handshake and validates the client certificate.
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response1->waitForEndStream());
-  EXPECT_EQ("200", response1->headers().getStatusValue());
-  auto* first_session = static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
-  EXPECT_FALSE(first_session->IsResumption());
-  codec_client_->close();
-
-  // The second connection resumes the session while the configuration is unchanged.
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response2->waitForEndStream());
-  EXPECT_EQ("200", response2->headers().getStatusValue());
-  auto* second_session = static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
-  EXPECT_TRUE(second_session->IsResumption());
-  codec_client_->close();
+  establishAndResumeMtlsSession();
 
   // Change the trust anchor to one that does not sign the client certificate.
-  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
-  new_config_helper.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* transport_socket = bootstrap.mutable_static_resources()
-                                 ->mutable_listeners(0)
-                                 ->mutable_filter_chains(0)
-                                 ->mutable_transport_socket();
-    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
-    ASSERT_TRUE(MessageUtil::unpackTo(*transport_socket->mutable_typed_config(), quic_config).ok());
-    quic_config.mutable_downstream_tls_context()
-        ->mutable_common_tls_context()
-        ->mutable_validation_context()
-        ->mutable_trusted_ca()
-        ->set_filename(
+  updateDownstreamValidationContext(
+      [](envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& ctx) {
+        ctx.mutable_trusted_ca()->set_filename(
             TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(quic_config));
-  });
-  new_config_helper.setLds("1");
-  test_server_->waitForCounter("listener_manager.listener_in_place_updated", testing::Ge(1));
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", testing::Ge(1));
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", testing::Eq(0));
+      });
 
   // The cached session was scoped to the previous trust anchor, so resumption is refused, and the
   // full handshake re-validates the client certificate against the new trust anchor and rejects it.
   EXPECT_LOG_CONTAINS("debug", "QUIC client certificate validation rejected",
                       { expectConnectionFailure(""); });
+}
+
+// A configuration change that keeps the client certificate valid still refuses a cached session,
+// but the full handshake succeeds because the certificate validates against the unchanged trust
+// anchor.
+TEST_P(QuicMtlsIntegrationTest, MtlsResumptionRefusedButRequestSucceedsWhenCertRemainsValid) {
+  concurrency_ = 1;
+  setupServerWithClientCertValidation("cacert.pem", "servercert.pem", "serverkey.pem",
+                                      /*require_client_cert=*/true, /*enable_resumption=*/true);
+  initialize();
+
+  establishAndResumeMtlsSession();
+
+  // Allow expired certificates. This keeps the client certificate valid but changes the session id
+  // context, so the cached session no longer matches.
+  updateDownstreamValidationContext(
+      [](envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& ctx) {
+        ctx.set_allow_expired_certificate(true);
+      });
+
+  // Resumption is refused because the session id context changed, but the full handshake validates
+  // the client certificate against the unchanged trust anchor, so the request succeeds.
+  sendRequestAndExpectSuccess();
+  expectResumption(false);
+  codec_client_->close();
 }
 
 } // namespace Quic

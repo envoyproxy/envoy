@@ -17,12 +17,13 @@ EnvoyTlsServerHandshaker::EnvoyTlsServerHandshaker(
     : TlsServerHandshaker(session, crypto_config), pinned_ssl_ctx_(std::move(pinned_ssl_ctx)) {
   SSL_set_ex_data(ssl(), handshakerExDataIndex(), this);
   bool refuse_resumption = disable_resumption;
+  // The pinned server context is null until the downstream secrets are loaded, and its session
+  // context id is empty for a dynamic certificate selector. Resumption cannot be scoped in either
+  // case, so refuse it and force a full handshake that re-validates the client certificate.
   auto* context = pinnedServerContext();
   const absl::Span<const uint8_t> session_context_id =
       context != nullptr ? context->sessionContextId() : absl::Span<const uint8_t>();
   if (session_context_id.empty()) {
-    // Without a session context id resumption cannot be scoped, so refuse it and force a full
-    // handshake that re-validates the client certificate.
     refuse_resumption = true;
   } else {
     // Bind resumption to the matched configuration so a resumed session cannot reuse the client
