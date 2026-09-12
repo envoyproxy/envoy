@@ -98,7 +98,8 @@ protected:
 
   HealthCheckerImplBase(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger,
+                        Stats::Scope& stats_scope, HealthFlagCallbacks health_flag_callbacks);
   ~HealthCheckerImplBase() override;
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
@@ -116,6 +117,9 @@ protected:
   Random::RandomGenerator& random_;
   const bool reuse_connection_;
   HealthCheckEventLoggerPtr event_logger_;
+  Upstream::HealthFlagCallbacks::HealthFlagGet health_flag_get_;
+  Upstream::HealthFlagCallbacks::HealthFlagSet health_flag_set_;
+  Upstream::HealthFlagCallbacks::HealthFlagClear health_flag_clear_;
 
 private:
   struct HealthCheckHostMonitorImpl : public HealthCheckHostMonitor {

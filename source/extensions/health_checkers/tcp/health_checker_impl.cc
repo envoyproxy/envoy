@@ -38,7 +38,8 @@ Upstream::HealthCheckerSharedPtr TcpHealthCheckerFactory::createCustomHealthChec
     Server::Configuration::HealthCheckerFactoryContext& context) {
   return std::make_shared<TcpHealthCheckerImpl>(
       context.cluster(), config, context.mainThreadDispatcher(), context.runtime(),
-      context.api().randomGenerator(), context.eventLogger());
+      context.api().randomGenerator(), context.eventLogger(), context.statsScope(),
+      context.healthFlagCallbacks());
 }
 
 REGISTER_FACTORY(TcpHealthCheckerFactory, Server::Configuration::CustomHealthCheckerFactory);
@@ -47,8 +48,11 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
                                            const envoy::config::core::v3::HealthCheck& config,
                                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                                            Random::RandomGenerator& random,
-                                           HealthCheckEventLoggerPtr&& event_logger)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
+                                           HealthCheckEventLoggerPtr&& event_logger,
+                                           Stats::Scope& stats_scope,
+                                           HealthFlagCallbacks health_flag_callbacks)
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger),
+                            stats_scope, std::move(health_flag_callbacks)),
       send_bytes_([&config] {
         if (!config.tcp_health_check().send().text().empty()) {
           auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.tcp_health_check().send());
