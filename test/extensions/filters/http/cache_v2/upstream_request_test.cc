@@ -1,3 +1,6 @@
+#include "envoy/http/codes.h"
+
+#include "source/common/http/headers.h"
 #include "source/extensions/filters/http/cache_v2/upstream_request_impl.h"
 
 #include "test/extensions/filters/http/cache_v2/mocks.h"
@@ -258,19 +261,59 @@ TEST_F(UpstreamRequestTest, DestroyedWhileBodyBufferedCorrectsStats) {
   upstream_request_.reset();
 }
 
+TEST(UpstreamRequestHeadersTest, SendsRangeHeaderUnchangedToUpstream) {
+  for (const char* range : {"bytes=3-4", "bytes=3-", "bytes=-2"}) {
+    SCOPED_TRACE(range);
+    testing::StrictMock<Event::MockDispatcher> dispatcher;
+    testing::StrictMock<Http::MockAsyncClientStream> http_stream;
+    testing::StrictMock<Http::MockAsyncClient> async_client;
+    auto stats_provider = std::make_shared<testing::NiceMock<MockCacheFilterStatsProvider>>();
+    Http::TestRequestHeaderMapImpl expected_headers{{":method", "GET"}, {":path", "/banana"}};
+    expected_headers.addCopy(Http::Headers::get().Range, range);
+
+    EXPECT_CALL(dispatcher, isThreadSafe()).WillRepeatedly(testing::Return(true));
+    EXPECT_CALL(async_client, start(_, _)).WillOnce(testing::Return(&http_stream));
+    Http::AsyncClient::StreamOptions options;
+    auto upstream_request =
+        UpstreamRequestImplFactory(dispatcher, async_client, options).create(stats_provider);
+    EXPECT_CALL(http_stream, sendHeaders(HeaderMapEqualRef(&expected_headers), true));
+    upstream_request->sendHeaders(
+        Http::createHeaderMap<Http::RequestHeaderMapImpl>(expected_headers));
+    EXPECT_CALL(http_stream, reset());
+  }
+}
+
 class UpstreamRequestWithRangeHeaderTest : public UpstreamRequestTest {
 protected:
   void SetUp() override {
-    request_headers_.addCopy("range", "bytes=3-4");
+    request_headers_.addCopy(Http::Headers::get().Range, "bytes=3-4");
     UpstreamRequestTest::SetUp();
   }
 };
 
-TEST_F(UpstreamRequestWithRangeHeaderTest, RangeHeaderSkipsToExpectedStreamPos) {
+TEST_F(UpstreamRequestWithRangeHeaderTest, PartialResponseBodyStartsAtContentRangeOffset) {
   Buffer::OwnedImpl data{"lo"};
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb;
+  response_headers_.setStatus(static_cast<uint64_t>(Http::Code::PartialContent));
+  response_headers_.addCopy(Http::Headers::get().ContentRange, "bytes 3-4/5");
+  http_callbacks_->onHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
+                             false);
+
   upstream_request_->getBody(AdjustedByteRange{3, 5}, body_cb.AsStdFunction());
   EXPECT_CALL(body_cb, Call(Pointee(BufferString("lo")), EndStream::End));
+  http_callbacks_->onData(data, true);
+  http_callbacks_->onComplete();
+}
+
+TEST_F(UpstreamRequestWithRangeHeaderTest, UpstreamIgnoresRangeReadsFullBodyFromStart) {
+  response_headers_.setStatus(static_cast<uint64_t>(Http::Code::OK));
+  http_callbacks_->onHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
+                             false);
+
+  testing::StrictMock<MockFunction<void(Buffer::InstancePtr, EndStream)>> body_cb;
+  upstream_request_->getBody(AdjustedByteRange{0, 5}, body_cb.AsStdFunction());
+  EXPECT_CALL(body_cb, Call(Pointee(BufferString("hello")), EndStream::End));
+  Buffer::OwnedImpl data{"hello"};
   http_callbacks_->onData(data, true);
   http_callbacks_->onComplete();
 }

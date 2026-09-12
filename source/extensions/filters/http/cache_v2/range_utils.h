@@ -106,6 +106,10 @@ struct RangeDetails {
 };
 
 namespace RangeUtils {
+// For 206 responses, reads the byte range from Content-Range.
+// For other responses, returns [0, UINT64_MAX) to read the entire body until the stream ends.
+AdjustedByteRange rangeFromHeaders(Http::ResponseHeaderMap& response_headers);
+
 // Create a RangeDetails object from request headers and provided content
 // length to assess whether the range request can be satisfied. nullopt
 // indicates that this request should not be treated as a range request
