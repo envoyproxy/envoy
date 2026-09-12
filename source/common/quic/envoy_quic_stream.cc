@@ -95,6 +95,24 @@ void EnvoyQuicStream::encodeTrailersImpl(quiche::HttpHeaderBlock&& trailers) {
   onLocalEndStream();
 }
 
+void EnvoyQuicStream::maybeReliableReset(quic::QuicRstStreamErrorCode rst) {
+  // Checking if there are bytes to be sent cause PartialResetWriteSide
+  // will trigger QUIC_BUG if reliable_size_ is 0
+  const bool has_bytes =
+      (quic_stream_.stream_bytes_written() + quic_stream_.BufferedDataBytes()) > 0;
+
+  if (has_bytes && quic_stream_.SetReliableSize()) {
+    const quic::QuicResetStreamError error = quic::QuicResetStreamError::FromInternal(rst);
+    quic_stream_.PartialResetWriteSide(error);
+
+    // Explicitly calling SendStopSending cause PartialResetWriteSide
+    // doesn't send STOP_SENDING and close read side
+    quic_stream_.SendStopSending(error);
+  } else {
+    quic_stream_.Reset(rst);
+  }
+}
+
 std::unique_ptr<Http::MetadataMap>
 EnvoyQuicStream::metadataMapFromHeaderList(const quic::QuicHeaderList& header_list) {
   auto metadata_map = std::make_unique<Http::MetadataMap>();
