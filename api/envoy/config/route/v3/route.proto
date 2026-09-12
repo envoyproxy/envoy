@@ -164,28 +164,31 @@ message RouteConfiguration {
   // the filter name should be specified as ``envoy.filters.http.router``.
   core.v3.Metadata metadata = 17;
 
-  // Route extensions applied to the route resolved for a request under this route configuration.
-  // An extension acts on the route, not on the request.
+  // After the route matching has resolved a route for incoming request, the route extensions
+  // are applied to the route to customize or monitor it and the output of the extensions will be
+  // used as the final route by Envoy for the request. The extensions here will not modify/affect
+  // the request attributes (e.g., headers, path) directly.
   //
   // Extensions are executed in order, and the output of each is the input of the next. The route
   // that comes out of the last one is the route Envoy uses for the request.
   //
-  // Extensions are configured at three levels, which run in this order:
+  // Extensions are configured at three levels. Extensions in three levels will run in this order:
   //
-  // 1. this field;
-  // 2. :ref:`VirtualHost.route_extensions
-  //    <envoy_v3_api_field_config.route.v3.VirtualHost.route_extensions>` of the matched virtual
-  //    host;
-  // 3. :ref:`Route.route_extensions <envoy_v3_api_field_config.route.v3.Route.route_extensions>`
-  //    of the matched route.
+  // 1. The ``route_extensions`` of
+  //    :ref:`route configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`
+  // 2. The ``route_extensions`` of resolved
+  //    :ref:`virtual host <envoy_v3_api_msg_config.route.v3.VirtualHost>`
+  // 3. The ``route_extensions`` of resolved
+  //    :ref:`route <envoy_v3_api_msg_config.route.v3.Route>`.
   //
-  // A level is only reached once it has been matched: a request that matches no virtual host runs
-  // this field alone, and one that matches a virtual host but none of its routes runs this field
-  // and the virtual host's.
+  // .. note::
+  //   If the route matching resolves no route, the route extensions at the route configuration
+  //   and the virtual host levels will still be applied to null. This allows route extensions to
+  //   optionally generate a valid route even when no route is resolved for the request.
+  //   Similarly, if the route matching resolves a valid route, the route extensions may drop it
+  //   and return no route. Then Envoy will treat it as route not found and result in 404 response.
   //
-  // The route an extension takes comes from route matching or from the previous extension, and may
-  // be no route at all, since the extensions run even when matching resolved nothing. An extension
-  // may therefore generate a valid route from its own logic, or drop the valid route it was given.
+  // See :ref:`route extensions <config_http_conn_man_route_extensions>` for more details.
   repeated core.v3.TypedExtensionConfig route_extensions = 19;
 }
 
