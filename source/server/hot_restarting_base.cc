@@ -67,6 +67,15 @@ void RpcStream::bindDomainSocket(uint64_t id, const std::string& role,
     }
     throw EnvoyException(msg);
   }
+
+  // The `fchmod()` in `createDomainSocketAddress()` is the race-free way to set the mode:
+  // on Linux, bind() propagates the socket inode's mode to the filesystem node. Apply
+  // the mode to the node directly as well, so the mode is still set on platforms where
+  // `fchmod()` on a socket descriptor has no effect.
+  if (::chmod(address.sun_path, socket_mode) != 0) {
+    ENVOY_LOG_MISC(debug, "Failed to set mode {} on hot restart socket {}: errno = {}.",
+                   socket_mode, address.sun_path, errno);
+  }
 }
 
 bool RpcStream::sendHotRestartMessage(sockaddr_un& address, const HotRestartMessage& proto,
@@ -246,6 +255,19 @@ std::unique_ptr<HotRestartMessage> RpcStream::receiveHotRestartMessage(Blocking 
       RELEASE_ASSERT(recv_result.return_value_ >= 8, "received a brokenly tiny message fragment.");
 
       expected_proto_length_ = be64toh(*reinterpret_cast<uint64_t*>(recv_buf_.data()));
+      // A length prefix within sizeof(uint64_t) of UINT64_MAX would overflow the size
+      // computation below, wrapping it to a near-zero value; the next recvmsg() would
+      // then write past the end of the buffer. Such a datagram cannot be a legitimate
+      // hot restart message: drop it and reset state (see #45872).
+      if (expected_proto_length_.value() >
+          std::numeric_limits<uint64_t>::max() - sizeof(uint64_t)) {
+        ENVOY_LOG_MISC(warn, "Hot restart IPC: dropping datagram with invalid length ({}).",
+                       expected_proto_length_.value());
+        recv_buf_.resize(0);
+        cur_msg_recvd_bytes_ = 0;
+        expected_proto_length_.reset();
+        return nullptr;
+      }
       // Expand the buffer from its default 4096 if this message is going to be longer.
       if (expected_proto_length_.value() > MaxSendmsgSize - sizeof(uint64_t)) {
         recv_buf_.resize(expected_proto_length_.value() + sizeof(uint64_t));
