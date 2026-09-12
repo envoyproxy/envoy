@@ -73,7 +73,14 @@ quic::QuicAsyncStatus EnvoyTlsServerHandshaker::VerifyCertChain(
     *details = std::make_unique<CertVerifyResult>(false);
     return quic::QUIC_FAILURE;
   }
-  return verifyQuicClientCertChain(certs, *context, error_details, details, out_alert);
+  bool cert_validated = false;
+  const quic::QuicAsyncStatus status = verifyQuicClientCertChain(
+      certs, *context, error_details, details, out_alert, &cert_validated);
+  if (cert_validated) {
+    ASSERT(dynamic_cast<EnvoyQuicServerSession*>(session()) != nullptr);
+    static_cast<EnvoyQuicServerSession*>(session())->setClientCertificateValidated();
+  }
+  return status;
 }
 
 } // namespace Quic

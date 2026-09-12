@@ -115,6 +115,10 @@ public:
                                   const Network::FilterChain& filter_chain,
                                   ConnectionMapIter position);
 
+  // Called by `EnvoyTlsServerHandshaker::VerifyCertChain` when the client certificate chains to the
+  // configured trust anchor.
+  void setClientCertificateValidated();
+
   bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override {
     return false;
   }

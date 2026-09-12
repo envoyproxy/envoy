@@ -1438,6 +1438,9 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
       [&](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
         initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context,
                       true);
+        // Drop the validation context added by `initializeTls()` so QUIC listeners do not request
+        // client certificates by default. mTLS tests configure their own validation context.
+        common_tls_context.clear_validation_context();
       },
       /*enable_quic_early_data=*/true,
       /*enable_quic_resumption=*/true);
