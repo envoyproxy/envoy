@@ -1,3 +1,6 @@
+#include "envoy/http/codes.h"
+
+#include "source/common/http/headers.h"
 #include "source/extensions/filters/http/cache_v2/upstream_request_impl.h"
 
 #include "test/extensions/filters/http/cache_v2/mocks.h"
@@ -265,8 +268,8 @@ TEST(UpstreamRequestHeadersTest, SendsRangeHeaderUnchangedToUpstream) {
     testing::StrictMock<Http::MockAsyncClientStream> http_stream;
     testing::StrictMock<Http::MockAsyncClient> async_client;
     auto stats_provider = std::make_shared<testing::NiceMock<MockCacheFilterStatsProvider>>();
-    const Http::TestRequestHeaderMapImpl expected_headers{
-        {":method", "GET"}, {":path", "/banana"}, {"range", range}};
+    Http::TestRequestHeaderMapImpl expected_headers{{":method", "GET"}, {":path", "/banana"}};
+    expected_headers.addCopy(Http::Headers::get().Range, range);
 
     EXPECT_CALL(dispatcher, isThreadSafe()).WillRepeatedly(testing::Return(true));
     EXPECT_CALL(async_client, start(_, _)).WillOnce(testing::Return(&http_stream));
@@ -283,16 +286,16 @@ TEST(UpstreamRequestHeadersTest, SendsRangeHeaderUnchangedToUpstream) {
 class UpstreamRequestWithRangeHeaderTest : public UpstreamRequestTest {
 protected:
   void SetUp() override {
-    request_headers_.addCopy("range", "bytes=3-4");
+    request_headers_.addCopy(Http::Headers::get().Range, "bytes=3-4");
     UpstreamRequestTest::SetUp();
   }
 };
 
-TEST_F(UpstreamRequestWithRangeHeaderTest, RangeHeaderSkipsToExpectedStreamPos) {
+TEST_F(UpstreamRequestWithRangeHeaderTest, PartialResponseBodyStartsAtContentRangeOffset) {
   Buffer::OwnedImpl data{"lo"};
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb;
-  response_headers_.setStatus("206");
-  response_headers_.addCopy("content-range", "bytes 3-4/5");
+  response_headers_.setStatus(static_cast<uint64_t>(Http::Code::PartialContent));
+  response_headers_.addCopy(Http::Headers::get().ContentRange, "bytes 3-4/5");
   http_callbacks_->onHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
                              false);
 
@@ -302,8 +305,8 @@ TEST_F(UpstreamRequestWithRangeHeaderTest, RangeHeaderSkipsToExpectedStreamPos) 
   http_callbacks_->onComplete();
 }
 
-TEST_F(UpstreamRequestWithRangeHeaderTest, IgnoredRangeReturnsEntireBody) {
-  response_headers_.setStatus("200");
+TEST_F(UpstreamRequestWithRangeHeaderTest, UpstreamIgnoresRangeReadsFullBodyFromStart) {
+  response_headers_.setStatus(static_cast<uint64_t>(Http::Code::OK));
   http_callbacks_->onHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
                              false);
 
