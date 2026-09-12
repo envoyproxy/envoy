@@ -144,6 +144,7 @@ public:
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_CIPHER_SUITES_FIPS;
   static const std::string DEFAULT_CURVES;
+  static const std::string DEFAULT_CURVES_NO_PQC;
   static const std::string DEFAULT_CURVES_FIPS;
 
   static absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>>

@@ -73,19 +73,18 @@ key exchange that combines the classical X25519 elliptic-curve Diffie-Hellman wi
 protection against "harvest now, decrypt later" attacks by quantum computers while maintaining
 compatibility with existing infrastructure through the hybrid construction.
 
-X25519MLKEM768 is **not** included in the default ECDH curves. To opt in, explicitly set the
-``ecdh_curves`` field in the
+X25519MLKEM768 is included in the default ECDH curves for both downstream and upstream TLS
+connections (non-FIPS builds). Peers that do not support ML-KEM will gracefully fall back to
+X25519 or P-256 via standard TLS group negotiation.
+
+To disable post-quantum key exchange, set the runtime flag
+``envoy.reloadable_features.pqc_default_ecdh_curves`` to ``false``, or explicitly configure
+the ``ecdh_curves`` field in
 :ref:`TlsParameters <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsParameters>`:
 
 .. literalinclude:: _include/ssl-pqc.yaml
    :language: yaml
    :caption: :download:`ssl-pqc.yaml <_include/ssl-pqc.yaml>`
-
-Placing X25519MLKEM768 first gives it the highest priority. Peers that do not support
-ML-KEM will gracefully fall back to X25519 or P-256 via standard TLS group negotiation.
-
-The same configuration pattern applies to upstream (client) connections using
-:ref:`UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.
 
 
 Performance considerations
