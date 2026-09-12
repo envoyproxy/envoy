@@ -110,3 +110,26 @@ envoy_cc_library(
         "@quiche//:quic_platform_base",
     ]),
 )
+
+envoy_cc_library(
+    name = "breaking_changes_flags",
+    hdrs = [
+        "breaking_changes_flags.h",
+    ],
+)
+
+envoy_cc_library(
+    name = "breaking_changes",
+    srcs = [
+        "breaking_changes.cc",
+    ],
+    hdrs = [
+        "breaking_changes.h",
+    ],
+    deps = [
+        ":breaking_changes_flags",
+        "//envoy/stream_info:filter_state_interface",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/strings",
+    ],
+)

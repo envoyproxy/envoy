@@ -865,6 +865,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "breaking_changes_integration_test",
+    srcs = [
+        "breaking_changes_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/integration/filters:breaking_change_filter_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "buffer_accounting_integration_test",
     size = "large",
     srcs = [
