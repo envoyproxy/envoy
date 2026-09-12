@@ -17,9 +17,39 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Custom Tag]
 
 // Describes custom tags for the active span.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message CustomTag {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.tracing.v2.CustomTag";
+
+  // Specifies how the resolved tag value should be typed on tracers that support
+  // typed span attributes (e.g. OpenTelemetry). The integer and floating-point
+  // cases are declared explicitly so the emitted attribute type is deterministic
+  // rather than inferred from the value.
+  enum ValueType {
+    // Emit the tag value as a string. This is the default and preserves the
+    // preexisting behavior for every tracer.
+    STRING = 0;
+
+    // Coerce the resolved tag value to a signed 64-bit integer. Tracers that
+    // support typed span attributes emit it as a native integer attribute (for
+    // OpenTelemetry, an OTLP ``int_value``). If the value does not parse as an
+    // integer, or the tracer has no typed-attribute support, it falls back to a
+    // string tag.
+    INT = 1;
+
+    // Coerce the resolved tag value to a double. Tracers that support typed span
+    // attributes emit it as a native floating-point attribute (for OpenTelemetry,
+    // an OTLP ``double_value``). If the value does not parse as a double, or the
+    // tracer has no typed-attribute support, it falls back to a string tag.
+    DOUBLE = 2;
+
+    // Coerce the resolved tag value to a boolean. Tracers that support typed span
+    // attributes emit it as a native boolean attribute (for OpenTelemetry, an OTLP
+    // ``bool_value``). Accepts the usual boolean spellings (``true``/``false``,
+    // ``1``/``0``, etc.). If the value does not parse as a boolean, or the tracer
+    // has no typed-attribute support, it falls back to a string tag.
+    BOOL = 3;
+  }
 
   // Literal type custom tag with static value for the tag value.
   message Literal {
@@ -106,4 +136,11 @@ message CustomTag {
     // unknown specifier values are replaced with the empty string instead of ``-``.
     string value = 6;
   }
+
+  // The value's type. Defaults to ``STRING``, which preserves the preexisting
+  // behavior. When set to ``INT``, ``DOUBLE`` or ``BOOL``, tracers that support
+  // typed span attributes (e.g. OpenTelemetry) emit the tag as an integer,
+  // floating-point or boolean attribute instead of a string. Applies to every
+  // custom tag type.
+  ValueType value_type = 7 [(validate.rules).enum = {defined_only: true}];
 }
