@@ -76,11 +76,6 @@ ProtobufTypes::MessagePtr redactedCopy(const Protobuf::Message& message,
   return copy;
 }
 
-bool isTypedStruct(const Protobuf::Descriptor& descriptor) {
-  const absl::string_view name = descriptor.full_name();
-  return name == "xds.type.v3.TypedStruct" || name == "udpa.type.v1.TypedStruct";
-}
-
 // Render map key 'field's value as a string.
 absl::string_view mapKeyToString(const Protobuf::Message& entry, const Field& field,
                                  std::string& scratch) {
@@ -137,7 +132,7 @@ void MessageStreamer::emitNamedMessage(const Protobuf::Message& message,
   Frame& frame = [&]() -> Frame& {
     // A TypedStruct has to be reified before it can be redacted, see redactOpaque in
     // source/common/protobuf/utility.cc. The copy comes back redacted, so nothing below it is.
-    if (options_.redact_sensitive_fields_ && isTypedStruct(*message.GetDescriptor())) {
+    if (options_.redact_sensitive_fields_ && MessageUtil::isTypedStruct(*message.GetDescriptor())) {
       return pushOwnedFrame(redactedCopy(message, is_sensitive), level, false);
     } else if (owned == nullptr) {
       return pushFrame(message, level, is_sensitive);
@@ -332,7 +327,7 @@ void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStream
   case Protobuf::Descriptor::WELLKNOWNTYPE_UNSPECIFIED:
     // A TypedStruct has to be reified before it can be redacted, see redactOpaque in
     // source/common/protobuf/utility.cc. The copy comes back redacted, so nothing below it is.
-    if (options_.redact_sensitive_fields_ && isTypedStruct(descriptor)) {
+    if (options_.redact_sensitive_fields_ && MessageUtil::isTypedStruct(descriptor)) {
       pushOwnedFrame(redactedCopy(message, is_sensitive), level, false);
       return;
     }

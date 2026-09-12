@@ -972,6 +972,41 @@ sensitive_string: This field is sensitive, but we have no way of knowing.
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+TEST_F(ProtobufUtilityTest, RedactSensitiveOpaqueWithEmptyPayload) {
+  envoy::test::Sensitive actual;
+  actual.mutable_sensitive_any()->set_type_url("type.googleapis.com/envoy.test.Sensitive");
+  actual.mutable_sensitive_typed_struct()->set_type_url("type.googleapis.com/envoy.test.Sensitive");
+
+  const envoy::test::Sensitive expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  EXPECT_TRUE(MessageUtil::getJsonStringFromMessage(actual).ok());
+  expectStreamedRedactionMatches(expected, actual);
+}
+
+TEST_F(ProtobufUtilityTest, RedactSensitiveTypedStructWithUnknownTypeUrl) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.unknown.Message
+  value:
+    text: This is sensitive, but we have no way of knowing.
+)EOF",
+                            actual);
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.unknown.Message
+  value:
+    text: '[redacted]'
+)EOF",
+                            expected);
+
+  const envoy::test::Sensitive original = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
+}
+
 // Messages packed into `TypedStruct` should be treated the same as normal messages. Note that
 // ints are quoted as strings here because that's what happens in the JSON conversion.
 TEST_F(ProtobufUtilityTest, RedactTypedStruct) {
@@ -1146,6 +1181,24 @@ template <typename T> class TypedStructUtilityTest : public ProtobufUtilityTest 
 
 using TypedStructTypes = ::testing::Types<xds::type::v3::TypedStruct, udpa::type::v1::TypedStruct>;
 TYPED_TEST_SUITE(TypedStructUtilityTest, TypedStructTypes);
+
+TYPED_TEST(TypedStructUtilityTest, RedactSensitiveAnyHoldingTypedStruct) {
+  TypeParam typed_struct;
+  typed_struct.set_type_url("type.googleapis.com/envoy.unknown.Message");
+  (*typed_struct.mutable_value()->mutable_fields())["text"].set_string_value("sensitive");
+
+  envoy::test::Sensitive actual;
+  std::ignore = actual.mutable_sensitive_any()->PackFrom(typed_struct);
+
+  const envoy::test::Sensitive original = actual;
+  MessageUtil::redact(actual);
+
+  TypeParam redacted;
+  ASSERT_TRUE(actual.sensitive_any().UnpackTo(&redacted));
+  EXPECT_EQ("type.googleapis.com/envoy.unknown.Message", redacted.type_url());
+  EXPECT_EQ("[redacted]", redacted.value().fields().at("text").string_value());
+  expectStreamedRedactionMatches(original, actual);
+}
 
 // Empty `TypedStruct` can be trivially redacted.
 TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypedStruct) {

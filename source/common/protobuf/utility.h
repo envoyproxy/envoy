@@ -640,6 +640,11 @@ public:
   static bool isSensitiveField(const Protobuf::FieldDescriptor& field);
 
   /**
+   * Whether `descriptor` is `xds.type.v3.TypedStruct` or `udpa.type.v1.TypedStruct`.
+   */
+  static bool isTypedStruct(const Protobuf::Descriptor& descriptor);
+
+  /**
    * Sanitizes a string to contain only valid UTF-8. Invalid UTF-8 characters will be replaced. If
    * the input string is valid UTF-8, it will be returned unmodified.
    */

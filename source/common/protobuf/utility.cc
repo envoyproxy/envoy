@@ -482,12 +482,13 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
   const auto* type_url_field_descriptor = opaque_descriptor->FindFieldByName("type_url");
   const auto* value_field_descriptor = opaque_descriptor->FindFieldByName("value");
   ASSERT(type_url_field_descriptor != nullptr && value_field_descriptor != nullptr);
-  if (!reflection->HasField(*reflectable_message, type_url_field_descriptor) &&
-      !reflection->HasField(*reflectable_message, value_field_descriptor)) {
+  // No payload to reify or to redact. Continuing would hand the message to the generic pass,
+  // which would write "[redacted]" over the type url.
+  if (!reflection->HasField(*reflectable_message, value_field_descriptor)) {
     return true;
   }
-  if (!reflection->HasField(*reflectable_message, type_url_field_descriptor) ||
-      !reflection->HasField(*reflectable_message, value_field_descriptor)) {
+  // A payload with no type url cannot be reified.
+  if (!reflection->HasField(*reflectable_message, type_url_field_descriptor)) {
     return false;
   }
 
@@ -601,6 +602,11 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
     const bool sensitive =
         ancestor_is_sensitive || MessageUtil::isSensitiveField(*field_descriptor);
 
+    if (sensitive && field_descriptor->name() == "type_url" &&
+        MessageUtil::isTypedStruct(*descriptor)) {
+      continue;
+    }
+
     if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
       // Recursive case: traverse message fields.
       if (field_descriptor->is_map()) {
@@ -670,6 +676,11 @@ void MessageUtil::redactAll(Protobuf::Message& message) {
 
 bool MessageUtil::isSensitiveField(const Protobuf::FieldDescriptor& field) {
   return field.options().GetExtension(udpa::annotations::sensitive);
+}
+
+bool MessageUtil::isTypedStruct(const Protobuf::Descriptor& descriptor) {
+  const absl::string_view name = descriptor.full_name();
+  return name == "xds.type.v3.TypedStruct" || name == "udpa.type.v1.TypedStruct";
 }
 
 std::string MessageUtil::toTextProto(const Protobuf::Message& message) {
