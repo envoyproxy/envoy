@@ -7,6 +7,7 @@
 
 #include "envoy/http/header_map.h"
 
+#include "source/common/common/utility.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
@@ -207,10 +208,25 @@ SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
   return {};
 }
 
+void CacheHeadersUtils::ensureDateHeader(Http::ResponseHeaderMap& headers,
+                                         const SystemTime response_time) {
+  if (!DateUtil::timePointValid(httpTime(headers.Date()))) {
+    // Sender must use IMF-fixdate, see https://www.rfc-editor.org/rfc/rfc9110#section-5.6.7
+    static const DateFormatter formatter("%a, %d %b %Y %H:%M:%S GMT");
+    headers.setDate(formatter.fromTime(response_time));
+  }
+}
+
 Seconds CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
                                         const SystemTime response_time, const SystemTime now) {
   // Age headers calculations follow: https://httpwg.org/specs/rfc7234.html#age.calculations
-  const SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
+  SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
+  // New entries always carry a Date due to ensureDateHeader, but old entries persisted by the
+  // filesystem cache may not until their next validation. Fall back to the response time for
+  // them, see https://www.rfc-editor.org/rfc/rfc9111#section-4.2.1.
+  if (!DateUtil::timePointValid(date_value)) {
+    date_value = response_time;
+  }
 
   long age_value;
   const absl::string_view age_header = response_headers.getInlineValue(CacheCustomHeaders::age());
