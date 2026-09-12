@@ -244,14 +244,16 @@ void ProtobufConverterUtils::pushLuaArrayFromRepeatedField(
   }
 }
 
-int ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
-    lua_State* state, const Protobuf::Map<std::string, Protobuf::Any>& typed_metadata_map) {
+absl::StatusOr<int> ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
+    lua_State* state, const Protobuf::Map<std::string, Protobuf::Any>& typed_metadata_map,
+    absl::string_view function) {
 
   // Get filter name from Lua argument
-  const absl::string_view filter_name = getStringViewFromLuaString(state, 2);
+  const absl::StatusOr<absl::string_view> filter_name = checkStringOrError(state, 2, function);
+  RETURN_IF_NOT_OK_REF(filter_name.status());
 
   // Look up the typed metadata by filter name
-  const auto it = typed_metadata_map.find(std::string(filter_name));
+  const auto it = typed_metadata_map.find(std::string(*filter_name));
   if (it == typed_metadata_map.end()) {
     // Return nil if the filter name is not found
     lua_pushnil(state);
