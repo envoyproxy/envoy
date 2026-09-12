@@ -705,6 +705,9 @@ private:
   bool include_timeout_retry_header_in_request_ : 1 = false;
   bool request_buffer_overflowed_ : 1 = false;
   const bool allow_multiplexed_upstream_half_close_ : 1 = false;
+  // Accumulates request body chunks for retry/redirect, kept separate from the shared
+  // filter-chain buffered_request_data_.
+  Buffer::InstancePtr retry_buffer_;
   bool upstream_request_started_ : 1 = false;
   // True if cross-cluster retry is enabled: refreshClusterOnRetry is set in the effective retry
   // policy and there is no hedge policy (hedging is incompatible with cross-cluster retry).
