@@ -98,6 +98,11 @@ public:
   void Initialize() override;
   void OnCanWrite() override;
   void OnTlsHandshakeComplete() override;
+
+  // Called by EnvoyTlsServerHandshaker once the client certificate has been validated, with the
+  // chain built during verification (leaf first, issuers following). Marks the connection's SSL
+  // info as validated; the chain serves the validated-issuer accessors.
+  void onClientCertValidated(const std::vector<bssl::UniquePtr<X509>>& validated_chain);
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
                         const quic::QuicSocketAddress& peer_address,
@@ -190,6 +195,9 @@ private:
   bool h3_go_away_sent_ = false;
   bool on_connection_closed_called_ = false;
   bool is_in_idle_list_ = false;
+  // Whether the SSL object will be released after the handshake, in which case the peer
+  // certificate chain is cached at handshake completion.
+  bool reset_ssl_after_handshake_enabled_ = false;
 };
 
 } // namespace Quic

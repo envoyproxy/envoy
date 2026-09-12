@@ -40,6 +40,13 @@ public:
                   std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert,
                   std::unique_ptr<quic::ProofVerifierCallback> callback) override;
 
+  // quic::TlsHandshaker
+  // Invoked with the details produced by VerifyCertChain() once the client certificate has been
+  // validated. Marks the connection's SSL info as validated and hands it the chain built during
+  // verification, so the validated-issuer accessors are served from that chain rather than from
+  // the list the peer sent.
+  void OnProofVerifyDetailsAvailable(const quic::ProofVerifyDetails& verify_details) override;
+
 private:
   // QuicServerTransportSocketFactory creates ServerContextImpl when sslCtx()
   // is available, so this downcast is safe for non-null contexts.

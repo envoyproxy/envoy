@@ -182,6 +182,7 @@ void EnvoyQuicServerSession::Initialize() {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_enable_reset_ssl_after_handshake")) {
     enable_reset_ssl_after_handshake();
+    reset_ssl_after_handshake_enabled_ = true;
   }
   quic::QuicServerSessionBase::Initialize();
 
@@ -211,19 +212,20 @@ quic::QuicConnection* EnvoyQuicServerSession::quicConnection() {
 
 void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   quic::QuicServerSessionBase::OnTlsHandshakeComplete();
-  // The client certificate is already validated by `EnvoyTlsServerHandshaker` before this hook
-  // runs. Surface the validated state to downstream consumers, but only when the matched chain
-  // sets `requiresClientCertificate()`, so a certificate presented to a chain that does not
-  // require one is not marked as validated.
-  if (position_.has_value() && quic_ssl_info_->peerCertificatePresented()) {
-    const auto& transport_socket_factory = dynamic_cast<const QuicServerTransportSocketFactory&>(
-        position_->filter_chain_.transportSocketFactory());
-    if (transport_socket_factory.requiresClientCertificate()) {
-      quic_ssl_info_->onCertValidated();
-    }
+  if (reset_ssl_after_handshake_enabled_) {
+    // The SSL object is released once the peer acknowledges handshake completion; cache the
+    // presented peer certificate chain (if any) while it is still available.
+    quic_ssl_info_->cachePeerCertificateChain();
   }
   streamInfo().downstreamTiming().onDownstreamHandshakeComplete(dispatcher_.timeSource());
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
+}
+
+void EnvoyQuicServerSession::onClientCertValidated(
+    const std::vector<bssl::UniquePtr<X509>>& validated_chain) {
+  // The client certificate was validated by EnvoyTlsServerHandshaker against the matched filter
+  // chain's context; a certificate is only ever presented when that chain requests one.
+  quic_ssl_info_->onCertValidated(validated_chain);
 }
 
 void EnvoyQuicServerSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {
