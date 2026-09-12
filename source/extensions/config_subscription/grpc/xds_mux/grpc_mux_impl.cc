@@ -65,7 +65,8 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
       xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
-      target_xds_authority_(grpc_mux_context.target_xds_authority_) {
+      target_xds_authority_(grpc_mux_context.target_xds_authority_),
+      load_stats_reporter_factory_(grpc_mux_context.load_stats_reporter_factory_) {
   THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("ads", grpc_mux_context.local_info_));
   AllMuxes::get().insert(this);
 }
@@ -251,7 +252,7 @@ absl::Status GrpcMuxImpl<S, F, RQ, RS>::updateMuxSource(
     Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
     BackOffStrategyPtr&& backoff_strategy,
     const envoy::config::core::v3::ApiConfigSource& ads_config_source,
-    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>) {
+    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
       Utility::parseRateLimitSettings(ads_config_source);
@@ -266,6 +267,9 @@ absl::Status GrpcMuxImpl<S, F, RQ, RS>::updateMuxSource(
   grpc_stream_ = createGrpcStreamObject(std::move(primary_async_client),
                                         std::move(failover_async_client), service_method, scope,
                                         std::move(backoff_strategy), *rate_limit_settings_or_error);
+
+  load_stats_reporter_factory_ = load_stats_reporter_factory;
+
   // No need to update the config_validators_ as they may contain some state
   // that needs to be kept across different GrpcMux objects.
 
@@ -500,6 +504,31 @@ Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   OpaqueResourceDecoderSharedPtr,
                                                   const SubscriptionOptions&) {
   throwEnvoyExceptionOrPanic("ADS must be configured to support an ADS config source");
+}
+
+template <class S, class F, class RQ, class RS>
+Upstream::LoadStatsReporter* GrpcMuxImpl<S, F, RQ, RS>::maybeCreateLoadStatsReporter() {
+  if (!lrs_server_ && load_stats_reporter_factory_ &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_lrs_server_self_ads")) {
+    ENVOY_LOG(info, "Creating self-hosted LRS reporter for xDS-gRPC-Mux (target-authority: {})",
+              target_xds_authority_);
+    lrs_server_ = load_stats_reporter_factory_();
+    if (!lrs_server_) {
+      ENVOY_LOG(warn,
+                "Failed to create self-hosted LRS reporter, not using an xDS-based LRS server");
+      return nullptr;
+    }
+    ENVOY_LOG(
+        debug,
+        "Successfully created self-hosted LRS reporter for xDS-gRPC-Mux (target-authority: {})",
+        target_xds_authority_);
+  }
+  return lrs_server_.get();
+}
+
+template <class S, class F, class RQ, class RS>
+Upstream::LoadStatsReporter* GrpcMuxImpl<S, F, RQ, RS>::loadStatsReporter() const {
+  return lrs_server_.get();
 }
 
 class DeltaGrpcMuxFactory : public MuxFactory {
