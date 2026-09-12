@@ -552,6 +552,15 @@ struct VirtualHostInitializationObject : Logger::Loggable<Logger::Id::router> {
 using VirtualHostInitObjectConstSharedPtr = std::shared_ptr<const VirtualHostInitializationObject>;
 
 /**
+ * Returns true if the virtual host configuration requires full probe validation at configuration
+ * ingestion time, or false if it is eligible for fast-path deferred validation.
+ */
+bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_proto,
+                             const CommonConfigSharedPtr& global_route_config,
+                             bool validate_clusters,
+                             Server::Configuration::ServerFactoryContext& factory_context);
+
+/**
  * Manages the transition between dormant VirtualHostInitializationObject and active VirtualHostImpl
  * using a shared lock-free CAS architecture.
  */

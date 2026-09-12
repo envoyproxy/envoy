@@ -1945,8 +1945,6 @@ const DomainEntry* RouteMatcher::findWildcardDomainEntry(
   return nullptr;
 }
 
-namespace {
-
 /**
  * Isolated validation context used to sequentially validate virtual hosts and their route
  * structures at configuration ingestion time without polluting global server state or leaking
@@ -2020,67 +2018,74 @@ private:
 };
 
 bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_proto,
+                             const CommonConfigSharedPtr& global_route_config,
                              bool validate_clusters,
                              Server::Configuration::ServerFactoryContext& factory_context) {
-  // 1. VirtualHost-level safety checks:
-  if (!envoy::config::route::v3::VirtualHost_TlsRequirementType_IsValid(
-          vhost_proto.require_tls())) {
-    return true;
-  }
   if (vhost_proto.has_matcher()) {
     return true;
   }
-  if (!vhost_proto.typed_per_filter_config().empty()) {
-    return true;
-  }
-  if (!vhost_proto.request_headers_to_add().empty() ||
+
+  if (vhost_proto.virtual_clusters_size() > 0 || vhost_proto.rate_limits_size() > 0 ||
+      vhost_proto.has_cors() || vhost_proto.typed_per_filter_config_size() > 0 ||
+      vhost_proto.request_mirror_policies_size() > 0 || vhost_proto.has_retry_policy() ||
+      vhost_proto.has_retry_policy_typed_config() || vhost_proto.has_hedge_policy() ||
+      vhost_proto.has_metadata() || !vhost_proto.request_headers_to_add().empty() ||
       !vhost_proto.request_headers_to_remove().empty() ||
       !vhost_proto.response_headers_to_add().empty() ||
       !vhost_proto.response_headers_to_remove().empty()) {
     return true;
   }
-  if (vhost_proto.has_retry_policy() || vhost_proto.has_hedge_policy()) {
-    return true;
-  }
-  if (!vhost_proto.rate_limits().empty()) {
-    return true;
-  }
-  if (!vhost_proto.request_mirror_policies().empty()) {
-    return true;
-  }
-  if (!vhost_proto.virtual_clusters().empty()) {
-    return true;
-  }
-  if (vhost_proto.has_cors() || vhost_proto.has_metadata()) {
+
+  if (!envoy::config::route::v3::VirtualHost_TlsRequirementType_IsValid(
+          vhost_proto.require_tls())) {
     return true;
   }
 
-  // 2. Check all routes
+  // Global shadow cluster validation
+  if (validate_clusters && global_route_config != nullptr) {
+    for (const auto& shadow_policy : global_route_config->shadowPolicies()) {
+      if (!shadow_policy->cluster().empty() &&
+          !factory_context.clusterManager().hasCluster(shadow_policy->cluster())) {
+        return true;
+      }
+    }
+  }
+
   for (const auto& route : vhost_proto.routes()) {
-    const auto path_case = route.match().path_specifier_case();
-    if (path_case != envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix &&
-        path_case != envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath) {
-      return true;
-    }
-    if (!route.match().headers().empty() || !route.match().query_parameters().empty() ||
-        !route.match().cookies().empty() || !route.match().dynamic_metadata().empty() ||
-        !route.match().filter_state().empty() || route.match().has_tls_context() ||
-        route.match().has_grpc() || route.match().has_runtime_fraction()) {
+    if (route.action_case() != envoy::config::route::v3::Route::ActionCase::kRoute) {
       return true;
     }
 
-    if (!route.typed_per_filter_config().empty() || !route.request_headers_to_add().empty() ||
+    if (route.typed_per_filter_config_size() > 0 || !route.request_headers_to_add().empty() ||
         !route.request_headers_to_remove().empty() || !route.response_headers_to_add().empty() ||
         !route.response_headers_to_remove().empty() || route.has_metadata() ||
         route.has_decorator() || route.has_tracing()) {
       return true;
     }
 
-    if (route.action_case() != envoy::config::route::v3::Route::ActionCase::kRoute) {
+    switch (route.match().path_specifier_case()) {
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
+      break;
+    default:
+      return true;
+    }
+
+    if (route.match().headers_size() > 0 || route.match().query_parameters_size() > 0 ||
+        route.match().dynamic_metadata_size() > 0 || route.match().has_grpc() ||
+        route.match().has_tls_context() || !route.match().cookies().empty() ||
+        !route.match().filter_state().empty() || route.match().has_runtime_fraction()) {
       return true;
     }
 
     const auto& route_action = route.route();
+
+    if (route_action.cluster_specifier_case() !=
+        envoy::config::route::v3::RouteAction::ClusterSpecifierCase::kCluster) {
+      return true;
+    }
+
     if (route_action.cluster().empty() || route_action.has_weighted_clusters() ||
         route_action.has_cluster_specifier_plugin() ||
         route_action.has_inline_cluster_specifier_plugin() ||
@@ -2088,30 +2093,79 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
       return true;
     }
 
-    if (route_action.has_retry_policy() || route_action.has_hedge_policy() ||
-        !route_action.rate_limits().empty() || !route_action.request_mirror_policies().empty() ||
-        !route_action.hash_policy().empty() || route_action.has_cors() ||
-        !route_action.upgrade_configs().empty() || !route_action.prefix_rewrite().empty() ||
-        route_action.has_regex_rewrite() || !route_action.path_rewrite().empty() ||
-        route_action.has_path_rewrite_policy() || !route_action.host_rewrite_literal().empty() ||
-        !route_action.host_rewrite_header().empty() || route_action.has_host_rewrite_path_regex() ||
-        !route_action.host_rewrite().empty() || route_action.has_auto_host_rewrite() ||
-        route_action.append_x_forwarded_host() || route_action.has_internal_redirect_policy() ||
-        route_action.has_metadata_match() || route_action.has_early_data_policy()) {
+    if (validate_clusters && !factory_context.clusterManager().hasCluster(route_action.cluster())) {
       return true;
     }
 
-    if (validate_clusters) {
-      if (!factory_context.clusterManager().hasCluster(route_action.cluster())) {
+    // Enum validation
+    if (!envoy::config::route::v3::RouteAction_ClusterNotFoundResponseCode_IsValid(
+            route_action.cluster_not_found_response_code())) {
+      return true;
+    }
+    if (!envoy::config::core::v3::RoutingPriority_IsValid(route_action.priority())) {
+      return true;
+    }
+
+    // Legacy redirect validation
+    if (route_action.internal_redirect_action() !=
+        envoy::config::route::v3::RouteAction::PASS_THROUGH_INTERNAL_REDIRECT) {
+      return true;
+    }
+
+    // Duration validation
+    if (route_action.has_timeout() &&
+        !DurationUtil::validateDurationNoThrow(route_action.timeout()).ok()) {
+      return true;
+    }
+    if (route_action.has_idle_timeout() &&
+        !DurationUtil::validateDurationNoThrow(route_action.idle_timeout()).ok()) {
+      return true;
+    }
+    if (route_action.has_flush_timeout() &&
+        !DurationUtil::validateDurationNoThrow(route_action.flush_timeout()).ok()) {
+      return true;
+    }
+    if (route_action.has_max_grpc_timeout() &&
+        !DurationUtil::validateDurationNoThrow(route_action.max_grpc_timeout()).ok()) {
+      return true;
+    }
+    if (route_action.has_grpc_timeout_offset() &&
+        !DurationUtil::validateDurationNoThrow(route_action.grpc_timeout_offset()).ok()) {
+      return true;
+    }
+    if (route_action.has_max_stream_duration()) {
+      const auto& msd = route_action.max_stream_duration();
+      if (msd.has_max_stream_duration() &&
+          !DurationUtil::validateDurationNoThrow(msd.max_stream_duration()).ok()) {
         return true;
       }
+      if (msd.has_grpc_timeout_header_max() &&
+          !DurationUtil::validateDurationNoThrow(msd.grpc_timeout_header_max()).ok()) {
+        return true;
+      }
+      if (msd.has_grpc_timeout_header_offset() &&
+          !DurationUtil::validateDurationNoThrow(msd.grpc_timeout_header_offset()).ok()) {
+        return true;
+      }
+    }
+
+    if (route_action.has_retry_policy() || route_action.has_retry_policy_typed_config() ||
+        route_action.has_hedge_policy() || route_action.has_metadata_match() ||
+        !route_action.prefix_rewrite().empty() || !route_action.path_rewrite().empty() ||
+        route_action.has_regex_rewrite() || route_action.has_path_rewrite_policy() ||
+        !route_action.host_rewrite_literal().empty() || route_action.has_auto_host_rewrite() ||
+        !route_action.host_rewrite_header().empty() || route_action.has_host_rewrite_path_regex() ||
+        !route_action.host_rewrite().empty() || route_action.append_x_forwarded_host() ||
+        route_action.request_mirror_policies_size() > 0 || route_action.rate_limits_size() > 0 ||
+        route_action.hash_policy_size() > 0 || route_action.has_cors() ||
+        route_action.upgrade_configs_size() > 0 || route_action.has_internal_redirect_policy() ||
+        route_action.has_early_data_policy()) {
+      return true;
     }
   }
 
   return false;
 }
-
-} // namespace
 
 absl::StatusOr<std::unique_ptr<RouteMatcher>>
 RouteMatcher::create(const envoy::config::route::v3::RouteConfiguration& route_config,
@@ -2144,7 +2198,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     DomainEntrySharedPtr domain_entry;
     if (deferred_vhost_enabled) {
-      if (requiresProbeValidation(virtual_host_config, validate_clusters, factory_context)) {
+      if (requiresProbeValidation(virtual_host_config, global_route_config, validate_clusters,
+                                  factory_context)) {
         // Sequential probe validation using an isolated validation context.
         IsolatedValidationContext validation_context(factory_context);
         auto isolated_vhost_scope = validation_context.scope().scopeFromStatName(
@@ -2217,8 +2272,8 @@ const DomainEntry* RouteMatcher::findDomainEntry(absl::string_view host_header_v
   // request with VHost, using wildcard match
   // Lower-case the value of the host header, as hostnames are case insensitive. Hosts on the wire
   // are overwhelmingly lower-case already (DNS names normalize to lower-case per RFC 3986 3.2.2),
-  // so scan first and only build a lower-cased copy when an upper-case byte is present. This keeps
-  // the common path allocation-free instead of always constructing a std::string.
+  // so scan first and only build a lower-cased copy when an upper-case byte is present. This
+  // keeps the common path allocation-free instead of always constructing a std::string.
   absl::string_view host = host_header_value;
   std::string lowercase_host;
   if (std::any_of(host_header_value.begin(), host_header_value.end(),

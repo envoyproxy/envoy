@@ -13391,7 +13391,7 @@ TEST_F(RouteMatcherTest, DeferredVirtualHostValidationRejectsMissingClusterSpeci
 
   const std::string yaml = R"EOF(
 virtual_hosts:
-- name: vhost
+- name: csp_vhost
   domains: ["csp.example.com"]
   routes:
   - match: { prefix: "/" }
@@ -13413,11 +13413,11 @@ virtual_hosts:
 - name: isolated_vhost
   domains: ["isolated.example.com"]
   virtual_clusters:
-  - name: cluster1
+  - name: vcluster1
     headers:
     - name: ":path"
       string_match:
-        prefix: "/cluster"
+        prefix: "/vcluster"
   routes:
   - match: { prefix: "/" }
     route: { cluster: "cluster_isolated" }
@@ -13436,7 +13436,7 @@ virtual_hosts:
 
   // First request should lazily instantiate the virtual host and succeed
   Http::TestRequestHeaderMapImpl headers =
-      genHeaders("isolated.example.com", "/cluster/test", "GET");
+      genHeaders("isolated.example.com", "/vcluster/test", "GET");
   const auto route = config.route(headers, 0);
   ASSERT_NE(nullptr, route.route);
   EXPECT_EQ("isolated_vhost", route->virtualHost().name());
@@ -13530,6 +13530,194 @@ virtual_hosts:
   EXPECT_FALSE(creation_status_.ok());
   EXPECT_THAT(creation_status_.message(),
               testing::HasSubstr("route: unknown cluster 'cluster_missing'"));
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostSelectiveProbeRejectsNegativeTimeout) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: negative_timeout_vhost
+  domains: ["timeout.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route:
+      cluster: "valid_cluster"
+      timeout: { seconds: -5 }
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"valid_cluster"}, {});
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                         true, creation_status_),
+                          EnvoyException, "Expected positive duration");
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostSelectiveProbeRejectsMissingGlobalShadowCluster) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+
+  const std::string yaml = R"EOF(
+request_mirror_policies:
+- cluster: "missing_shadow_cluster"
+virtual_hosts:
+- name: vhost_with_global_shadow
+  domains: ["shadow.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route:
+      cluster: "valid_cluster"
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"valid_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_.message(),
+              testing::HasSubstr("route: unknown shadow cluster 'missing_shadow_cluster'"));
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostSelectiveProbeLegacyInternalRedirect) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: legacy_redirect_vhost
+  domains: ["redirect.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route:
+      cluster: "valid_cluster"
+      internal_redirect_action: HANDLE_INTERNAL_REDIRECT
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"valid_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_OK(creation_status_);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("redirect.example.com", "/test", "GET");
+  const auto route = config.route(headers, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("legacy_redirect_vhost", route->virtualHost().name());
+}
+
+TEST_F(RouteMatcherTest, DeferredVirtualHostFastPathSafetyInvariant) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.deferred_virtual_host_creation", "true"}});
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"cluster_fast_path", "shadow_cluster_fast_path"}, {});
+
+  const std::vector<std::string> valid_fast_path_yamls = {
+      // 1. Basic prefix route
+      R"EOF(
+virtual_hosts:
+- name: fast_path_prefix
+  domains: ["prefix.fastpath.com"]
+  routes:
+  - match: { prefix: "/api" }
+    route: { cluster: "cluster_fast_path" }
+)EOF",
+      // 2. Exact path route
+      R"EOF(
+virtual_hosts:
+- name: fast_path_exact
+  domains: ["exact.fastpath.com"]
+  routes:
+  - match: { path: "/v1/resource" }
+    route: { cluster: "cluster_fast_path" }
+)EOF",
+      // 3. Path-separated prefix route
+      R"EOF(
+virtual_hosts:
+- name: fast_path_separated
+  domains: ["separated.fastpath.com"]
+  routes:
+  - match: { path_separated_prefix: "/service" }
+    route: { cluster: "cluster_fast_path" }
+)EOF",
+      // 4. Valid timeout durations and stream durations
+      R"EOF(
+virtual_hosts:
+- name: fast_path_durations
+  domains: ["durations.fastpath.com"]
+  routes:
+  - match: { prefix: "/" }
+    route:
+      cluster: "cluster_fast_path"
+      timeout: { seconds: 15, nanos: 500000000 }
+      idle_timeout: { seconds: 30 }
+      flush_timeout: { seconds: 45 }
+      max_grpc_timeout: { seconds: 120 }
+      grpc_timeout_offset: { seconds: 1 }
+      max_stream_duration:
+        max_stream_duration: { seconds: 300 }
+        grpc_timeout_header_max: { seconds: 60 }
+        grpc_timeout_header_offset: { seconds: 2 }
+)EOF",
+      // 5. Valid enums (cluster_not_found_response_code and priority)
+      R"EOF(
+virtual_hosts:
+- name: fast_path_enums
+  domains: ["enums.fastpath.com"]
+  routes:
+  - match: { prefix: "/not_found" }
+    route:
+      cluster: "cluster_fast_path"
+      cluster_not_found_response_code: NOT_FOUND
+      priority: HIGH
+  - match: { prefix: "/server_error" }
+    route:
+      cluster: "cluster_fast_path"
+      cluster_not_found_response_code: INTERNAL_SERVER_ERROR
+      priority: DEFAULT
+)EOF",
+      // 6. Global shadow cluster with valid existing cluster
+      R"EOF(
+request_mirror_policies:
+- cluster: "shadow_cluster_fast_path"
+virtual_hosts:
+- name: fast_path_global_shadow
+  domains: ["shadow.fastpath.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "cluster_fast_path" }
+)EOF",
+  };
+
+  for (const auto& yaml : valid_fast_path_yamls) {
+    auto route_config = parseRouteConfigurationFromYaml(yaml);
+    const auto& vhost_proto = route_config.virtual_hosts(0);
+
+    Init::ManagerImpl local_init_manager{"local_init"};
+    auto global_route_config_or_error =
+        CommonConfigImpl::create(route_config, factory_context_,
+                                 ProtobufMessage::getStrictValidationVisitor(), local_init_manager);
+    EXPECT_OK(global_route_config_or_error.status());
+    auto global_route_config = global_route_config_or_error.value();
+
+    // 1. Assert requiresProbeValidation returns false (qualifies for fast path)
+    EXPECT_FALSE(requiresProbeValidation(vhost_proto, global_route_config, true, factory_context_));
+
+    // 2. Assert direct VirtualHostImpl constructor succeeds without error
+    auto vhost_scope = factory_context_.scope().scopeFromStatName(
+        factory_context_.routerContext().virtualClusterStatNames().vhost_);
+    absl::Status vhost_creation_status = absl::OkStatus();
+    VirtualHostImpl vhost(vhost_proto, global_route_config, factory_context_, *vhost_scope,
+                          ProtobufMessage::getStrictValidationVisitor(), local_init_manager, true,
+                          vhost_creation_status);
+    EXPECT_OK(vhost_creation_status);
+
+    // 3. Assert full ConfigImpl ingestion and routing succeeds
+    TestConfigImpl config(route_config, factory_context_, true, creation_status_);
+    EXPECT_OK(creation_status_);
+  }
 }
 
 } // namespace
