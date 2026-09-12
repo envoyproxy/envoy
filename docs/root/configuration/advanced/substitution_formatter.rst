@@ -1006,7 +1006,9 @@ Current supported substitution commands include:
     :ref:`Dynamic Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
     where ``NAMESPACE`` is the filter namespace used when setting the metadata, ``KEY`` is an optional
     lookup key in the namespace with the option of specifying nested keys separated by ':', and ``Z`` is an
-    optional parameter denoting string (and other non-structured value) truncation up to ``Z`` characters long.
+    optional parameter denoting truncation of the rendered value up to ``Z`` characters long. In typed
+    output (for example JSON access logs), only string values are truncated; values of any other type
+    (numbers, booleans, structs and lists) keep their type and are logged in full.
     Dynamic Metadata can be set by filters using the :repo:`StreamInfo <envoy/stream_info/stream_info.h>` API:
     *setDynamicMetadata*. The data will be logged as a JSON string. For example, for the following dynamic metadata:
 

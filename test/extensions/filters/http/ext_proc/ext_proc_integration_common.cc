@@ -741,6 +741,12 @@ void ExtProcIntegrationTest::testGetAndCloseStream() {
   processor_stream_->startGrpcStream();
   processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
+  // finishGrpcStream() only posts the response on the fake upstream's dispatcher. In
+  // observability mode, the main stream does not wait for the ext_proc stream, so wait until Envoy
+  // has processed the close before allowing the main response to complete and consume its logging
+  // info.
+  test_server_->waitForCounter("http.config_test.ext_proc.server_half_closed", Ge(1));
+
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 }

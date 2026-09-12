@@ -34,6 +34,7 @@ envoy_cc_test(
     srcs = ["credential_provider_chains_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:logger",
         "//source/extensions/common/aws:credential_provider_chains_lib",
         "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib",
         "//test/extensions/common/aws:aws_mocks",
