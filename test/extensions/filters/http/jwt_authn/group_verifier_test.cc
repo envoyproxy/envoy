@@ -71,9 +71,9 @@ constexpr auto allowfailed = "_allow_failed_";
 class GroupVerifierTest : public testing::Test {
 public:
   void createVerifier() {
-    ON_CALL(mock_factory_, create(_, _, _, _))
+    ON_CALL(mock_factory_, create(_, _, _, _, _))
         .WillByDefault(Invoke([&](const JwtVerify::CheckAudience*,
-                                  const std::optional<std::string>& provider, bool, bool) {
+                                  const std::optional<std::string>& provider, bool, bool, bool) {
           return std::move(mock_auths_[provider ? provider.value() : allowfailed]);
         }));
     auto verifier_or = Verifier::create(proto_config_.rules(0).requires_(),

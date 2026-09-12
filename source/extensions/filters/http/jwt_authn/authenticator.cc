@@ -13,6 +13,7 @@
 #include "source/common/jwt/struct_utils.h"
 #include "source/common/jwt/verify.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_join.h"
@@ -51,11 +52,12 @@ public:
   AuthenticatorImpl(const CheckAudience* check_audience, const std::optional<std::string>& provider,
                     bool allow_failed, bool allow_missing, JwksCache& jwks_cache,
                     Upstream::ClusterManager& cluster_manager,
-                    CreateJwksFetcherCb create_jwks_fetcher_cb, TimeSource& time_source)
+                    CreateJwksFetcherCb create_jwks_fetcher_cb, TimeSource& time_source,
+                    bool extract_only)
       : jwks_cache_(jwks_cache), cm_(cluster_manager),
         create_jwks_fetcher_cb_(create_jwks_fetcher_cb), check_audience_(check_audience),
         provider_(provider), is_allow_failed_(allow_failed), is_allow_missing_(allow_missing),
-        time_source_(time_source) {}
+        is_extract_only_(extract_only), time_source_(time_source) {}
   // Following functions are for JwksFetcher::JwksReceiver interface
   void onJwksSuccess(Envoy::JwtVerify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
@@ -77,6 +79,11 @@ private:
 
   // Handle Good Jwt either Cache JWT or verified public key.
   void handleGoodJwt(bool cache_hit);
+
+  // Forward the extracted JWT data (payload header, claim-to-headers, payload/header metadata) and
+  // apply forward/clear-route-cache side effects. Does NOT insert into the JWT cache. Shared by the
+  // verified-JWT path (handleGoodJwt) and the extract-only-without-validation path (startVerify).
+  void forwardExtractedData();
 
   // Normalize and set the payload metadata.
   void setPayloadMetadata(const Protobuf::Struct& jwt_payload);
@@ -129,6 +136,9 @@ private:
   const std::optional<std::string> provider_;
   const bool is_allow_failed_;
   const bool is_allow_missing_;
+  // When true, decode any present JWT and forward its claims/payload without any
+  // issuer/JWKS/signature/time/audience validation (extract_only_without_validation mode).
+  const bool is_extract_only_;
   TimeSource& time_source_;
   JwtVerify::Jwt* jwt_{};
 };
@@ -199,6 +209,34 @@ void AuthenticatorImpl::startVerify() {
       doneWithStatus(status);
       return;
     }
+  }
+
+  // extract_only_without_validation mode: the JWT parsed successfully, so decode it and forward its
+  // claims/payload to the upstream WITHOUT any issuer/JWKS/signature/time/audience validation, then
+  // always report Ok. This is the documented contract of extract_only_without_validation (issue
+  // #39930): the requester may not have a JWKS at all. The token is never inserted into the JWT
+  // cache (provider_ is nullopt here, so use_jwt_cache is always false).
+  if (is_extract_only_ &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.jwt_authn_extract_only_forwards_unverified_claims")) {
+    // Extraction is driven by a provider's config. Resolve one without enforcing the issuer:
+    // prefer the provider matching the token's `iss` (findByIssuer also falls back to the
+    // allow-all empty-issuer provider), otherwise the sole configured provider. If neither
+    // resolves (ambiguous multi-provider config), forward the token but extract nothing.
+    jwks_data_ = jwks_cache_.findByIssuer(jwt_->iss_);
+    if (jwks_data_ == nullptr) {
+      jwks_data_ = jwks_cache_.getSingleProvider();
+    }
+    if (jwks_data_ != nullptr) {
+      forwardExtractedData();
+    } else {
+      ENVOY_LOG(debug,
+                "{}: extract-only: no provider config resolved for issuer {}; forwarding token "
+                "without extracting claims",
+                name(), jwt_->iss_);
+    }
+    doneWithStatus(Status::Ok);
+    return;
   }
 
   ENVOY_LOG(debug, "{}: Verifying JWT of issuer {}", name(), jwt_->iss_);
@@ -388,7 +426,7 @@ bool AuthenticatorImpl::addJWTClaimToHeader(absl::Span<const absl::string_view> 
   return false;
 }
 
-void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
+void AuthenticatorImpl::forwardExtractedData() {
   // Forward the payload
   const auto& provider = jwks_data_->getJwtProvider();
 
@@ -427,6 +465,11 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
       setPayloadMetadata(jwt_->payload_pb_);
     }
   }
+}
+
+void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
+  forwardExtractedData();
+
   if (provider_ && !cache_hit) {
     // move the ownership of "owned_jwt_" into the function.
     jwks_data_->getJwtCache().insert(curr_token_->token(), std::move(owned_jwt_));
@@ -520,10 +563,10 @@ AuthenticatorPtr Authenticator::create(const CheckAudience* check_audience,
                                        bool allow_failed, bool allow_missing, JwksCache& jwks_cache,
                                        Upstream::ClusterManager& cluster_manager,
                                        CreateJwksFetcherCb create_jwks_fetcher_cb,
-                                       TimeSource& time_source) {
+                                       TimeSource& time_source, bool extract_only) {
   return std::make_unique<AuthenticatorImpl>(check_audience, provider, allow_failed, allow_missing,
                                              jwks_cache, cluster_manager, create_jwks_fetcher_cb,
-                                             time_source);
+                                             time_source, extract_only);
 }
 
 } // namespace JwtAuthn
