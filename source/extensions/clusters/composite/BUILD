@@ -19,6 +19,7 @@ envoy_cc_extension(
         "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
         "//source/extensions/load_balancing_policies/common:load_balancer_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/composite/v3:pkg_cc_proto",

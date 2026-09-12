@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["logical_host.h"],
     deps = [
         "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
