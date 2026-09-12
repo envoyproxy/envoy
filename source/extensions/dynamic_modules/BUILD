@@ -63,6 +63,8 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",

@@ -68,6 +68,16 @@ TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseHeaders) {
                    env_ptr, envoy_dynamic_module_type_http_header_type_ResponseHeader));
 }
 
+TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeRequestTrailers) {
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer", "trailer-value"}};
+  Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
+  log_context.setRequestTrailers(request_trailers);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  EXPECT_EQ(1, envoy_dynamic_module_callback_access_logger_get_headers_size(
+                   env_ptr, envoy_dynamic_module_type_http_header_type_RequestTrailer));
+}
+
 TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseTrailers) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
@@ -3083,6 +3093,129 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntResponseCodeNotSet) {
   uint64_t result = 0;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
       env_ptr, envoy_dynamic_module_type_attribute_id_ResponseCode, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntRequestSizes) {
+  stream_info_.protocol_ = Http::Protocol::Http11;
+  stream_info_.bytes_received_ = 17;
+  Http::TestRequestHeaderMapImpl request_headers{{"content-length", "0"}, {"x-test", "value"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer", "value"}};
+  Formatter::Context log_context(&request_headers, nullptr, nullptr);
+  log_context.setRequestTrailers(request_trailers);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 1;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestSize, &result));
+  EXPECT_EQ(17, result);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestTotalSize, &result));
+  EXPECT_EQ(17 + request_headers.byteSize() + request_trailers.byteSize(), result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntSizeFallbacks) {
+  stream_info_.protocol_ = Http::Protocol::Http11;
+  stream_info_.bytes_received_ = 23;
+  stream_info_.bytes_sent_ = 29;
+  Http::TestRequestHeaderMapImpl request_headers{{"x-test", "value"}};
+  Formatter::Context log_context(&request_headers, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestSize, &result));
+  EXPECT_EQ(23, result);
+
+  Formatter::Context no_headers(nullptr, nullptr, nullptr);
+  env_ptr = createThreadLocalLogger(no_headers, stream_info_);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestSize, &result));
+  EXPECT_EQ(23, result);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestTotalSize, &result));
+  EXPECT_EQ(23, result);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseTotalSize, &result));
+  EXPECT_EQ(29, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntRequestSizeIgnoresInvalidContentLength) {
+  stream_info_.protocol_ = Http::Protocol::Http11;
+  stream_info_.bytes_received_ = 23;
+  Http::TestRequestHeaderMapImpl request_headers{{"content-length", "invalid"}};
+  Formatter::Context log_context(&request_headers, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestSize, &result));
+  EXPECT_EQ(23, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntResponseTotalSize) {
+  stream_info_.protocol_ = Http::Protocol::Http11;
+  stream_info_.bytes_sent_ = 29;
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"x-test", "value"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"x-trailer", "value"}};
+  Formatter::Context log_context(nullptr, &response_headers, &response_trailers);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseTotalSize, &result));
+  EXPECT_EQ(29 + response_headers.byteSize() + response_trailers.byteSize(), result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntGrpcStatusPrecedence) {
+  stream_info_.protocol_ = Http::Protocol::Http11;
+  Http::TestResponseHeaderMapImpl response_headers{{"grpc-status", "3"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "7"}};
+  Formatter::Context log_context(nullptr, &response_headers, &response_trailers);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus, &result));
+  EXPECT_EQ(7, result);
+
+  Formatter::Context headers_only(nullptr, &response_headers, nullptr);
+  env_ptr = createThreadLocalLogger(headers_only, stream_info_);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus, &result));
+  EXPECT_EQ(3, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntGrpcStatusFallbacks) {
+  stream_info_.protocol_ = Http::Protocol::Http11;
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus, &result));
+  EXPECT_EQ(2, result);
+
+  stream_info_.response_code_ = std::nullopt;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeHttpIntsWithoutProtocol) {
+  stream_info_.protocol_ = std::nullopt;
+  Http::TestRequestHeaderMapImpl request_headers{{"content-length", "17"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  Formatter::Context log_context(&request_headers, &response_headers, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_RequestSize,
+                        envoy_dynamic_module_type_attribute_id_RequestTotalSize,
+                        envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus,
+                        envoy_dynamic_module_type_attribute_id_ResponseTotalSize}) {
+    EXPECT_FALSE(
+        envoy_dynamic_module_callback_access_logger_get_attribute_int(env_ptr, id, &result));
+  }
 }
 
 } // namespace

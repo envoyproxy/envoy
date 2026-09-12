@@ -2060,7 +2060,10 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
     // Fall back to the shared context accessor for stream-info-based attributes that are not
     // served from the live request state above.
     if (const auto stream_info = filter->streamInfo(); stream_info != nullptr) {
-      ok = ContextAccessor::getAttributeInt(*stream_info, attribute_id, result);
+      const ContextAccessor::HttpAttributeContext context{
+          filter->requestHeaders().ptr(), filter->responseHeaders().ptr(),
+          filter->responseTrailers().ptr(), filter->requestTrailers().ptr()};
+      ok = ContextAccessor::getAttributeInt(*stream_info, attribute_id, result, &context);
     }
     break;
   }

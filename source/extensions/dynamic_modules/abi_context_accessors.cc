@@ -9,6 +9,8 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
@@ -81,6 +83,8 @@ ContextAccessor::headerMapByType(const Formatter::Context& context,
   switch (type) {
   case envoy_dynamic_module_type_http_header_type_RequestHeader:
     return context.requestHeaders();
+  case envoy_dynamic_module_type_http_header_type_RequestTrailer:
+    return context.requestTrailers();
   case envoy_dynamic_module_type_http_header_type_ResponseHeader:
     return context.responseHeaders();
   case envoy_dynamic_module_type_http_header_type_ResponseTrailer:
@@ -431,9 +435,29 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
 
 bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
                                       envoy_dynamic_module_type_attribute_id attribute_id,
-                                      uint64_t* result) {
+                                      uint64_t* result, const HttpAttributeContext* http_context) {
   bool ok = false;
   switch (attribute_id) {
+  case envoy_dynamic_module_type_attribute_id_RequestSize: {
+    if (http_context == nullptr) {
+      break;
+    }
+    *result = stream_info.bytesReceived();
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_RequestTotalSize: {
+    if (http_context == nullptr) {
+      break;
+    }
+    *result =
+        stream_info.bytesReceived() +
+        (http_context->request_headers != nullptr ? http_context->request_headers->byteSize() : 0) +
+        (http_context->request_trailers != nullptr ? http_context->request_trailers->byteSize()
+                                                   : 0);
+    ok = true;
+    break;
+  }
   case envoy_dynamic_module_type_attribute_id_ResponseCode: {
     const auto code = stream_info.responseCode();
     if (code.has_value()) {
@@ -451,6 +475,37 @@ bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
   }
   case envoy_dynamic_module_type_attribute_id_ResponseSize: {
     *result = stream_info.bytesSent();
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus: {
+    if (http_context == nullptr) {
+      break;
+    }
+    const auto& response_headers = http_context->response_headers != nullptr
+                                       ? *http_context->response_headers
+                                       : *Http::StaticEmptyHeaders::get().response_headers;
+    const auto& response_trailers = http_context->response_trailers != nullptr
+                                        ? *http_context->response_trailers
+                                        : *Http::StaticEmptyHeaders::get().response_trailers;
+    const auto status =
+        Grpc::Common::getGrpcStatus(response_trailers, response_headers, stream_info);
+    if (status.has_value()) {
+      *result = static_cast<uint64_t>(status.value());
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ResponseTotalSize: {
+    if (http_context == nullptr) {
+      break;
+    }
+    *result =
+        stream_info.bytesSent() +
+        (http_context->response_headers != nullptr ? http_context->response_headers->byteSize()
+                                                   : 0) +
+        (http_context->response_trailers != nullptr ? http_context->response_trailers->byteSize()
+                                                    : 0);
     ok = true;
     break;
   }
@@ -509,6 +564,19 @@ bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
     break;
   }
   return ok;
+}
+
+bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
+                                      const Formatter::Context& context,
+                                      envoy_dynamic_module_type_attribute_id attribute_id,
+                                      uint64_t* result) {
+  if (!stream_info.protocol().has_value()) {
+    return getAttributeInt(stream_info, attribute_id, result);
+  }
+  const HttpAttributeContext http_context{
+      context.requestHeaders().ptr(), context.responseHeaders().ptr(),
+      context.responseTrailers().ptr(), context.requestTrailers().ptr()};
+  return getAttributeInt(stream_info, attribute_id, result, &http_context);
 }
 
 bool ContextAccessor::getAttributeBool(const StreamInfo::StreamInfo& stream_info,
