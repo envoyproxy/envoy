@@ -1,3 +1,5 @@
+#include "envoy/common/logger.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "library/common/api/external.h"
@@ -19,7 +21,7 @@ public:
     Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker);
   }
 
-  void SetUp() override { Context::changeAllLogLevels(spdlog::level::info); }
+  void SetUp() override { Context::changeAllLogLevels(Levels::info); }
 };
 
 std::unique_ptr<EnvoyEventTracker> LambdaDelegateTest::event_tracker =
@@ -47,17 +49,17 @@ TEST_F(LambdaDelegateTest, LogCbWithLevels) {
   LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
   // Set the log to critical. The message should not be logged.
-  Context::changeAllLogLevels(spdlog::level::critical);
+  Context::changeAllLogLevels(Levels::critical);
   ENVOY_LOG_MISC(error, unexpected_msg);
   EXPECT_THAT(actual_msg, Not(HasSubstr(unexpected_msg)));
 
   // Change to error. The message should be logged.
-  Context::changeAllLogLevels(spdlog::level::err);
+  Context::changeAllLogLevels(Levels::error);
   ENVOY_LOG_MISC(error, expected_msg);
   EXPECT_THAT(actual_msg, HasSubstr(expected_msg));
 
   // Change back to critical and test one more time.
-  Context::changeAllLogLevels(spdlog::level::critical);
+  Context::changeAllLogLevels(Levels::critical);
   ENVOY_LOG_MISC(error, expected_msg);
   EXPECT_THAT(actual_msg, Not(HasSubstr(unexpected_msg)));
 }
@@ -74,17 +76,11 @@ TEST_F(LambdaDelegateTest, ReleaseCb) {
   EXPECT_TRUE(released);
 }
 
-class LambdaDelegateWithLevelTest
-    : public testing::TestWithParam<std::tuple<Levels, spdlog::level::level_enum>> {};
+class LambdaDelegateWithLevelTest : public testing::TestWithParam<Levels> {};
 
 INSTANTIATE_TEST_SUITE_P(LogLevel, LambdaDelegateWithLevelTest,
-                         testing::Values(std::make_tuple<>(Levels::trace, spdlog::level::trace),
-                                         std::make_tuple<>(Levels::debug, spdlog::level::debug),
-                                         std::make_tuple<>(Levels::info, spdlog::level::info),
-                                         std::make_tuple<>(Levels::warn, spdlog::level::warn),
-                                         std::make_tuple<>(Levels::error, spdlog::level::err),
-                                         std::make_tuple<>(Levels::critical,
-                                                           spdlog::level::critical)));
+                         testing::Values(Levels::trace, Levels::debug, Levels::info,
+                                         Levels::warn, Levels::error, Levels::critical));
 
 TEST_P(LambdaDelegateWithLevelTest, Log) {
   std::string expected_msg = "Hello LambdaDelegate";
@@ -98,10 +94,9 @@ TEST_P(LambdaDelegateWithLevelTest, Log) {
 
   LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
-  Levels envoy_log_level = std::get<0>(GetParam());
-  spdlog::level::level_enum spd_log_level = std::get<1>(GetParam());
+  Levels envoy_log_level = GetParam();
 
-  Context::changeAllLogLevels(spd_log_level);
+  Context::changeAllLogLevels(envoy_log_level);
   switch (envoy_log_level) {
   case Levels::trace:
     ENVOY_LOG_MISC(trace, expected_msg);
