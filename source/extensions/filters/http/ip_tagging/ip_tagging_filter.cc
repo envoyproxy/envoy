@@ -7,6 +7,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -14,9 +15,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-IpTagsStats::IpTagsStats(const std::string& stat_prefix, Stats::ScopeSharedPtr scope)
+IpTagsStats::IpTagsStats(Stats::ScopeSharedPtr scope)
     : scope_(std::move(scope)), stat_name_set_(scope_->symbolTable().makeSet("IpTagging")),
-      stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
       unknown_tag_(stat_name_set_->add("unknown_tag.hit")), total_(stat_name_set_->add("total")),
       no_hit_(stat_name_set_->add("no_hit")),
       reload_success_(stat_name_set_->add("reload_success")) {}
@@ -26,8 +26,8 @@ void IpTagsStats::incHit(absl::string_view tag) {
 }
 
 void IpTagsStats::incCounter(Stats::StatName name) {
-  Stats::SymbolTable::StoragePtr storage = scope_->symbolTable().join({stats_prefix_, name});
-  scope_->counterFromStatName(Stats::StatName(storage.get())).inc();
+  // `scope_` already carries the `<stat_prefix>ip_tagging` prefix, so no join is needed here.
+  scope_->counterFromStatName(name).inc();
 }
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsStats::parseIpTagsAsProto(
@@ -58,9 +58,8 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsStats::parseIpTagsAsProto(
 IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
                                Event::Dispatcher& main_dispatcher, Api::Api& api,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
-                               ThreadLocal::SlotAllocator& tls, const std::string& stat_prefix,
-                               Stats::ScopeSharedPtr scope, Singleton::InstanceSharedPtr owner,
-                               absl::Status& creation_status)
+                               ThreadLocal::SlotAllocator& tls, Stats::ScopeSharedPtr scope,
+                               Singleton::InstanceSharedPtr owner, absl::Status& creation_status)
     : owner_(owner) {
   const auto& datasource_filename = ip_tags_datasource.filename();
   if (datasource_filename.empty()) {
@@ -84,7 +83,7 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
   // via IpTagsRegistrySingleton).
   auto provider_or_error = Config::DataSource::DataSourceProvider<LoadedIpTags>::create(
       ip_tags_datasource, main_dispatcher, tls, api, /*allow_empty=*/false,
-      [stat_prefix, scope, &validation_visitor, datasource_filename, first_load = true](
+      [scope, &validation_visitor, datasource_filename, first_load = true](
           absl::string_view new_data) mutable -> absl::StatusOr<std::shared_ptr<LoadedIpTags>> {
         IPTagsProto ip_tags_proto;
         if (absl::EndsWith(datasource_filename, MessageUtil::FileExtensions::get().Yaml)) {
@@ -104,7 +103,7 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
             return load_status;
           }
         }
-        auto stats = std::make_shared<IpTagsStats>(stat_prefix, scope);
+        auto stats = std::make_shared<IpTagsStats>(scope);
         auto trie_or = stats->parseIpTagsAsProto(ip_tags_proto.ip_tags());
         if (!trie_or.ok()) {
           return trie_or.status();
@@ -132,27 +131,29 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
     ProtobufMessage::ValidationVisitor& validation_visitor, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_dispatcher, const std::string& stat_prefix, Stats::Scope& scope,
     std::shared_ptr<IpTagsRegistrySingleton> singleton) {
-  // Lazily create a singleton-owned scope on first use. Reusing it across providers
-  // keeps the stats scope alive even after the listener that first created the
-  // provider goes away, since other listeners may still share this provider.
-  if (scope_ == nullptr) {
-    scope_ = scope.createScope("");
-  }
-  const size_t key = std::hash<std::string>()(ip_tags_datasource.filename());
+  // A provider owns the stats for the tags it loads, so two configs may only share one when
+  // they agree on both the file and where its stats land. Keying on the scope prefix and the
+  // filter's stat prefix as well as the filename keeps listeners with distinct stat prefixes
+  // from silently reporting into the first one's counters. Every part is always emitted, empty
+  // or not, so the separators keep the parts unambiguous.
+  std::string key = absl::StrCat(scope.symbolTable().toString(scope.prefix()), "|", stat_prefix,
+                                 "|", ip_tags_datasource.filename());
   auto it = ip_tags_registry_.find(key);
   if (it != ip_tags_registry_.end()) {
     if (std::shared_ptr<IpTagsProvider> provider = it->second.lock()) {
       return provider;
     }
   }
+  // The provider holds this scope for its whole life, so the stats outlive the listener that
+  // happened to bootstrap it while other listeners still share the provider.
   absl::Status creation_status = absl::OkStatus();
-  auto ip_tags_provider =
-      std::make_shared<IpTagsProvider>(ip_tags_datasource, main_dispatcher, api, validation_visitor,
-                                       tls, stat_prefix, scope_, singleton, creation_status);
+  auto ip_tags_provider = std::make_shared<IpTagsProvider>(
+      ip_tags_datasource, main_dispatcher, api, validation_visitor, tls,
+      scope.createScope(absl::StrCat(stat_prefix, "ip_tagging.")), singleton, creation_status);
   if (!creation_status.ok()) {
     return creation_status;
   }
-  ip_tags_registry_[key] = ip_tags_provider;
+  ip_tags_registry_[std::move(key)] = ip_tags_provider;
   return ip_tags_provider;
 }
 
@@ -198,7 +199,8 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   }
 
   if (!config.ip_tags().empty()) {
-    auto stats = std::make_shared<IpTagsStats>(stat_prefix, scope.createScope(""));
+    auto stats =
+        std::make_shared<IpTagsStats>(scope.createScope(absl::StrCat(stat_prefix, "ip_tagging.")));
     auto trie_or = stats->parseIpTagsAsProto(config.ip_tags());
     if (!trie_or.ok()) {
       creation_status = trie_or.status();

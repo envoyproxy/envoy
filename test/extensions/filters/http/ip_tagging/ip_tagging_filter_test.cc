@@ -490,6 +490,67 @@ TEST_F(IpTaggingFilterTest, ReusesIpTagsProviderInstanceForSameFilePath) {
   EXPECT_EQ(provider1->loadedIpTags()->trie, provider2->loadedIpTags()->trie);
 }
 
+TEST_F(IpTaggingFilterTest, DifferentIpTagsProviderInstanceForDifferentStatPrefix) {
+  envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),
+                            proto_config);
+  // Same file, but the two listeners report under different stat prefixes, so they must not
+  // share a provider: the provider owns the counters the tags are recorded on.
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config1_result =
+      IpTaggingFilterConfig::create(proto_config, "prefix1.", *singleton_manager_, *scope_,
+                                    runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
+  EXPECT_OK(config1_result);
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config2_result =
+      IpTaggingFilterConfig::create(proto_config, "prefix2.", *singleton_manager_, *scope_,
+                                    runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
+  EXPECT_OK(config2_result);
+  auto provider1 = IpTaggingFilterConfigPeer::ipTagsProvider(*config1_result.value());
+  auto provider2 = IpTaggingFilterConfigPeer::ipTagsProvider(*config2_result.value());
+  EXPECT_NE(nullptr, provider1);
+  EXPECT_NE(nullptr, provider2);
+  EXPECT_NE(provider1, provider2);
+
+  // Each config records into its own counters rather than the first one's.
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  for (const auto& config : {config1_result.value(), config2_result.value()}) {
+    auto filter = std::make_unique<IpTaggingFilter>(config);
+    filter->setDecoderFilterCallbacks(filter_callbacks_);
+    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+    filter->onDestroy();
+  }
+  EXPECT_EQ(stats_.counterFromString("prefix1.ip_tagging.internal_request.hit").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix1.ip_tagging.total").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix2.ip_tagging.internal_request.hit").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix2.ip_tagging.total").value(), 1);
+}
+
+TEST_F(IpTaggingFilterTest, DifferentIpTagsProviderInstanceForDifferentScope) {
+  envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),
+                            proto_config);
+  // Same file and same stat prefix, but rooted at scopes with different prefixes, which again
+  // puts the stats in different places.
+  Stats::ScopeSharedPtr scope1 = scope_->createScope("listener1");
+  Stats::ScopeSharedPtr scope2 = scope_->createScope("listener2");
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config1_result =
+      IpTaggingFilterConfig::create(proto_config, "prefix.", *singleton_manager_, *scope1, runtime_,
+                                    *api_, tls_, *dispatcher_, validation_visitor_);
+  EXPECT_OK(config1_result);
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config2_result =
+      IpTaggingFilterConfig::create(proto_config, "prefix.", *singleton_manager_, *scope2, runtime_,
+                                    *api_, tls_, *dispatcher_, validation_visitor_);
+  EXPECT_OK(config2_result);
+  auto provider1 = IpTaggingFilterConfigPeer::ipTagsProvider(*config1_result.value());
+  auto provider2 = IpTaggingFilterConfigPeer::ipTagsProvider(*config2_result.value());
+  EXPECT_NE(nullptr, provider1);
+  EXPECT_NE(nullptr, provider2);
+  EXPECT_NE(provider1, provider2);
+}
+
 TEST_F(IpTaggingFilterTest, DifferentIpTagsProviderInstanceForDifferentFilePath) {
   envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),
