@@ -103,7 +103,9 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
     for (const HostSetPtr& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
       for (const HostVector& hosts : host_set->hostsPerLocality().get()) {
-        ASSERT(!hosts.empty());
+        if (hosts.empty()) {
+          continue;
+        }
         uint64_t rq_success = 0;
         uint64_t rq_error = 0;
         uint64_t rq_active = 0;
