@@ -523,6 +523,12 @@ public:
   testing::AssertionResult
   waitForHalfClose(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
+  // Wait for the current fake-upstream dispatcher callback to unwind and for callbacks already
+  // queued on the dispatcher to complete.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForDispatcherBarrier(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   virtual void initialize() {
     absl::MutexLock lock(lock_);
     initialized_ = true;

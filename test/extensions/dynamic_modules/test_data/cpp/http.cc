@@ -554,6 +554,60 @@ public:
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(SpanCallbacksConfigFactory, "span_callbacks");
 
+// --- span_across_callbacks ---
+
+// Spawns a child span in onRequestHeaders, keeps it, and finishes it in onRequestTrailers to show
+// that a span can outlive the event hook that created it.
+class SpanAcrossCallbacksFilter : public HttpFilter {
+public:
+  explicit SpanAcrossCallbacksFilter(HttpFilterHandle& handle) : handle_(handle) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool) override {
+    auto span = handle_.getActiveSpan();
+    if (span != nullptr) {
+      child_span_ = span->spawnChild("child");
+    }
+    headers.set("x-span-stored", "true");
+    return HeadersStatus::Continue;
+  }
+
+  TrailersStatus onRequestTrailers(HeaderMap&) override {
+    if (child_span_ != nullptr) {
+      child_span_->setTag("child-key", "child-value");
+      child_span_->finish();
+      child_span_.reset();
+    }
+    return TrailersStatus::Continue;
+  }
+
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+  std::unique_ptr<ChildSpan> child_span_;
+};
+
+class SpanAcrossCallbacksFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<SpanAcrossCallbacksFilter>(handle);
+  }
+};
+
+class SpanAcrossCallbacksConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<SpanAcrossCallbacksFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(SpanAcrossCallbacksConfigFactory, "span_across_callbacks");
+
 // --- cluster_callbacks ---
 
 class ClusterCallbacksFilter : public HttpFilter {

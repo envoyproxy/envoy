@@ -119,6 +119,7 @@ envoy_cc_test(
     srcs = ["iam_roles_anywhere_credentials_provider_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:logger",
         "//source/extensions/common/aws:utility_lib",
         "//source/extensions/common/aws/credential_providers:credentials_file_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",

@@ -1,3 +1,4 @@
+#include <atomic>
 #include <vector>
 
 #include "envoy/common/scope_tracker.h"
@@ -36,11 +37,16 @@ class TestFatalErrorHandler : public FatalErrorHandlerInterface {
 
 class TestFatalAction : public Server::Configuration::FatalAction {
 public:
-  TestFatalAction(bool is_safe, int* const counter) : is_safe_(is_safe), counter_(counter) {}
+  TestFatalAction(bool is_safe, int* const counter) : is_safe_(is_safe), counter_(counter) {
+    ++alive_count_;
+  }
+  ~TestFatalAction() override { --alive_count_; }
   void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
     ++(*counter_);
   }
   bool isAsyncSignalSafe() const override { return is_safe_; }
+
+  static inline std::atomic<int> alive_count_{0};
 
 private:
   const bool is_safe_;
@@ -58,6 +64,7 @@ protected:
     // Reset module state
     FatalErrorHandler::resetFatalActionStateForTest();
     FatalErrorHandler::removeFatalErrorHandler(*handler_);
+    EXPECT_EQ(TestFatalAction::alive_count_.load(), 0);
   }
 
   std::unique_ptr<TestFatalErrorHandler> handler_;
@@ -119,6 +126,74 @@ TEST_F(FatalActionTest, ShouldOnlyBeAbleToRunUnsafeActionsFromThreadThatRanSafeA
   run_unsafe_actions.Notify();
 
   fatal_action_thread->join();
+}
+
+TEST_F(FatalActionTest, DuplicateRegistrationIsIgnored) {
+  safe_actions_.emplace_back(std::make_unique<TestFatalAction>(true, &counter_));
+  unsafe_actions_.emplace_back(std::make_unique<TestFatalAction>(false, &counter_));
+  FatalErrorHandler::registerFatalActions(std::move(safe_actions_), std::move(unsafe_actions_),
+                                          Thread::threadFactoryForTest());
+
+  int second_counter = 0;
+  FatalAction::FatalActionPtrList second_safe;
+  FatalAction::FatalActionPtrList second_unsafe;
+  second_safe.emplace_back(std::make_unique<TestFatalAction>(true, &second_counter));
+  second_unsafe.emplace_back(std::make_unique<TestFatalAction>(false, &second_counter));
+  FatalErrorHandler::registerFatalActions(std::move(second_safe), std::move(second_unsafe),
+                                          Thread::threadFactoryForTest());
+
+  EXPECT_EQ(FatalErrorHandler::runSafeActions(), Status::Success);
+  EXPECT_EQ(counter_, 1);
+  EXPECT_EQ(second_counter, 0);
+
+  EXPECT_EQ(FatalErrorHandler::runUnsafeActions(), Status::Success);
+  EXPECT_EQ(counter_, 2);
+  EXPECT_EQ(second_counter, 0);
+}
+
+TEST_F(FatalActionTest, ConcurrentRegistration) {
+  constexpr int num_threads = 8;
+  constexpr int num_iterations = 20;
+
+  for (int iter = 0; iter < num_iterations; ++iter) {
+    std::vector<Thread::ThreadPtr> threads;
+    threads.reserve(num_threads);
+
+    std::atomic<int> ready{0};
+    std::atomic<bool> go{false};
+
+    for (int i = 0; i < num_threads; ++i) {
+      threads.push_back(Thread::threadFactoryForTest().createThread([this, &ready, &go]() {
+        FatalAction::FatalActionPtrList safe_actions;
+        FatalAction::FatalActionPtrList unsafe_actions;
+        safe_actions.emplace_back(std::make_unique<TestFatalAction>(true, &counter_));
+        unsafe_actions.emplace_back(std::make_unique<TestFatalAction>(false, &counter_));
+
+        ready.fetch_add(1, std::memory_order_release);
+        while (!go.load(std::memory_order_acquire)) {
+        }
+
+        FatalErrorHandler::registerFatalActions(std::move(safe_actions), std::move(unsafe_actions),
+                                                Thread::threadFactoryForTest());
+      }));
+    }
+
+    while (ready.load(std::memory_order_acquire) < num_threads) {
+    }
+    go.store(true, std::memory_order_release);
+
+    for (auto& thread : threads) {
+      thread->join();
+    }
+
+    FatalErrorHandler::resetFatalActionStateForTest();
+    if (TestFatalAction::alive_count_.load() != 0) {
+      break;
+    }
+  }
+
+  EXPECT_EQ(TestFatalAction::alive_count_.load(), 0)
+      << "Memory leak detected: orphaned FatalActionManager leaked actions";
 }
 
 } // namespace FatalAction

@@ -28,6 +28,7 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
@@ -974,16 +975,22 @@ void ListenerManagerImpl::drainGroup(
   // connections are forcibly closed. The drain start time is captured once here so that every
   // connection shares a single, consistent drain timeline.
   //
-  // The strategy is forced to Immediate rather than using the configured
-  // Server::Options::drainStrategy(). This preserves the pre-existing behavior of
-  // PerFilterChainFactoryContextImpl::drainClose(), which returns true unconditionally once the
-  // filter chain is draining, and it is the correct behavior here: unlike a server drain, the
-  // configuration backing these connections is already gone, and at the end of the drain window
-  // removeFilterChains() hard-closes whatever is left. Ramping up gradually would mean a large
-  // share of connections are still running on deleted configuration when that deadline arrives,
-  // and are then closed abruptly instead of being given the whole window to finish gracefully.
+  // The configured Server::Options::drainStrategy() is applied, so a gradual server drain ramps
+  // these connections up over the drain window in the same way it ramps a server drain. Note that
+  // unlike a server drain the configuration backing these connections is already gone, and at the
+  // end of the drain window removeFilterChains() hard-closes whatever is left, so connections that
+  // survive the ramp are closed abruptly rather than being given the whole window to finish.
+  //
+  // When the guard is disabled the strategy is forced to Immediate, which preserves the legacy
+  // behavior of PerFilterChainFactoryContextImpl::drainClose(): it returned true unconditionally
+  // once the filter chain was draining.
+  const Server::DrainStrategy drain_strategy =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.filter_chain_drain_uses_configured_strategy")
+          ? server_.options().drainStrategy()
+          : Server::DrainStrategy::Immediate;
   const Network::ConnectionDrainEvent filter_chain_drain_event{
-      server_.api().timeSource().monotonicTime(), Server::DrainStrategy::Immediate};
+      server_.api().timeSource().monotonicTime(), drain_strategy};
   for (const auto& worker : workers_) {
     worker->onFilterChainDrain(draining_group->getDrainingListenerTag(),
                                draining_group->getDrainingFilterChains(), filter_chain_drain_event);
@@ -1378,12 +1385,11 @@ absl::Status ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listen
 }
 
 void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
-  if (!listener.udpListenerConfig().has_value() ||
-      listener.udpListenerConfig()->listenerFactory().isTransportConnectionless()) {
+  if (!listener.udpListenerConfig().has_value()) {
     // Close the listen sockets right away to avoid leaving TCP connections in accept queue
-    // already waiting for long timeout. However, connection-oriented UDP listeners shouldn't
-    // close the socket because they need to receive packets for existing connections via the
-    // listen sockets.
+    // already waiting for long timeout. UDP listeners keep their sockets: QUIC listeners
+    // need them to receive packets for existing connections, raw UDP listeners need them
+    // so a hot restart parent can keep serving established sessions during drain.
     listener.closeAllSockets();
 
     // In case of this listener was in-place updated previously and in the filter chains draining

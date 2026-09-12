@@ -530,7 +530,13 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
   return Http::okStatus();
 }
 
+std::atomic<bool> HeaderUtility::disable_request_header_validation_for_tests_{false};
+
 Http::Status HeaderUtility::checkValidRequestHeaders(const Http::RequestHeaderMap& headers) {
+  if (disable_request_header_validation_for_tests_.load(std::memory_order_relaxed)) {
+    return Http::okStatus();
+  }
+
   const HeaderEntry* invalid_entry = nullptr;
   bool invalid_key = false;
   headers.iterate([&invalid_entry, &invalid_key](const HeaderEntry& header) -> HeaderMap::Iterate {

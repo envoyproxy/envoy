@@ -32,13 +32,14 @@ public:
   explicit PostingExternalBuffer(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
   ~PostingExternalBuffer() override { *alive_ = false; }
 
-  void write(Buffer::InstancePtr data, WriteCallback cb) override {
+  void write(Buffer::InstancePtr data, bool end_stream, WriteCallback cb) override {
     // Enforce the single-writer contract: the manager must never issue a write
     // while another is outstanding.
     EXPECT_FALSE(write_active_);
     write_active_ = true;
     ++write_calls_;
     write_sizes_.push_back(data->length());
+    write_end_streams_.push_back(end_stream);
     dispatcher_.post([this, alive = alive_, data = std::move(data), cb = std::move(cb)]() mutable {
       if (!*alive) {
         return;
@@ -68,6 +69,7 @@ public:
   // that the manager serializes and coalesces queued writes.
   int write_calls_{0};
   std::vector<uint64_t> write_sizes_;
+  std::vector<bool> write_end_streams_;
 
 private:
   Event::Dispatcher& dispatcher_;
@@ -101,7 +103,7 @@ public:
       : dispatcher_(dispatcher), mode_(mode) {}
   ~FailingExternalBuffer() override { *alive_ = false; }
 
-  void write(Buffer::InstancePtr data, WriteCallback cb) override {
+  void write(Buffer::InstancePtr data, bool /*end_stream*/, WriteCallback cb) override {
     dispatcher_.post([this, alive = alive_, data = std::move(data), cb = std::move(cb)]() mutable {
       if (!*alive) {
         return;
@@ -527,6 +529,7 @@ TEST_F(BufferManagerTest, BatchesSmallFramesUntilEndStream) {
   // endStream() flushes the batched backlog as a single write.
   EXPECT_EQ(buffer->write_calls_, 1);
   EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(8)); // "aaa"+"bbb"+"cc".
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(true));
 
   replayAll();
   drain();
@@ -565,6 +568,7 @@ TEST_F(BufferManagerTest, SerializesAndCoalescesQueuedWrites) {
   // never overlapping (asserted in the fake) -- and the payload round-trips.
   EXPECT_EQ(buffer->write_calls_, 2);
   EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(threshold, 2 * threshold));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(false, true));
   EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), chunk + chunk + chunk);
 }

@@ -286,6 +286,11 @@ public:
     common_tls_context.add_alpn_protocols(test_quic_ ? Http::Utility::AlpnNames::get().Http3
                                                      : Http::Utility::AlpnNames::get().Http11);
 
+    // Tests can set a context cipher to verify that certificate-level SDS parameters override it.
+    if (!context_cipher_suite_.empty()) {
+      common_tls_context.mutable_tls_params()->add_cipher_suites(context_cipher_suite_);
+    }
+
     auto* validation_context = common_tls_context.mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
@@ -449,6 +454,7 @@ protected:
       TestEnvironment::temporaryPath("session_ticket_keys.sds.yaml")};
   bool configure_keylog_{false};
   const std::string keylog_path_{TestEnvironment::temporaryPath(TestUtility::uniqueFilename())};
+  std::string context_cipher_suite_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
@@ -632,6 +638,57 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+}
+
+// Verify that certificate-level TLS parameters delivered through SDS override the context-level
+// parameters and that a subsequent SDS update removes the override.
+TEST_P(SdsDynamicDownstreamIntegrationTest, CertificateTlsParams) {
+  if (test_quic_) {
+    GTEST_SKIP() << "QUIC uses TLS 1.3, which ignores the configured TLS 1.2 cipher suites";
+  }
+
+  // Set AES128 at the context level as the value the SDS certificate must override.
+  context_cipher_suite_ = "ECDHE-RSA-AES128-GCM-SHA256";
+  on_server_init_function_ = [this]() {
+    createSdsStream(*sdsUpstream());
+    auto secret = getServerSecretRsa();
+    // Deliver AES256 in the certificate-level TLS parameters through the ordinary SDS stream.
+    secret.mutable_tls_certificate()->mutable_tls_params()->add_cipher_suites(
+        "ECDHE-RSA-AES256-GCM-SHA384");
+    sendSdsResponse(secret);
+  };
+  initialize();
+
+  // Offer both ciphers so the server's effective certificate-level policy determines the result.
+  client_ssl_ctx_ = createClientSslTransportSocketFactory(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"}),
+      context_manager_, *api_, &server_factory_context_.serverScope());
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+  // The SDS certificate's AES256 restriction must override the context's AES128 restriction.
+  EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384"))
+                   ->value());
+  cleanupUpstreamAndDownstream();
+
+  // Remove certificate-level TLS parameters through SDS, leaving the context baseline in effect.
+  sendSdsResponse(getServerSecretRsa());
+  waitForSdsUpdateStats(2);
+
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+  // Without a certificate override, the context-level AES128 restriction must be restored.
+  EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256"))
+                   ->value());
+  // The unchanged AES256 count proves that the restored context baseline excludes AES256.
+  EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384"))
+                   ->value());
+  // Both SDS resources must be accepted: one adding the override and one removing it.
+  EXPECT_EQ(2, test_server_->counter("sds.server_cert_rsa.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 }
 
