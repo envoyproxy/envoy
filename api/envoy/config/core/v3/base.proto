@@ -488,8 +488,9 @@ message HeaderValueOption {
   // otherwise they are added.
   //
   // .. note::
-  // In any context other than the router filter, we always act as if keep_empty_value is true,
-  // regardless of the setting of this field.
+  //   In any context other than the router filter, we always act as if keep_empty_value is true,
+  //   regardless of the setting of this field.
+  //
   bool keep_empty_value = 4;
 }
 
