@@ -457,6 +457,7 @@ EXTENSIONS = {
     # HTTP header formatters
     #
 
+    "envoy.http.stateful_header_formatters.dynamic_modules":    "//source/extensions/http/header_formatters/dynamic_modules:config",
     "envoy.http.stateful_header_formatters.preserve_case":       "//source/extensions/http/header_formatters/preserve_case:config",
 
     #
