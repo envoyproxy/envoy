@@ -198,6 +198,20 @@ TEST(MessageStreamerTest, AnyOfUnknownType) {
             stream(message).first);
 }
 
+TEST(MessageStreamerTest, AnyWithPartialPayload) {
+  TestNested nested;
+  nested.set_name("truncated");
+  nested.set_ratio(0.5);
+  const std::string serialized = nested.SerializeAsString();
+
+  TestMessage message;
+  Protobuf::Any& any = *message.mutable_any();
+  any.set_type_url("type.googleapis.com/test.common.json.TestNested");
+  // Cutting into the ratio leaves the name behind, which both implementations still print.
+  any.set_value(serialized.substr(0, serialized.size() - 1));
+  expectSameJson(message);
+}
+
 TEST(MessageStreamerTest, EmptyAny) {
   TestMessage message;
   message.mutable_any();

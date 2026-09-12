@@ -1,5 +1,7 @@
 #include "source/common/json/proto_streamer.h"
 
+#include <tuple>
+
 #include "source/common/common/base64.h"
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/utility.h"
@@ -398,12 +400,14 @@ void MessageStreamer::emitAny(const Protobuf::Message& message, BufferStreamer::
   }
 
   ProtobufTypes::MessagePtr packed = ProtobufMessage::Helper::typeUrlToMessage(any->type_url());
-  if (packed == nullptr || !MessageUtil::unpackTo(*any, *packed).ok()) {
+  if (packed == nullptr) {
     BufferStreamer::MapPtr map = level.addMap();
     map->addKey("@type");
     map->addString(any->type_url());
     return;
   }
+  // A payload that only parses in part still prints the part that did.
+  std::ignore = packed->ParsePartialFromString(any->value());
 
   const Protobuf::Message& payload = *packed;
   emitNamedMessage(payload, level, any->type_url(), is_sensitive, std::move(packed));
