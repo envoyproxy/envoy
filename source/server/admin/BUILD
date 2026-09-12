@@ -271,6 +271,7 @@ envoy_cc_library(
     deps = [
         ":handler_ctx_lib",
         ":utils_lib",
+        "//envoy/common:logger",
         "//envoy/http:codes_interface",
         "//envoy/server:admin_interface",
         "//envoy/server:instance_interface",

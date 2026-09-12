@@ -32,6 +32,7 @@ envoy_cc_test_with_engine_builder(
         ":base_client_integration_test_lib",
         "//test/common/mocks/common:common_mocks",
         "//test/common/mocks/dns:mock_dns_resolver_lib",
+        "@envoy//envoy/common:logger",
         "@envoy//source/common/quic:active_quic_listener_lib",
         "@envoy//source/common/quic:client_connection_factory_lib",
         "@envoy//source/common/quic:quic_server_factory_lib",
