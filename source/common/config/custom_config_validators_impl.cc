@@ -14,7 +14,8 @@ CustomConfigValidatorsImpl::CustomConfigValidatorsImpl(
   for (const auto& validator_config : validators_configs) {
     auto& factory =
         Config::Utility::getAndCheckFactory<Config::ConfigValidatorFactory>(validator_config);
-    const auto validator_type_url = factory.typeUrl();
+    const auto validator_type_url =
+        factory.typeUrlFromConfig(validator_config.typed_config(), validation_visitor);
     Config::ConfigValidatorPtr validator =
         factory.createConfigValidator(validator_config.typed_config(), validation_visitor);
 

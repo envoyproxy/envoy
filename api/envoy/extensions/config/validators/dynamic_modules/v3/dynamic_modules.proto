@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package envoy.extensions.config.validators.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.config.validators.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/config/validators/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Config Validator]
+// [#extension: envoy.config.validators.dynamic_modules]
+
+// Configuration for an xDS config validator implemented by a dynamic module. For each xDS update the
+// module receives the xDS type URL and the decoded resources, with each resource carrying its name,
+// version, aliases, TTL, and re-serialized protobuf payload. During validation the module can also
+// read current server state, such as the dynamic cluster count, through the validation context. A
+// rejection from the module follows Envoy's normal xDS rejection path, so the xDS client receives a
+// NACK and the last accepted configuration is retained.
+message DynamicModuleConfigValidator {
+  // Specifies the shared-object level configuration. This field is required.
+  //
+  // Only the ``name`` and ``module.local.filename`` sources are supported. Remote module sources
+  // are not supported because config validators are created without a factory context.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name identifying the config validator implementation within the module. This is passed to
+  // the module's config validator init function so that a module can host multiple
+  // implementations. This field is required.
+  string extension_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The configuration for the implementation chosen by ``extension_name``. If not specified, an
+  // empty configuration is passed to the module.
+  //
+  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly without
+  // the wrapper. Otherwise the serialized bytes of the configured message are passed.
+  google.protobuf.Any extension_config = 3;
+
+  // The xDS resource type URL handled by this validator. Only updates whose type URL matches this
+  // value invoke the module. The value must use the canonical ``type.googleapis.com/<message>``
+  // form. This field is required.
+  string type_url = 4 [(validate.rules).string = {min_len: 1}];
+}
