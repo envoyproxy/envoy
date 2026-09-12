@@ -52,13 +52,18 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
     return;
   }
   absl::string_view message_view(message.ptr, message.length);
-  // spdlog reads the source file as a null-terminated C string, so materialize one from the
-  // module-owned buffer before building the source location.
-  const std::string source_file_str =
-      source_file.ptr == nullptr ? std::string() : std::string(source_file.ptr, source_file.length);
+  // spdlog reads the source file as a null-terminated C string. Reuse a thread-local buffer to
+  // null-terminate the module-owned bytes without allocating on each log call. The pointer only
+  // needs to stay valid for this synchronous log call.
+  thread_local std::string source_file_buffer;
+  if (source_file.ptr == nullptr) {
+    source_file_buffer.clear();
+  } else {
+    source_file_buffer.assign(source_file.ptr, source_file.length);
+  }
   // Log directly with the module source location. The ENVOY_LOG macros would bake in this file and
   // line instead.
-  logger.log(spdlog::source_loc{source_file_str.c_str(), static_cast<int>(source_line), ""},
+  logger.log(spdlog::source_loc{source_file_buffer.c_str(), static_cast<int>(source_line), ""},
              spdlog_level, "{}", message_view);
 }
 
@@ -109,17 +114,16 @@ bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_m
   if (function_ptr == nullptr) {
     return false;
   }
-  std::string key_str(key.ptr, key.length);
   absl::WriterMutexLock lock(function_registry_mutex);
-  auto [it, inserted] = function_registry.try_emplace(key_str, function_ptr);
+  auto [it, inserted] =
+      function_registry.try_emplace(std::string(key.ptr, key.length), function_ptr);
   return inserted;
 }
 
 bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module_buffer key,
                                                 void** function_ptr_out) {
-  std::string key_str(key.ptr, key.length);
   absl::ReaderMutexLock lock(function_registry_mutex);
-  auto it = function_registry.find(key_str);
+  auto it = function_registry.find(absl::string_view(key.ptr, key.length));
   if (it != function_registry.end()) {
     *function_ptr_out = it->second;
     return true;
@@ -134,17 +138,15 @@ bool envoy_dynamic_module_callback_register_shared_data(envoy_dynamic_module_typ
   if (data_ptr == nullptr) {
     return false;
   }
-  std::string key_str(key.ptr, key.length);
   absl::WriterMutexLock lock(shared_data_registry_mutex);
-  shared_data_registry[key_str] = data_ptr;
+  shared_data_registry[std::string(key.ptr, key.length)] = data_ptr;
   return true;
 }
 
 bool envoy_dynamic_module_callback_get_shared_data(envoy_dynamic_module_type_module_buffer key,
                                                    void** data_ptr_out) {
-  std::string key_str(key.ptr, key.length);
   absl::ReaderMutexLock lock(shared_data_registry_mutex);
-  auto it = shared_data_registry.find(key_str);
+  auto it = shared_data_registry.find(absl::string_view(key.ptr, key.length));
   if (it != shared_data_registry.end()) {
     *data_ptr_out = it->second;
     return true;

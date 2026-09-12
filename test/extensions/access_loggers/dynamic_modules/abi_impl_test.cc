@@ -1662,6 +1662,24 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNotSet) {
                                                                                 key, &result));
 }
 
+// Verifies that a null metadata path is handled without crashing and resolves to no value.
+TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNullPath) {
+  Protobuf::Struct struct_obj;
+  auto& fields = *struct_obj.mutable_fields();
+  fields["key"] = ValueUtil::stringValue("value");
+  (*stream_info_.metadata_.mutable_filter_metadata())["test_filter"] = struct_obj;
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
+  envoy_dynamic_module_type_module_buffer key = {nullptr, 0};
+  envoy_dynamic_module_type_envoy_buffer result{};
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(env_ptr, filter,
+                                                                                key, &result));
+}
+
 TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNonStringValue) {
   Protobuf::Struct struct_obj;
   auto& fields = *struct_obj.mutable_fields();
