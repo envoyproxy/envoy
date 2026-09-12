@@ -817,6 +817,27 @@ TEST_F(HickoryDnsImplTest, ResolveIpAddressV6) {
   EXPECT_TRUE(callback_called);
 }
 
+TEST_F(HickoryDnsImplTest, ResolveSrvNotImplemented) {
+  initialize();
+
+  DnsResolver::ResolutionStatus result_status{};
+  bool callback_called = false;
+  auto* query = resolver_->resolveSrv("localhost",
+                                      [this, &callback_called, &result_status](
+                                          DnsResolver::ResolutionStatus status,
+                                          absl::string_view ABSL_ATTRIBUTE_UNUSED,
+                                          std::list<DnsResponse>&& response ABSL_ATTRIBUTE_UNUSED) {
+                                        result_status = status;
+                                        callback_called = true;
+                                        dispatcher_->exit();
+                                      });
+
+  EXPECT_EQ(query, nullptr);
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  EXPECT_TRUE(callback_called);
+  EXPECT_EQ(result_status, DnsResolver::ResolutionStatus::Failure);
+}
+
 // -- Failure-path tests for HickoryDnsResolverConfig::create() -----------------------------------
 //
 // The production path uses the statically linked ``hickory_dns_static`` module so the load,
