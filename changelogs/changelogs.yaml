@@ -40,12 +40,18 @@ sections:
     title: Deprecated
 
 areas:
+  admin:
+    title: admin
   access_log:
     title: access_log
+  ai_protocol_manager:
+    title: ai_protocol_manager
   alts:
     title: alts
   attributes:
     title: attributes
+  aws:
+    title: aws
   basic_auth:
     title: basic_auth
   build:
@@ -54,18 +60,36 @@ areas:
     title: circuit_breaker
   composite:
     title: composite
+  composite_cluster:
+    title: composite_cluster
   compressor:
     title: compressor
   credential_injector:
     title: credential_injector
-  dns_resolver:
-    title: dns_resolver
+  dns:
+    title: dns
+  dns~cares:
+    title: dns/cares
+  dns~filter:
+    title: dns/filter
+  dynamic_forward_proxy:
+    title: dynamic_forward_proxy
   dynamic_modules:
     title: dynamic_modules
+  ext_authz:
+    title: ext_authz
+  ext_proc:
+    title: ext_proc
   gcp_authn:
     title: gcp_authn
+  generic_proxy:
+    title: generic_proxy
   golang:
     title: golang
+  grpc_field_extraction:
+    title: grpc_field_extraction
+  grpc_http1_reverse_bridge:
+    title: grpc_http1_reverse_bridge
   http:
     title: http
   http2:
@@ -74,22 +98,42 @@ areas:
     title: http_inspector
   jwt_authn:
     title: jwt_authn
+  listener:
+    title: listener
   load_balancing:
     title: load_balancing
   load_report:
     title: load_report
+  local_ratelimit:
+    title: local_ratelimit
   logging:
     title: logging
+  lua:
+    title: lua
+  matching:
+    title: matching
+  mcp:
+    title: mcp
   mcp_json_rest_bridge:
     title: mcp_json_rest_bridge
   mcp_router:
     title: mcp_router
+  mcp_transcoder:
+    title: mcp_transcoder
   mysql_proxy:
     title: mysql_proxy
   network_ext_proc:
     title: network_ext_proc
   oauth2:
     title: oauth2
+  on_demand:
+    title: on_demand
+  original_dst:
+    title: original_dst
+  postgres:
+    title: postgres
+  proxy_protocol:
+    title: proxy_protocol
   quic:
     title: quic
   ratelimit:
@@ -108,6 +152,8 @@ areas:
     title: router
   sds:
     title: sds
+  server:
+    title: server
   set_metadata_filter:
     title: set_metadata_filter
   sockets:
@@ -122,23 +168,27 @@ areas:
     title: tap
   tcp_proxy:
     title: tcp_proxy
+  thrift_proxy:
+    title: thrift_proxy
   tls:
     title: tls
   tracing:
     title: tracing
+  tracing~opentelemetry:
+    title: tracing/opentelemetry
+  udp:
+    title: udp
+  upstream:
+    title: upstream
+  upstream~happy_eyeballs:
+    title: upstream/happy_eyeballs
   vhds:
     title: vhds
   wasm:
     title: wasm
   watchdog:
     title: watchdog
-  dns:
-    title: dns
-  proxy_protocol:
-    title: proxy_protocol
+  websocket:
+    title: websocket
   zstd:
     title: zstd
-  server:
-    title: server
-  udp:
-    title: udp

@@ -3,9 +3,9 @@ aio.core>=0.11.1
 aiohttp>=3.14.3
 aioquic>=1.3.0
 dependatool>=0.3.1
-envoy.base.utils>=0.6.9
+# envoy.base.utils>=0.6.9
 envoy.ci.report>=0.1.1
-envoy.code.check>=0.6.7
+# envoy.code.check>=0.6.7
 envoy.dependency.check>=0.2.1
 envoy.distribution.release>=0.1.2
 envoy.distribution.verify>=0.1.1
@@ -24,3 +24,6 @@ pyopenssl>=26.3.0
 pyyaml
 setuptools>=84.0.0
 slack_sdk
+
+envoy.base.utils @ git+https://github.com/envoyproxy/toolshed@ccb8b5485db7c07c136b1a8ac9c283ddb6068fe0#subdirectory=py/envoy.base.utils
+envoy.code.check @ git+https://github.com/envoyproxy/toolshed@ccb8b5485db7c07c136b1a8ac9c283ddb6068fe0#subdirectory=py/envoy.code.check
