@@ -48,6 +48,43 @@ fn test_log_level_callbacks() {
   assert!(is_log_enabled(Level::Trace));
 }
 
+// A value hook defined through `ffi_export!` returns its fallback when the body panics.
+crate::ffi_export! {
+  fn ffi_export_test_value_hook() -> u32 {
+    panic!("boom");
+  }
+  on_panic = 7
+}
+
+// A void hook defined through `ffi_export!` swallows the panic without unwinding.
+crate::ffi_export! {
+  fn ffi_export_test_void_hook() {
+    panic!("boom");
+  }
+}
+
+// The unsafe arms must fail closed the same way as the safe arms.
+crate::ffi_export! {
+  unsafe fn ffi_export_test_unsafe_value_hook() -> u32 {
+    panic!("boom");
+  }
+  on_panic = 9
+}
+
+crate::ffi_export! {
+  unsafe fn ffi_export_test_unsafe_void_hook() {
+    panic!("boom");
+  }
+}
+
+#[test]
+fn test_ffi_export_fails_closed_on_panic() {
+  assert_eq!(ffi_export_test_value_hook(), 7);
+  ffi_export_test_void_hook();
+  assert_eq!(unsafe { ffi_export_test_unsafe_value_hook() }, 9);
+  unsafe { ffi_export_test_unsafe_void_hook() };
+}
+
 #[test]
 fn test_envoy_dynamic_module_on_http_filter_config_new_impl() {
   struct TestHttpFilterConfig;
