@@ -73,28 +73,21 @@ impl ClusterSpecifierContext {
     if count == 0 {
       return Vec::new();
     }
-    let mut raw: Vec<abi::envoy_dynamic_module_type_envoy_http_header> = Vec::with_capacity(count);
+    // Fill the pairs in place as ABI headers to avoid a second allocation.
+    let mut headers: Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> = Vec::with_capacity(count);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
         self.envoy_ptr,
-        raw.as_mut_ptr(),
+        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
       )
     };
     if !success {
       return Vec::new();
     }
     unsafe {
-      raw.set_len(count);
+      headers.set_len(count);
     }
-    raw
-      .iter()
-      .map(|h| {
-        (
-          unsafe { EnvoyBuffer::new_from_raw(h.key_ptr as *const _, h.key_length) },
-          unsafe { EnvoyBuffer::new_from_raw(h.value_ptr as *const _, h.value_length) },
-        )
-      })
-      .collect()
+    headers
   }
 
   /// Get the first value of the request header with the given key.
