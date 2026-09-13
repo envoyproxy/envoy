@@ -13,6 +13,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/hash/hash_testing.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
 #include "gtest/gtest.h"
@@ -39,6 +40,25 @@ protected:
   }
 
   StatName makeStat(absl::string_view name) { return pool_.add(name); }
+
+  // A name of num_tokens distinct tokens. Each token encodes to one byte while the table holds
+  // fewer than 128 symbols, so the encoded length tracks num_tokens closely enough to walk a
+  // join across the inline/heap boundary.
+  StatName makeMultiTokenStat(absl::string_view prefix, uint32_t num_tokens) {
+    std::vector<std::string> tokens;
+    tokens.reserve(num_tokens);
+    for (uint32_t i = 0; i < num_tokens; ++i) {
+      tokens.push_back(absl::StrCat(prefix, i));
+    }
+    return makeStat(absl::StrJoin(tokens, "."));
+  }
+
+  // Whether the assembled bytes sit in the storage's own footprint rather than in a heap spill.
+  static bool bytesAreInline(const SymbolTable::InlineStorage& storage) {
+    const uint8_t* bytes = storage.statName().dataIncludingSize();
+    const uint8_t* object = reinterpret_cast<const uint8_t*>(std::addressof(storage));
+    return bytes == object;
+  }
 
   std::vector<uint8_t> serializeDeserialize(uint64_t number) {
     return TestUtil::serializeDeserializeNumber(number);
@@ -1106,20 +1126,87 @@ TEST_F(StatNameTest, JoinerIsNotRelocatable) {
 
 // inlineJoin() must produce exactly the bytes join() produces.
 TEST_F(StatNameTest, InlineJoinMatchesJoin) {
+  const StatName spill = makeMultiTokenStat("spill", 40);
+  const StatName other_spill = makeMultiTokenStat("other", 40);
   const std::vector<StatNameVec> cases = {
       {makeStat("a.b"), makeStat("c.d")},
       {makeStat(""), makeStat("c.d")},
+      {spill, makeStat("tail")},
       {makeStat("a.b"), makeStat("")},
+      {makeStat(""), spill},
       {makeStat(""), makeStat("")},
+      {spill, makeStat(""), other_spill},
       {makeStat("a.b"), makeStat("c.d"), makeStat("e.f")},
+      {spill, other_spill},
       {makeStat(""), makeStat("c.d"), makeStat("")},
       {makeStat(""), makeStat(""), makeStat("")},
   };
+
+  // One storage for the whole loop, so every case also has to replace whatever the previous case
+  // left behind -- including a short join landing on top of a heap spill.
+  SymbolTable::InlineStorage reused;
   for (const StatNameVec& names : cases) {
     SymbolTable::StoragePtr joined = table_.join(names);
+    const StatName expected(joined.get());
+
     const SymbolTable::InlineStorage inline_joined = table_.inlineJoin(names);
-    EXPECT_EQ(table_.toString(StatName(joined.get())), table_.toString(inline_joined.statName()));
-    EXPECT_EQ(StatName(joined.get()), inline_joined.statName());
+    EXPECT_EQ(table_.toString(expected), table_.toString(inline_joined.statName()));
+    EXPECT_EQ(expected, inline_joined.statName());
+
+    table_.inlineJoin(names, reused);
+    EXPECT_EQ(table_.toString(expected), table_.toString(reused.statName()));
+    EXPECT_EQ(expected, reused.statName());
+
+    // Neither overload may decide the inline/heap question differently from the other.
+    EXPECT_EQ(bytesAreInline(inline_joined), bytesAreInline(reused))
+        << "for " << table_.toString(expected);
+  }
+}
+
+TEST_F(StatNameTest, InlineJoinMatchesJoinAcrossSpillBoundary) {
+  bool saw_inline = false;
+  bool saw_spill = false;
+  SymbolTable::InlineStorage reused;
+
+  for (uint32_t num_tokens = 1; num_tokens <= 40; ++num_tokens) {
+    const StatNameVec names{makeMultiTokenStat("token", num_tokens), makeStat("suffix")};
+    const SymbolTable::StoragePtr joined = table_.join(names);
+    const StatName expected(joined.get());
+
+    const SymbolTable::InlineStorage returned = table_.inlineJoin(names);
+    EXPECT_EQ(expected, returned.statName()) << "num_tokens=" << num_tokens;
+
+    table_.inlineJoin(names, reused);
+    EXPECT_EQ(expected, reused.statName()) << "num_tokens=" << num_tokens;
+    EXPECT_EQ(bytesAreInline(returned), bytesAreInline(reused)) << "num_tokens=" << num_tokens;
+
+    if (bytesAreInline(returned)) {
+      saw_inline = true;
+    } else {
+      saw_spill = true;
+    }
+  }
+
+  // The sweep proves nothing about the spill branch unless it reached it.
+  EXPECT_TRUE(saw_inline);
+  EXPECT_TRUE(saw_spill);
+}
+
+TEST_F(StatNameTest, InlineJoinStorageReuseAlternatesSpillAndInline) {
+  const StatNameVec long_names{makeMultiTokenStat("long", 40), makeStat("tail")};
+  const StatNameVec short_names{makeStat("a.b"), makeStat("c.d")};
+  const SymbolTable::StoragePtr long_joined = table_.join(long_names);
+  const SymbolTable::StoragePtr short_joined = table_.join(short_names);
+
+  SymbolTable::InlineStorage storage;
+  for (int iteration = 0; iteration < 3; ++iteration) {
+    table_.inlineJoin(long_names, storage);
+    EXPECT_EQ(StatName(long_joined.get()), storage.statName()) << "iteration=" << iteration;
+    EXPECT_FALSE(bytesAreInline(storage)) << "iteration=" << iteration;
+
+    table_.inlineJoin(short_names, storage);
+    EXPECT_EQ(StatName(short_joined.get()), storage.statName()) << "iteration=" << iteration;
+    EXPECT_TRUE(bytesAreInline(storage)) << "iteration=" << iteration;
   }
 }
 

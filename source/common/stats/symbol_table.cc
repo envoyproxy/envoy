@@ -676,6 +676,11 @@ SymbolTable::StoragePtr SymbolTable::join(absl::Span<const StatName> stat_names)
 }
 
 void StatNameJoiner::join(absl::Span<const StatName> stat_names, const SymbolTable& symbol_table) {
+  // The elided path below drops storage_ without copying anything out of it, so it needs the same
+  // aliasing check that SymbolTable::inlineJoin() makes for the assembling path.
+  ASSERT(!storage_.checkStatNameOverlaps(stat_names),
+         "stat_names should not contain name overlapping with the storage");
+
   // A join with at most one non-empty name produces bytes identical to that name, so the
   // allocation can be skipped and the name referenced directly.
   StatName sole_name;

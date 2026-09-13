@@ -113,6 +113,17 @@ public:
      */
     inline StatName statName() const;
 
+    /**
+     * Determines whether any of stat_names is backed by the bytes this storage owns. Assembling
+     * into this storage overwrites its inline bytes as it goes, and replacing the storage
+     * releases its heap buffer, so such a name is a self-overlapping copy or a use-after-free,
+     * and the caller must assemble into a different destination.
+     *
+     * @param stat_names the names about to be joined into this storage.
+     * @return whether any of them aliases this storage.
+     */
+    inline bool checkStatNameOverlaps(absl::Span<const StatName> stat_names) const;
+
   private:
     // The bytes are assembled only by the SymbolTable, e.g. by inlineJoin(); everyone else
     // reads the result through statName().
@@ -865,6 +876,9 @@ SymbolTable::heapJoin(absl::Span<const StatName> stat_names, size_t num_bytes) c
 // back out of it.
 ABSL_ATTRIBUTE_ALWAYS_INLINE inline void
 SymbolTable::inlineJoin(absl::Span<const StatName> stat_names, InlineStorage& storage) const {
+  ASSERT(!storage.checkStatNameOverlaps(stat_names),
+         "stat_names should not contain name overlapping with the storage");
+
   size_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
@@ -873,18 +887,18 @@ SymbolTable::inlineJoin(absl::Span<const StatName> stat_names, InlineStorage& st
 
   if (total_bytes > InlineStorage::InlineCapacity) {
     // Too long for the inline buffer, so spill onto the heap.
-    storage.inline_[0] = 0;
     storage.heap_ = heapJoin(stat_names, num_bytes);
+    storage.inline_[0] = 0;
     return;
   }
 
-  storage.heap_ = nullptr;
   uint8_t* p = Encoding::appendEncoding(num_bytes, storage.inline_);
   for (StatName stat_name : stat_names) {
     const size_t nbytes = stat_name.dataSize();
     memcpy(p, stat_name.data(), nbytes); // NOLINT(safe-memcpy)
     p += nbytes;
   }
+  storage.heap_ = nullptr;
   ASSERT(p == storage.inline_ + total_bytes);
 }
 
@@ -906,6 +920,17 @@ StatName SymbolTable::InlineStorage::statName() const {
     return StatName(inline_);
   }
   return {};
+}
+
+bool SymbolTable::InlineStorage::checkStatNameOverlaps(
+    absl::Span<const StatName> stat_names) const {
+  for (StatName stat_name : stat_names) {
+    const uint8_t* begin = stat_name.dataIncludingSize();
+    if (begin == inline_ || begin == heap_.get()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 StatName StatNameStorageBase::statName() const { return StatName(bytes_.get()); }
