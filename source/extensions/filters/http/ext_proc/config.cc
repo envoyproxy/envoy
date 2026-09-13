@@ -106,10 +106,14 @@ ExternalProcessingFilterConfig::createHttpFilterFactoryFromProtoTyped(
       config_creation_status);
   RETURN_IF_NOT_OK_REF(config_creation_status);
   if (proto_config.has_grpc_service()) {
-    return [filter_config = std::move(filter_config), &context,
-            scope](Http::FilterChainFactoryCallbacks& callbacks) {
-      auto client =
-          createExternalProcessorClient(context.clusterManager().grpcAsyncClientManager(), *scope);
+    return [filter_config = std::move(filter_config),
+            &context](Http::FilterChainFactoryCallbacks& callbacks) {
+      // The google gRPC client will create a fresh scope for its stats from the input scope and use
+      // 'grpc.<google_grpc_stat_prefix>.' as the prefix.
+      // To avoid unexpected additional prefixes like 'http.<connection_manager>' or
+      // 'cluster.<cluster_name>', the server scope here is used.
+      auto client = createExternalProcessorClient(context.clusterManager().grpcAsyncClientManager(),
+                                                  context.scope());
       callbacks.addStreamFilter(
           Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
     };
