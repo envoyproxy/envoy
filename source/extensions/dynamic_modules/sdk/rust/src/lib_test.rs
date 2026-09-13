@@ -9319,6 +9319,118 @@ unsafe fn stub_specifier_result(
   true
 }
 
+// Shared header fixture for the single-allocation `get_all_headers` getters.
+const GETTER_HEADERS: [(&[u8], &[u8]); 2] = [(b"h1", b"v1"), (b"h2", b"v2")];
+static EHM_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
+static EHM_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
+static FMT_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
+static FMT_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
+
+fn fill_getter_headers(result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header) {
+  for (i, (key, value)) in GETTER_HEADERS.iter().enumerate() {
+    unsafe {
+      *result_headers.add(i) = abi::envoy_dynamic_module_type_envoy_http_header {
+        key_ptr: key.as_ptr() as *mut _,
+        key_length: key.len(),
+        value_ptr: value.as_ptr() as *mut _,
+        value_length: value.len(),
+      };
+    }
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_early_header_mutation_get_headers_size(
+  _envoy_ptr: abi::envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+) -> usize {
+  if EHM_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    GETTER_HEADERS.len()
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_early_header_mutation_get_headers(
+  _envoy_ptr: abi::envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+  result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+) -> bool {
+  if !EHM_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  fill_getter_headers(result_headers);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_formatter_get_headers_size(
+  _envoy_ptr: abi::envoy_dynamic_module_type_formatter_context_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+) -> usize {
+  if FMT_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    GETTER_HEADERS.len()
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_formatter_get_headers(
+  _envoy_ptr: abi::envoy_dynamic_module_type_formatter_context_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+  result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+) -> bool {
+  if !FMT_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  fill_getter_headers(result_headers);
+  true
+}
+
+// The rewritten getters fill the returned pairs in one allocation, so cover the three branches.
+#[test]
+fn test_early_header_mutation_get_all_headers_single_allocation() {
+  let ctx = unsafe { early_header_mutation::EarlyHeaderMutationContext::new(std::ptr::null_mut()) };
+
+  EHM_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  EHM_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+  let headers = ctx.get_all_headers();
+  assert_eq!(headers.len(), 2);
+  assert_eq!(headers[0].0.as_slice(), b"h1");
+  assert_eq!(headers[0].1.as_slice(), b"v1");
+  assert_eq!(headers[1].0.as_slice(), b"h2");
+  assert_eq!(headers[1].1.as_slice(), b"v2");
+
+  EHM_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx.get_all_headers().is_empty());
+
+  EHM_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  EHM_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx.get_all_headers().is_empty());
+}
+
+#[test]
+fn test_formatter_get_all_headers_single_allocation() {
+  let ctx = formatter::FormatterContext::new(std::ptr::null_mut());
+  let request = abi::envoy_dynamic_module_type_http_header_type::RequestHeader;
+
+  FMT_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  FMT_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+  let headers = ctx.get_all_headers(request);
+  assert_eq!(headers.len(), 2);
+  assert_eq!(headers[0].0.as_slice(), b"h1");
+  assert_eq!(headers[0].1.as_slice(), b"v1");
+  assert_eq!(headers[1].0.as_slice(), b"h2");
+  assert_eq!(headers[1].1.as_slice(), b"v2");
+
+  FMT_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx.get_all_headers(request).is_empty());
+
+  FMT_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  FMT_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx.get_all_headers(request).is_empty());
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_request_headers_size(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
