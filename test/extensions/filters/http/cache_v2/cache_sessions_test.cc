@@ -136,6 +136,15 @@ protected:
         api_->timeSource().systemTime(), mock_cacheable_response_checker_, cache_sessions_, false);
   }
 
+  ActiveLookupRequestPtr
+  testLookupRequestForCacheability(Http::RequestHeaderMap& headers,
+                                   bool ignore_request_cache_control_header = false) {
+    return std::make_unique<ActiveLookupRequest>(
+        headers, std::make_unique<testing::NiceMock<MockUpstreamRequestFactory>>(), "test_cluster",
+        *dispatcher_, api_->timeSource().systemTime(), mock_cacheable_response_checker_,
+        cache_sessions_, ignore_request_cache_control_header);
+  }
+
   ActiveLookupRequestPtr testLookupRequest(absl::string_view path) {
     auto headers = requestHeaders(path);
     return testLookupRequest(headers);
@@ -232,6 +241,18 @@ MATCHER_P2(HasHeader, key, matcher, "") {
   return ExplainMatchResult(GetResultHasValue(matcher),
                             arg.get(::Envoy::Http::LowerCaseString(std::string(key))),
                             result_listener);
+}
+
+TEST_F(CacheSessionsTest, RequestNoStoreMakesResponseUncacheableUnlessIgnored) {
+  Http::TestRequestHeaderMapImpl request_headers = requestHeaders("/no-store");
+  request_headers.addCopy(Http::CustomHeaders::get().CacheControl, "no-store");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  ActiveLookupRequestPtr request = testLookupRequestForCacheability(request_headers);
+  EXPECT_FALSE(request->isCacheableResponse(response_headers));
+
+  ActiveLookupRequestPtr ignored_request = testLookupRequestForCacheability(request_headers, true);
+  EXPECT_TRUE(ignored_request->isCacheableResponse(response_headers));
 }
 
 TEST_F(CacheSessionsTest, RequestsForSeparateKeysIssueSeparateLookupRequests) {
