@@ -21,17 +21,18 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-using TriggerPtr = std::unique_ptr<Trigger>;
-
 class ThresholdTriggerImpl final : public Trigger {
 public:
   ThresholdTriggerImpl(const envoy::config::overload::v3::ThresholdTrigger& config)
       : threshold_(config.value()), state_(OverloadActionState::inactive()) {}
 
+  OverloadActionState evaluate(double value) const override {
+    return value >= threshold_ ? OverloadActionState::saturated() : OverloadActionState::inactive();
+  }
+
   bool updateValue(double value) override {
     const OverloadActionState state = actionState();
-    state_ =
-        value >= threshold_ ? OverloadActionState::saturated() : OverloadActionState::inactive();
+    state_ = evaluate(value);
     // This is a floating point comparison, though state_ is always either
     // saturated or inactive so there's no risk due to floating point precision.
     return state.value() != actionState().value();
@@ -54,16 +55,20 @@ public:
     return std::unique_ptr<ScaledTriggerImpl>(new ScaledTriggerImpl(config));
   }
 
-  bool updateValue(double value) override {
-    const OverloadActionState old_state = actionState();
+  OverloadActionState evaluate(double value) const override {
     if (value <= scaling_threshold_) {
-      state_ = OverloadActionState::inactive();
+      return OverloadActionState::inactive();
     } else if (value >= saturated_threshold_) {
-      state_ = OverloadActionState::saturated();
+      return OverloadActionState::saturated();
     } else {
-      state_ = OverloadActionState(
+      return OverloadActionState(
           UnitFloat((value - scaling_threshold_) / (saturated_threshold_ - scaling_threshold_)));
     }
+  }
+
+  bool updateValue(double value) override {
+    const OverloadActionState old_state = actionState();
+    state_ = evaluate(value);
     // All values of state_ are produced via this same code path. Even if
     // old_state and state_ should be approximately equal, there's no harm in
     // signaling for a small change if they're not float::operator== equal.
@@ -82,6 +87,8 @@ private:
   const double saturated_threshold_;
   OverloadActionState state_;
 };
+
+} // namespace
 
 absl::StatusOr<TriggerPtr>
 createTriggerFromConfig(const envoy::config::overload::v3::Trigger& trigger_config) {
@@ -104,6 +111,8 @@ createTriggerFromConfig(const envoy::config::overload::v3::Trigger& trigger_conf
 
   return trigger;
 }
+
+namespace {
 
 Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view name_of_stat) {
   Stats::StatNameManagedStorage stat_name(name_of_stat, scope.symbolTable());
@@ -392,14 +401,8 @@ void LoadShedPointImpl::updateProbabilityShedLoad() {
 }
 
 bool LoadShedPointImpl::shouldShedLoad() {
-  float unit_float_probability_shed_load = probability_shed_load_.load();
-  // This should be ok as we're using unit float which saturates at 1.0f.
-  if (unit_float_probability_shed_load == 1.0f) {
-    shed_load_counter_.inc();
-    return true;
-  }
-
-  if (random_generator_.bernoulli(UnitFloat(unit_float_probability_shed_load))) {
+  const float probability = probability_shed_load_.load(std::memory_order_relaxed);
+  if (random_generator_.bernoulli(UnitFloat(probability))) {
     shed_load_counter_.inc();
     return true;
   }
