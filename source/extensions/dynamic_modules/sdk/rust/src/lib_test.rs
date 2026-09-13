@@ -2070,6 +2070,126 @@ fn test_http_get_upstream_connection_id_unavailable() {
   assert_eq!(filter.get_upstream_connection_id(), 0);
 }
 
+// Mock storage backing the HTTP header getters so the fast path can be exercised without Envoy.
+static HTTP_GET_HEADER_CALLS: AtomicUsize = AtomicUsize::new(0);
+static HTTP_GET_HEADER_VALUES_CALLS: AtomicUsize = AtomicUsize::new(0);
+static HTTP_HEADER_VALUE_COUNT: AtomicUsize = AtomicUsize::new(0);
+static HTTP_GET_HEADER_VALUES_SUCCEEDS: AtomicBool = AtomicBool::new(true);
+
+const HTTP_HEADER_VALUE_0: &[u8] = b"value-0";
+const HTTP_HEADER_VALUE_1: &[u8] = b"value-1";
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_header(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _index: usize,
+  optional_size: *mut usize,
+) -> bool {
+  HTTP_GET_HEADER_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  let count = HTTP_HEADER_VALUE_COUNT.load(std::sync::atomic::Ordering::SeqCst);
+  if count == 0 {
+    return false;
+  }
+  if !optional_size.is_null() {
+    unsafe { *optional_size = count };
+  }
+  // The SDK only ever reads the first value through this callback.
+  unsafe {
+    (*result_buffer).ptr = HTTP_HEADER_VALUE_0.as_ptr() as *const _;
+    (*result_buffer).length = HTTP_HEADER_VALUE_0.len();
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_header_values(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  HTTP_GET_HEADER_VALUES_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  if !HTTP_GET_HEADER_VALUES_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  let values: [&[u8]; 2] = [HTTP_HEADER_VALUE_0, HTTP_HEADER_VALUE_1];
+  let count = HTTP_HEADER_VALUE_COUNT.load(std::sync::atomic::Ordering::SeqCst);
+  for (i, value) in values.iter().enumerate().take(count) {
+    unsafe {
+      let out = result_buffer.add(i);
+      (*out).ptr = value.as_ptr() as *const _;
+      (*out).length = value.len();
+    }
+  }
+  true
+}
+
+// The mock symbols above are process-wide, so the cases share one test to stay deterministic.
+#[test]
+fn test_http_get_header_values_fast_path() {
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  // A single value is served from the first crossing, so the batch getter is never called.
+  HTTP_GET_HEADER_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_GET_HEADER_VALUES_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_HEADER_VALUE_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
+  let single = filter.get_request_header_values("x-test");
+  assert_eq!(single.len(), 1);
+  assert_eq!(single[0].as_slice(), HTTP_HEADER_VALUE_0);
+  assert_eq!(
+    HTTP_GET_HEADER_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  assert_eq!(
+    HTTP_GET_HEADER_VALUES_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    0
+  );
+
+  // Multiple values still take the batch crossing after the sizing call.
+  HTTP_GET_HEADER_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_GET_HEADER_VALUES_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_HEADER_VALUE_COUNT.store(2, std::sync::atomic::Ordering::SeqCst);
+  let multiple = filter.get_request_header_values("x-test");
+  assert_eq!(multiple.len(), 2);
+  assert_eq!(multiple[0].as_slice(), HTTP_HEADER_VALUE_0);
+  assert_eq!(multiple[1].as_slice(), HTTP_HEADER_VALUE_1);
+  assert_eq!(
+    HTTP_GET_HEADER_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  assert_eq!(
+    HTTP_GET_HEADER_VALUES_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+
+  // An absent header returns empty without a batch call.
+  HTTP_GET_HEADER_VALUES_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_HEADER_VALUE_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
+  let absent = filter.get_request_header_values("x-missing");
+  assert!(absent.is_empty());
+  assert_eq!(
+    HTTP_GET_HEADER_VALUES_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    0
+  );
+
+  // A failed batch crossing returns empty without exposing uninitialized entries.
+  HTTP_GET_HEADER_VALUES_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_HEADER_VALUE_COUNT.store(2, std::sync::atomic::Ordering::SeqCst);
+  HTTP_GET_HEADER_VALUES_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  let failed = filter.get_request_header_values("x-test");
+  assert!(failed.is_empty());
+  assert_eq!(
+    HTTP_GET_HEADER_VALUES_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  HTTP_GET_HEADER_VALUES_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
 // =============================================================================
 // StartTLS Tests
 // =============================================================================

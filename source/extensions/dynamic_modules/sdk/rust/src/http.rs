@@ -4284,6 +4284,11 @@ impl EnvoyHttpFilterImpl {
       return Vec::new();
     }
 
+    // A single value is already in hand from the first crossing so skip the batch call.
+    if count == 1 {
+      return vec![unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) }];
+    }
+
     // Fill all values in a single crossing instead of one call per value.
     let mut results: Vec<EnvoyBuffer> = Vec::with_capacity(count);
     let success = unsafe {
