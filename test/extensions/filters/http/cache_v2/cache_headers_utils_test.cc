@@ -223,7 +223,7 @@ public:
         {
           "s-maxage=10, private=content-length, no-cache=content-encoding",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, true, false, false, false, Seconds(10)}
+          {true, true, false, true, false, Seconds(10)}
         },
         {
           "private",
@@ -239,7 +239,7 @@ public:
         {
           "s-maxage=\"20\", max-age=\"10\", public",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, true, Seconds(20)}
+          {false, false, false, true, true, Seconds(20)}
         },
         {
           "max-age=\"50\", private",
@@ -249,7 +249,7 @@ public:
         {
           "s-maxage=\"0\"",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, false, Seconds(0)}
+          {false, false, false, true, false, Seconds(0)}
         },
         // Unknown directives are ignored
         {
@@ -1007,6 +1007,13 @@ TEST(ResponseCacheControl, SMaxageTakesPrecedenceOverMaxAge) {
   ResponseCacheControl cc("s-maxage=100, max-age=200");
   EXPECT_TRUE(cc.max_age_.has_value());
   EXPECT_EQ(cc.max_age_.value(), Seconds(100));
+}
+
+TEST(ResponseCacheControl, SMaxageImpliesNoStale) {
+  ResponseCacheControl cc("s-maxage=100");
+  EXPECT_TRUE(cc.max_age_.has_value());
+  EXPECT_EQ(cc.max_age_.value(), Seconds(100));
+  EXPECT_TRUE(cc.no_stale_);
 }
 
 TEST(ResponseCacheControl, ProxyRevalidateSetsNoStale) {

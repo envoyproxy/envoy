@@ -901,6 +901,17 @@ TEST_F(CacheSessionsTest, UpstreamResetDuringCacheMissReportsUpstreamReset) {
   EXPECT_THAT(result->status_, Eq(CacheEntryStatus::UpstreamReset));
 }
 
+TEST_F(CacheSessionsTest, ExpiredSMaxageRequiresValidationEvenWhenRequestAllowsMaxStale) {
+  auto headers = requestHeaders("/a");
+  headers.addCopy("cache-control", "max-stale=500");
+  ActiveLookupRequestPtr lookup = testLookupRequest(headers);
+  Http::TestResponseHeaderMapImpl response_headers{{"cache-control", "s-maxage=1000"},
+                                                   {"date", dateNow()}};
+  // Age 1499s with s-maxage=1000 is 499s stale, which max-stale=500 would allow unless
+  // s-maxage implies proxy-revalidate / no-stale.
+  EXPECT_TRUE(lookup->requiresValidation(response_headers, std::chrono::seconds(1499)));
+}
+
 TEST_F(CacheSessionsTest, VaryHeaderInUpstreamResponseTreatedAsUncacheable) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
