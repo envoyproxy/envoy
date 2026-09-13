@@ -38,27 +38,29 @@ class TlsHistogramState {
 public:
   enum class State : uint8_t { Empty, Inline, MaterializedEmpty, MaterializedUsed };
 
-  TlsHistogramState() = default;
+  TlsHistogramState() : histogram_ptr_(nullptr) {}
   ~TlsHistogramState();
 
   TlsHistogramState(const TlsHistogramState&) = delete;
   TlsHistogramState& operator=(const TlsHistogramState&) = delete;
 
-  void insert(hist_bucket_t bucket, uint64_t count, std::optional<uint32_t> initial_bins);
+  void insert(hist_bucket_t bucket, uint64_t count, uint16_t initial_bins);
   histogram_t* histogram() const {
-    return state_ == State::MaterializedUsed ? histogram_ : nullptr;
+    return state_ == State::MaterializedUsed ? histogram_ptr_ : nullptr;
   }
   bool mergeInlineInto(histogram_t* target);
   void clear();
 
 private:
-  histogram_t* histogram_{nullptr};
-  uint64_t inline_count_{0};
+  union {
+    histogram_t* histogram_ptr_;
+    uint64_t inline_count_;
+  };
   hist_bucket_t inline_bucket_{};
   State state_{State::Empty};
 };
 
-static_assert(sizeof(TlsHistogramState) == 24);
+static_assert(sizeof(TlsHistogramState) == 16);
 
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
@@ -97,12 +99,14 @@ public:
   bool hidden() const override { return false; }
 
 private:
+  static constexpr uint16_t NoBins = UINT16_MAX;
+
   const Histogram::Unit unit_;
-  const std::optional<uint32_t> initial_bins_;
-  uint64_t otherHistogramIndex() const { return 1 - current_active_; }
-  uint64_t current_active_{0};
-  TlsHistogramState histograms_[2];
+  uint8_t current_active_{0};
   std::atomic<bool> used_;
+  const uint16_t initial_bins_;
+  uint16_t otherHistogramIndex() const { return 1 - current_active_; }
+  TlsHistogramState histograms_[2];
   const std::thread::id created_thread_id_;
   SymbolTable& symbol_table_;
 };
@@ -164,15 +168,19 @@ public:
   // Indicates that the ThreadLocalStore is shutting down, so no need to clear its histogram_set_.
   void setShuttingDown(bool shutting_down) { shutting_down_ = shutting_down; }
   bool shuttingDown() const { return shutting_down_; }
-  std::optional<uint32_t> bins() const { return bins_; }
+  std::optional<uint32_t> bins() const {
+    return bins_ == NoBins ? std::nullopt : std::optional<uint32_t>(bins_);
+  }
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
   std::vector<Stats::ParentHistogram::Bucket>
   detailedlBucketsHelper(const histogram_t& histogram) const;
 
+  static constexpr uint16_t NoBins = UINT16_MAX;
+
   const Histogram::Unit unit_;
-  const std::optional<uint32_t> bins_;
+  const uint16_t bins_;
   ThreadLocalStoreImpl& thread_local_store_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;

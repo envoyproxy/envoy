@@ -1090,13 +1090,12 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
 }
 
 TlsHistogramState::~TlsHistogramState() {
-  if (histogram_ != nullptr) {
-    hist_free(histogram_);
+  if (state_ == State::MaterializedEmpty || state_ == State::MaterializedUsed) {
+    hist_free(histogram_ptr_);
   }
 }
 
-void TlsHistogramState::insert(hist_bucket_t bucket, uint64_t count,
-                               std::optional<uint32_t> initial_bins) {
+void TlsHistogramState::insert(hist_bucket_t bucket, uint64_t count, uint16_t initial_bins) {
   if (count == 0) {
     return;
   }
@@ -1115,15 +1114,16 @@ void TlsHistogramState::insert(hist_bucket_t bucket, uint64_t count,
       return;
     }
 
-    histogram_ = initial_bins.has_value() ? hist_alloc_nbins(static_cast<int>(initial_bins.value()))
-                                          : hist_alloc();
-    hist_insert_raw(histogram_, inline_bucket_, inline_count_);
+    const uint64_t count_copy = inline_count_;
+    histogram_ptr_ = initial_bins != UINT16_MAX ? hist_alloc_nbins(static_cast<int>(initial_bins))
+                                                : hist_alloc();
+    hist_insert_raw(histogram_ptr_, inline_bucket_, count_copy);
     state_ = State::MaterializedUsed;
   } else if (state_ == State::MaterializedEmpty) {
     state_ = State::MaterializedUsed;
   }
 
-  hist_insert_raw(histogram_, bucket, count);
+  hist_insert_raw(histogram_ptr_, bucket, count);
 }
 
 bool TlsHistogramState::mergeInlineInto(histogram_t* target) {
@@ -1142,7 +1142,7 @@ void TlsHistogramState::clear() {
     inline_bucket_ = {};
     state_ = State::Empty;
   } else if (state_ == State::MaterializedUsed) {
-    hist_clear(histogram_);
+    hist_clear(histogram_ptr_);
     state_ = State::MaterializedEmpty;
   }
 }
@@ -1153,8 +1153,10 @@ ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Uni
                                                    SymbolTable& symbol_table,
                                                    std::optional<uint32_t> bins)
     : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, symbol_table), unit_(unit),
-      initial_bins_(bins), used_(false), created_thread_id_(std::this_thread::get_id()),
-      symbol_table_(symbol_table) {}
+      used_(false), initial_bins_(bins.has_value() ? static_cast<uint16_t>(bins.value()) : NoBins),
+      created_thread_id_(std::this_thread::get_id()), symbol_table_(symbol_table) {
+  RELEASE_ASSERT(!bins.has_value() || bins.value() < NoBins, "Histogram bins exceed uint16_t");
+}
 
 ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() { MetricImpl::clear(symbol_table_); }
 
@@ -1179,10 +1181,13 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
                                          ConstSupportedBuckets& supported_buckets,
                                          std::optional<uint32_t> bins, uint64_t id)
     : MetricImpl(name, tag_extracted_name, stat_name_tags, thread_local_store.symbolTable()),
-      unit_(unit), bins_(bins), thread_local_store_(thread_local_store),
-      interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
+      unit_(unit), bins_(bins.has_value() ? static_cast<uint16_t>(bins.value()) : NoBins),
+      thread_local_store_(thread_local_store), interval_histogram_(hist_alloc()),
+      cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_, unit, supported_buckets),
-      cumulative_statistics_(cumulative_histogram_, unit, supported_buckets), id_(id) {}
+      cumulative_statistics_(cumulative_histogram_, unit, supported_buckets), id_(id) {
+  RELEASE_ASSERT(!bins.has_value() || bins.value() < NoBins, "Histogram bins exceed uint16_t");
+}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   thread_local_store_.releaseHistogramCrossThread(id_);
