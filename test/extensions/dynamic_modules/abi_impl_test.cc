@@ -553,6 +553,12 @@ WEAK_STUB(CertValidatorGetFilterState,
           envoy_dynamic_module_callback_cert_validator_get_filter_state(nullptr, {nullptr, 0},
                                                                         nullptr))
 
+WEAK_STUB(ConfigValidatorSetRejectionMessage,
+          envoy_dynamic_module_callback_config_validator_set_rejection_message(nullptr,
+                                                                               {nullptr, 0}))
+WEAK_STUB(ConfigValidatorGetDynamicClusterCount,
+          envoy_dynamic_module_callback_config_validator_get_dynamic_cluster_count(nullptr))
+
 WEAK_STUB(ClusterAddHosts,
           envoy_dynamic_module_callback_cluster_add_hosts(nullptr, 0, nullptr, nullptr, nullptr,
                                                           nullptr, nullptr, nullptr, 0, 0, nullptr))

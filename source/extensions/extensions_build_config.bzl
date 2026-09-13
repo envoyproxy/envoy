@@ -50,6 +50,7 @@ EXTENSIONS = {
     # Config validators
     #
 
+    "envoy.config.validators.dynamic_modules":                "//source/extensions/config/validators/dynamic_modules:config",
     "envoy.config.validators.minimum_clusters_validator":     "//source/extensions/config/validators/minimum_clusters:config",
 
     #
