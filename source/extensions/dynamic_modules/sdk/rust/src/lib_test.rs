@@ -48,6 +48,43 @@ fn test_log_level_callbacks() {
   assert!(is_log_enabled(Level::Trace));
 }
 
+// A value hook defined through `ffi_export!` returns its fallback when the body panics.
+crate::ffi_export! {
+  fn ffi_export_test_value_hook() -> u32 {
+    panic!("boom");
+  }
+  on_panic = 7
+}
+
+// A void hook defined through `ffi_export!` swallows the panic without unwinding.
+crate::ffi_export! {
+  fn ffi_export_test_void_hook() {
+    panic!("boom");
+  }
+}
+
+// The unsafe arms must fail closed the same way as the safe arms.
+crate::ffi_export! {
+  unsafe fn ffi_export_test_unsafe_value_hook() -> u32 {
+    panic!("boom");
+  }
+  on_panic = 9
+}
+
+crate::ffi_export! {
+  unsafe fn ffi_export_test_unsafe_void_hook() {
+    panic!("boom");
+  }
+}
+
+#[test]
+fn test_ffi_export_fails_closed_on_panic() {
+  assert_eq!(ffi_export_test_value_hook(), 7);
+  ffi_export_test_void_hook();
+  assert_eq!(unsafe { ffi_export_test_unsafe_value_hook() }, 9);
+  unsafe { ffi_export_test_unsafe_void_hook() };
+}
+
 #[test]
 fn test_envoy_dynamic_module_on_http_filter_config_new_impl() {
   struct TestHttpFilterConfig;
@@ -2068,6 +2105,126 @@ fn test_http_get_upstream_connection_id_unavailable() {
   };
 
   assert_eq!(filter.get_upstream_connection_id(), 0);
+}
+
+// Mock storage backing the HTTP header getters so the fast path can be exercised without Envoy.
+static HTTP_GET_HEADER_CALLS: AtomicUsize = AtomicUsize::new(0);
+static HTTP_GET_HEADER_VALUES_CALLS: AtomicUsize = AtomicUsize::new(0);
+static HTTP_HEADER_VALUE_COUNT: AtomicUsize = AtomicUsize::new(0);
+static HTTP_GET_HEADER_VALUES_SUCCEEDS: AtomicBool = AtomicBool::new(true);
+
+const HTTP_HEADER_VALUE_0: &[u8] = b"value-0";
+const HTTP_HEADER_VALUE_1: &[u8] = b"value-1";
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_header(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _index: usize,
+  optional_size: *mut usize,
+) -> bool {
+  HTTP_GET_HEADER_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  let count = HTTP_HEADER_VALUE_COUNT.load(std::sync::atomic::Ordering::SeqCst);
+  if count == 0 {
+    return false;
+  }
+  if !optional_size.is_null() {
+    unsafe { *optional_size = count };
+  }
+  // The SDK only ever reads the first value through this callback.
+  unsafe {
+    (*result_buffer).ptr = HTTP_HEADER_VALUE_0.as_ptr() as *const _;
+    (*result_buffer).length = HTTP_HEADER_VALUE_0.len();
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_header_values(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  HTTP_GET_HEADER_VALUES_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  if !HTTP_GET_HEADER_VALUES_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  let values: [&[u8]; 2] = [HTTP_HEADER_VALUE_0, HTTP_HEADER_VALUE_1];
+  let count = HTTP_HEADER_VALUE_COUNT.load(std::sync::atomic::Ordering::SeqCst);
+  for (i, value) in values.iter().enumerate().take(count) {
+    unsafe {
+      let out = result_buffer.add(i);
+      (*out).ptr = value.as_ptr() as *const _;
+      (*out).length = value.len();
+    }
+  }
+  true
+}
+
+// The mock symbols above are process-wide, so the cases share one test to stay deterministic.
+#[test]
+fn test_http_get_header_values_fast_path() {
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  // A single value is served from the first crossing, so the batch getter is never called.
+  HTTP_GET_HEADER_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_GET_HEADER_VALUES_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_HEADER_VALUE_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
+  let single = filter.get_request_header_values("x-test");
+  assert_eq!(single.len(), 1);
+  assert_eq!(single[0].as_slice(), HTTP_HEADER_VALUE_0);
+  assert_eq!(
+    HTTP_GET_HEADER_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  assert_eq!(
+    HTTP_GET_HEADER_VALUES_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    0
+  );
+
+  // Multiple values still take the batch crossing after the sizing call.
+  HTTP_GET_HEADER_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_GET_HEADER_VALUES_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_HEADER_VALUE_COUNT.store(2, std::sync::atomic::Ordering::SeqCst);
+  let multiple = filter.get_request_header_values("x-test");
+  assert_eq!(multiple.len(), 2);
+  assert_eq!(multiple[0].as_slice(), HTTP_HEADER_VALUE_0);
+  assert_eq!(multiple[1].as_slice(), HTTP_HEADER_VALUE_1);
+  assert_eq!(
+    HTTP_GET_HEADER_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  assert_eq!(
+    HTTP_GET_HEADER_VALUES_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+
+  // An absent header returns empty without a batch call.
+  HTTP_GET_HEADER_VALUES_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_HEADER_VALUE_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
+  let absent = filter.get_request_header_values("x-missing");
+  assert!(absent.is_empty());
+  assert_eq!(
+    HTTP_GET_HEADER_VALUES_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    0
+  );
+
+  // A failed batch crossing returns empty without exposing uninitialized entries.
+  HTTP_GET_HEADER_VALUES_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_HEADER_VALUE_COUNT.store(2, std::sync::atomic::Ordering::SeqCst);
+  HTTP_GET_HEADER_VALUES_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  let failed = filter.get_request_header_values("x-test");
+  assert!(failed.is_empty());
+  assert_eq!(
+    HTTP_GET_HEADER_VALUES_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  HTTP_GET_HEADER_VALUES_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
 // =============================================================================
@@ -9317,6 +9474,118 @@ unsafe fn stub_specifier_result(
     length: value.len(),
   };
   true
+}
+
+// Shared header fixture for the single-allocation `get_all_headers` getters.
+const GETTER_HEADERS: [(&[u8], &[u8]); 2] = [(b"h1", b"v1"), (b"h2", b"v2")];
+static EHM_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
+static EHM_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
+static FMT_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
+static FMT_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
+
+fn fill_getter_headers(result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header) {
+  for (i, (key, value)) in GETTER_HEADERS.iter().enumerate() {
+    unsafe {
+      *result_headers.add(i) = abi::envoy_dynamic_module_type_envoy_http_header {
+        key_ptr: key.as_ptr() as *mut _,
+        key_length: key.len(),
+        value_ptr: value.as_ptr() as *mut _,
+        value_length: value.len(),
+      };
+    }
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_early_header_mutation_get_headers_size(
+  _envoy_ptr: abi::envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+) -> usize {
+  if EHM_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    GETTER_HEADERS.len()
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_early_header_mutation_get_headers(
+  _envoy_ptr: abi::envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+  result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+) -> bool {
+  if !EHM_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  fill_getter_headers(result_headers);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_formatter_get_headers_size(
+  _envoy_ptr: abi::envoy_dynamic_module_type_formatter_context_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+) -> usize {
+  if FMT_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    GETTER_HEADERS.len()
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_formatter_get_headers(
+  _envoy_ptr: abi::envoy_dynamic_module_type_formatter_context_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+  result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+) -> bool {
+  if !FMT_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  fill_getter_headers(result_headers);
+  true
+}
+
+// The rewritten getters fill the returned pairs in one allocation, so cover the three branches.
+#[test]
+fn test_early_header_mutation_get_all_headers_single_allocation() {
+  let ctx = unsafe { early_header_mutation::EarlyHeaderMutationContext::new(std::ptr::null_mut()) };
+
+  EHM_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  EHM_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+  let headers = ctx.get_all_headers();
+  assert_eq!(headers.len(), 2);
+  assert_eq!(headers[0].0.as_slice(), b"h1");
+  assert_eq!(headers[0].1.as_slice(), b"v1");
+  assert_eq!(headers[1].0.as_slice(), b"h2");
+  assert_eq!(headers[1].1.as_slice(), b"v2");
+
+  EHM_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx.get_all_headers().is_empty());
+
+  EHM_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  EHM_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx.get_all_headers().is_empty());
+}
+
+#[test]
+fn test_formatter_get_all_headers_single_allocation() {
+  let ctx = formatter::FormatterContext::new(std::ptr::null_mut());
+  let request = abi::envoy_dynamic_module_type_http_header_type::RequestHeader;
+
+  FMT_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  FMT_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+  let headers = ctx.get_all_headers(request);
+  assert_eq!(headers.len(), 2);
+  assert_eq!(headers[0].0.as_slice(), b"h1");
+  assert_eq!(headers[0].1.as_slice(), b"v1");
+  assert_eq!(headers[1].0.as_slice(), b"h2");
+  assert_eq!(headers[1].1.as_slice(), b"v2");
+
+  FMT_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx.get_all_headers(request).is_empty());
+
+  FMT_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  FMT_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx.get_all_headers(request).is_empty());
 }
 
 #[no_mangle]

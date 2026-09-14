@@ -21,7 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.mcp]
 
 // This filter will inspect and get attributes from MCP traffic.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message Mcp {
   // Traffic handling mode for non-MCP traffic.
   enum TrafficMode {
@@ -140,6 +140,28 @@ message Mcp {
   // and the method-specific identifier carried by ``Mcp-Name``; other configured
   // extraction rules still require body parsing.
   AttributeSource attribute_source = 9 [(validate.rules).enum = {defined_only: true}];
+
+  // When true, stop parsing (and buffering) the request body as soon as all the
+  // required routing attributes for the request's method have been collected
+  // (for example ``method`` and ``params.name`` for ``tools/call``), even if
+  // optional attributes such as ``params._meta`` or the remainder of the body
+  // have not been parsed yet. This decouples routing from body size, so a large
+  // trailing payload (for example ``params.arguments``) does not need to be
+  // buffered at the proxy just to route the request.
+  //
+  // Early termination is intentionally skipped when it could change observable
+  // behavior, so it has no effect when any of the following holds:
+  //
+  // - ``reject_duplicate_keys`` is set (duplicate detection needs a full-body scan);
+  // - ``propagate_trace_context`` or ``propagate_baggage`` is set (both read
+  //   ``params._meta``, which may appear after the routing attributes);
+  // - ``attribute_source`` is not ``BODY``.
+  //
+  // Requests whose body arrives complete in a single chunk are unaffected, since
+  // the whole root object is observed before iteration continues.
+  //
+  // Defaults to false.
+  bool early_terminate_when_routable = 10;
 }
 
 // Parser configuration with method-specific rules.

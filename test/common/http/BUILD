@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/router:context_lib",
+        "//source/common/router:router_lib",
         "//source/extensions/upstreams/http/generic:config",
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",

@@ -369,7 +369,7 @@ public:
 
   void log(LogLevel level, std::string_view message, std::source_location location) override {
     const std::string_view source_file(location.file_name());
-    envoy_dynamic_module_callback_log(
+    envoy_dynamic_module_callback_log_v2(
         static_cast<envoy_dynamic_module_type_log_level>(level),
         envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
         envoy_dynamic_module_type_module_buffer{source_file.data(), source_file.size()},
@@ -471,7 +471,7 @@ public:
 
   void log(LogLevel level, std::string_view message, std::source_location location) override {
     const std::string_view source_file(location.file_name());
-    envoy_dynamic_module_callback_log(
+    envoy_dynamic_module_callback_log_v2(
         static_cast<envoy_dynamic_module_type_log_level>(level),
         envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
         envoy_dynamic_module_type_module_buffer{source_file.data(), source_file.size()},
