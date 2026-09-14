@@ -74,20 +74,6 @@ message Mcp {
     HEADERS = 2;
   }
 
-  // Configures MCP protocol revisions accepted by the filter.
-  message ProtocolVersions {
-    // MCP protocol revisions accepted by the filter.
-    //
-    // If one or more revisions are configured, a request with an explicit
-    // MCP-Protocol-Version header is accepted only when the value exactly matches
-    // one of the configured revisions.
-    //
-    // If unset or empty, no protocol-version allowlist restriction is applied.
-    // The request's MCP-Protocol-Version header determines the revision when
-    // present; if the header is absent, existing legacy behavior is preserved.
-    repeated string supported = 1;
-  }
-
   message TraceContextPropagationConfig {
     option (xds.annotations.v3.message_status).work_in_progress = true;
   }
@@ -181,9 +167,11 @@ message Mcp {
   // Defaults to false.
   bool early_terminate_when_routable = 10;
 
-  // MCP protocol revisions accepted by the filter.
-  ProtocolVersions protocol_versions = 11;
-
+  // The latest MCP protocol revision supported by the filter.
+  //
+  // Requests using a known protocol revision newer than this value are rejected.
+  // When unset, no protocol-version restriction is applied.
+  google.protobuf.StringValue max_supported_protocol_version = 11;
 }
 
 // Parser configuration with method-specific rules.
