@@ -314,6 +314,24 @@ TEST(DynamicModuleNetworkFilterConfigTest, StopIterationStatus) {
 }
 
 // -----------------------------------------------------------------------------
+// Worker index tests
+// -----------------------------------------------------------------------------
+
+// The filter publishes the worker index parsed from its dispatcher name. Malformed names are
+// covered by the shared helper unit test.
+TEST_F(DynamicModuleNetworkFilterTest, WorkerIndexParsedFromDispatcherName) {
+  NiceMock<Event::MockDispatcher> worker_dispatcher{"worker_7"};
+  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
+  NiceMock<Network::MockConnection> connection;
+  ON_CALL(connection, dispatcher()).WillByDefault(testing::ReturnRef(worker_dispatcher));
+  ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
+
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks);
+  EXPECT_EQ(7U, filter->workerIndex());
+}
+
+// -----------------------------------------------------------------------------
 // Metrics Tests
 // -----------------------------------------------------------------------------
 

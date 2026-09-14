@@ -130,15 +130,25 @@ protected:
         {"host", "test_host"}, {":path", std::string{path}}, {":scheme", "https"}};
   }
 
-  ActiveLookupRequestPtr testLookupRequest(Http::RequestHeaderMap& headers) {
+  ActiveLookupRequestPtr testLookupRequest(Http::RequestHeaderMap& headers,
+                                           Event::Dispatcher& dispatcher) {
     return std::make_unique<ActiveLookupRequest>(
-        headers, mockUpstreamFactory(), "test_cluster", *dispatcher_,
-        api_->timeSource().systemTime(), mock_cacheable_response_checker_, cache_sessions_, false);
+        headers, mockUpstreamFactory(), "test_cluster", dispatcher, api_->timeSource().systemTime(),
+        mock_cacheable_response_checker_, cache_sessions_, false);
+  }
+
+  ActiveLookupRequestPtr testLookupRequest(Http::RequestHeaderMap& headers) {
+    return testLookupRequest(headers, *dispatcher_);
   }
 
   ActiveLookupRequestPtr testLookupRequest(absl::string_view path) {
     auto headers = requestHeaders(path);
     return testLookupRequest(headers);
+  }
+
+  ActiveLookupRequestPtr testLookupRequest(absl::string_view path, Event::Dispatcher& dispatcher) {
+    auto headers = requestHeaders(path);
+    return testLookupRequest(headers, dispatcher);
   }
 
   ActiveLookupRequestPtr testLookupRangeRequest(absl::string_view path, int start, int end) {
@@ -574,6 +584,13 @@ TEST_F(CacheSessionsTest, CacheHitGoesDirectlyToCachedResponses) {
   EXPECT_CALL(body_callback2, Call(IsNull(), EndStream::More));
   result->http_source_->getBody(AdjustedByteRange(5, 9999), body_callback2.AsStdFunction());
   pumpDispatcher();
+  // Requests beyond the body must also deliver their reset through the dispatcher.
+  MockFunction<void(Buffer::InstancePtr, EndStream)> out_of_range_callback;
+  EXPECT_CALL(out_of_range_callback, Call).Times(0);
+  result->http_source_->getBody(AdjustedByteRange(6, 9999), out_of_range_callback.AsStdFunction());
+  Mock::VerifyAndClearExpectations(&out_of_range_callback);
+  EXPECT_CALL(out_of_range_callback, Call(IsNull(), EndStream::Reset));
+  pumpDispatcher();
   // Then finally the 'filter' asks for trailers, and gets them back immediately.
   MockFunction<void(Http::ResponseTrailerMapPtr, EndStream)> trailer_callback;
   EXPECT_CALL(trailer_callback,
@@ -662,13 +679,14 @@ TEST_F(CacheSessionsTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAga
 }
 
 TEST_F(CacheSessionsTest, CacheInsertFailureResetsStreamingContexts) {
+  auto second_dispatcher = api_->allocateDispatcher("second_subscriber");
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
   ActiveLookupResultPtr result1, result2;
   auto response_headers = cacheableResponseHeaders();
   cache_sessions_->lookup(testLookupRequest("/a"),
                           [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
-  cache_sessions_->lookup(testLookupRequest("/a"),
+  cache_sessions_->lookup(testLookupRequest("/a", *second_dispatcher),
                           [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
   pumpDispatcher();
   // Cache miss.
@@ -695,16 +713,23 @@ TEST_F(CacheSessionsTest, CacheInsertFailureResetsStreamingContexts) {
                               Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers),
                               false);
   pumpDispatcher();
+  second_dispatcher->run(Event::Dispatcher::RunType::Block);
   ASSERT_THAT(result1->http_source_, NotNull());
   ASSERT_THAT(result2->http_source_, NotNull());
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_callback;
   MockFunction<void(Http::ResponseTrailerMapPtr, EndStream)> trailers_callback;
   result1->http_source_->getBody(AdjustedByteRange(0, 5), body_callback.AsStdFunction());
   result2->http_source_->getTrailers(trailers_callback.AsStdFunction());
-  EXPECT_CALL(body_callback, Call(IsNull(), EndStream::Reset));
-  EXPECT_CALL(trailers_callback, Call(IsNull(), EndStream::Reset));
+  EXPECT_CALL(body_callback, Call).Times(0);
+  EXPECT_CALL(trailers_callback, Call).Times(0);
   progress->onInsertFailed(absl::InternalError("test error"));
+  Mock::VerifyAndClearExpectations(&body_callback);
+  EXPECT_CALL(body_callback, Call(IsNull(), EndStream::Reset));
   pumpDispatcher();
+  // Pumping the first subscriber's dispatcher must not notify the second subscriber.
+  Mock::VerifyAndClearExpectations(&trailers_callback);
+  EXPECT_CALL(trailers_callback, Call(IsNull(), EndStream::Reset));
+  second_dispatcher->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_F(CacheSessionsTest, MismatchedSizeAndContentLengthFromUpstreamLogsAnError) {

@@ -55,7 +55,7 @@ jobs:
     runs-on: ${{ fromJSON(inputs.env).config.ci.agent-ubuntu }}
     name: Start checks
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       id: check-config
       name: Prepare check data
       with:
@@ -78,13 +78,13 @@ jobs:
           | .skipped.output.summary = "${{ inputs.skipped-summary }}"
           | .skipped.output.text = ""
 
-    - uses: envoyproxy/toolshed/actions/appauth@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/appauth@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/actions/github/checks@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/github/checks@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       name: Start checks
       id: checks
       with:
@@ -95,7 +95,7 @@ jobs:
 
           ${{ fromJSON(inputs.env).summary.summary }}
         token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/actions/json/table@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/json/table@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       name: Summary
       with:
         collapse-open: true
@@ -119,7 +119,7 @@ jobs:
         output-path: GITHUB_STEP_SUMMARY
         title: Checks started/skipped
 
-    - uses: envoyproxy/toolshed/actions/github/env/save@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/github/env/save@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
       name: Save env
       id: data
       with:

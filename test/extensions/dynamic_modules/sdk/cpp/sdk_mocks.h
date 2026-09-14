@@ -86,7 +86,8 @@ public:
   MOCK_METHOD((std::optional<std::string_view>), getGenericSecret, (GenericSecretID id),
               (override));
   MOCK_METHOD(bool, logEnabled, (LogLevel level), (override));
-  MOCK_METHOD(void, log, (LogLevel level, std::string_view message), (override));
+  MOCK_METHOD(void, log, (LogLevel level, std::string_view message, std::source_location location),
+              (override));
   MOCK_METHOD((std::pair<HttpCalloutInitResult, uint64_t>), httpCallout,
               (std::string_view cluster, std::span<const HeaderView> headers, std::string_view body,
                uint64_t timeout_ms, HttpCalloutCallback& cb),
@@ -226,7 +227,8 @@ public:
   MOCK_METHOD((std::optional<std::string_view>), getGenericSecret, (GenericSecretID id),
               (override));
   MOCK_METHOD(bool, logEnabled, (LogLevel level), (override));
-  MOCK_METHOD(void, log, (LogLevel level, std::string_view message), (override));
+  MOCK_METHOD(void, log, (LogLevel level, std::string_view message, std::source_location location),
+              (override));
 };
 
 class MockHttpFilter : public HttpFilter {

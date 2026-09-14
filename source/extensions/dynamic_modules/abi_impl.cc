@@ -39,32 +39,32 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
 }
 
 void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
-                                       envoy_dynamic_module_type_module_buffer message) {
-  absl::string_view message_view(message.ptr, message.length);
+                                       envoy_dynamic_module_type_module_buffer message,
+                                       envoy_dynamic_module_type_module_buffer source_file,
+                                       uint32_t source_line) {
   spdlog::logger& logger = Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules);
-
-  switch (level) {
-  case envoy_dynamic_module_type_log_level_Trace:
-    ENVOY_LOG_TO_LOGGER(logger, trace, "{}", message_view);
-    break;
-  case envoy_dynamic_module_type_log_level_Debug:
-    ENVOY_LOG_TO_LOGGER(logger, debug, "{}", message_view);
-    break;
-  case envoy_dynamic_module_type_log_level_Info:
-    ENVOY_LOG_TO_LOGGER(logger, info, "{}", message_view);
-    break;
-  case envoy_dynamic_module_type_log_level_Warn:
-    ENVOY_LOG_TO_LOGGER(logger, warn, "{}", message_view);
-    break;
-  case envoy_dynamic_module_type_log_level_Error:
-    ENVOY_LOG_TO_LOGGER(logger, error, "{}", message_view);
-    break;
-  case envoy_dynamic_module_type_log_level_Critical:
-    ENVOY_LOG_TO_LOGGER(logger, critical, "{}", message_view);
-    break;
-  default:
-    break;
+  const auto spdlog_level = static_cast<spdlog::level::level_enum>(level);
+  // Ignore Off and any out-of-range value, which also guards spdlog against an invalid level.
+  if (spdlog_level < spdlog::level::trace || spdlog_level > spdlog::level::critical) {
+    return;
   }
+  if (!Envoy::Logger::should_log || spdlog_level < logger.level()) {
+    return;
+  }
+  absl::string_view message_view(message.ptr, message.length);
+  // spdlog reads the source file as a null-terminated C string. Reuse a thread-local buffer to
+  // null-terminate the module-owned bytes without allocating on each log call. The pointer only
+  // needs to stay valid for this synchronous log call.
+  thread_local std::string source_file_buffer;
+  if (source_file.ptr == nullptr) {
+    source_file_buffer.clear();
+  } else {
+    source_file_buffer.assign(source_file.ptr, source_file.length);
+  }
+  // Log directly with the module source location. The ENVOY_LOG macros would bake in this file and
+  // line instead.
+  logger.log(spdlog::source_loc{source_file_buffer.c_str(), static_cast<int>(source_line), ""},
+             spdlog_level, "{}", message_view);
 }
 
 envoy_dynamic_module_type_log_level envoy_dynamic_module_callback_get_log_level() {
@@ -114,17 +114,16 @@ bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_m
   if (function_ptr == nullptr) {
     return false;
   }
-  std::string key_str(key.ptr, key.length);
   absl::WriterMutexLock lock(function_registry_mutex);
-  auto [it, inserted] = function_registry.try_emplace(key_str, function_ptr);
+  auto [it, inserted] =
+      function_registry.try_emplace(std::string(key.ptr, key.length), function_ptr);
   return inserted;
 }
 
 bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module_buffer key,
                                                 void** function_ptr_out) {
-  std::string key_str(key.ptr, key.length);
   absl::ReaderMutexLock lock(function_registry_mutex);
-  auto it = function_registry.find(key_str);
+  auto it = function_registry.find(absl::string_view(key.ptr, key.length));
   if (it != function_registry.end()) {
     *function_ptr_out = it->second;
     return true;
@@ -139,17 +138,15 @@ bool envoy_dynamic_module_callback_register_shared_data(envoy_dynamic_module_typ
   if (data_ptr == nullptr) {
     return false;
   }
-  std::string key_str(key.ptr, key.length);
   absl::WriterMutexLock lock(shared_data_registry_mutex);
-  shared_data_registry[key_str] = data_ptr;
+  shared_data_registry[std::string(key.ptr, key.length)] = data_ptr;
   return true;
 }
 
 bool envoy_dynamic_module_callback_get_shared_data(envoy_dynamic_module_type_module_buffer key,
                                                    void** data_ptr_out) {
-  std::string key_str(key.ptr, key.length);
   absl::ReaderMutexLock lock(shared_data_registry_mutex);
-  auto it = shared_data_registry.find(key_str);
+  auto it = shared_data_registry.find(absl::string_view(key.ptr, key.length));
   if (it != shared_data_registry.end()) {
     *data_ptr_out = it->second;
     return true;
@@ -557,6 +554,14 @@ envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
   return nullptr;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) void envoy_dynamic_module_callback_cluster_lb_get_cluster_name(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_cluster_name: "
@@ -838,6 +843,16 @@ envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
   return false;
 }
 
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    const envoy_dynamic_module_type_module_key_value_pair*, size_t) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch: "
+      "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_cluster_scheduler_module_ptr
 envoy_dynamic_module_callback_cluster_scheduler_new(envoy_dynamic_module_type_cluster_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_scheduler_new: "
@@ -988,6 +1003,66 @@ envoy_dynamic_module_callback_cluster_config_record_histogram_value(
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_config_record_histogram_value: "
                "not implemented in this context");
   return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_counter_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t,
+    envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_config_resolve_counter_vec: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t,
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t,
+    envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_metric_counter_add(
+    envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_metric_counter_add: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_metric_gauge_set(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_metric_gauge_set: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_metric_gauge_add(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_metric_gauge_add: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_metric_gauge_sub(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_metric_gauge_sub: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_metric_histogram_record(
+    envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_metric_histogram_record: "
+               "not implemented in this context");
 }
 
 __attribute__((weak)) void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
@@ -3094,6 +3169,114 @@ envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value: not "
                "implemented in this context");
   return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_early_header_mutation_add_header(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_add_header: not implemented in "
+               "this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_early_header_mutation_get_attribute_bool(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id, bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_get_attribute_bool: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_early_header_mutation_get_attribute_int(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id, uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_get_attribute_int: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_early_header_mutation_get_attribute_string(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_get_attribute_string: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_bool: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, double*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_number: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_early_header_mutation_get_header_value(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*, size_t,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_get_header_value: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_early_header_mutation_get_headers(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_get_headers: not implemented "
+               "in this context");
+  return false;
+}
+
+__attribute__((weak)) size_t envoy_dynamic_module_callback_early_header_mutation_get_headers_size(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_get_headers_size: not "
+               "implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_early_header_mutation_remove_header(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_remove_header: not implemented "
+               "in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_early_header_mutation_set_header(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_early_header_mutation_set_header: not implemented in "
+               "this context");
+  return false;
 }
 
 __attribute__((weak)) envoy_dynamic_module_type_access_log_type

@@ -53,6 +53,7 @@ envoy_cc_extension(
         ":filter_config_lib",
         ":filter_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
     ],
 )

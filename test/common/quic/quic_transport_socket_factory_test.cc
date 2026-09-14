@@ -186,7 +186,78 @@ downstream_tls_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF");
-  verifyQuicServerTransportSocketFactory(yaml, true);
+  // Resumption and early data default to off when a client certificate is required.
+  verifyQuicServerTransportSocketFactory(yaml, /*expect_early_data=*/false,
+                                         /*expect_resumption=*/false);
+}
+
+// A filter chain that requires a client certificate can explicitly opt into session resumption.
+// Early data still defaults to off.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthResumptionExplicitlyEnabled) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+enable_resumption: true
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+  verifyQuicServerTransportSocketFactory(yaml, /*expect_early_data=*/false,
+                                         /*expect_resumption=*/true);
+}
+
+// Explicitly enabling early data on a filter chain that requires a client certificate without
+// also enabling resumption is rejected like any other early-data-without-resumption config.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthEarlyDataWithoutResumptionInvalid) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+enable_early_data: true
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_EQ(
+      config_factory_.createTransportSocketFactory(proto_config, context_, {}).status().message(),
+      "QUIC early data is enabled but resumption is disabled. Early data requires resumption.");
+}
+
+// With the `quic_mtls_resumption_disabled_by_default` runtime guard disabled, resumption and
+// early data keep their unconditional default of on.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthResumptionDefaultWhenRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quic_mtls_resumption_disabled_by_default", "false"}});
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+  verifyQuicServerTransportSocketFactory(yaml, /*expect_early_data=*/true,
+                                         /*expect_resumption=*/true);
 }
 
 // With the `quic_mtls_server_enabled` runtime guard disabled, a listener that requires a client

@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 exports_files([
     "gen_git_sha.sh",
-    "check_repositories.sh",
 ])
 
 py_binary(

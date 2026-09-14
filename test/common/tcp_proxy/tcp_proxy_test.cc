@@ -2909,6 +2909,137 @@ TEST_P(TcpProxyTest, EmptyDataWithEndStreamDoesNotTriggerConnection) {
   EXPECT_TRUE(conn_pool_callbacks_.empty());
 }
 
+// Test load shedding in onData() when receive_before_connect is enabled.
+TEST_P(TcpProxyTest, OnDataLoadShedPointCanCloseConnection) {
+  // Mock load shed point
+  Server::MockLoadShedPoint on_data_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(&on_data_loadshed_point));
+
+  // Configure TCP Proxy
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+  setupOnDownstreamDataMode(config, true);
+
+  // Verify if TCP filter ready to receive downstream data
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Mock TCP memory overload
+  EXPECT_CALL(on_data_loadshed_point, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush,
+                    StreamInfo::LocalCloseReasons::get().OverloadManagerClose));
+
+  // Mock TCP package data
+  Buffer::OwnedImpl data("hello");
+
+  // Verify TCP connection dropped when memory overloaded
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(1U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+}
+
+// Test that early downstream data triggers upstream connection when not overloaded.
+TEST_P(TcpProxyTest, OnDataLoadShedPointNotTriggeredWhenNotOverloaded) {
+  Server::MockLoadShedPoint on_data_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(&on_data_loadshed_point));
+
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+  setupOnDownstreamDataMode(config, true);
+
+  // Verify if TCP filter ready to receive downstream data
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(on_data_loadshed_point, shouldShedLoad()).WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  Buffer::OwnedImpl data("hello");
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  // Verify that the load shedding is not triggered and the TCP connection is not dropped
+  EXPECT_EQ(0U, config_->stats().downstream_cx_overload_close_.value());
+  // Verifies that the connection was not flagged with an overload failure
+  EXPECT_FALSE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+  EXPECT_EQ(conn_pool_callbacks_.size(), 1);
+}
+
+// Test load shedding in onData() when upstream is already connected.
+TEST_P(TcpProxyTest, OnDataLoadShedPointCanCloseConnectionWhenUpstreamConnected) {
+  Server::MockLoadShedPoint on_data_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(&on_data_loadshed_point));
+
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(on_data_loadshed_point, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush,
+                    StreamInfo::LocalCloseReasons::get().OverloadManagerClose));
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(1U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+}
+
+// Test that overload manager is bypassed when context.shouldBypassOverloadManager() returns true.
+TEST_P(TcpProxyTest, OnDataLoadShedPointBypassedWhenOverloadManagerBypassed) {
+  EXPECT_CALL(factory_context_, shouldBypassOverloadManager()).WillRepeatedly(Return(true));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_, getLoadShedPoint(_))
+      .Times(0);
+
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+  setupOnDownstreamDataMode(config, true);
+
+  EXPECT_EQ(nullptr, config_->tcpProxyOnDataLoadShedPoint());
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(0U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_FALSE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+  EXPECT_EQ(conn_pool_callbacks_.size(), 1);
+}
+
 // Test that StopIteration in ON_DOWNSTREAM_DATA mode still allows reading.
 TEST_P(TcpProxyTest, StopIterationAllowsReading) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();

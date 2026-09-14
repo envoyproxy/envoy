@@ -48,6 +48,43 @@ fn test_log_level_callbacks() {
   assert!(is_log_enabled(Level::Trace));
 }
 
+// A value hook defined through `ffi_export!` returns its fallback when the body panics.
+crate::ffi_export! {
+  fn ffi_export_test_value_hook() -> u32 {
+    panic!("boom");
+  }
+  on_panic = 7
+}
+
+// A void hook defined through `ffi_export!` swallows the panic without unwinding.
+crate::ffi_export! {
+  fn ffi_export_test_void_hook() {
+    panic!("boom");
+  }
+}
+
+// The unsafe arms must fail closed the same way as the safe arms.
+crate::ffi_export! {
+  unsafe fn ffi_export_test_unsafe_value_hook() -> u32 {
+    panic!("boom");
+  }
+  on_panic = 9
+}
+
+crate::ffi_export! {
+  unsafe fn ffi_export_test_unsafe_void_hook() {
+    panic!("boom");
+  }
+}
+
+#[test]
+fn test_ffi_export_fails_closed_on_panic() {
+  assert_eq!(ffi_export_test_value_hook(), 7);
+  ffi_export_test_void_hook();
+  assert_eq!(unsafe { ffi_export_test_unsafe_value_hook() }, 9);
+  unsafe { ffi_export_test_unsafe_void_hook() };
+}
+
 #[test]
 fn test_envoy_dynamic_module_on_http_filter_config_new_impl() {
   struct TestHttpFilterConfig;
@@ -2068,6 +2105,126 @@ fn test_http_get_upstream_connection_id_unavailable() {
   };
 
   assert_eq!(filter.get_upstream_connection_id(), 0);
+}
+
+// Mock storage backing the HTTP header getters so the fast path can be exercised without Envoy.
+static HTTP_GET_HEADER_CALLS: AtomicUsize = AtomicUsize::new(0);
+static HTTP_GET_HEADER_VALUES_CALLS: AtomicUsize = AtomicUsize::new(0);
+static HTTP_HEADER_VALUE_COUNT: AtomicUsize = AtomicUsize::new(0);
+static HTTP_GET_HEADER_VALUES_SUCCEEDS: AtomicBool = AtomicBool::new(true);
+
+const HTTP_HEADER_VALUE_0: &[u8] = b"value-0";
+const HTTP_HEADER_VALUE_1: &[u8] = b"value-1";
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_header(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _index: usize,
+  optional_size: *mut usize,
+) -> bool {
+  HTTP_GET_HEADER_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  let count = HTTP_HEADER_VALUE_COUNT.load(std::sync::atomic::Ordering::SeqCst);
+  if count == 0 {
+    return false;
+  }
+  if !optional_size.is_null() {
+    unsafe { *optional_size = count };
+  }
+  // The SDK only ever reads the first value through this callback.
+  unsafe {
+    (*result_buffer).ptr = HTTP_HEADER_VALUE_0.as_ptr() as *const _;
+    (*result_buffer).length = HTTP_HEADER_VALUE_0.len();
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_header_values(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  HTTP_GET_HEADER_VALUES_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  if !HTTP_GET_HEADER_VALUES_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  let values: [&[u8]; 2] = [HTTP_HEADER_VALUE_0, HTTP_HEADER_VALUE_1];
+  let count = HTTP_HEADER_VALUE_COUNT.load(std::sync::atomic::Ordering::SeqCst);
+  for (i, value) in values.iter().enumerate().take(count) {
+    unsafe {
+      let out = result_buffer.add(i);
+      (*out).ptr = value.as_ptr() as *const _;
+      (*out).length = value.len();
+    }
+  }
+  true
+}
+
+// The mock symbols above are process-wide, so the cases share one test to stay deterministic.
+#[test]
+fn test_http_get_header_values_fast_path() {
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  // A single value is served from the first crossing, so the batch getter is never called.
+  HTTP_GET_HEADER_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_GET_HEADER_VALUES_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_HEADER_VALUE_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
+  let single = filter.get_request_header_values("x-test");
+  assert_eq!(single.len(), 1);
+  assert_eq!(single[0].as_slice(), HTTP_HEADER_VALUE_0);
+  assert_eq!(
+    HTTP_GET_HEADER_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  assert_eq!(
+    HTTP_GET_HEADER_VALUES_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    0
+  );
+
+  // Multiple values still take the batch crossing after the sizing call.
+  HTTP_GET_HEADER_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_GET_HEADER_VALUES_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_HEADER_VALUE_COUNT.store(2, std::sync::atomic::Ordering::SeqCst);
+  let multiple = filter.get_request_header_values("x-test");
+  assert_eq!(multiple.len(), 2);
+  assert_eq!(multiple[0].as_slice(), HTTP_HEADER_VALUE_0);
+  assert_eq!(multiple[1].as_slice(), HTTP_HEADER_VALUE_1);
+  assert_eq!(
+    HTTP_GET_HEADER_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  assert_eq!(
+    HTTP_GET_HEADER_VALUES_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+
+  // An absent header returns empty without a batch call.
+  HTTP_GET_HEADER_VALUES_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_HEADER_VALUE_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
+  let absent = filter.get_request_header_values("x-missing");
+  assert!(absent.is_empty());
+  assert_eq!(
+    HTTP_GET_HEADER_VALUES_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    0
+  );
+
+  // A failed batch crossing returns empty without exposing uninitialized entries.
+  HTTP_GET_HEADER_VALUES_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+  HTTP_HEADER_VALUE_COUNT.store(2, std::sync::atomic::Ordering::SeqCst);
+  HTTP_GET_HEADER_VALUES_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  let failed = filter.get_request_header_values("x-test");
+  assert!(failed.is_empty());
+  assert_eq!(
+    HTTP_GET_HEADER_VALUES_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  HTTP_GET_HEADER_VALUES_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
 // =============================================================================
@@ -4715,6 +4872,130 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_async_host_selection_
 ) {
 }
 
+/// Records what the resolve-and-record wrappers did so a test can assert them. Resolution reports
+/// `MetricNotFound` for id 0 so the failure arm is reachable, and otherwise hands back a handle
+/// derived from the id.
+pub(crate) static MOCK_CLUSTER_METRIC_OPS: std::sync::Mutex<Vec<(String, usize, u64)>> =
+  std::sync::Mutex::new(Vec::new());
+
+fn record_cluster_metric_op(op: &str, handle: *mut std::ffi::c_void, value: u64) {
+  MOCK_CLUSTER_METRIC_OPS
+    .lock()
+    .unwrap()
+    .push((op.to_owned(), handle as usize, value));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_resolve_counter_vec(
+  _config: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  counter_ptr: *mut abi::envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  if id == 0 {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  unsafe { *counter_ptr = (0x1000 + id) as _ };
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec(
+  _config: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  gauge_ptr: *mut abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  if id == 0 {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  unsafe { *gauge_ptr = (0x2000 + id) as _ };
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec(
+  _config: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  histogram_ptr: *mut abi::envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  if id == 0 {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  unsafe { *histogram_ptr = (0x3000 + id) as _ };
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_counter_add(
+  counter: abi::envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("counter_add", counter, value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_gauge_set(
+  gauge: abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("gauge_set", gauge, value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_gauge_add(
+  gauge: abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("gauge_add", gauge, value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_gauge_sub(
+  gauge: abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("gauge_sub", gauge, value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_histogram_record(
+  histogram: abi::envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("histogram_record", histogram, value);
+}
+
+// Records the batched entries so a test can assert the wrapper flattened them in order.
+pub(crate) static MOCK_CLUSTER_LB_CONTEXT_METADATA_BATCH: std::sync::Mutex<Vec<(String, String)>> =
+  std::sync::Mutex::new(Vec::new());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _ns: abi::envoy_dynamic_module_type_module_buffer,
+  entries: *const abi::envoy_dynamic_module_type_module_key_value_pair,
+  entries_size: usize,
+) -> bool {
+  let mut recorded = MOCK_CLUSTER_LB_CONTEXT_METADATA_BATCH.lock().unwrap();
+  recorded.clear();
+  for i in 0..entries_size {
+    let entry = unsafe { &*entries.add(i) };
+    let key = unsafe { std::slice::from_raw_parts(entry.key_ptr as *const u8, entry.key_length) };
+    let value =
+      unsafe { std::slice::from_raw_parts(entry.value_ptr as *const u8, entry.value_length) };
+    recorded.push((
+      String::from_utf8_lossy(key).into_owned(),
+      String::from_utf8_lossy(value).into_owned(),
+    ));
+  }
+  true
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
   _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
@@ -4730,6 +5011,49 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
   _index: usize,
 ) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
   std::ptr::null_mut()
+}
+
+/// Maps each priority to a scenario so the SDK wrapper's size-then-fill handshake is exercised end
+/// to end.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  priority: u32,
+  hosts_out: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  hosts_capacity: usize,
+  hosts_size_out: *mut usize,
+) -> bool {
+  const HOSTS: [usize; 2] = [0xAB, 0xCD];
+  match priority {
+    // Two healthy hosts, filled once the buffer is large enough.
+    0 => {
+      unsafe { *hosts_size_out = HOSTS.len() };
+      if hosts_capacity < HOSTS.len() {
+        return false;
+      }
+      for (i, addr) in HOSTS.iter().enumerate() {
+        unsafe {
+          *hosts_out.add(i) = *addr as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr
+        };
+      }
+      true
+    },
+    // Existing but empty partition. A zero buffer already holds it.
+    1 => {
+      unsafe { *hosts_size_out = 0 };
+      true
+    },
+    // A partition that never fits, so the fill call keeps failing.
+    2 => {
+      unsafe { *hosts_size_out = HOSTS.len() };
+      false
+    },
+    // No such priority level.
+    _ => {
+      unsafe { *hosts_size_out = 0 };
+      false
+    },
+  }
 }
 
 #[no_mangle]
@@ -9152,6 +9476,118 @@ unsafe fn stub_specifier_result(
   true
 }
 
+// Shared header fixture for the single-allocation `get_all_headers` getters.
+const GETTER_HEADERS: [(&[u8], &[u8]); 2] = [(b"h1", b"v1"), (b"h2", b"v2")];
+static EHM_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
+static EHM_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
+static FMT_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
+static FMT_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
+
+fn fill_getter_headers(result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header) {
+  for (i, (key, value)) in GETTER_HEADERS.iter().enumerate() {
+    unsafe {
+      *result_headers.add(i) = abi::envoy_dynamic_module_type_envoy_http_header {
+        key_ptr: key.as_ptr() as *mut _,
+        key_length: key.len(),
+        value_ptr: value.as_ptr() as *mut _,
+        value_length: value.len(),
+      };
+    }
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_early_header_mutation_get_headers_size(
+  _envoy_ptr: abi::envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+) -> usize {
+  if EHM_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    GETTER_HEADERS.len()
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_early_header_mutation_get_headers(
+  _envoy_ptr: abi::envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
+  result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+) -> bool {
+  if !EHM_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  fill_getter_headers(result_headers);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_formatter_get_headers_size(
+  _envoy_ptr: abi::envoy_dynamic_module_type_formatter_context_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+) -> usize {
+  if FMT_HEADERS_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    GETTER_HEADERS.len()
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_formatter_get_headers(
+  _envoy_ptr: abi::envoy_dynamic_module_type_formatter_context_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+  result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+) -> bool {
+  if !FMT_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  fill_getter_headers(result_headers);
+  true
+}
+
+// The rewritten getters fill the returned pairs in one allocation, so cover the three branches.
+#[test]
+fn test_early_header_mutation_get_all_headers_single_allocation() {
+  let ctx = unsafe { early_header_mutation::EarlyHeaderMutationContext::new(std::ptr::null_mut()) };
+
+  EHM_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  EHM_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+  let headers = ctx.get_all_headers();
+  assert_eq!(headers.len(), 2);
+  assert_eq!(headers[0].0.as_slice(), b"h1");
+  assert_eq!(headers[0].1.as_slice(), b"v1");
+  assert_eq!(headers[1].0.as_slice(), b"h2");
+  assert_eq!(headers[1].1.as_slice(), b"v2");
+
+  EHM_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx.get_all_headers().is_empty());
+
+  EHM_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  EHM_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx.get_all_headers().is_empty());
+}
+
+#[test]
+fn test_formatter_get_all_headers_single_allocation() {
+  let ctx = formatter::FormatterContext::new(std::ptr::null_mut());
+  let request = abi::envoy_dynamic_module_type_http_header_type::RequestHeader;
+
+  FMT_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  FMT_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+  let headers = ctx.get_all_headers(request);
+  assert_eq!(headers.len(), 2);
+  assert_eq!(headers[0].0.as_slice(), b"h1");
+  assert_eq!(headers[0].1.as_slice(), b"v1");
+  assert_eq!(headers[1].0.as_slice(), b"h2");
+  assert_eq!(headers[1].1.as_slice(), b"v2");
+
+  FMT_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx.get_all_headers(request).is_empty());
+
+  FMT_HEADERS_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  FMT_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx.get_all_headers(request).is_empty());
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_request_headers_size(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
@@ -9736,6 +10172,22 @@ fn test_cluster_specifier_context_reads_request_state() {
   assert!(ctx.get_cluster_host_count("prod", 0).is_none());
   assert!(ctx.route_name().is_none());
   STUB_SPECIFIER_STATE_PRESENT.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_attribute_id_ordering() {
+  assert_eq!(
+    67,
+    abi::envoy_dynamic_module_type_attribute_id::HealthCheck as u32
+  );
+  assert_eq!(
+    68,
+    abi::envoy_dynamic_module_type_attribute_id::UpstreamRequestedServerName as u32
+  );
+  assert_eq!(
+    69,
+    abi::envoy_dynamic_module_type_attribute_id::XdsVirtualClusterName as u32
+  );
 }
 
 #[test]

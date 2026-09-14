@@ -4466,7 +4466,8 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
     EXPECT_THAT(formatValueForTest(formatter, stream_info), ProtoEq(expected_val));
   }
 
-  // A non-string scalar is rendered as JSON and, once truncated, becomes a string.
+  // A non-string scalar keeps its type regardless of the length limit; only its rendered form is
+  // truncated.
   {
     Protobuf::Struct& struct_obj = (*metadata.mutable_filter_metadata())["com.test"];
     (*struct_obj.mutable_fields())["test_num"] = ValueUtil::numberValue(1234);
@@ -4487,11 +4488,12 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
                   ProtoEq(ValueUtil::numberValue(1234)));
     }
     {
-      // A limit that bites turns the value into a truncated string.
+      // A limit that bites leaves the value typed too...
       DynamicMetadataFormatter formatter("com.test", {"test_num"}, std::optional<size_t>(2));
-      EXPECT_EQ("12", formatForTest(formatter, stream_info));
       EXPECT_THAT(formatValueForTest(formatter, stream_info),
-                  ProtoEq(ValueUtil::stringValue("12")));
+                  ProtoEq(ValueUtil::numberValue(1234)));
+      // ...but its rendered form is truncated.
+      EXPECT_EQ("12", formatForTest(formatter, stream_info));
     }
     {
       DynamicMetadataFormatter formatter("com.test", {"test_bool"}, std::optional<size_t>());
@@ -4500,8 +4502,22 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
     }
     {
       DynamicMetadataFormatter formatter("com.test", {"test_bool"}, std::optional<size_t>(2));
+      EXPECT_THAT(formatValueForTest(formatter, stream_info), ProtoEq(ValueUtil::boolValue(true)));
       EXPECT_EQ("tr", formatForTest(formatter, stream_info));
-      EXPECT_THAT(formatValueForTest(formatter, stream_info),
+    }
+
+    // With the runtime guard disabled, a non-string scalar whose rendered form is truncated
+    // becomes a string.
+    {
+      TestScopedRuntime scoped_runtime;
+      scoped_runtime.mergeValues(
+          {{"envoy.reloadable_features.metadata_formatter_only_truncate_string", "false"}});
+
+      DynamicMetadataFormatter num_formatter("com.test", {"test_num"}, std::optional<size_t>(2));
+      EXPECT_THAT(formatValueForTest(num_formatter, stream_info),
+                  ProtoEq(ValueUtil::stringValue("12")));
+      DynamicMetadataFormatter bool_formatter("com.test", {"test_bool"}, std::optional<size_t>(2));
+      EXPECT_THAT(formatValueForTest(bool_formatter, stream_info),
                   ProtoEq(ValueUtil::stringValue("tr")));
     }
 

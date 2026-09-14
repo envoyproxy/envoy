@@ -88,7 +88,9 @@ MetadataFormatter::MetadataFormatter(absl::string_view filter_namespace,
                                      std::optional<size_t> max_length,
                                      MetadataFormatter::GetMetadataFunction get_func)
     : filter_namespace_(filter_namespace), path_(path.begin(), path.end()), max_length_(max_length),
-      get_func_(get_func) {}
+      get_func_(get_func),
+      only_truncate_string_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.metadata_formatter_only_truncate_string")) {}
 
 std::optional<std::string>
 MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metadata) const {
@@ -125,18 +127,27 @@ MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& 
     return SubstitutionFormatUtils::unspecifiedValue();
   }
 
-  if (max_length_.has_value() && val.kind_case() != Protobuf::Value::kStructValue &&
-      val.kind_case() != Protobuf::Value::kListValue) {
-    std::string str;
-    if (val.kind_case() == Protobuf::Value::kStringValue) {
-      str = val.string_value();
-    } else {
-      Json::Utility::appendValueToString(val, str);
-    }
-    if (SubstitutionFormatUtils::truncate(str, max_length_)) {
-      Protobuf::Value output;
-      output.set_string_value(str);
-      return output;
+  if (max_length_.has_value()) {
+    // Only string values are truncated. Structs and lists keep their structure, and non-string
+    // scalars (numbers, booleans) keep their type because truncating their rendered form would
+    // only produce a string that no longer represents the original value.
+    const bool truncatable = only_truncate_string_
+                                 ? val.kind_case() == Protobuf::Value::kStringValue
+                                 : (val.kind_case() != Protobuf::Value::kStructValue &&
+                                    val.kind_case() != Protobuf::Value::kListValue);
+
+    if (truncatable) {
+      std::string str;
+      if (val.kind_case() == Protobuf::Value::kStringValue) {
+        str = val.string_value();
+      } else {
+        Json::Utility::appendValueToString(val, str);
+      }
+      if (SubstitutionFormatUtils::truncate(str, max_length_)) {
+        Protobuf::Value output;
+        output.set_string_value(str);
+        return output;
+      }
     }
   }
 

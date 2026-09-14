@@ -4939,17 +4939,22 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
       1 /* 0xfc */, 1 /* 0xfd */, 1 /* 0xfe */, 1 /* 0xff */
   };
 
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.validate_upstream_headers", "false"}});
   stream_error_on_invalid_http_messaging_ = true;
 
   setupRequestDecoderMock(request_decoder_);
   initialize();
 
 #ifdef ENVOY_ENABLE_UHV
+  // With UHV the client codec does not validate the headers it encodes (UHV does it before
+  // encoding), so the invalid values reach the server codec, which rejects them.
+  constexpr bool kClientValidatesEncodedHeaders = false;
   // UHV does not appear to reject some header value chars.
   if (http2_implementation_ == Http2Impl::Oghttp2) {
     GTEST_SKIP();
   }
+#else
+  // The client codec rejects invalid header keys and values in encodeHeaders().
+  constexpr bool kClientValidatesEncodedHeaders = true;
 #endif
 
   // Change one character in the header value and verify that codec correctly
@@ -4976,6 +4981,15 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
     StreamEncoder* response_encoder;
     MockStreamCallbacks server_stream_callbacks;
     MockRequestDecoder request_decoder;
+
+    if (!ValidHeaderValueChars[i] && kClientValidatesEncodedHeaders) {
+      // The client codec rejects the invalid header value in encodeHeaders(), so nothing is
+      // written and the server never sees a new stream.
+      EXPECT_THAT(request_encoder->encodeHeaders(request_headers, true),
+                  HasStatusMessage(testing::HasSubstr("invalid header value for: foo")));
+      driveToCompletion();
+      continue;
+    }
 
     setupRequestDecoderMock(request_decoder);
     EXPECT_CALL(server_callbacks_, newStream(_, _))

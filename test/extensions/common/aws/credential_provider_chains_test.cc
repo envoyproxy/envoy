@@ -1,3 +1,5 @@
+#include "envoy/common/logger.h"
+
 #include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 
@@ -62,7 +64,7 @@ public:
 };
 
 TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
   MockCredentialsProvider mock_provider;
 
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _))

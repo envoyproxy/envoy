@@ -918,10 +918,13 @@ public:
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));
   }
-  void log(LogLevel level, std::string_view message) override {
+  void log(LogLevel level, std::string_view message, std::source_location location) override {
+    const std::string_view source_file(location.file_name());
     return envoy_dynamic_module_callback_log(
         static_cast<envoy_dynamic_module_type_log_level>(level),
-        envoy_dynamic_module_type_module_buffer{message.data(), message.size()});
+        envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
+        envoy_dynamic_module_type_module_buffer{source_file.data(), source_file.size()},
+        location.line());
   }
 
   void* host_plugin_ptr_;
@@ -1074,10 +1077,13 @@ public:
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));
   }
-  void log(LogLevel level, std::string_view message) override {
+  void log(LogLevel level, std::string_view message, std::source_location location) override {
+    const std::string_view source_file(location.file_name());
     return envoy_dynamic_module_callback_log(
         static_cast<envoy_dynamic_module_type_log_level>(level),
-        envoy_dynamic_module_type_module_buffer{message.data(), message.size()});
+        envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
+        envoy_dynamic_module_type_module_buffer{source_file.data(), source_file.size()},
+        location.line());
   }
 
   std::pair<HttpCalloutInitResult, uint64_t> httpCallout(std::string_view cluster,
@@ -1159,10 +1165,14 @@ public:
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));
   }
-  void log(LogLevel level, std::string_view message) {
+  void log(LogLevel level, std::string_view message,
+           std::source_location location = std::source_location::current()) {
+    const std::string_view source_file(location.file_name());
     return envoy_dynamic_module_callback_log(
         static_cast<envoy_dynamic_module_type_log_level>(level),
-        envoy_dynamic_module_type_module_buffer{message.data(), message.size()});
+        envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
+        envoy_dynamic_module_type_module_buffer{source_file.data(), source_file.size()},
+        location.line());
   }
 };
 

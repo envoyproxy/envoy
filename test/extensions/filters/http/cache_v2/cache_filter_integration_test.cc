@@ -133,10 +133,9 @@ public:
   OptRef<const Http::TestResponseTrailerMapImpl> no_trailers_;
 };
 
-// TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
     Protocols, CacheIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    testing::ValuesIn(HttpProtocolIntegrationTest::getHttp1OnlyProtocolTestParams()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(CacheIntegrationTest, MissInsertHit) {

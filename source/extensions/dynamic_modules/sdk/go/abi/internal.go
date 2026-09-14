@@ -188,11 +188,17 @@ func hostLog(level shared.LogLevel, format string, args []any) {
 		return
 	}
 	message := fmt.Sprintf(format, args...)
+	// Skip hostLog and the public Log wrapper so the host reports the module call site instead of a
+	// location inside the SDK. An empty file is a fine fallback if the caller cannot be resolved.
+	_, sourceFile, sourceLine, _ := runtime.Caller(2)
 	C.envoy_dynamic_module_callback_log(
 		(C.envoy_dynamic_module_type_log_level)(logLevel),
 		stringToModuleBuffer(message),
+		stringToModuleBuffer(sourceFile),
+		C.uint32_t(sourceLine),
 	)
 	runtime.KeepAlive(message)
+	runtime.KeepAlive(sourceFile)
 }
 
 type dymHeaderMap struct {
