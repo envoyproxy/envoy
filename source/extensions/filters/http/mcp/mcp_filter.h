@@ -74,23 +74,11 @@ public:
   }
   bool earlyTerminateWhenRoutable() const { return early_terminate_when_routable_; }
 
-  const envoy::extensions::filters::http::mcp::v3::Mcp::ProtocolVersions& protocolVersions() const {
-    return protocol_versions_;
+  const std::optional<std::string>& maxSupportedProtocolVersion() const {
+    return max_supported_protocol_version_;
   }
 
-  bool isProtocolVersionSupported(absl::string_view version) const {
-    if (protocol_versions_.supported().empty()) {
-      return true;
-    }
-
-    for (const auto& supported_version : protocol_versions_.supported()) {
-      if (supported_version == version) {
-        return true;
-      }
-    }
-
-    return false;
-  }
+  bool isProtocolVersionSupported(absl::string_view version) const;
 
   const ParserConfig& parserConfig() const { return parser_config_; }
   bool shouldStoreToDynamicMetadata() const {
@@ -120,8 +108,9 @@ private:
   const uint32_t max_request_body_size_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attribute_source_;
+
   const bool early_terminate_when_routable_;
-  const envoy::extensions::filters::http::mcp::v3::Mcp::ProtocolVersions protocol_versions_;
+  const std::optional<std::string> max_supported_protocol_version_;
   const std::string metadata_namespace_;
   ParserConfig parser_config_;
   McpFilterStats stats_;
