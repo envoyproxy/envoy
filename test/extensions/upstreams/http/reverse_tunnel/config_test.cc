@@ -225,12 +225,22 @@ TEST_F(ReverseTunnelUpstreamCodecTest, PeerGoAwayReportsToReporter) {
   const std::string node_id = "node-1";
   const std::string cluster_id = "cluster-1";
   extension_ = makeExtension(node_id, cluster_id, kTestSocketFd);
+  auto socket = socket_manager_->getConnectionSocket(node_id);
+  ASSERT_NE(socket, nullptr);
+  socket_manager_->setMaxConnectionsPerNode(1);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), node_id);
 
   NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
   DrainAwareClientCallbacks wrapper(inner, kTestSocketFd);
 
   EXPECT_CALL(*reporter, reportGoAwayEvent(Eq(node_id), Eq(cluster_id), Eq(kTestSocketFd)));
-  EXPECT_CALL(inner, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  EXPECT_CALL(inner, onGoAway(Envoy::Http::GoAwayErrorCode::NoError))
+      .WillOnce(Invoke([&](Envoy::Http::GoAwayErrorCode) {
+        EXPECT_TRUE(socket_manager_->getNodeWithSocket(cluster_id).empty());
+        EXPECT_TRUE(socket_manager_->getNodeWithSocket(node_id).empty());
+        EXPECT_EQ(socket_manager_->getClusterForNode(node_id), cluster_id);
+        EXPECT_FALSE(socket_manager_->canAcceptConnection(node_id, ""));
+      }));
   wrapper.onGoAway(Envoy::Http::GoAwayErrorCode::NoError);
 }
 
@@ -283,11 +293,14 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CreateClientCodecPeerGoAwayReportsToRepor
   buffer.add(std::string(Envoy::Http::Http2::Http2Frame::makeEmptyGoAwayFrame(
       0, Envoy::Http::Http2::Http2Frame::ErrorCode::NoError)));
   EXPECT_TRUE(codec->dispatch(buffer).ok());
+  EXPECT_TRUE(socket_manager_->getNodeWithSocket(cluster_id).empty());
 }
 
 TEST_F(ReverseTunnelUpstreamCodecTest, LocalGracefulDrainDoesNotReportGoAway) {
   NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
   extension_ = makeExtension("node-1", "cluster-1", kTestSocketFd);
+  auto socket = socket_manager_->getConnectionSocket("node-1");
+  ASSERT_NE(socket, nullptr);
 
   auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
   auto* inner_raw = inner.get();
@@ -300,9 +313,14 @@ TEST_F(ReverseTunnelUpstreamCodecTest, LocalGracefulDrainDoesNotReportGoAway) {
   EXPECT_CALL(*inner_raw, shutdownNotice());
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(100), _));
   codec.startGracefulDrain(std::chrono::milliseconds(100));
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("cluster-1"), "node-1");
 
   EXPECT_CALL(*inner_raw, goAway());
-  EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError))
+      .WillOnce(Invoke([&](Envoy::Http::GoAwayErrorCode) {
+        EXPECT_TRUE(socket_manager_->getNodeWithSocket("cluster-1").empty());
+        EXPECT_EQ(socket_manager_->getClusterForNode("node-1"), "cluster-1");
+      }));
   drain_timer->invokeCallback();
 }
 
