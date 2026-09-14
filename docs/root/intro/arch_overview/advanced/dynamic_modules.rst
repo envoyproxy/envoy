@@ -60,27 +60,27 @@ Envoy's dynamic modules have stricter compatibility requirements than Envoy's ot
 Stabilizing the ABI is challenging due to the way the ABI needs to be tightly coupled to Envoy's internals.
 
 The ABI therefore follows a strict no-breaking-change policy. The rules below are what you can rely
-on as a module author; the full version, including the process a contributor must follow when
+on as a module author. The full version, including the process a contributor must follow when
 changing the ABI, is documented at the top of the
 :repo:`ABI header <source/extensions/dynamic_modules/abi/abi.h>`.
 
 **Released ABI is frozen.**
 Once a function, type or struct in the ABI has shipped in an Envoy release, it never changes. That
-covers its name, its signature, its struct layout and enum numbering, and its documented semantics —
-ownership, buffer lifetime, threading constraints, which values may be null, and the meaning of each
-return value. A module compiled against the old documentation stays correct.
+covers its name, its signature, its struct layout and enum numbering, and its documented semantics,
+including ownership, buffer lifetime, threading constraints, whether a value may be null, and the
+meaning of each return value. A module compiled against the old documentation stays correct.
 
 **The ABI grows by addition, not by mutation.**
 When an existing function or type needs a different signature or different behavior, a new one is
-added alongside it: usually the old name with a ``_v2``, ``_v3``, ... suffix, or a different
-descriptive name where the concept itself changed and a suffix would be misleading. The original
-keeps working exactly as before.
+added alongside it. This is usually the old name with a numeric suffix such as ``_v2`` or ``_v3``.
+It can instead be a different descriptive name where the concept itself changed and a suffix would
+be misleading. The original keeps working exactly as before.
 
 **Superseded ABI is deprecated for at least four Envoy release cycles.**
 The old entity is marked ``@deprecated`` in the ABI header, naming its replacement and the earliest
 version it may be removed in, and the corresponding SDK wrappers are deprecated too, so you get a
 compile-time warning rather than discovering the removal at runtime. It then keeps working,
-unchanged, for at least four Envoy release cycles — roughly one year — before it may be removed.
+unchanged, for at least four Envoy release cycles, roughly one year, before it may be removed.
 Removals are announced in the release notes.
 
 **The one exception is ABI that has never been released.**
@@ -97,7 +97,7 @@ functionality is only available through newly added ABI entities.
 
   The ``ENVOY_DYNAMIC_MODULES_ABI_VERSION`` string in the ABI header is not part of the policy
   above and is **not** a compatibility gate. It only reflects changes to the header itself, and
-  Envoy never strictly validates it: a module reports the value it was built against from
+  Envoy never strictly validates it. A module reports the value it was built against from
   ``envoy_dynamic_module_on_program_init``, and if that differs from Envoy's own value Envoy logs
   it and loads the module anyway. Neither Envoy nor your module should depend on it.
 
