@@ -619,6 +619,71 @@ uint32_t envoy_dynamic_module_callback_get_concurrency();
  */
 bool envoy_dynamic_module_callback_is_validation_mode();
 
+// ----------------------------- Runtime -----------------------------------
+//
+// The callbacks in this section each read a single value from the Envoy runtime, i.e. the layered
+// key/value configuration described by the `layered_runtime` bootstrap option, including RTDS
+// layers and values set through the admin `/runtime_modify` endpoint. They differ only in the type
+// they read the value as, and all share the following semantics.
+//
+//  * They may be called from any thread.
+//  * key is only read during the call.
+//  * default_value is returned whenever the key does not exist, the stored value cannot be read as
+//    the requested type, or the runtime is not reachable from the calling thread.
+//
+// Envoy stores every numeric runtime value as a double, so the _int and _number callbacks read the
+// same stored value through different conversions. For both of them key must not name one of
+// Envoy's own `envoy.reloadable_features.*` or `envoy.restart_features.*` guards: those are
+// boolean guards and Envoy asserts against reading them as a number in debug builds, so read them
+// with envoy_dynamic_module_callback_get_runtime_bool instead.
+
+/**
+ * envoy_dynamic_module_callback_get_runtime_bool is called by the module to read a runtime value
+ * as a boolean.
+ *
+ * @param key is the runtime key to look up.
+ * @param default_value is the value to return if the key does not exist, the stored value is not a
+ * boolean, or the runtime is not reachable from the calling thread.
+ * @return the runtime value as a boolean, or default_value.
+ */
+bool envoy_dynamic_module_callback_get_runtime_bool(envoy_dynamic_module_type_module_buffer key,
+                                                    bool default_value);
+
+/**
+ * envoy_dynamic_module_callback_get_runtime_int is called by the module to read a runtime value as
+ * an unsigned integer.
+ *
+ * Because the value is stored as a double, this conversion is lossy at both ends. A value above
+ * 2^53 loses precision and is rounded to the nearest representable value, and a fractional value
+ * is truncated toward zero; in both cases the converted value is returned rather than
+ * default_value. Only a negative value, or one beyond the range of a 64-bit unsigned integer,
+ * stores no integer at all and therefore yields default_value. Use
+ * envoy_dynamic_module_callback_get_runtime_number to read the value without either conversion.
+ *
+ * @param key is the runtime key to look up.
+ * @param default_value is the value to return if the key does not exist, the stored value is not
+ * an integer, or the runtime is not reachable from the calling thread.
+ * @return the runtime value as an unsigned integer, or default_value.
+ */
+uint64_t envoy_dynamic_module_callback_get_runtime_int(envoy_dynamic_module_type_module_buffer key,
+                                                       uint64_t default_value);
+
+/**
+ * envoy_dynamic_module_callback_get_runtime_number is called by the module to read a runtime value
+ * as a double.
+ *
+ * This is the lossless counterpart to envoy_dynamic_module_callback_get_runtime_int: it returns
+ * the value exactly as Envoy stores it, so it neither rounds nor truncates, and it reads negative
+ * values, which the integer callback answers with default_value.
+ *
+ * @param key is the runtime key to look up.
+ * @param default_value is the value to return if the key does not exist, the stored value is not a
+ * number, or the runtime is not reachable from the calling thread.
+ * @return the runtime value as a double, or default_value.
+ */
+double envoy_dynamic_module_callback_get_runtime_number(envoy_dynamic_module_type_module_buffer key,
+                                                        double default_value);
+
 // ----------------------------- Function Registry -----------------------------
 
 /**

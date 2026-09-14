@@ -895,6 +895,8 @@ func (h *dymNetworkFilterHandle) GetWorkerIndex() uint32 {
 }
 
 type dymNetworkConfigHandle struct {
+	dymCommonHandle
+
 	hostConfigPtr C.envoy_dynamic_module_type_network_filter_config_envoy_ptr
 	scheduler     *dymScheduler
 }

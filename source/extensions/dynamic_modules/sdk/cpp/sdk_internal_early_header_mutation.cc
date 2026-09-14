@@ -8,6 +8,7 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "sdk_early_header_mutation.h"
+#include "sdk_internal_common.h"
 
 namespace Envoy {
 namespace DynamicModules {
@@ -204,7 +205,8 @@ private:
   EarlyHeaderMutationHeaderMapImpl request_headers_;
 };
 
-class EarlyHeaderMutationConfigHandleImpl : public EarlyHeaderMutationConfigHandle {
+class EarlyHeaderMutationConfigHandleImpl
+    : public CommonHandleImpl<EarlyHeaderMutationConfigHandle> {
 public:
   // Early header mutation exposes no config-scoped callbacks, so the Envoy config pointer is not
   // retained.

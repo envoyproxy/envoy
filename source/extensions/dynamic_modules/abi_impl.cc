@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/common/assert.h"
@@ -45,6 +46,19 @@ void logToDynamicModulesLogger(envoy_dynamic_module_type_log_level level,
   }
   absl::string_view message_view(message.ptr, message.length);
   logger.log(source_location, spdlog_level, "{}", message_view);
+}
+
+// Resolve the runtime snapshot for the calling thread, or nullptr when the server context is not
+// installed on this thread. Unlike the main-thread-only callbacks below this does not fail closed:
+// the server context is a thread local singleton that only exists on the main thread, so a call
+// from a worker thread legitimately finds no context and must fall back to the caller's default
+// rather than trip an ENVOY_BUG on every lookup.
+Envoy::OptRef<const Envoy::Runtime::Snapshot> currentRuntimeSnapshot() {
+  auto context = Envoy::Server::Configuration::ServerFactoryContextInstance::getExisting();
+  if (context == nullptr) {
+    return {};
+  }
+  return context->runtime().snapshot();
 }
 
 } // namespace
@@ -120,6 +134,35 @@ bool envoy_dynamic_module_callback_is_validation_mode() {
     return false;
   }
   return context->options().mode() == Server::Mode::Validate;
+}
+
+// ---------------------- Runtime callbacks --------------------------------
+
+bool envoy_dynamic_module_callback_get_runtime_bool(envoy_dynamic_module_type_module_buffer key,
+                                                    bool default_value) {
+  const auto snapshot = currentRuntimeSnapshot();
+  if (!snapshot.has_value()) {
+    return default_value;
+  }
+  return snapshot->getBoolean(absl::string_view(key.ptr, key.length), default_value);
+}
+
+uint64_t envoy_dynamic_module_callback_get_runtime_int(envoy_dynamic_module_type_module_buffer key,
+                                                       uint64_t default_value) {
+  const auto snapshot = currentRuntimeSnapshot();
+  if (!snapshot.has_value()) {
+    return default_value;
+  }
+  return snapshot->getInteger(absl::string_view(key.ptr, key.length), default_value);
+}
+
+double envoy_dynamic_module_callback_get_runtime_number(envoy_dynamic_module_type_module_buffer key,
+                                                        double default_value) {
+  const auto snapshot = currentRuntimeSnapshot();
+  if (!snapshot.has_value()) {
+    return default_value;
+  }
+  return snapshot->getDouble(absl::string_view(key.ptr, key.length), default_value);
 }
 
 // ---------------------- Function registry callbacks --------------------------------

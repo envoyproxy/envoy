@@ -292,9 +292,9 @@ public:
                    std::source_location location = std::source_location::current()) = 0;
 };
 
-class NetworkFilterConfigHandle {
+class NetworkFilterConfigHandle : public CommonHandle {
 public:
-  virtual ~NetworkFilterConfigHandle();
+  ~NetworkFilterConfigHandle() override;
 
   /** Defines a histogram metric during config initialization. */
   virtual std::pair<MetricID, MetricsResult> defineHistogram(std::string_view name) = 0;
