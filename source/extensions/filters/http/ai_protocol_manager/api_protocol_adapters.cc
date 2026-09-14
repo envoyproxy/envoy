@@ -42,52 +42,49 @@ protected:
   void extractUsageInto(const nlohmann::json& json, ExtractionResult& result) const override {
     bool& malformed = result.malformed;
     TokenUsage& usage = result.usage;
-    const nlohmann::json* response = readObject(json, JsonKeys::get().Response, malformed);
+    const nlohmann::json* response = readObject(json, Keys::Response, malformed);
     const nlohmann::json& node = response != nullptr ? *response : json;
 
-    if (auto model = readString(node, JsonKeys::get().Model); model.has_value()) {
+    if (auto model = readString(node, Keys::Model); model.has_value()) {
       usage.model = std::move(model).value();
     }
 
     const nlohmann::json* usage_node =
-        readObject(node, JsonKeys::get().Usage, malformed, NullPolicy::AllowNullAsAbsent);
+        readObject(node, Keys::Usage, malformed, NullPolicy::AllowNullAsAbsent);
     if (usage_node == nullptr) {
       return;
     }
 
-    usage.input_tokens = readCount(*usage_node, JsonKeys::get().PromptTokens, malformed);
+    usage.input_tokens = readCount(*usage_node, Keys::PromptTokens, malformed);
     if (!usage.input_tokens.has_value()) {
-      usage.input_tokens = readCount(*usage_node, JsonKeys::get().InputTokens, malformed);
+      usage.input_tokens = readCount(*usage_node, Keys::InputTokens, malformed);
     }
-    usage.output_tokens = readCount(*usage_node, JsonKeys::get().CompletionTokens, malformed);
+    usage.output_tokens = readCount(*usage_node, Keys::CompletionTokens, malformed);
     if (!usage.output_tokens.has_value()) {
-      usage.output_tokens = readCount(*usage_node, JsonKeys::get().OutputTokens, malformed);
+      usage.output_tokens = readCount(*usage_node, Keys::OutputTokens, malformed);
     }
-    usage.total_tokens = readCount(*usage_node, JsonKeys::get().TotalTokens, malformed);
+    usage.total_tokens = readCount(*usage_node, Keys::TotalTokens, malformed);
 
-    const nlohmann::json* input_details = readObject(
-        *usage_node, JsonKeys::get().PromptTokensDetails, malformed, NullPolicy::AllowNullAsAbsent);
+    const nlohmann::json* input_details = readObject(*usage_node, Keys::PromptTokensDetails,
+                                                     malformed, NullPolicy::AllowNullAsAbsent);
     if (input_details == nullptr) {
-      input_details = readObject(*usage_node, JsonKeys::get().InputTokensDetails, malformed,
+      input_details = readObject(*usage_node, Keys::InputTokensDetails, malformed,
                                  NullPolicy::AllowNullAsAbsent);
     }
     if (input_details != nullptr) {
-      usage.cached_input_tokens =
-          readCount(*input_details, JsonKeys::get().CachedTokens, malformed);
+      usage.cached_input_tokens = readCount(*input_details, Keys::CachedTokens, malformed);
       usage.cache_creation_input_tokens =
-          readCount(*input_details, JsonKeys::get().CacheWriteTokens, malformed);
+          readCount(*input_details, Keys::CacheWriteTokens, malformed);
     }
 
-    const nlohmann::json* output_details =
-        readObject(*usage_node, JsonKeys::get().CompletionTokensDetails, malformed,
-                   NullPolicy::AllowNullAsAbsent);
+    const nlohmann::json* output_details = readObject(*usage_node, Keys::CompletionTokensDetails,
+                                                      malformed, NullPolicy::AllowNullAsAbsent);
     if (output_details == nullptr) {
-      output_details = readObject(*usage_node, JsonKeys::get().OutputTokensDetails, malformed,
+      output_details = readObject(*usage_node, Keys::OutputTokensDetails, malformed,
                                   NullPolicy::AllowNullAsAbsent);
     }
     if (output_details != nullptr) {
-      usage.reasoning_tokens =
-          readCount(*output_details, JsonKeys::get().ReasoningTokens, malformed);
+      usage.reasoning_tokens = readCount(*output_details, Keys::ReasoningTokens, malformed);
     }
   }
 };
@@ -112,7 +109,7 @@ public:
   bool isTerminalEvent(const nlohmann::json& json) const override {
     // Terminal lifecycle events; also the usage carriers, so callers
     // extractUsage() first.
-    const auto type = readString(json, JsonKeys::get().Type);
+    const auto type = readString(json, Keys::Type);
     return type.has_value() && isOpenAiResponsesTerminalEventType(type.value());
   }
 };
@@ -134,7 +131,7 @@ public:
   }
 
   bool isTerminalEvent(const nlohmann::json& json) const override {
-    const auto type = readString(json, JsonKeys::get().Type);
+    const auto type = readString(json, Keys::Type);
     return type.has_value() && type.value() == "message_stop";
   }
 
@@ -145,19 +142,19 @@ protected:
     // Anthropic documents `event: error` after a 200 has streamed: the
     // terminal usage update never arrives, so the accumulation so far must
     // not publish as complete.
-    if (const auto type = readString(json, JsonKeys::get().Type);
+    if (const auto type = readString(json, Keys::Type);
         type.has_value() && type.value() == "error") {
       result.stream_error = true;
       return;
     }
-    const nlohmann::json* message = readObject(json, JsonKeys::get().Message, malformed);
+    const nlohmann::json* message = readObject(json, Keys::Message, malformed);
     const nlohmann::json& node = message != nullptr ? *message : json;
 
-    if (auto model = readString(node, JsonKeys::get().Model); model.has_value()) {
+    if (auto model = readString(node, Keys::Model); model.has_value()) {
       usage.model = std::move(model).value();
     }
 
-    const nlohmann::json* usage_node = readObject(node, JsonKeys::get().Usage, malformed);
+    const nlohmann::json* usage_node = readObject(node, Keys::Usage, malformed);
     if (usage_node == nullptr) {
       return;
     }
@@ -165,19 +162,18 @@ protected:
     // Native counts only: the disjoint input/cache buckets are summed once,
     // in canonicalizeUsage() -- summing per event would let a partial update
     // regress the accumulated value via last-wins merge.
-    usage.input_tokens = readCount(*usage_node, JsonKeys::get().InputTokens, malformed);
+    usage.input_tokens = readCount(*usage_node, Keys::InputTokens, malformed);
     // `output_tokens` already includes thinking tokens (inclusive).
-    usage.output_tokens = readCount(*usage_node, JsonKeys::get().OutputTokens, malformed);
+    usage.output_tokens = readCount(*usage_node, Keys::OutputTokens, malformed);
     // No total_tokens in this dialect; computed at finalize.
-    usage.cached_input_tokens =
-        readCount(*usage_node, JsonKeys::get().CacheReadInputTokens, malformed);
+    usage.cached_input_tokens = readCount(*usage_node, Keys::CacheReadInputTokens, malformed);
     usage.cache_creation_input_tokens =
-        readCount(*usage_node, JsonKeys::get().CacheCreationInputTokens, malformed);
+        readCount(*usage_node, Keys::CacheCreationInputTokens, malformed);
 
-    if (const nlohmann::json* details = readObject(*usage_node, JsonKeys::get().OutputTokensDetails,
+    if (const nlohmann::json* details = readObject(*usage_node, Keys::OutputTokensDetails,
                                                    malformed, NullPolicy::AllowNullAsAbsent);
         details != nullptr) {
-      usage.reasoning_tokens = readCount(*details, JsonKeys::get().ThinkingTokens, malformed);
+      usage.reasoning_tokens = readCount(*details, Keys::ThinkingTokens, malformed);
     }
   }
 };
@@ -207,25 +203,23 @@ protected:
   void extractUsageInto(const nlohmann::json& json, ExtractionResult& result) const override {
     bool& malformed = result.malformed;
     TokenUsage& usage = result.usage;
-    if (auto model = readString(json, JsonKeys::get().ModelVersion); model.has_value()) {
+    if (auto model = readString(json, Keys::ModelVersion); model.has_value()) {
       usage.model = std::move(model).value();
     }
 
-    const nlohmann::json* usage_node = readObject(json, JsonKeys::get().UsageMetadata, malformed);
+    const nlohmann::json* usage_node = readObject(json, Keys::UsageMetadata, malformed);
     if (usage_node == nullptr) {
       return;
     }
 
     // Native counts only; the tool-use and thoughts adjuncts are summed in at
     // canonicalizeUsage(), after the last cumulative snapshot merged.
-    usage.input_tokens = readCount(*usage_node, JsonKeys::get().PromptTokenCount, malformed);
-    usage.output_tokens = readCount(*usage_node, JsonKeys::get().CandidatesTokenCount, malformed);
-    usage.total_tokens = readCount(*usage_node, JsonKeys::get().TotalTokenCount, malformed);
-    usage.cached_input_tokens =
-        readCount(*usage_node, JsonKeys::get().CachedContentTokenCount, malformed);
-    usage.tool_use_input_tokens =
-        readCount(*usage_node, JsonKeys::get().ToolUsePromptTokenCount, malformed);
-    usage.reasoning_tokens = readCount(*usage_node, JsonKeys::get().ThoughtsTokenCount, malformed);
+    usage.input_tokens = readCount(*usage_node, Keys::PromptTokenCount, malformed);
+    usage.output_tokens = readCount(*usage_node, Keys::CandidatesTokenCount, malformed);
+    usage.total_tokens = readCount(*usage_node, Keys::TotalTokenCount, malformed);
+    usage.cached_input_tokens = readCount(*usage_node, Keys::CachedContentTokenCount, malformed);
+    usage.tool_use_input_tokens = readCount(*usage_node, Keys::ToolUsePromptTokenCount, malformed);
+    usage.reasoning_tokens = readCount(*usage_node, Keys::ThoughtsTokenCount, malformed);
   }
 };
 
@@ -264,21 +258,20 @@ ApiProtocol AdapterRegistry::detect(const nlohmann::json& json) {
   // Gemini markers, validated by value shape: a foreign document with e.g. a
   // `candidates` *string* must not lock the stream. Real candidates lists are
   // non-empty arrays of objects.
-  if (const auto it = json.find(JsonKeys::get().Candidates);
+  if (const auto it = json.find(Keys::Candidates);
       it != json.end() && it->is_array() && !it->empty() && it->front().is_object()) {
     return ApiProtocol::GeminiGenerateContent;
   }
-  if (const auto it = json.find(JsonKeys::get().UsageMetadata);
-      it != json.end() && it->is_object()) {
+  if (const auto it = json.find(Keys::UsageMetadata); it != json.end() && it->is_object()) {
     return ApiProtocol::GeminiGenerateContent;
   }
-  if (readString(json, JsonKeys::get().ModelVersion).has_value()) {
+  if (readString(json, Keys::ModelVersion).has_value()) {
     return ApiProtocol::GeminiGenerateContent;
   }
 
   // OpenAI Chat Completions and non-streaming Responses discriminate on
   // `object`; Responses streaming events discriminate on `type` ("response.*").
-  if (const auto object = readString(json, JsonKeys::get().ObjectKey); object.has_value()) {
+  if (const auto object = readString(json, Keys::ObjectKey); object.has_value()) {
     if (absl::StartsWith(object.value(), "chat.completion")) {
       return ApiProtocol::OpenAiChatCompletions;
     }
@@ -287,7 +280,7 @@ ApiProtocol AdapterRegistry::detect(const nlohmann::json& json) {
     }
   }
 
-  if (const auto type = readString(json, JsonKeys::get().Type); type.has_value()) {
+  if (const auto type = readString(json, Keys::Type); type.has_value()) {
     const absl::string_view type_view = type.value();
     if (absl::StartsWith(type_view, "response.")) {
       return ApiProtocol::OpenAiResponses;
@@ -298,17 +291,17 @@ ApiProtocol AdapterRegistry::detect(const nlohmann::json& json) {
     // before any usage, so skipping the bare event types loses nothing.
     bool discard = false;
     if (type_view == "message") {
-      if (readString(json, JsonKeys::get().Role).has_value() ||
-          readObject(json, JsonKeys::get().Usage, discard) != nullptr) {
+      if (readString(json, Keys::Role).has_value() ||
+          readObject(json, Keys::Usage, discard) != nullptr) {
         return ApiProtocol::AnthropicMessages;
       }
     } else if (type_view == "message_start") {
-      if (readObject(json, JsonKeys::get().Message, discard) != nullptr) {
+      if (readObject(json, Keys::Message, discard) != nullptr) {
         return ApiProtocol::AnthropicMessages;
       }
     } else if (type_view == "message_delta") {
-      if (readObject(json, JsonKeys::get().Usage, discard) != nullptr ||
-          readObject(json, JsonKeys::get().Delta, discard) != nullptr) {
+      if (readObject(json, Keys::Usage, discard) != nullptr ||
+          readObject(json, Keys::Delta, discard) != nullptr) {
         return ApiProtocol::AnthropicMessages;
       }
     }

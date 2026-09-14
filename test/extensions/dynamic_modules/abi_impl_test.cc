@@ -205,6 +205,41 @@ TEST(CommonAbiImplTest, LogHandlesEmptySourceFile) {
   logger.set_level(original_level);
 }
 
+// Verifies that the reused source file buffer reflects only the bytes reported by each call, so a
+// shorter path never inherits stale trailing bytes from a longer one and the module-supplied
+// length is honored even when the module bytes are not null-terminated.
+TEST(CommonAbiImplTest, LogHonorsSourceFileLengthAcrossReusedBuffer) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "reuse buffer";
+  const std::string long_file = "a/very/long/module/source/path/handler.rs";
+  const std::string short_file = "a.rs";
+  // The trailing bytes past the reported length prove only the length is copied.
+  const std::string backing = "prefix.rs_TRAILING";
+  const std::pair<absl::string_view, absl::string_view> cases[] = {
+      {long_file, long_file},
+      {short_file, short_file},
+      {absl::string_view(backing.data(), 9), "prefix.rs"},
+      {absl::string_view(nullptr, 0), ""},
+  };
+  uint32_t line = 1;
+  for (const auto& [source_file, expected_filename] : cases) {
+    sink.captured_ = false;
+    envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info,
+                                      {message.data(), message.size()},
+                                      {source_file.data(), source_file.size()}, line);
+    EXPECT_TRUE(sink.captured_);
+    EXPECT_EQ(expected_filename, sink.filename_);
+    EXPECT_EQ(static_cast<int>(line), sink.line_);
+    ++line;
+  }
+
+  logger.set_level(original_level);
+}
+
 // Verifies that Off and out-of-range levels are dropped without reaching spdlog.
 TEST(CommonAbiImplTest, LogIgnoresOffAndOutOfRangeLevels) {
   auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);

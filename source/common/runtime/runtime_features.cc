@@ -63,12 +63,16 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_lrs_server_self_ads);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
-// Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
+// Ignore the automated "remove this flag" issue: never remove this before 2027/10. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_report_client_creation_error);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_return_stop_iteration);
+// Notify the connections of a draining filter chain (an in-place listener filter chain update or
+// removal) with the configured Server::Options::drainStrategy() instead of always forcing
+// DrainStrategy::Immediate.
+RUNTIME_GUARD(envoy_reloadable_features_filter_chain_drain_uses_configured_strategy);
 // When a filter drains the current data frame into the filter-manager buffer via
 // addDecoded/EncodedData() and then returns Continue (e.g. a wasm filter resuming after buffering),
 // forward that buffered data down the chain instead of the now-empty frame, so the frame is not
@@ -103,6 +107,7 @@ RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_shadow_mode_no_short_cir
 RUNTIME_GUARD(envoy_reloadable_features_map_http_stream_reset_to_tcp_rst);
 RUNTIME_GUARD(envoy_reloadable_features_match_headers_individually);
 RUNTIME_GUARD(envoy_reloadable_features_mcp_filter_use_new_metadata_namespace);
+RUNTIME_GUARD(envoy_reloadable_features_metadata_formatter_only_truncate_string);
 RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
 // When enabled, a non-graceful admin drain (/drain_listeners without `graceful`) also starts a
 // drain sequence and notifies the connections of the covered listeners that a drain has begun,

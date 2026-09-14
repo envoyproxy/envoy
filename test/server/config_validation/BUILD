@@ -44,6 +44,7 @@ envoy_cc_test(
     env = {"CONFIGS_TAR_PATH": "$(location //configs)"},
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:logger",
         "//source/extensions/access_loggers/stream:config",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",

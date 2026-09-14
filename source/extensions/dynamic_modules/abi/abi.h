@@ -385,6 +385,8 @@ typedef enum envoy_dynamic_module_type_attribute_id {
   envoy_dynamic_module_type_attribute_id_HealthCheck,
   // upstream.server_name
   envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
+  // xds.virtual_cluster_name
+  envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName,
 } envoy_dynamic_module_type_attribute_id;
 
 /**
@@ -7211,7 +7213,7 @@ bool envoy_dynamic_module_callback_access_logger_get_route_name(
 
 /**
  * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
- * envoy_dynamic_module_type_attribute_id_XdsVirtualHostName instead.
+ * envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName instead.
  *
  * Get the virtual cluster name.
  *

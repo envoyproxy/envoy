@@ -625,6 +625,67 @@ macro_rules! drop_wrapped_c_void_ptr {
   }};
 }
 
+/// Define an `extern "C"` FFI hook that fails closed on panic.
+///
+/// The body runs inside `std::panic::catch_unwind` so a panic never unwinds across the C boundary.
+/// The value form requires an `on_panic` fallback that is returned when the body panics, which
+/// keeps the fail-closed default explicit at every hook. The void form logs the panic and returns.
+#[macro_export]
+macro_rules! ffi_export {
+  (
+    $(#[$meta:meta])*
+    fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) -> $ret:ty $body:block
+    on_panic = $default:expr $(;)?
+  ) => {
+    $(#[$meta])*
+    #[no_mangle]
+    pub extern "C" fn $name($($arg: $arg_ty),*) -> $ret {
+      ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).unwrap_or_else(|panic| {
+        $crate::log_ffi_panic(::std::stringify!($name), panic);
+        $default
+      })
+    }
+  };
+  (
+    $(#[$meta:meta])*
+    unsafe fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) -> $ret:ty $body:block
+    on_panic = $default:expr $(;)?
+  ) => {
+    $(#[$meta])*
+    #[no_mangle]
+    pub unsafe extern "C" fn $name($($arg: $arg_ty),*) -> $ret {
+      ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).unwrap_or_else(|panic| {
+        $crate::log_ffi_panic(::std::stringify!($name), panic);
+        $default
+      })
+    }
+  };
+  (
+    $(#[$meta:meta])*
+    fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) $body:block
+  ) => {
+    $(#[$meta])*
+    #[no_mangle]
+    pub extern "C" fn $name($($arg: $arg_ty),*) {
+      let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).map_err(|panic| {
+        $crate::log_ffi_panic(::std::stringify!($name), panic);
+      });
+    }
+  };
+  (
+    $(#[$meta:meta])*
+    unsafe fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) $body:block
+  ) => {
+    $(#[$meta])*
+    #[no_mangle]
+    pub unsafe extern "C" fn $name($($arg: $arg_ty),*) {
+      let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).map_err(|panic| {
+        $crate::log_ffi_panic(::std::stringify!($name), panic);
+      });
+    }
+  };
+}
+
 // =============================================================================
 // Network Filter Support
 // =============================================================================
