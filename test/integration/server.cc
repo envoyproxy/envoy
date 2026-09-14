@@ -1,5 +1,6 @@
 #include "test/integration/server.h"
 
+#include <array>
 #include <memory>
 #include <random>
 #include <string>
@@ -39,7 +40,31 @@ public:
     Thread::LockGuard lock(mutex_);
     return generator_();
   }
-  std::string uuid() override { return "a121e9e1-feae-4136-9e0e-6fac343d56c9"; }
+  std::string uuid() override {
+    Thread::LockGuard lock(mutex_);
+    std::array<uint8_t, 16> bytes;
+    for (size_t i = 0; i < bytes.size(); i += sizeof(uint64_t)) {
+      const uint64_t value = generator_();
+      for (size_t j = 0; j < sizeof(uint64_t); ++j) {
+        bytes[i + j] = static_cast<uint8_t>(value >> (sizeof(uint64_t) * 8 - 8 * (j + 1)));
+      }
+    }
+
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // UUID version 4 (random)
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // UUID variant 1 (RFC4122)
+
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string uuid;
+    uuid.reserve(36);
+    for (size_t i = 0; i < bytes.size(); ++i) {
+      if (i == 4 || i == 6 || i == 8 || i == 10) {
+        uuid.push_back('-');
+      }
+      uuid.push_back(hex[bytes[i] >> 4]);
+      uuid.push_back(hex[bytes[i] & 0x0f]);
+    }
+    return uuid;
+  }
 
 private:
   Thread::MutexBasicLockable mutex_;

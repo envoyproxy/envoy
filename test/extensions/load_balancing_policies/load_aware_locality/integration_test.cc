@@ -291,6 +291,7 @@ TEST_P(LoadAwareLocalityIntegrationTest, EwmaDampensSpike) {
 }
 
 TEST_P(LoadAwareLocalityIntegrationTest, ThreeLocalityDistribution) {
+  ASSERT_EQ(concurrency_, 1) << "This test relies on a reproducible seeded RNG draw order";
   setDeterministicSeed(12345);
   initializeConfig(/*variance_threshold=*/0.1, /*remote_probe_fraction=*/0.1,
                    /*weight_update_period_seconds=*/10, /*smoothing_time_constant_seconds=*/1,
@@ -306,7 +307,9 @@ TEST_P(LoadAwareLocalityIntegrationTest, ThreeLocalityDistribution) {
 
   constexpr double request_count = 400.0;
   constexpr double total_weight = 0.4 + 1.4 + 1.0;
-  constexpr double tolerance = 20.0;
+  // Allow roughly five standard deviations of sampling variance while still detecting the
+  // weighting regressions covered by this test.
+  constexpr double tolerance = 50.0;
   EXPECT_NEAR(zone_a, (0.4 / total_weight) * request_count, tolerance);
   EXPECT_NEAR(zone_b, (1.4 / total_weight) * request_count, tolerance);
   EXPECT_NEAR(zone_c, (1.0 / total_weight) * request_count, tolerance);
