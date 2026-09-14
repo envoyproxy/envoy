@@ -760,6 +760,81 @@ TEST_F(FilterManagerTest, FilterOutlivesManagerUntilItsCoroutineCompletes) {
   EXPECT_TRUE(destroyed);
 }
 
+class BidirectionalTracingFilter : public AiFilter {
+public:
+  BidirectionalTracingFilter(std::string name, std::vector<std::string>& trace)
+      : name_(std::move(name)), trace_(trace) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
+    trace_.push_back("decode:" + name_);
+    seen_request_model_ = req->json()["model"].get<std::string>();
+    co_return co_await std::move(propagate_request)(std::move(req));
+  }
+
+  Coroutine::Task<absl::Status> encodeSSE(SseStreamReceiver receive,
+                                          SseStreamPropagator propagate) override {
+    while (true) {
+      ASSIGN_OR_CO_RETURN(auto event, co_await receive());
+      if (!event.has_value()) {
+        co_return absl::OkStatus();
+      }
+      trace_.push_back("encode:" + name_);
+      if ((*event)->is_json()) {
+        (*event)->json().json()[name_ + "_saw_model"] = seen_request_model_;
+      }
+      CO_RETURN_IF_ERROR(co_await propagate(std::move(*event)));
+    }
+  }
+
+private:
+  std::string name_;
+  std::vector<std::string>& trace_;
+  std::string seen_request_model_;
+};
+
+TEST_F(FilterManagerTest, RequestAndResponseShareFilterInstancesInReverseOrder) {
+  std::vector<std::string> trace;
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_shared<BidirectionalTracingFilter>("A", trace));
+  filters.push_back(std::make_shared<BidirectionalTracingFilter>("B", trace));
+
+  FilterManager manager(std::move(filters));
+
+  JsonWithExtBuf req_doc;
+  req_doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+  bool req_completed = false;
+  manager.startRequest(std::move(req_doc), &buffer_manager_, *dispatcher_, stream_info_,
+                       /*request_headers=*/nullptr, /*local_reply_fn=*/nullptr,
+                       [&req_completed](absl::Status s) { req_completed = s.ok(); });
+  drain();
+  ASSERT_TRUE(req_completed);
+  EXPECT_EQ(trace, (std::vector<std::string>{"decode:A", "decode:B"}));
+
+  FakeBridge resp_bridge(*dispatcher_);
+  BufferManager resp_out_manager(BufferManager::Config{}, factory_, resp_bridge);
+  bool resp_completed = false;
+  manager.startSseResponse(factory_, resp_bridge, resp_out_manager,
+                           [&resp_completed](absl::Status s) { resp_completed = s.ok(); });
+
+  Buffer::OwnedImpl sse_input;
+  sse_input.add("data: {\"ok\":true}\n\n");
+  manager.onResponseData(sse_input, /*end_stream=*/true);
+  drain();
+  ASSERT_TRUE(resp_completed);
+
+  EXPECT_EQ(trace, (std::vector<std::string>{"decode:A", "decode:B", "encode:B", "encode:A"}));
+  const std::string resp_output = resp_bridge.injected_.toString();
+  const nlohmann::json parsed_resp =
+      nlohmann::json::parse(resp_output.substr(6, resp_output.size() - 8));
+  EXPECT_EQ(parsed_resp["A_saw_model"], "gpt-4");
+  EXPECT_EQ(parsed_resp["B_saw_model"], "gpt-4");
+
+  resp_out_manager.onDestroy();
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

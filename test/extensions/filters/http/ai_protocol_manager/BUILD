@@ -308,3 +308,19 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "response_filter_manager_test",
+    srcs = ["response_filter_manager_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        ":fake_bridge_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:buffer_manager_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:response_filter_manager_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
