@@ -17,10 +17,8 @@
 //! filter state to read. The module only sees header keys, plus the logging exposed by
 //! [`HeaderFormatterHandle`], which is where future formatter-scoped callbacks will live.
 
-use crate::{abi, bytes_to_module_buffer};
+use crate::{abi, bytes_to_module_buffer, ffi_export};
 use std::ffi::c_void;
-use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::ptr;
 
 /// Trait that the dynamic module implements to produce header formatters.
 ///
@@ -61,16 +59,21 @@ impl HeaderFormatterHandle {
   }
 
   /// Log a message through Envoy's logging subsystem.
+  ///
+  /// `#[track_caller]` makes the reported source location the module call site rather than a
+  /// location inside the SDK, matching what the `envoy_log_*` macros report.
+  #[track_caller]
   pub fn log(&self, level: abi::envoy_dynamic_module_type_log_level, message: &str) {
-    let message_bytes = message.as_bytes();
-    // SAFETY: the logging callbacks are module-wide FFI calls provided by the Envoy host.
+    let location = std::panic::Location::caller();
+    let source_file = location.file();
+    // SAFETY: the logging callbacks are module-wide FFI calls provided by the Envoy host, and both
+    // buffers are only read for the duration of the call.
     unsafe {
-      abi::envoy_dynamic_module_callback_log(
+      abi::envoy_dynamic_module_callback_log_v2(
         level,
-        abi::envoy_dynamic_module_type_module_buffer {
-          ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
-          length: message_bytes.len(),
-        },
+        bytes_to_module_buffer(message.as_bytes()),
+        bytes_to_module_buffer(source_file.as_bytes()),
+        location.line(),
       );
     }
   }
@@ -115,17 +118,16 @@ pub trait HeaderFormatter {
   fn format(&mut self, key: &str, handle: &HeaderFormatterHandle) -> Option<&str>;
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_header_formatter_config_new(
-  _config_envoy_ptr: abi::envoy_dynamic_module_type_header_formatter_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> *const c_void {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_header_formatter_config_new(
+    _config_envoy_ptr: abi::envoy_dynamic_module_type_header_formatter_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> *const c_void {
     // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes.
     // The helpers tolerate `(nullptr, 0)` empty inputs and substitute `U+FFFD` for malformed
     // UTF-8 rather than triggering UB.
@@ -142,11 +144,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_header_formatter_config_new(
         .get()
         .expect("NEW_HEADER_FORMATTER_CONFIG_FUNCTION must be set"),
     )
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_header_formatter_config_new", panic);
-    ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
 /// Testable wrapper for [`envoy_dynamic_module_on_header_formatter_config_new`].
@@ -160,84 +159,64 @@ pub fn envoy_dynamic_module_on_header_formatter_config_new_impl(
 ) -> *const c_void {
   match new_fn(name, config) {
     Some(config) => crate::wrap_into_c_void_ptr!(config),
-    None => ptr::null(),
+    None => std::ptr::null(),
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_header_formatter_config_destroy(
-  config_ptr: *const c_void,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_header_formatter_config_destroy(config_ptr: *const c_void) {
     crate::drop_wrapped_c_void_ptr!(config_ptr, HeaderFormatterConfig);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_header_formatter_config_destroy",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_header_formatter_new(
-  config_ptr: abi::envoy_dynamic_module_type_header_formatter_config_module_ptr,
-  // Header formatting exposes no formatter-scoped callbacks, so the Envoy formatter pointer is
-  // not retained.
-  _formatter_envoy_ptr: abi::envoy_dynamic_module_type_header_formatter_envoy_ptr,
-) -> *const c_void {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_header_formatter_new(
+    config_ptr: abi::envoy_dynamic_module_type_header_formatter_config_module_ptr,
+    // Header formatting exposes no formatter-scoped callbacks, so the Envoy formatter pointer is
+    // not retained.
+    _formatter_envoy_ptr: abi::envoy_dynamic_module_type_header_formatter_envoy_ptr,
+  ) -> *const c_void {
     // The configuration is shared by all worker threads and is only ever borrowed immutably here,
     // which is why `HeaderFormatterConfig` requires `Send + Sync`.
     let config = &*(config_ptr as *const Box<dyn HeaderFormatterConfig>);
     match config.create() {
       Some(formatter) => crate::wrap_into_c_void_ptr!(formatter),
-      None => ptr::null(),
+      None => std::ptr::null(),
     }
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_header_formatter_new", panic);
-    // A null formatter makes Envoy fall back to the default header casing for this message, which
-    // is the safest outcome for a panicking module.
-    ptr::null()
-  })
+  }
+  // A null formatter makes Envoy fall back to the default header casing for this message, which
+  // is the safest outcome for a panicking module.
+  on_panic = std::ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_header_formatter_destroy(
-  formatter_ptr: *const c_void,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_header_formatter_destroy(formatter_ptr: *const c_void) {
     crate::drop_wrapped_c_void_ptr!(formatter_ptr, HeaderFormatter);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_header_formatter_destroy", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_header_formatter_process_key(
-  formatter_envoy_ptr: abi::envoy_dynamic_module_type_header_formatter_envoy_ptr,
-  formatter_ptr: abi::envoy_dynamic_module_type_header_formatter_module_ptr,
-  key: abi::envoy_dynamic_module_type_envoy_buffer,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_header_formatter_process_key(
+    formatter_envoy_ptr: abi::envoy_dynamic_module_type_header_formatter_envoy_ptr,
+    formatter_ptr: abi::envoy_dynamic_module_type_header_formatter_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
     // SAFETY: Envoy calls the hooks of one formatter instance from a single thread and never
     // reentrantly, so this is the only live reference to the box for the duration of the call.
     let formatter = &mut *(formatter_ptr as *mut Box<dyn HeaderFormatter>);
@@ -245,27 +224,20 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_header_formatter_process_key(
       unsafe { crate::ffi_helpers::str_lossy_from_raw(key.ptr as *const u8, key.length) };
     let handle = unsafe { HeaderFormatterHandle::new(formatter_envoy_ptr) };
     formatter.process_key(key_str.as_ref(), &handle);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_header_formatter_process_key",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_header_formatter_format(
-  formatter_envoy_ptr: abi::envoy_dynamic_module_type_header_formatter_envoy_ptr,
-  formatter_ptr: abi::envoy_dynamic_module_type_header_formatter_module_ptr,
-  key: abi::envoy_dynamic_module_type_envoy_buffer,
-  result: *mut abi::envoy_dynamic_module_type_module_buffer,
-) -> bool {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_header_formatter_format(
+    formatter_envoy_ptr: abi::envoy_dynamic_module_type_header_formatter_envoy_ptr,
+    formatter_ptr: abi::envoy_dynamic_module_type_header_formatter_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    result: *mut abi::envoy_dynamic_module_type_module_buffer,
+  ) -> bool {
     // SAFETY: Envoy calls the hooks of one formatter instance from a single thread and never
     // reentrantly, so this is the only live reference to the box for the duration of the call.
     let formatter = &mut *(formatter_ptr as *mut Box<dyn HeaderFormatter>);
@@ -284,10 +256,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_header_formatter_format(
       },
       None => false,
     }
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_header_formatter_format", panic);
-    // Leaving the key unchanged keeps the message serializable after a panic.
-    false
-  })
+  }
+  // Leaving the key unchanged keeps the message serializable after a panic.
+  on_panic = false
 }
