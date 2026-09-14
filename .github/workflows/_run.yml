@@ -395,7 +395,7 @@ jobs:
         summary-post: ${{ inputs.summary-post }}
         uploads: |
           ${{ inputs.uploads }}
-          junit-xml-${{ inputs.target-name || inputs.target }}-${{ inputs.arch || 'x64' }}: container/envoy/*/generated/test-results/**/*.xml
+          junit-xml-${{inputs.target-name||inputs.target}}-${{inputs.arch||'x64'}}: container/envoy/*/generated/test-results/**/*.xml
         warning-match: ${{ inputs.warning-match }}
         working-directory: ${{ inputs.working-directory }}
       env:
