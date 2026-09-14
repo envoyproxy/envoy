@@ -949,7 +949,7 @@ bool envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
   return envoy_dynamic_module_callback_access_logger_get_attribute_string(
-      logger_envoy_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualHostName, result);
+      logger_envoy_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName, result);
 }
 
 uint32_t envoy_dynamic_module_callback_access_logger_get_attempt_count(

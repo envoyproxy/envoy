@@ -175,8 +175,8 @@ TEST(CommonAbiImplTest, LogUsesModuleSuppliedSourceLocation) {
   uint32_t line = 10;
   for (const auto& [abi_level, spdlog_level] : cases) {
     sink.captured_ = false;
-    envoy_dynamic_module_callback_log(abi_level, {message.data(), message.size()},
-                                      {file.data(), file.size()}, line);
+    envoy_dynamic_module_callback_log_v2(abi_level, {message.data(), message.size()},
+                                         {file.data(), file.size()}, line);
     EXPECT_TRUE(sink.captured_);
     EXPECT_EQ(file, sink.filename_);
     EXPECT_EQ(static_cast<int>(line), sink.line_);
@@ -197,10 +197,45 @@ TEST(CommonAbiImplTest, LogHandlesEmptySourceFile) {
   SourceLocationCapturingSink sink(Logger::Registry::getSink());
 
   const std::string message = "no source file";
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info,
-                                    {message.data(), message.size()}, {nullptr, 0}, 0);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Info,
+                                       {message.data(), message.size()}, {nullptr, 0}, 0);
   EXPECT_TRUE(sink.captured_);
   EXPECT_EQ("", sink.filename_);
+
+  logger.set_level(original_level);
+}
+
+// Verifies that the reused source file buffer reflects only the bytes reported by each call, so a
+// shorter path never inherits stale trailing bytes from a longer one and the module-supplied
+// length is honored even when the module bytes are not null-terminated.
+TEST(CommonAbiImplTest, LogHonorsSourceFileLengthAcrossReusedBuffer) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "reuse buffer";
+  const std::string long_file = "a/very/long/module/source/path/handler.rs";
+  const std::string short_file = "a.rs";
+  // The trailing bytes past the reported length prove only the length is copied.
+  const std::string backing = "prefix.rs_TRAILING";
+  const std::pair<absl::string_view, absl::string_view> cases[] = {
+      {long_file, long_file},
+      {short_file, short_file},
+      {absl::string_view(backing.data(), 9), "prefix.rs"},
+      {absl::string_view(nullptr, 0), ""},
+  };
+  uint32_t line = 1;
+  for (const auto& [source_file, expected_filename] : cases) {
+    sink.captured_ = false;
+    envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Info,
+                                         {message.data(), message.size()},
+                                         {source_file.data(), source_file.size()}, line);
+    EXPECT_TRUE(sink.captured_);
+    EXPECT_EQ(expected_filename, sink.filename_);
+    EXPECT_EQ(static_cast<int>(line), sink.line_);
+    ++line;
+  }
 
   logger.set_level(original_level);
 }
@@ -214,16 +249,16 @@ TEST(CommonAbiImplTest, LogIgnoresOffAndOutOfRangeLevels) {
 
   const std::string message = "ignored";
   const std::string file = "my_module.rs";
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Off,
-                                    {message.data(), message.size()}, {file.data(), file.size()},
-                                    1);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Off,
+                                       {message.data(), message.size()}, {file.data(), file.size()},
+                                       1);
   EXPECT_FALSE(sink.captured_);
   // A value further outside the enum range would be undefined behavior to load, so use one past
   // Off.
   const auto out_of_range =
       static_cast<envoy_dynamic_module_type_log_level>(envoy_dynamic_module_type_log_level_Off + 1);
-  envoy_dynamic_module_callback_log(out_of_range, {message.data(), message.size()},
-                                    {file.data(), file.size()}, 1);
+  envoy_dynamic_module_callback_log_v2(out_of_range, {message.data(), message.size()},
+                                       {file.data(), file.size()}, 1);
   EXPECT_FALSE(sink.captured_);
 
   logger.set_level(original_level);
@@ -239,16 +274,46 @@ TEST(CommonAbiImplTest, LogRespectsConfiguredLevel) {
 
   const std::string message = "level gated";
   const std::string file = "my_module.rs";
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info,
-                                    {message.data(), message.size()}, {file.data(), file.size()},
-                                    1);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Info,
+                                       {message.data(), message.size()}, {file.data(), file.size()},
+                                       1);
   EXPECT_FALSE(sink.captured_);
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Error,
-                                    {message.data(), message.size()}, {file.data(), file.size()},
-                                    42);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Error,
+                                       {message.data(), message.size()}, {file.data(), file.size()},
+                                       42);
   EXPECT_TRUE(sink.captured_);
   EXPECT_EQ(file, sink.filename_);
   EXPECT_EQ(42, sink.line_);
+
+  logger.set_level(original_level);
+}
+
+// Verifies that the deprecated two-argument callback still logs at every level and reports an empty
+// source location.
+TEST(CommonAbiImplTest, LogDeprecatedOverloadReportsEmptySourceLocation) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "deprecated overload message";
+  const std::pair<envoy_dynamic_module_type_log_level, spdlog::level::level_enum> cases[] = {
+      {envoy_dynamic_module_type_log_level_Trace, spdlog::level::trace},
+      {envoy_dynamic_module_type_log_level_Debug, spdlog::level::debug},
+      {envoy_dynamic_module_type_log_level_Info, spdlog::level::info},
+      {envoy_dynamic_module_type_log_level_Warn, spdlog::level::warn},
+      {envoy_dynamic_module_type_log_level_Error, spdlog::level::err},
+      {envoy_dynamic_module_type_log_level_Critical, spdlog::level::critical},
+  };
+  for (const auto& [abi_level, spdlog_level] : cases) {
+    sink.captured_ = false;
+    envoy_dynamic_module_callback_log(abi_level, {message.data(), message.size()});
+    EXPECT_TRUE(sink.captured_);
+    EXPECT_EQ("", sink.filename_);
+    EXPECT_EQ(0, sink.line_);
+    EXPECT_EQ(spdlog_level, sink.level_);
+    EXPECT_NE(std::string::npos, sink.formatted_.find(message));
+  }
 
   logger.set_level(original_level);
 }
@@ -466,6 +531,13 @@ WEAK_STUB(BootstrapExtensionTimerEnabled,
 
 WEAK_STUB(BootstrapExtensionTimerDelete,
           envoy_dynamic_module_callback_bootstrap_extension_timer_delete(nullptr))
+WEAK_STUB(BootstrapExtensionFileWatcherAddWatch,
+          envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(nullptr,
+                                                                                   {nullptr, 0}, 0))
+WEAK_STUB(BootstrapExtensionEnableClusterLifecycle,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(nullptr))
+WEAK_STUB(BootstrapExtensionEnableListenerLifecycle,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr))
 
 WEAK_STUB(BootstrapExtensionRegisterAdminHandler,
           envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
@@ -573,6 +645,15 @@ WEAK_STUB(ClusterLbContextSetFilterStateTyped,
           envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(nullptr,
                                                                                   {nullptr, 0},
                                                                                   {nullptr, 0}))
+WEAK_STUB(ClusterLbContextGetHostStat,
+          envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+              nullptr, nullptr, envoy_dynamic_module_type_host_stat_RqTotal))
+WEAK_STUB(ClusterLbContextSetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, 0))
+WEAK_STUB(ClusterLbContextSetDynamicMetadataString,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}))
 WEAK_STUB(ClusterLbContextSetDynamicMetadataStringBatch,
           envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
               nullptr, {nullptr, 0}, nullptr, 0))
@@ -634,6 +715,12 @@ WEAK_STUB(ClusterLbAsyncHostSelectionComplete,
 WEAK_STUB(ClusterLbGetMemberUpdateHostAddress,
           envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(nullptr, 0, true,
                                                                                   nullptr))
+WEAK_STUB(ClusterLbGetMemberUpdateHost,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_host(nullptr, 0, true))
+WEAK_STUB(ClusterLbGetMemberUpdateHostPackedAddress,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(nullptr, 0,
+                                                                                         true,
+                                                                                         nullptr))
 WEAK_STUB(ClusterUpdateHostHealth,
           envoy_dynamic_module_callback_cluster_update_host_health(
               nullptr, nullptr, envoy_dynamic_module_type_host_health_Healthy))
@@ -646,6 +733,15 @@ WEAK_STUB(ClusterSchedulerNew, envoy_dynamic_module_callback_cluster_scheduler_n
 WEAK_STUB(ClusterSchedulerDelete, envoy_dynamic_module_callback_cluster_scheduler_delete(nullptr))
 WEAK_STUB(ClusterSchedulerCommit,
           envoy_dynamic_module_callback_cluster_scheduler_commit(nullptr, 0))
+WEAK_STUB(ClusterRunOnAllWorkers,
+          envoy_dynamic_module_callback_cluster_run_on_all_workers(nullptr, 0))
+WEAK_STUB(ClusterWorkerSlotSet,
+          envoy_dynamic_module_callback_cluster_worker_slot_set(nullptr, nullptr))
+WEAK_STUB(ClusterWorkerSlotGet, envoy_dynamic_module_callback_cluster_worker_slot_get(nullptr))
+WEAK_STUB(ClusterGetName, envoy_dynamic_module_callback_cluster_get_name(nullptr, nullptr))
+WEAK_STUB(ClusterHttpCallout,
+          envoy_dynamic_module_callback_cluster_http_callout(nullptr, nullptr, {nullptr, 0},
+                                                             nullptr, 0, {nullptr, 0}, 0))
 WEAK_STUB(ClusterConfigDefineCounter,
           envoy_dynamic_module_callback_cluster_config_define_counter(nullptr, {nullptr, 0},
                                                                       nullptr, 0, nullptr))
@@ -1737,6 +1833,9 @@ WEAK_STUB(HttpSetDynamicMetadataStringBatch,
 WEAK_STUB(HttpSetDynamicMetadataStruct,
           envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(nullptr, {nullptr, 0},
                                                                          {nullptr, 0}))
+WEAK_STUB(HttpSetDynamicTypedMetadata,
+          envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(nullptr, {nullptr, 0},
+                                                                        {nullptr, 0}))
 WEAK_STUB(HttpGetMetadataString, envoy_dynamic_module_callback_http_get_metadata_string(
                                      nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                      {nullptr, 0}, {nullptr, 0}, nullptr))

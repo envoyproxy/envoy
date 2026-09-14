@@ -15,11 +15,8 @@ static void log_info(const char* message) {
   envoy_dynamic_module_type_module_buffer buf;
   buf.ptr = message;
   buf.length = strlen(message);
-  envoy_dynamic_module_type_module_buffer source_file;
-  source_file.ptr = __FILE__;
-  source_file.length = strlen(__FILE__);
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info, buf, source_file,
-                                    __LINE__);
+  // Exercises the deprecated two-argument logging callback for backward compatibility coverage.
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info, buf);
 }
 
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {

@@ -141,6 +141,15 @@ protected:
     return testLookupRequest(headers, *dispatcher_);
   }
 
+  ActiveLookupRequestPtr
+  testLookupRequestForCacheability(Http::RequestHeaderMap& headers,
+                                   bool ignore_request_cache_control_header = false) {
+    return std::make_unique<ActiveLookupRequest>(
+        headers, std::make_unique<testing::NiceMock<MockUpstreamRequestFactory>>(), "test_cluster",
+        *dispatcher_, api_->timeSource().systemTime(), mock_cacheable_response_checker_,
+        cache_sessions_, ignore_request_cache_control_header);
+  }
+
   ActiveLookupRequestPtr testLookupRequest(absl::string_view path) {
     auto headers = requestHeaders(path);
     return testLookupRequest(headers);
@@ -242,6 +251,18 @@ MATCHER_P2(HasHeader, key, matcher, "") {
   return ExplainMatchResult(GetResultHasValue(matcher),
                             arg.get(::Envoy::Http::LowerCaseString(std::string(key))),
                             result_listener);
+}
+
+TEST_F(CacheSessionsTest, RequestNoStoreMakesResponseUncacheableUnlessIgnored) {
+  Http::TestRequestHeaderMapImpl request_headers = requestHeaders("/no-store");
+  request_headers.addCopy(Http::CustomHeaders::get().CacheControl, "no-store");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  ActiveLookupRequestPtr request = testLookupRequestForCacheability(request_headers);
+  EXPECT_FALSE(request->isCacheableResponse(response_headers));
+
+  ActiveLookupRequestPtr ignored_request = testLookupRequestForCacheability(request_headers, true);
+  EXPECT_TRUE(ignored_request->isCacheableResponse(response_headers));
 }
 
 TEST_F(CacheSessionsTest, RequestsForSeparateKeysIssueSeparateLookupRequests) {
@@ -865,6 +886,40 @@ TEST_F(CacheSessionsTest, RangeRequestWhenLengthIsUnknownReturnsNotSatisfiable) 
   ASSERT_THAT(result1, NotNull());
   result1->http_source_->getHeaders(headers_callback1.AsStdFunction());
   Mock::VerifyAndClearExpectations(&headers_callback1);
+}
+
+// The Range header field is evaluated after evaluating the precondition header
+// fields defined in Section 13.1, and only if the result in absence of the Range
+// header field would be a 200 (OK) response.
+// https://httpwg.org/specs/rfc9110.html#field.range
+TEST_F(CacheSessionsTest, RangeRequestOnCached404DoesNotRewriteTo206) {
+  auto response_headers = cacheableResponseHeaders(100);
+  response_headers->setStatus("404");
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+  ActiveLookupResultPtr result;
+  cache_sessions_->lookup(testLookupRangeRequest("/a", 0, 5),
+                          [&result](ActiveLookupResultPtr r) { result = std::move(r); });
+  pumpDispatcher();
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime();
+  consumeCallback(captured_lookup_callbacks_[0])(LookupResult{
+      std::make_unique<MockCacheReader>(),
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers),
+      nullptr,
+      std::move(metadata),
+      100,
+  });
+  pumpDispatcher();
+  ASSERT_THAT(result, NotNull());
+  EXPECT_THAT(result->status_, Eq(CacheEntryStatus::Hit));
+  MockFunction<void(Http::ResponseHeaderMapPtr, EndStream)> headers_callback;
+  EXPECT_CALL(headers_callback,
+              Call(Pointee(AllOf(HasHeader(":status", "404"), HasHeader("content-length", "100"),
+                                 HasNoHeader("content-range"))),
+                   EndStream::More));
+  result->http_source_->getHeaders(headers_callback.AsStdFunction());
+  Mock::VerifyAndClearExpectations(&headers_callback);
 }
 
 TEST_F(CacheSessionsTest, PassthroughWithUpstreamResetCallsGetHeadersCallbackWithNullPointer) {
