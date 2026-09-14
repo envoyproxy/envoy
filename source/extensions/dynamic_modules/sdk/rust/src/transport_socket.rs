@@ -4,10 +4,11 @@
 //! modules. A transport socket performs I/O and participates in connection lifecycle for TCP
 //! connections in Envoy.
 
-use crate::{abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, wrap_into_c_void_ptr};
+use crate::{
+  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, wrap_into_c_void_ptr,
+};
 use mockall::*;
 use std::cell::RefCell;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// What should happen to the connection after a transport socket read or write completes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -447,18 +448,17 @@ fn fill_string_buffer_out(
 
 // Transport Socket Event Hook Implementations
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config_new(
-  _config_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_factory_config_envoy_ptr,
-  socket_name: abi::envoy_dynamic_module_type_envoy_buffer,
-  socket_config: abi::envoy_dynamic_module_type_envoy_buffer,
-  is_upstream: bool,
-) -> abi::envoy_dynamic_module_type_transport_socket_factory_config_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_factory_config_new(
+    _config_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_factory_config_envoy_ptr,
+    socket_name: abi::envoy_dynamic_module_type_envoy_buffer,
+    socket_config: abi::envoy_dynamic_module_type_envoy_buffer,
+    is_upstream: bool,
+  ) -> abi::envoy_dynamic_module_type_transport_socket_factory_config_module_ptr {
     let name_bytes = unsafe {
       crate::ffi_helpers::slice_from_raw_or_empty(socket_name.ptr as *const u8, socket_name.length)
     };
@@ -486,48 +486,34 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config
       Some(config) => wrap_into_c_void_ptr!(config),
       None => std::ptr::null(),
     }
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_transport_socket_factory_config_new",
-      panic,
-    );
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config_destroy(
-  factory_config_ptr: abi::envoy_dynamic_module_type_transport_socket_factory_config_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_factory_config_destroy(
+    factory_config_ptr: abi::envoy_dynamic_module_type_transport_socket_factory_config_module_ptr,
+  ) {
     drop_wrapped_c_void_ptr!(
       factory_config_ptr,
       TransportSocketFactoryConfig<EnvoyTransportSocketImpl>
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_transport_socket_factory_config_destroy",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_new(
-  factory_config_ptr: abi::envoy_dynamic_module_type_transport_socket_factory_config_module_ptr,
-  transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
-) -> abi::envoy_dynamic_module_type_transport_socket_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_new(
+    factory_config_ptr: abi::envoy_dynamic_module_type_transport_socket_factory_config_module_ptr,
+    transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+  ) -> abi::envoy_dynamic_module_type_transport_socket_module_ptr {
     let config = factory_config_ptr
       as *const *const dyn TransportSocketFactoryConfig<EnvoyTransportSocketImpl>;
     let config = unsafe { &**config };
@@ -535,230 +521,169 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_new(
     let socket = config.new_transport_socket(&mut envoy);
     let wrapper = Box::new(TransportSocketWrapper { socket });
     Box::into_raw(wrapper) as abi::envoy_dynamic_module_type_transport_socket_module_ptr
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_transport_socket_new", panic);
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_destroy(
-  transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_destroy(
+    transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
+  ) {
     let wrapper = transport_socket_module_ptr as *mut TransportSocketWrapper;
     let _ = unsafe { Box::from_raw(wrapper) };
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_transport_socket_destroy", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_set_callbacks(
-  transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
-  transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_set_callbacks(
+    transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+    transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
+  ) {
     let wrapper = unsafe { &mut *(transport_socket_module_ptr as *mut TransportSocketWrapper) };
     let mut envoy = EnvoyTransportSocketImpl::new(transport_socket_envoy_ptr);
     wrapper.socket.on_set_callbacks(&mut envoy);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_transport_socket_set_callbacks",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_on_connected(
-  transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
-  transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_on_connected(
+    transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+    transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
+  ) {
     let wrapper = unsafe { &mut *(transport_socket_module_ptr as *mut TransportSocketWrapper) };
     let mut envoy = EnvoyTransportSocketImpl::new(transport_socket_envoy_ptr);
     wrapper.socket.on_connected(&mut envoy);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_transport_socket_on_connected",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_do_read(
-  transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
-  transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
-) -> abi::envoy_dynamic_module_type_transport_socket_io_result {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_do_read(
+    transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+    transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
+  ) -> abi::envoy_dynamic_module_type_transport_socket_io_result {
     let wrapper = unsafe { &mut *(transport_socket_module_ptr as *mut TransportSocketWrapper) };
     let mut envoy = EnvoyTransportSocketImpl::new(transport_socket_envoy_ptr);
     let io = wrapper.socket.on_do_read(&mut envoy);
     io.into()
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_transport_socket_do_read", panic);
-    IoResult::close(0, false).into()
-  })
+  }
+  on_panic = IoResult::close(0, false).into()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_do_write(
-  transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
-  transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
-  end_stream: bool,
-) -> abi::envoy_dynamic_module_type_transport_socket_io_result {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_do_write(
+    transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+    transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
+    end_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_transport_socket_io_result {
     let wrapper = unsafe { &mut *(transport_socket_module_ptr as *mut TransportSocketWrapper) };
     let mut envoy = EnvoyTransportSocketImpl::new(transport_socket_envoy_ptr);
     let io = wrapper.socket.on_do_write(&mut envoy, end_stream);
     io.into()
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_transport_socket_do_write", panic);
-    IoResult::close(0, false).into()
-  })
+  }
+  on_panic = IoResult::close(0, false).into()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_close(
-  transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
-  transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
-  event: abi::envoy_dynamic_module_type_network_connection_event,
-  abort_reset: bool,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_close(
+    transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+    transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
+    event: abi::envoy_dynamic_module_type_network_connection_event,
+    abort_reset: bool,
+  ) {
     let wrapper = unsafe { &mut *(transport_socket_module_ptr as *mut TransportSocketWrapper) };
     let mut envoy = EnvoyTransportSocketImpl::new(transport_socket_envoy_ptr);
     wrapper
       .socket
       .on_close(&mut envoy, event.into(), abort_reset);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_transport_socket_close", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_get_protocol(
-  transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
-  transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
-  result: *mut abi::envoy_dynamic_module_type_module_buffer,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_get_protocol(
+    transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+    transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
+    result: *mut abi::envoy_dynamic_module_type_module_buffer,
+  ) {
     let wrapper = unsafe { &*(transport_socket_module_ptr as *const TransportSocketWrapper) };
     let mut envoy = EnvoyTransportSocketImpl::new(transport_socket_envoy_ptr);
     let s = wrapper.socket.get_protocol(&mut envoy);
     fill_string_buffer_out(&GET_PROTOCOL_BUF, result, &s);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_transport_socket_get_protocol",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_get_failure_reason(
-  transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
-  transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
-  result: *mut abi::envoy_dynamic_module_type_module_buffer,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_get_failure_reason(
+    transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+    transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
+    result: *mut abi::envoy_dynamic_module_type_module_buffer,
+  ) {
     let wrapper = unsafe { &*(transport_socket_module_ptr as *const TransportSocketWrapper) };
     let mut envoy = EnvoyTransportSocketImpl::new(transport_socket_envoy_ptr);
     let s = wrapper.socket.get_failure_reason(&mut envoy);
     fill_string_buffer_out(&GET_FAILURE_REASON_BUF, result, &s);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_transport_socket_get_failure_reason",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_can_flush_close(
-  transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
-  transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
-) -> bool {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_can_flush_close(
+    transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+    transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
+  ) -> bool {
     let wrapper = unsafe { &*(transport_socket_module_ptr as *const TransportSocketWrapper) };
     let mut envoy = EnvoyTransportSocketImpl::new(transport_socket_envoy_ptr);
     wrapper.socket.can_flush_close(&mut envoy)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_transport_socket_can_flush_close",
-      panic,
-    );
-    false
-  })
+  }
+  on_panic = false
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_start_secure_transport(
-  transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
-  transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
-) -> bool {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_transport_socket_start_secure_transport(
+    transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+    transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
+  ) -> bool {
     let wrapper = unsafe { &mut *(transport_socket_module_ptr as *mut TransportSocketWrapper) };
     let mut envoy = EnvoyTransportSocketImpl::new(transport_socket_envoy_ptr);
     wrapper.socket.start_secure_transport(&mut envoy)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_transport_socket_start_secure_transport",
-      panic,
-    );
-    false
-  })
+  }
+  on_panic = false
 }
