@@ -16,6 +16,7 @@
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/singleton/instance.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/hash.h"
@@ -217,6 +218,7 @@ public:
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket& socket,
                                               const StreamInfo::StreamInfo& info) const override;
+  std::vector<absl::string_view> filterChainNames() const override;
 
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
@@ -502,6 +504,10 @@ public:
   // Unsubscribes a listener from FCDS distribution.
   void unsubscribe(const std::string& filter_chain_name, FcdsSubscriptionHandle& handle);
 
+  // Names of FCDS filter chains that are active (warmed and committed). Main-thread only; reads the
+  // same per-subscription committed chain that updateTlsState() publishes as active.
+  std::vector<absl::string_view> activeFilterChainNames() const;
+
   // FilterChainUpdateCallbacks
   absl::Status onFilterChainUpdated(const FilterChainProto& proto) override;
   void onFilterChainRemoved(Network::DrainableFilterChainSharedPtr&& draining) override;
@@ -525,6 +531,12 @@ private:
   void onFilterChainWarmed(Network::DrainableFilterChainSharedPtr filter_chain);
   void updateTlsState();
 };
+
+// Helper function to look up the process-wide FCDS shared filter chain manager, returning it if it
+// has been created, else nullptr (non-constructing). The name must match
+// SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager) in listener_impl.cc.
+std::shared_ptr<FcdsSharedFilterChainManager>
+getFcdsSharedFilterChainManager(Singleton::Manager& singleton_manager);
 
 } // namespace Server
 } // namespace Envoy

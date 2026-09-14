@@ -614,6 +614,17 @@ makeCidrListEntry(const std::string& cidr, const T& data, absl::Status& creation
 
 }; // namespace
 
+std::vector<absl::string_view> FilterChainManagerImpl::filterChainNames() const {
+  std::vector<absl::string_view> names;
+  names.reserve(fc_contexts_.size());
+  for (const auto& [proto, chain] : fc_contexts_) {
+    if (!chain->name().empty()) {
+      names.push_back(chain->name());
+    }
+  }
+  return names;
+}
+
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket,
                                         const StreamInfo::StreamInfo& info) const {
@@ -1181,6 +1192,25 @@ void FcdsSharedFilterChainManager::updateTlsState() {
     }
   }
   tls_slot_->set([filter_chains](Event::Dispatcher&) { return filter_chains; });
+}
+
+std::vector<absl::string_view> FcdsSharedFilterChainManager::activeFilterChainNames() const {
+  std::vector<absl::string_view> names;
+  names.reserve(subscriptions_.size());
+  // A subscription's committed chain is non-null exactly when it is active (same test
+  // updateTlsState() uses to publish the active set to workers).
+  for (const auto& [name, state] : subscriptions_) {
+    if (state->api_->filterChain() != nullptr) {
+      names.push_back(name);
+    }
+  }
+  return names;
+}
+
+std::shared_ptr<FcdsSharedFilterChainManager>
+getFcdsSharedFilterChainManager(Singleton::Manager& singleton_manager) {
+  return singleton_manager.getTyped<FcdsSharedFilterChainManager>(
+      "fcds_shared_filter_chain_manager_singleton");
 }
 
 } // namespace Server

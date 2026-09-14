@@ -2789,6 +2789,15 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_iterate_gaug
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _kind: abi::envoy_dynamic_module_type_bootstrap_active_resource_kind,
+  _name_fn: abi::envoy_dynamic_module_type_bootstrap_active_resource_name_fn,
+  _user_data: *mut std::os::raw::c_void,
+) {
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
   _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   _name: abi::envoy_dynamic_module_type_module_buffer,
