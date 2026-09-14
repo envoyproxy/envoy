@@ -338,7 +338,9 @@ public:
    * Sets the minimum log severity required to print messages.
    * Messages below this loglevel will be suppressed.
    */
-  static void setLogLevel(spdlog::level::level_enum log_level);
+  static void setLogLevel(Levels log_level);
+  [[deprecated("Use setLogLevel(Levels) instead")]] static void
+  setLogLevel(spdlog::level::level_enum log_level);
 
   /**
    * Sets the log format.

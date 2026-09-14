@@ -386,9 +386,7 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
-  if (parent_.validate_upstream_headers_) {
-    RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
-  }
+  RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
@@ -997,10 +995,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                               : 0),
       http2_include_cookies_in_limits_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_include_cookies_in_limits")),
-#ifndef ENVOY_ENABLE_UHV
-      validate_upstream_headers_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers")),
-#endif
       protocol_constraints_(stats, http2_options,
                             Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.http2_flood_protection_active_streams")),

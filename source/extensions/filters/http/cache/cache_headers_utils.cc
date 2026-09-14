@@ -67,20 +67,23 @@ RequestCacheControl::RequestCacheControl(absl::string_view cache_control_header)
   for (auto full_directive : directives) {
     absl::string_view directive, argument;
     std::tie(directive, argument) = separateDirectiveAndArgument(full_directive);
+    // Directive names are case-insensitive per RFC 9111 section 5.2:
+    // https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2
+    const std::string lowercase_directive = absl::AsciiStrToLower(directive);
 
-    if (directive == "no-cache") {
+    if (lowercase_directive == "no-cache") {
       must_validate_ = true;
-    } else if (directive == "no-store") {
+    } else if (lowercase_directive == "no-store") {
       no_store_ = true;
-    } else if (directive == "no-transform") {
+    } else if (lowercase_directive == "no-transform") {
       no_transform_ = true;
-    } else if (directive == "only-if-cached") {
+    } else if (lowercase_directive == "only-if-cached") {
       only_if_cached_ = true;
-    } else if (directive == "max-age") {
+    } else if (lowercase_directive == "max-age") {
       max_age_ = parseDuration(argument);
-    } else if (directive == "min-fresh") {
+    } else if (lowercase_directive == "min-fresh") {
       min_fresh_ = parseDuration(argument);
-    } else if (directive == "max-stale") {
+    } else if (lowercase_directive == "max-stale") {
       max_stale_ = argument.empty() ? SystemTime::duration::max() : parseDuration(argument);
     }
   }
@@ -92,22 +95,26 @@ ResponseCacheControl::ResponseCacheControl(absl::string_view cache_control_heade
   for (auto full_directive : directives) {
     absl::string_view directive, argument;
     std::tie(directive, argument) = separateDirectiveAndArgument(full_directive);
+    // Directive names are case-insensitive per RFC 9111 section 5.2:
+    // https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2
+    const std::string lowercase_directive = absl::AsciiStrToLower(directive);
 
-    if (directive == "no-cache") {
+    if (lowercase_directive == "no-cache") {
       // If no-cache directive has arguments they are ignored - not handled.
       must_validate_ = true;
-    } else if (directive == "must-revalidate" || directive == "proxy-revalidate") {
+    } else if (lowercase_directive == "must-revalidate" ||
+               lowercase_directive == "proxy-revalidate") {
       no_stale_ = true;
-    } else if (directive == "no-store" || directive == "private") {
+    } else if (lowercase_directive == "no-store" || lowercase_directive == "private") {
       // If private directive has arguments they are ignored - not handled.
       no_store_ = true;
-    } else if (directive == "no-transform") {
+    } else if (lowercase_directive == "no-transform") {
       no_transform_ = true;
-    } else if (directive == "public") {
+    } else if (lowercase_directive == "public") {
       is_public_ = true;
-    } else if (directive == "s-maxage") {
+    } else if (lowercase_directive == "s-maxage") {
       max_age_ = parseDuration(argument);
-    } else if (!max_age_.has_value() && directive == "max-age") {
+    } else if (!max_age_.has_value() && lowercase_directive == "max-age") {
       max_age_ = parseDuration(argument);
     }
   }

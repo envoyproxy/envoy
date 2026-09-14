@@ -141,7 +141,7 @@ void BufferManager::maybeIssueWrite() {
   in_flight_write_size_ = pending_.length();
   owned->move(pending_);
   write_in_flight_ = true;
-  buffer_->write(std::move(owned),
+  buffer_->write(std::move(owned), end_stream_seen_,
                  [this](ExternalBufferStatus status) { onWriteComplete(status); });
 }
 

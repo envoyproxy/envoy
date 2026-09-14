@@ -288,7 +288,8 @@ public:
   virtual bool logEnabled(LogLevel level) = 0;
 
   /** Logs a message through Envoy's logging subsystem. */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 };
 
 class NetworkFilterConfigHandle {
@@ -314,7 +315,8 @@ public:
   virtual bool logEnabled(LogLevel level) = 0;
 
   /** Logs a message through Envoy's logging subsystem. */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 };
 
 class NetworkFilter {

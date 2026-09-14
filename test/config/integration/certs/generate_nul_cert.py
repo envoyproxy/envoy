@@ -45,7 +45,7 @@ def generate_certs():
                     ).serial_number(x509.random_serial_number()).not_valid_before(
                         datetime.datetime.utcnow() - datetime.timedelta(days=1)).not_valid_after(
                             datetime.datetime.utcnow()
-                            + datetime.timedelta(days=730)  # 730 days (2 years) to match certs.sh
+                            + datetime.timedelta(days=730)  # 730 days (2 years)
                         ).add_extension(
                             x509.BasicConstraints(ca=False, path_length=None),
                             critical=True).add_extension(

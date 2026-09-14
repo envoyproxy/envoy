@@ -1,6 +1,5 @@
 use std::env;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // Resolves a `$(location ...)` value produced by Bazel to an absolute path.
 //
@@ -57,17 +56,24 @@ fn bazel_clang_args() -> Vec<String> {
   }
 
   // This allows the cross-compilation of the SDK to succeed by providing the necessary system
-  // headers for the target platform.
-  for (env_var, triple) in [
-    ("ENVOY_SYSROOT_AMD64_ANCHOR", "x86_64-linux-gnu"),
-    ("ENVOY_SYSROOT_ARM64_ANCHOR", "aarch64-linux-gnu"),
+  // headers for the target platform. Only add the sysroot matching the build target to avoid
+  // pulling in incompatible headers (e.g. amd64 stubs-32.h when targeting arm64).
+  let target = env::var("TARGET").unwrap_or_default();
+  for (env_var, triple, target_prefix) in [
+    ("ENVOY_SYSROOT_AMD64_ANCHOR", "x86_64-linux-gnu", "x86_64"),
+    ("ENVOY_SYSROOT_ARM64_ANCHOR", "aarch64-linux-gnu", "aarch64"),
   ] {
+    if !target.is_empty() && !target.starts_with(target_prefix) {
+      continue;
+    }
     if let Ok(sysroot_anchor) = env::var(env_var) {
       if let Some(anchor) = resolve_bazel_location(&sysroot_anchor) {
         // The anchor is `<sysroot>/usr/include/stdio.h`, so its parent is `usr/include`.
         if let Some(include_dir) = anchor.parent() {
-          args.push(format!("-isystem {}", include_dir.display()));
-          args.push(format!("-isystem {}/{}", include_dir.display(), triple));
+          args.push("-isystem".to_string());
+          args.push(format!("{}", include_dir.display()));
+          args.push("-isystem".to_string());
+          args.push(format!("{}/{}", include_dir.display(), triple));
         }
       }
     }
