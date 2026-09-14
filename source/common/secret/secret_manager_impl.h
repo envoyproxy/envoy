@@ -75,6 +75,9 @@ public:
 
   std::vector<std::string> dynamicActiveTlsCertificateSecretNames() const override;
 
+  void setDynamicTlsCertificateSecretProviderCreatedCallback(
+      DynamicTlsCertificateSecretProviderCreatedCb callback) override;
+
 private:
   ProtobufTypes::MessagePtr dumpSecretConfigs(const Matchers::StringMatcher& name_matcher);
 
@@ -102,6 +105,12 @@ private:
         secret_provider = SecretType::create(server_context, sds_config_source, config_name,
                                              unregister_secret_provider, warm);
         dynamic_secret_providers_[map_key] = secret_provider;
+        // Notify an observer (e.g. a bootstrap dynamic module) that a new dynamic provider exists,
+        // so it can subscribe to the provider's update/remove callbacks. Only wired for the TLS
+        // certificate providers today.
+        if (on_provider_created_) {
+          on_provider_created_(config_name, secret_provider);
+        }
       }
       // It is important to add the init target to the manager regardless the secret provider is new
       // or existing. Different clusters / listeners can share same secret so they have to be marked
@@ -135,6 +144,11 @@ private:
       }
       return providers;
     }
+
+    // Optional hook invoked on the main thread with (config_name, provider) each time a new
+    // dynamic provider is created. Only set for the TLS certificate providers.
+    std::function<void(const std::string&, const std::shared_ptr<SecretType>&)>
+        on_provider_created_;
 
   private:
     // Removes dynamic secret provider which has been deleted.

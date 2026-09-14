@@ -170,6 +170,27 @@ std::vector<std::string> SecretManagerImpl::dynamicActiveTlsCertificateSecretNam
   return names;
 }
 
+void SecretManagerImpl::setDynamicTlsCertificateSecretProviderCreatedCallback(
+    DynamicTlsCertificateSecretProviderCreatedCb callback) {
+  if (!callback) {
+    certificate_providers_.on_provider_created_ = nullptr;
+    return;
+  }
+  certificate_providers_.on_provider_created_ =
+      [callback = std::move(callback)](const std::string& name,
+                                       const std::shared_ptr<TlsCertificateSdsApi>& provider) {
+        callback(name, provider);
+      };
+  // Replay providers that already exist so the observer subscribes to them on the same footing as
+  // providers created later. Without this, a provider created before this call would deliver
+  // neither its update nor its removal events to the observer. allSecretProviders() returns a
+  // snapshot of locked providers, so invoking the callback (which may subscribe) cannot invalidate
+  // the iteration.
+  for (const auto& provider : certificate_providers_.allSecretProviders()) {
+    certificate_providers_.on_provider_created_(provider->secretData().resource_name_, provider);
+  }
+}
+
 ProtobufTypes::MessagePtr
 SecretManagerImpl::dumpSecretConfigs(const Matchers::StringMatcher& name_matcher) {
   auto config_dump = std::make_unique<envoy::admin::v3::SecretsConfigDump>();

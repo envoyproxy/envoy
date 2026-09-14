@@ -656,4 +656,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle
   return config->enableListenerLifecycle();
 }
 
+// -------------------- Secret Lifecycle Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  return config->enableSecretLifecycle();
+}
+
 } // extern "C"

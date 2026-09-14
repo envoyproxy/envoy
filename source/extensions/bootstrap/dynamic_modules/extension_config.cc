@@ -74,17 +74,31 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
 
 void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
     absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand&) {
-  if (in_module_config_ != nullptr && on_bootstrap_extension_cluster_add_or_update_ != nullptr) {
-    on_bootstrap_extension_cluster_add_or_update_(thisAsVoidPtr(), in_module_config_,
-                                                  {cluster_name.data(), cluster_name.size()});
-  }
+  // ThreadLocalClusterUpdateCallbacks are delivered on every worker thread (runOnAllThreads), but
+  // the module hooks may only run on the main thread. Marshal there via post(), copying the name
+  // since the view does not outlive the callback, and locking a weak_ptr so a post that outlives
+  // the config is dropped rather than dereferencing freed memory.
+  main_thread_dispatcher_.post([weak = weak_from_this(), name = std::string(cluster_name)]() {
+    auto self = weak.lock();
+    if (self && self->in_module_config_ != nullptr &&
+        self->on_bootstrap_extension_cluster_add_or_update_ != nullptr) {
+      self->on_bootstrap_extension_cluster_add_or_update_(
+          self->thisAsVoidPtr(), self->in_module_config_, {name.data(), name.size()});
+    }
+  });
 }
 
 void DynamicModuleBootstrapExtensionConfig::onClusterRemoval(absl::string_view cluster_name) {
-  if (in_module_config_ != nullptr && on_bootstrap_extension_cluster_removal_ != nullptr) {
-    on_bootstrap_extension_cluster_removal_(thisAsVoidPtr(), in_module_config_,
-                                            {cluster_name.data(), cluster_name.size()});
-  }
+  // Marshal to the main thread as in onClusterAddOrUpdate. cluster_name is a view that does not
+  // outlive this call, so copy it into the posted task rather than capturing the view.
+  main_thread_dispatcher_.post([weak = weak_from_this(), name = std::string(cluster_name)]() {
+    auto self = weak.lock();
+    if (self && self->in_module_config_ != nullptr &&
+        self->on_bootstrap_extension_cluster_removal_ != nullptr) {
+      self->on_bootstrap_extension_cluster_removal_(self->thisAsVoidPtr(), self->in_module_config_,
+                                                    {name.data(), name.size()});
+    }
+  });
 }
 
 bool DynamicModuleBootstrapExtensionConfig::enableListenerLifecycle() {
@@ -116,6 +130,65 @@ void DynamicModuleBootstrapExtensionConfig::onListenerRemoval(const std::string&
   if (in_module_config_ != nullptr && on_bootstrap_extension_listener_removal_ != nullptr) {
     on_bootstrap_extension_listener_removal_(thisAsVoidPtr(), in_module_config_,
                                              {listener_name.data(), listener_name.size()});
+  }
+}
+
+bool DynamicModuleBootstrapExtensionConfig::enableSecretLifecycle() {
+  if (secret_lifecycle_enabled_) {
+    return false;
+  }
+  if (!server_initialized_) {
+    ENVOY_LOG(error, "cannot enable secret lifecycle before server is initialized");
+    return false;
+  }
+  secret_lifecycle_enabled_ = true;
+  // Subscribe to every dynamic TLS certificate secret provider. The SecretManager invokes this on
+  // the main thread once for each provider that already exists and again for each one created
+  // later; we then hook the provider's own update/remove callbacks (also main thread). Because
+  // pre-existing providers are replayed through the same path, they get update AND removal events,
+  // not just an initial add.
+  context_.secretManager().setDynamicTlsCertificateSecretProviderCreatedCallback(
+      [weak = weak_from_this()](const std::string& secret_name,
+                                const Secret::TlsCertificateConfigProviderSharedPtr& provider) {
+        if (auto self = weak.lock()) {
+          self->subscribeSecretProvider(secret_name, provider);
+        }
+      });
+  return true;
+}
+
+void DynamicModuleBootstrapExtensionConfig::subscribeSecretProvider(
+    const std::string& secret_name, const Secret::TlsCertificateConfigProviderSharedPtr& provider) {
+  // addUpdateCallback fires immediately if the secret is already present, and again on every
+  // rotation; addRemoveCallback fires when the resource is explicitly removed. Both run on the main
+  // thread. The handles are retained so the subscriptions stay live for the life of the config.
+  secret_callback_handles_.push_back(
+      provider->addUpdateCallback([weak = weak_from_this(), secret_name]() {
+        if (auto self = weak.lock()) {
+          self->onSecretAddOrUpdate(secret_name);
+        }
+        return absl::OkStatus();
+      }));
+  secret_callback_handles_.push_back(
+      provider->addRemoveCallback([weak = weak_from_this(), secret_name]() {
+        if (auto self = weak.lock()) {
+          self->onSecretRemoval(secret_name);
+        }
+        return absl::OkStatus();
+      }));
+}
+
+void DynamicModuleBootstrapExtensionConfig::onSecretAddOrUpdate(const std::string& secret_name) {
+  if (in_module_config_ != nullptr && on_bootstrap_extension_secret_add_or_update_ != nullptr) {
+    on_bootstrap_extension_secret_add_or_update_(thisAsVoidPtr(), in_module_config_,
+                                                 {secret_name.data(), secret_name.size()});
+  }
+}
+
+void DynamicModuleBootstrapExtensionConfig::onSecretRemoval(const std::string& secret_name) {
+  if (in_module_config_ != nullptr && on_bootstrap_extension_secret_removal_ != nullptr) {
+    on_bootstrap_extension_secret_removal_(thisAsVoidPtr(), in_module_config_,
+                                           {secret_name.data(), secret_name.size()});
   }
 }
 
@@ -439,6 +512,20 @@ newDynamicModuleBootstrapExtensionConfig(
     return on_listener_removal.status();
   }
 
+  auto on_secret_add_or_update =
+      dynamic_module->getFunctionPointer<OnBootstrapExtensionSecretAddOrUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update");
+  if (!on_secret_add_or_update.ok()) {
+    return on_secret_add_or_update.status();
+  }
+
+  auto on_secret_removal =
+      dynamic_module->getFunctionPointer<OnBootstrapExtensionSecretRemovalType>(
+          "envoy_dynamic_module_on_bootstrap_extension_secret_removal");
+  if (!on_secret_removal.ok()) {
+    return on_secret_removal.status();
+  }
+
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
       extension_name, extension_config, metrics_namespace, std::move(dynamic_module),
       main_thread_dispatcher, context, stats_store);
@@ -473,6 +560,8 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_cluster_removal_ = on_cluster_removal.value();
   config->on_bootstrap_extension_listener_add_or_update_ = on_listener_add_or_update.value();
   config->on_bootstrap_extension_listener_removal_ = on_listener_removal.value();
+  config->on_bootstrap_extension_secret_add_or_update_ = on_secret_add_or_update.value();
+  config->on_bootstrap_extension_secret_removal_ = on_secret_removal.value();
 
   config->stat_creation_frozen_ = true;
 

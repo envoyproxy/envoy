@@ -364,6 +364,9 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_cluster
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
+
 // ---------------------- Cluster extension callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the cluster extension abi_impl.cc when the cluster extension is used.

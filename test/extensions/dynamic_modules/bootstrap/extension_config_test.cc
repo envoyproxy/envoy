@@ -3,6 +3,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/listener_manager.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
@@ -47,6 +48,8 @@ TEST_F(ExtensionConfigTest, LoadOK) {
   EXPECT_NE(config.value()->on_bootstrap_extension_http_callout_done_, nullptr);
   EXPECT_NE(config.value()->on_bootstrap_extension_timer_fired_, nullptr);
   EXPECT_NE(config.value()->on_bootstrap_extension_admin_request_, nullptr);
+  EXPECT_NE(config.value()->on_bootstrap_extension_secret_add_or_update_, nullptr);
+  EXPECT_NE(config.value()->on_bootstrap_extension_secret_removal_, nullptr);
 }
 
 TEST_F(ExtensionConfigTest, ConfigNewFail) {
@@ -307,6 +310,91 @@ TEST_F(ExtensionConfigTest, ClusterAccessRequiresServerInitialized) {
   testing::NiceMock<Server::MockListenerManager> listener_manager;
   config->setListenerManager(listener_manager);
   EXPECT_TRUE(config->enableClusterLifecycle());
+}
+
+TEST_F(ExtensionConfigTest, MissingSecretAddOrUpdate) {
+  // Test that config creation fails when
+  // envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update symbol is missing.
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      testDataDir() + "/libbootstrap_no_secret_add_or_update.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  EXPECT_FALSE(config.ok());
+  EXPECT_THAT(
+      config.status().message(),
+      testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update"));
+}
+
+TEST_F(ExtensionConfigTest, MissingSecretRemoval) {
+  // Test that config creation fails when
+  // envoy_dynamic_module_on_bootstrap_extension_secret_removal symbol is missing.
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      testDataDir() + "/libbootstrap_no_secret_removal.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  EXPECT_FALSE(config.ok());
+  EXPECT_THAT(config.status().message(),
+              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_secret_removal"));
+}
+
+TEST_F(ExtensionConfigTest, ClusterCallbacksMarshaledToMainThread) {
+  // Cluster lifecycle callbacks are delivered by the ClusterManager on every worker thread
+  // (runOnAllThreads), but the module hooks may only run on the main thread. Both callbacks must
+  // therefore reach the module via the main-thread dispatcher's post(), not inline. This guards the
+  // historical worker-thread crash.
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+  auto config_or = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
+      context_, context_.store_);
+  ASSERT_TRUE(config_or.ok()) << config_or.status();
+  auto config = config_or.value();
+
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  ASSERT_TRUE(config->enableClusterLifecycle());
+
+  int posts = 0;
+  EXPECT_CALL(dispatcher_, post(testing::_)).Times(2).WillRepeatedly([&posts](Event::PostCb cb) {
+    ++posts;
+    // Simulate the main-thread turn running the marshaled work.
+    cb();
+  });
+
+  testing::NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  Upstream::ThreadLocalClusterCommand command = [&cluster]() -> Upstream::ThreadLocalCluster& {
+    return cluster;
+  };
+  config->onClusterAddOrUpdate("some_cluster", command);
+  config->onClusterRemoval("some_cluster");
+  EXPECT_EQ(posts, 2);
+}
+
+TEST_F(ExtensionConfigTest, EnableSecretLifecycleRequiresServerInitialized) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+  auto config_or = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
+      context_, context_.store_);
+  ASSERT_TRUE(config_or.ok()) << config_or.status();
+  auto config = config_or.value();
+
+  // Before the server is initialized the SecretManager is unavailable, so enabling is refused.
+  EXPECT_FALSE(config->enableSecretLifecycle());
+
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  // After initialization it can be enabled once; a second call is a no-op.
+  EXPECT_TRUE(config->enableSecretLifecycle());
+  EXPECT_FALSE(config->enableSecretLifecycle());
 }
 
 } // namespace DynamicModules

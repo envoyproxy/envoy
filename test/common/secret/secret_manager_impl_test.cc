@@ -438,11 +438,45 @@ tls_certificate:
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  EXPECT_OK(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
-                ->onConfigUpdate(decoded_resources.refvec_, ""));
+  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, "")
+                  .ok());
   // Delivered: the secret is now active.
   EXPECT_THAT(secret_manager->dynamicActiveTlsCertificateSecretNames(),
               testing::UnorderedElementsAre("abc.com"));
+}
+
+// Registering the provider-created callback replays it for providers that already exist, so an
+// observer that subscribes after a provider was created still learns of it (and can hook the
+// provider's update/removal callbacks). Without the replay a pre-existing provider's removal would
+// never reach the observer.
+TEST_F(SecretManagerImplTest, SecretProviderCreatedCallbackReplaysExistingProviders) {
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  envoy::config::core::v3::ConfigSource config_source;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Init::MockManager> init_manager;
+  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+      .WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
+
+  // Create the provider before the callback is registered.
+  auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
+      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+
+  // Registering the callback replays it for the already-existing provider, carrying its name and
+  // the same provider handle.
+  std::vector<std::string> observed;
+  Secret::TlsCertificateConfigProviderSharedPtr observed_provider;
+  secret_manager->setDynamicTlsCertificateSecretProviderCreatedCallback(
+      [&observed, &observed_provider](
+          const std::string& name, const Secret::TlsCertificateConfigProviderSharedPtr& provider) {
+        observed.push_back(name);
+        observed_provider = provider;
+      });
+  EXPECT_THAT(observed, testing::ElementsAre("abc.com"));
+  EXPECT_EQ(observed_provider.get(), secret_provider.get());
 }
 
 TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
