@@ -5,6 +5,8 @@
 
 This document defines the naming conventions and style guidelines for the Dynamic Modules ABI header (`abi.h`). All ABI definitions must follow these conventions to maintain consistency and clarity across the codebase.
 
+This document covers naming and documentation conventions only. For the compatibility guarantees of the ABI, and the process a change to an already released ABI entity must follow, see the ABI compatibility policy at the top of [abi.h](abi/abi.h).
+
 ## Function Signature Style
 
 Dynamic module mainly has two types of functions: event hooks and callbacks. The event hooks are implemented by the dynamic module and called by Envoy, while the callbacks are implemented by Envoy and called by the dynamic module.

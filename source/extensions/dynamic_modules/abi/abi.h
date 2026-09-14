@@ -26,14 +26,80 @@
 // by nature. For example, we assume that modules will not try to pass invalid pointers to Envoy
 // intentionally.
 
-// This is the ABI version that we bump the minor version at least once for any ABI changes in same
-// Envoy release cycle to indicate the ABI change.
+// =============================================================================
+// =========================== ABI Compatibility Policy ========================
+// =============================================================================
 //
-// Until we reach v1.0, the ABI is experimental and any version change may be breaking, so a module
-// must be rebuilt against the exact Envoy version it runs with.
+// Modules may be built and shipped independently of the Envoy binary that loads them, so there is
+// no recompilation step that would surface an incompatibility: a mismatch shows up as a failed
+// symbol resolution at config load time, or, worse, as undefined behavior at request time.
+// Everything declared in this file - types (envoy_dynamic_module_type_*), event hooks
+// (envoy_dynamic_module_on_*) and callbacks (envoy_dynamic_module_callback_*), collectively "ABI
+// entities" - is therefore governed by the following rules. See also the user-facing summary in
+// docs/root/intro/arch_overview/advanced/dynamic_modules.rst.
 //
-// This is used only for tracking the ABI version of dynamic modules and emitting warnings when
-// there's a mismatch.
+// 1. A released ABI entity is never changed in place.
+//
+//    An entity is "released" once it is present in this file on a cut Envoy release branch, that
+//    is, once it has shipped in any Envoy vX.Y.0.
+//
+//    From then on none of the following may change: the name of a function, type, struct field or
+//    enum value; a function's parameter count, order, types or return type; a struct's layout (no
+//    adding, removing, reordering or resizing a field, and no giving one a new meaning); an enum's
+//    numbering or the meaning of an existing enumerator; or the documented semantics - ownership,
+//    buffer lifetime, threading and reentrancy constraints, which values may be null, and the
+//    meaning of each return value.
+//
+// 2. An ABI entity that has never been released may be changed freely.
+//
+//    An entity added to main since the last release branch was cut may be modified, renamed or
+//    removed outright, with no suffix, no deprecation period and no release note, because no
+//    released SDK or module can depend on it.
+//
+// 3. Iterate by adding, never by mutating.
+//
+//    When a released entity needs a different signature or different semantics, add a new entity
+//    alongside it and deprecate the old one, using one of two naming schemes:
+//
+//    a. Append a _v2 suffix to the existing name, then _v3, and so on. This is the default, for
+//       when the new entity is the same operation with a changed signature or semantics, so the
+//       name still describes it accurately. The original unsuffixed name is implicitly _v1 and
+//       must never be renamed to _v1, which would itself be a breaking change. Suffixes are
+//       monotonic and never reused, even if an intermediate version is later removed.
+//
+//    b. Give the replacement an entirely new, descriptive name when the concept itself changed.
+//
+//    Prefer (a) when in doubt: a numeric suffix needs no naming debate and makes the lineage
+//    obvious.
+//
+//    Adding a brand new callback or type is always additive and needs none of the above. Adding a
+//    new event hook to an existing extension point needs care: a module built against an older SDK
+//    does not export a hook that was added later, so every newly added hook must be resolved
+//    optionally on the Envoy side, treating an unresolved symbol as "the module does not implement
+//    this hook" rather than as a config failure. A new hook resolved as mandatory is a breaking
+//    change. Likewise, appending an enumerator is safe only for enums that flow from a module into
+//    Envoy, since an older module never returns the new value; appending to an enum that Envoy
+//    passes into a module breaks modules built before the value existed.
+//
+// 4. Deprecate for at least four Envoy release cycles before removing.
+//
+//    Four cycles is a floor, not a target. A widely used entity, or one whose replacement is
+//    awkward to migrate to, should stay longer, and never removing a deprecated entity is an
+//    acceptable outcome.
+//
+// Compatibility follows from these four rules together with symbol resolution.
+
+// =============================================================================
+// ======================= End of ABI Compatibility Policy =====================
+// =============================================================================
+
+// ENVOY_DYNAMIC_MODULES_ABI_VERSION is a diagnostic marker. It is deliberately not part of the
+// compatibility policy above, and nothing in Envoy or in a module should depend on it.
+//
+// It records which revision of this file a binary was built against. But Envoy never strictly
+// validates it. A module reports the value it was built against from
+// envoy_dynamic_module_on_program_init, and a value that differs from Envoy's own is logged and
+// otherwise ignored - the module still loads and runs.
 //
 // Note(internal): We could use the Envoy's version such as "v1.38.0" here, there are several
 // reasons as to why we use a static version string instead:
@@ -69,8 +135,10 @@ const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
 
 /**
  * envoy_dynamic_module_type_abi_version_module_ptr represents a null-terminated string that
- * contains the ABI version of the dynamic module. This is used to ensure that the dynamic module is
- * built against the compatible version of the ABI.
+ * contains the ABI version the dynamic module was built against. Envoy logs it and does not
+ * otherwise act on it: it is a diagnostic marker, not a compatibility gate, and a value that
+ * differs from Envoy's own does not prevent the module from loading. See the ABI compatibility
+ * policy at the top of this file.
  *
  * OWNERSHIP: Module owns the pointer. The string must remain valid until the end of
  * envoy_dynamic_module_on_program_init function.
@@ -454,7 +522,9 @@ typedef enum envoy_dynamic_module_type_socket_direction {
  * loaded. The function returns the ABI version of the dynamic module. If null is returned, the
  * module will be unloaded immediately.
  *
- * For Envoy, the return value will be used to check the compatibility of the dynamic module.
+ * For Envoy, the return value is recorded and logged for diagnostics only. Envoy does not
+ * validate it against its own ABI version, so returning a version that differs from Envoy's does
+ * not fail the load; only returning null does.
  *
  * For dynamic modules, this is useful when they need to perform some process-wide
  * initialization or check if the module is compatible with the platform, such as CPU features.
@@ -463,8 +533,8 @@ typedef enum envoy_dynamic_module_type_socket_direction {
  * to check compatibility and gracefully fail the initialization because there is no way to
  * report an error to Envoy.
  *
- * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version of the dynamic
- * module. Null means the error and the module will be unloaded immediately.
+ * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version the dynamic module
+ * was built against. Null means the error and the module will be unloaded immediately.
  */
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void);
 
