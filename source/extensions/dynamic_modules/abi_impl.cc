@@ -29,19 +29,11 @@ absl::Mutex shared_data_registry_mutex;
 absl::flat_hash_map<std::string, void*>
     shared_data_registry ABSL_GUARDED_BY(shared_data_registry_mutex);
 
-} // namespace
-
-extern "C" {
-
-bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level level) {
-  return Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules).level() <=
-         static_cast<spdlog::level::level_enum>(level);
-}
-
-void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
-                                       envoy_dynamic_module_type_module_buffer message,
-                                       envoy_dynamic_module_type_module_buffer source_file,
-                                       uint32_t source_line) {
+// Logs message to the dynamic modules logger at level, dropping levels outside the valid spdlog
+// range or below the configured level. The deprecated callback passes an empty source location.
+void logToDynamicModulesLogger(envoy_dynamic_module_type_log_level level,
+                               envoy_dynamic_module_type_module_buffer message,
+                               spdlog::source_loc source_location) {
   spdlog::logger& logger = Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules);
   const auto spdlog_level = static_cast<spdlog::level::level_enum>(level);
   // Ignore Off and any out-of-range value, which also guards spdlog against an invalid level.
@@ -52,6 +44,28 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
     return;
   }
   absl::string_view message_view(message.ptr, message.length);
+  logger.log(source_location, spdlog_level, "{}", message_view);
+}
+
+} // namespace
+
+extern "C" {
+
+bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level level) {
+  return Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules).level() <=
+         static_cast<spdlog::level::level_enum>(level);
+}
+
+void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
+                                       envoy_dynamic_module_type_module_buffer message) {
+  // The deprecated callback predates source location support, so report an empty location.
+  logToDynamicModulesLogger(level, message, spdlog::source_loc{});
+}
+
+void envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level level,
+                                          envoy_dynamic_module_type_module_buffer message,
+                                          envoy_dynamic_module_type_module_buffer source_file,
+                                          uint32_t source_line) {
   // spdlog reads the source file as a null-terminated C string. Reuse a thread-local buffer to
   // null-terminate the module-owned bytes without allocating on each log call. The pointer only
   // needs to stay valid for this synchronous log call.
@@ -61,10 +75,11 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
   } else {
     source_file_buffer.assign(source_file.ptr, source_file.length);
   }
-  // Log directly with the module source location. The ENVOY_LOG macros would bake in this file and
-  // line instead.
-  logger.log(spdlog::source_loc{source_file_buffer.c_str(), static_cast<int>(source_line), ""},
-             spdlog_level, "{}", message_view);
+  // Log directly with the module source location. The ENVOY_LOG macros would bake in the
+  // abi_impl.cc file and line instead.
+  logToDynamicModulesLogger(
+      level, message,
+      spdlog::source_loc{source_file_buffer.c_str(), static_cast<int>(source_line), ""});
 }
 
 envoy_dynamic_module_type_log_level envoy_dynamic_module_callback_get_log_level() {

@@ -1,9 +1,8 @@
 use crate::{
-  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr,
-  NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
+  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
+  wrap_into_c_void_ptr, NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
 };
 use mockall::*;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// The module-side bridge configuration.
 ///
@@ -325,13 +324,12 @@ impl EnvoyUpstreamHttpTcpBridge for EnvoyUpstreamHttpTcpBridgeImpl {
 
 // Upstream HTTP TCP Bridge Event Hook Implementations
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new(
-  _config_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new(
+    _config_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr {
     let name_str =
       unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
     let config_slice = unsafe {
@@ -344,144 +342,101 @@ pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new(
       Some(config) => wrap_into_c_void_ptr!(config),
       None => std::ptr::null(),
     }
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new",
-      panic,
-    );
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_destroy(
-  config_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_destroy(
+    config_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr,
+  ) {
     drop_wrapped_c_void_ptr!(config_module_ptr, UpstreamHttpTcpBridgeConfig);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_upstream_http_tcp_bridge_config_destroy",
-      panic,
-    );
-  });
+  }
 }
 
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
-  config_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr,
-  bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
-) -> abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
+    config_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr,
+    bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+  ) -> abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr {
     let config = config_module_ptr as *const *const dyn UpstreamHttpTcpBridgeConfig;
     let config = &**config;
     let envoy_bridge = EnvoyUpstreamHttpTcpBridgeImpl::new(bridge_envoy_ptr);
     let bridge = config.new_bridge(&envoy_bridge);
     wrap_into_c_void_ptr!(bridge)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_upstream_http_tcp_bridge_new",
-      panic,
-    );
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
-  bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
-  bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
-  end_of_stream: bool,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
+    bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
+    end_of_stream: bool,
+  ) {
     let bridge = bridge_module_ptr as *mut Box<dyn UpstreamHttpTcpBridge>;
     let bridge = unsafe { &mut *bridge };
     let envoy_bridge = EnvoyUpstreamHttpTcpBridgeImpl::new(bridge_envoy_ptr);
     bridge.on_encode_headers(&envoy_bridge, end_of_stream);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers",
-      panic,
-    );
-  });
+  }
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
-  bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
-  bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
-  end_of_stream: bool,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
+    bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
+    end_of_stream: bool,
+  ) {
     let bridge = bridge_module_ptr as *mut Box<dyn UpstreamHttpTcpBridge>;
     let bridge = unsafe { &mut *bridge };
     let envoy_bridge = EnvoyUpstreamHttpTcpBridgeImpl::new(bridge_envoy_ptr);
     bridge.on_encode_data(&envoy_bridge, end_of_stream);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data",
-      panic,
-    );
-  });
+  }
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers(
-  bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
-  bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers(
+    bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
+  ) {
     let bridge = bridge_module_ptr as *mut Box<dyn UpstreamHttpTcpBridge>;
     let bridge = unsafe { &mut *bridge };
     let envoy_bridge = EnvoyUpstreamHttpTcpBridgeImpl::new(bridge_envoy_ptr);
     bridge.on_encode_trailers(&envoy_bridge);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers",
-      panic,
-    );
-  });
+  }
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data(
-  bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
-  bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
-  end_of_stream: bool,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data(
+    bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
+    end_of_stream: bool,
+  ) {
     let bridge = bridge_module_ptr as *mut Box<dyn UpstreamHttpTcpBridge>;
     let bridge = unsafe { &mut *bridge };
     let envoy_bridge = EnvoyUpstreamHttpTcpBridgeImpl::new(bridge_envoy_ptr);
     bridge.on_upstream_data(&envoy_bridge, end_of_stream);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data",
-      panic,
-    );
-  });
+  }
 }
 
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy(
-  bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy(
+    bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
+  ) {
     drop_wrapped_c_void_ptr!(bridge_module_ptr, UpstreamHttpTcpBridge);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy",
-      panic,
-    );
-  });
+  }
 }
 
 /// Declare the init functions for the upstream HTTP TCP bridge dynamic module.
