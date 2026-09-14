@@ -763,6 +763,24 @@ TEST_F(McpFilterTest, ProtocolVersionBelowMaxAllowed) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
+TEST_F(McpFilterTest, UnknownProtocolVersionIsUnsupported) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
+
+  EXPECT_FALSE(config_->isProtocolVersionSupported("2099-01-01"));
+}
+
+TEST_F(McpFilterTest, UnknownMaxProtocolVersionIsUnsupported) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_max_supported_protocol_version()->set_value("2099-01-01");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "", factory_context_.scope());
+
+  EXPECT_FALSE(config_->isProtocolVersionSupported("2026-07-28"));
+}
+
 TEST_F(McpFilterTest, EmptySupportedVersionsAcceptsExplicitVersion) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
