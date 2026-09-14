@@ -65,8 +65,10 @@ const Protobuf::Value& dynamicMetadataValue(const StreamInfo::StreamInfo& stream
                                             envoy_dynamic_module_type_module_buffer filter_name,
                                             envoy_dynamic_module_type_module_buffer path) {
   std::string filter_name_str(filter_name.ptr, filter_name.length);
-  std::string path_str(path.ptr, path.length);
-  std::vector<std::string> path_parts = absl::StrSplit(path_str, '.');
+  // Keep a non-null empty view for an absent path so the split result is unchanged.
+  const absl::string_view path_view =
+      path.ptr == nullptr ? absl::string_view("") : absl::string_view(path.ptr, path.length);
+  std::vector<std::string> path_parts = absl::StrSplit(path_view, '.');
   const auto& metadata = stream_info.dynamicMetadata();
   return Envoy::Config::Metadata::metadataValue(&metadata, filter_name_str, path_parts);
 }
@@ -170,6 +172,15 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
     break;
   }
   case envoy_dynamic_module_type_attribute_id_XdsVirtualHostName: {
+    const auto virtual_host = stream_info.virtualHost();
+    if (virtual_host.has_value()) {
+      const auto& name = virtual_host->name();
+      *result = {const_cast<char*>(name.data()), name.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName: {
     const auto& name = stream_info.virtualClusterName();
     if (name.has_value() && !name->empty()) {
       *result = {const_cast<char*>(name->data()), name->size()};
