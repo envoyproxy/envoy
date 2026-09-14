@@ -1187,7 +1187,7 @@ public:
         .Times(AnyNumber())
         .WillRepeatedly(Return(false));
     ON_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).WillByDefault(Invoke([this]() {
-      return new Upstream::ResourceAutoIncDec(pending_requests_);
+      return new Upstream::ResourceAutoIncDec(lookup_requests_);
     }));
   }
 
@@ -1223,6 +1223,9 @@ public:
                                                  std::nullopt};
             }));
   }
+
+  // Separate from pending_requests_, which the base fixture's circuit breaker also releases.
+  NiceMock<Upstream::MockBasicResourceLimit> lookup_requests_;
 };
 
 TEST_F(ProxyFilterHostCandidatesTest, ResolvesEachHostOnce) {
@@ -1283,11 +1286,11 @@ TEST_F(ProxyFilterHostCandidatesTest, WaitsForEveryLoadingHost) {
   ASSERT_NE(nullptr, callbacks_a);
   ASSERT_NE(nullptr, callbacks_b);
 
-  EXPECT_CALL(pending_requests_, dec());
+  EXPECT_CALL(lookup_requests_, dec());
   EXPECT_CALL(callbacks_, continueDecoding()).Times(0);
   callbacks_a->onLoadDnsCacheComplete(hostInfo(false));
 
-  EXPECT_CALL(pending_requests_, dec());
+  EXPECT_CALL(lookup_requests_, dec());
   EXPECT_CALL(callbacks_, continueDecoding());
   EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   callbacks_b->onLoadDnsCacheComplete(hostInfo(true));
@@ -1325,7 +1328,7 @@ TEST_F(ProxyFilterHostCandidatesTest, DestroyCancelsPendingHosts) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
-  EXPECT_CALL(pending_requests_, dec());
+  EXPECT_CALL(lookup_requests_, dec());
   EXPECT_CALL(*handle, onDestroy());
   filter_->onDestroy();
 }
