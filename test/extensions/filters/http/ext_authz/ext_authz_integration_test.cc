@@ -618,6 +618,8 @@ public:
     if (fake_ext_authz_connection_ != nullptr) {
       AssertionResult result = fake_ext_authz_connection_->close();
       RELEASE_ASSERT(result, result.message());
+      result = fake_ext_authz_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
     cleanupUpstreamAndDownstream();
   }
