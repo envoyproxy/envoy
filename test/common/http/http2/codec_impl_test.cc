@@ -4556,9 +4556,9 @@ TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProc
   EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(1, 3));
 }
 
-// Regression test for reentrant encoding during connection-level low watermark callbacks. The
-// callback fanout must tolerate an encode operation reordering active_streams_ while still
-// notifying every stream exactly once in the original LRU order.
+// Regression test for reentrant encoding during connection-level watermark callbacks. The callback
+// fanout must tolerate an encode operation reordering active_streams_ while still notifying every
+// stream exactly once in the original order.
 TEST_P(Http2CodecImplTest, LowWatermarkCallbackCanReorderActiveStreams) {
   initialize();
 
@@ -4588,20 +4588,26 @@ TEST_P(Http2CodecImplTest, LowWatermarkCallbackCanReorderActiveStreams) {
   request_encoder2->getStream().addCallbacks(callbacks2);
   request_encoder3->getStream().addCallbacks(callbacks3);
 
-  EXPECT_CALL(callbacks1, onAboveWriteBufferHighWatermark());
+  Buffer::OwnedImpl high_watermark_data("a");
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  EXPECT_CALL(callbacks1, onAboveWriteBufferHighWatermark()).WillOnce([&]() {
+    request_encoder1->encodeData(high_watermark_data, false);
+  });
   EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(callbacks3, onAboveWriteBufferHighWatermark());
   client_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1, 5, 3));
+  driveToCompletion();
 
-  Buffer::OwnedImpl data("a");
+  Buffer::OwnedImpl low_watermark_data("a");
   EXPECT_CALL(request_decoder_, decodeData(_, false));
-  EXPECT_CALL(callbacks1, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([&]() {
-    request_encoder1->encodeData(data, false);
-  }));
-  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).WillOnce([&]() {
+    request_encoder2->encodeData(low_watermark_data, false);
+  });
+  EXPECT_CALL(callbacks1, onBelowWriteBufferLowWatermark());
   EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
   client_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
-  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1, 5, 3));
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(3, 1, 5));
   driveToCompletion();
 }
 

@@ -169,7 +169,16 @@ public:
   bool wantsToWrite() override { return adapter_->want_write(); }
   // Propagate network connection watermark events to each stream on the connection.
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
+    // Snapshot the streams before invoking callbacks. A callback may encode on its stream and
+    // reorder active_streams_, invalidating the traversal. Stream deletion is deferred, so the
+    // pointers remain valid for the duration of this synchronous callback fanout.
+    std::vector<StreamImpl*> streams;
+    streams.reserve(active_streams_.size());
     for (auto& stream : active_streams_) {
+      streams.push_back(stream.get());
+    }
+
+    for (StreamImpl* stream : streams) {
       stream->runHighWatermarkCallbacks();
     }
   }
