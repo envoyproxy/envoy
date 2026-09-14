@@ -10,7 +10,7 @@
 
 #define FLAG_LOGGER(name)                                                                          \
   if (name) {                                                                                      \
-    defects.push_back(#name);                                                                      \
+    changes.push_back(#name);                                                                      \
   }
 
 namespace Envoy {
@@ -32,14 +32,14 @@ BreakingChangesTracker::fromFilterState(const StreamInfo::FilterStateSharedPtr& 
 std::optional<std::string> BreakingChangesTracker::serializeAsString() const {
   // The likely case is that there are 0 defects. Sometimes there will be 1.
   // Very rarely, there will be 2.
-  absl::InlinedVector<absl::string_view, 1> defects;
+  absl::InlinedVector<absl::string_view, 1> changes;
   ALL_BREAKING_CHANGES(FLAG_LOGGER, FLAG_LOGGER)
 
-  if (defects.empty()) {
+  if (changes.empty()) {
     return std::nullopt;
   }
 
-  return absl::StrJoin(defects, ",");
+  return absl::StrJoin(changes, ",");
 }
 
 } // namespace Runtime

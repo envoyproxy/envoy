@@ -30,11 +30,16 @@ Introducing a breaking change
 
 "Breaking change" is a code change that may have observable impact on existing production traffic.
 When introducing a breaking change in Envoy, it desirable to surface in observability potential impact of
-enabling the chanmge. Operators can assess the impact via access logs and metrics before older behaviors
-are modified or removed.
+enabling the change. Operators can assess the impact via access logs before older behaviors are modified
+or removed.
+
+Observability for breaking changes is disabled by default. It can be enabled by setting the
+``envoy.reloadable_features.breaking_change_observability_enabled`` runtime flag. Envoy emits observability data for
+all breaking changes encountered in the traffic. Envoy stops emmitting observability data when a breaking change flag
+is decommissioned.
 
 Adding a breaking change flag introduces Envoy reloadabale flag with the ``envoy.reloadable_features.<flag_name>``
-name and puts tracking state in the ``BreakingChangesTracker`` class. Breaking changes are enable by setting
+name and puts tracking state in the ``BreakingChangesTracker`` class. Breaking changes are enabled by setting
 the ``envoy.reloadable_features.<flag_name>`` flag in Envoy Runtime.
 
 To introduce and track a breaking change:
