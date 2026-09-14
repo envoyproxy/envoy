@@ -28,7 +28,7 @@ run --color=yes
 build --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/dd48349c76a2195c95ea1b0a859b1a285254090b
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/ea7d3f2e84c102cda5ad4db645dbe156c807a77f
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -141,7 +141,6 @@ build --@quiche//:quiche_export_impl_lib=@envoy//source/common/quic/platform:qui
 build --@quiche//:quiche_flags_impl_lib=@envoy//source/common/quic/platform:quiche_flags_impl_lib
 build --@quiche//:quiche_logging_impl_lib=@envoy//source/common/quic/platform:quiche_logging_impl_lib
 build --@quiche//:quiche_lower_case_string_impl_lib=@envoy//source/common/quic/platform:quiche_lower_case_string_impl_lib
-build --@quiche//:quiche_mem_slice_impl_lib=@envoy//source/common/quic/platform:quiche_mem_slice_impl_lib
 build --@quiche//:quiche_platform_iovec_impl_lib=@envoy//source/common/quic/platform:quiche_platform_iovec_impl_lib
 build --@quiche//:quiche_stack_trace_impl_lib=@envoy//source/common/quic/platform:quiche_stack_trace_impl_lib
 build --@quiche//:quiche_time_utils_impl_lib=@envoy//source/common/quic/platform:quiche_time_utils_impl_lib
@@ -499,7 +498,7 @@ build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-# This flag may be more generally useful - it sets foreign_cc builds -jauto.
+# This flag may be more generally useful - it sets the openssl foreign_cc build -jauto.
 # It is only set here because if it were the default it risks OOMing on local builds.
 build:remote --@openssl//:parallel_builds
 

@@ -159,6 +159,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "ai_request_test",
+    srcs = ["ai_request_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:ai_request_lib",
+        "//test/test_common:status_utility_lib",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "filter_manager_test",
     srcs = ["filter_manager_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],

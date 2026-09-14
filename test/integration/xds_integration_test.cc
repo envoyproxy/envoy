@@ -372,6 +372,10 @@ public:
         matcher_(std::get<1>(GetParam())) {}
 
   void inplaceInitialize(bool add_default_filter_chain = false) {
+    // These tests assert that the connections of a deleted filter chain are drain-closed at the
+    // first opportunity, which is what the immediate drain strategy does. The default gradual
+    // strategy ramps the drain close over the drain window instead.
+    drain_strategy_ = Server::DrainStrategy::Immediate;
     autonomous_upstream_ = true;
     setUpstreamCount(2);
 

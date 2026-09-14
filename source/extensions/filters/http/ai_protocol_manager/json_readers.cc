@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-std::optional<uint64_t> readCount(const nlohmann::json& json, const std::string& key,
+std::optional<uint64_t> readCount(const nlohmann::json& json, absl::string_view key,
                                   bool& malformed) {
   const auto it = json.find(key);
   if (it == json.end()) {
@@ -50,7 +50,7 @@ std::optional<uint64_t> readCount(const nlohmann::json& json, const std::string&
   return std::nullopt;
 }
 
-std::optional<std::string> readString(const nlohmann::json& json, const std::string& key) {
+std::optional<std::string> readString(const nlohmann::json& json, absl::string_view key) {
   const auto it = json.find(key);
   if (it == json.end() || !it->is_string()) {
     return std::nullopt;
@@ -62,8 +62,8 @@ std::optional<std::string> readString(const nlohmann::json& json, const std::str
   return value;
 }
 
-const nlohmann::json* readObject(const nlohmann::json& json, const std::string& key,
-                                 bool& malformed, NullPolicy null_policy) {
+const nlohmann::json* readObject(const nlohmann::json& json, absl::string_view key, bool& malformed,
+                                 NullPolicy null_policy) {
   const auto it = json.find(key);
   if (it == json.end()) {
     return nullptr;

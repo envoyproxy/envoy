@@ -2758,6 +2758,28 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ConfigStatsOperate) {
                 config, invalid_id, 1));
 }
 
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeUpstreamRequestedServerName) {
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
+      &string_result));
+
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::string sni = "network-upstream.example.com";
+  ON_CALL(*ssl_info, sni()).WillByDefault(testing::ReturnRef(sni));
+  connection_.stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
+      &string_result));
+  EXPECT_EQ("network-upstream.example.com",
+            absl::string_view(string_result.ptr, string_result.length));
+  bool bool_result = false;
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
+      &bool_result));
+}
+
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeInt) {
   const uint64_t response_flags = (1ULL << 1) | (1ULL << 26);
   EXPECT_CALL(connection_.stream_info_, legacyResponseFlags())

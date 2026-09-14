@@ -35,6 +35,7 @@
 #include "source/common/http/mixed_conn_pool.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/router.h"
 #include "source/common/router/shadow_writer_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tcp/conn_pool.h"
@@ -332,6 +333,15 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
               const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>(
               dispatcher_)),
       shutdown_(false) {
+  // The router filter config used by async clients depends on server-wide state only, so build a
+  // single instance here and share it with the async client of every cluster on every worker
+  // thread. This must happen on the main thread, before any worker can call httpAsyncClient().
+  async_client_router_config_ = std::make_shared<Router::FilterConfig>(
+      context_, http_context_.asyncClientStatPrefix(), *stats_.rootScope(), *this, runtime_,
+      random_, std::make_unique<Router::ShadowWriterImpl>(*this), true, false, false, false, false,
+      false, false, Protobuf::RepeatedPtrField<std::string>{}, time_source_, http_context_,
+      router_context_);
+
   if (auto admin = context.admin(); admin.has_value()) {
     config_tracker_entry_ = admin->getConfigTracker().add(
         "clusters", [this](const Matchers::StringMatcher& name_matcher) {
@@ -1573,11 +1583,9 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
 Http::AsyncClient&
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient() {
   if (lazy_http_async_client_ == nullptr) {
-    lazy_http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cluster_info_, parent_.parent_.stats_, parent_.thread_local_dispatcher_, parent_.parent_,
-        parent_.parent_.context_,
-        Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent_.parent_)},
-        parent_.parent_.http_context_, parent_.parent_.router_context_);
+    lazy_http_async_client_ =
+        std::make_unique<Http::AsyncClientImpl>(cluster_info_, parent_.thread_local_dispatcher_,
+                                                parent_.parent_.async_client_router_config_);
   }
   return *lazy_http_async_client_;
 }

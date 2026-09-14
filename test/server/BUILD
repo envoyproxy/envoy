@@ -403,6 +403,7 @@ envoy_cc_test(
     ],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:logger",
         "//source/common/common:notification_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:allocator_lib",

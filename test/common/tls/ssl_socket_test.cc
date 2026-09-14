@@ -2687,7 +2687,7 @@ TEST_P(SslSocketTest, PerCertTlsParamsMaxVersionApplied) {
   // Context allows TLSv1.3 by default, but cert's tls_params cap it at TLSv1.2 — mismatch.
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
   testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
-      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "ssl/tls alert protocol version")));
+      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "tlsv1 alert protocol version")));
 }
 
 // Per-cert tls_params: cert restricts ecdh_curves to P-384. Client only supports P-256 — no
@@ -2797,7 +2797,7 @@ TEST_P(SslSocketTest, PerCertTlsParamsMinVersionApplied) {
   // TLSv1_2 cannot negotiate.
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
   testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
-      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "ssl/tls alert protocol version")));
+      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "tlsv1 alert protocol version")));
 }
 
 // Certificate-level tls_params under a TLS 1.3 handshake: cert restricts to one signature

@@ -42,8 +42,9 @@ public:
     return "envoy.http.stateful_header_formatters.preserve_case";
   }
 
-  Envoy::Http::StatefulHeaderKeyFormatterFactorySharedPtr
-  createFromProto(const Protobuf::Message& message) override;
+  absl::StatusOr<Envoy::Http::StatefulHeaderKeyFormatterFactorySharedPtr>
+  createFactoryFromProto(const Protobuf::Message& message,
+                         Server::Configuration::GenericFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::http::header_formatters::preserve_case::v3::

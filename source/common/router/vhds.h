@@ -41,8 +41,8 @@ public:
   static absl::StatusOr<std::unique_ptr<VhdsSubscription>>
   createVhdsSubscription(const envoy::config::route::v3::RouteConfiguration& route_config,
                          Server::Configuration::ServerFactoryContext& factory_context,
-                         const std::string& stat_prefix, VhdsConfigUpdateReceiver& receiver,
-                         Init::Manager& init_manager);
+                         const std::string& stat_prefix, bool from_rds,
+                         VhdsConfigUpdateReceiver& receiver, Init::Manager& init_manager);
 
   ~VhdsSubscription() override { init_target_.ready(); }
 
@@ -59,8 +59,9 @@ public:
 private:
   VhdsSubscription(const envoy::config::route::v3::RouteConfiguration& route_config,
                    Server::Configuration::ServerFactoryContext& factory_context,
-                   const std::string& stat_prefix, VhdsConfigUpdateReceiver& receiver,
-                   Init::Manager& init_manager, absl::Status& creation_status);
+                   const std::string& stat_prefix, bool from_rds,
+                   VhdsConfigUpdateReceiver& receiver, Init::Manager& init_manager,
+                   absl::Status& creation_status);
 
   // Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
