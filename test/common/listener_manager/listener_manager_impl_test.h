@@ -57,26 +57,6 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
-class MockUdpListenerFactory : public Network::ActiveUdpListenerFactory {
-public:
-  MockUdpListenerFactory() {
-    ON_CALL(*this, isTransportConnectionless()).WillByDefault(Return(true));
-    ON_CALL(*this, socketOptions()).WillByDefault(ReturnRef(socket_options_));
-  }
-
-  MOCK_METHOD(Network::ConnectionHandler::ActiveUdpListenerPtr, createActiveUdpListener,
-              (Runtime::Loader & runtime, uint32_t worker_index,
-               Network::UdpConnectionHandler& parent, Network::SocketSharedPtr&& listen_socket_ptr,
-               Event::Dispatcher& dispatcher, Network::ListenerConfig& config),
-              (override));
-  MOCK_METHOD(bool, isTransportConnectionless, (), (const, override));
-  MOCK_METHOD(const Network::Socket::OptionsSharedPtr&, socketOptions, (), (const, override));
-  MOCK_METHOD(absl::Status, initializeWorkerRouting,
-              (absl::Span<const Network::ListenSocketFactoryPtr>), (override));
-
-  Network::Socket::OptionsSharedPtr socket_options_{std::make_shared<Network::Socket::Options>()};
-};
-
 // Parameterized on (use_matcher, defer_worker_routing_init).
 class ListenerManagerImplTest : public testing::TestWithParam<std::tuple<bool, bool>> {
 public:
@@ -103,7 +83,8 @@ protected:
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
-    EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
+    // Retires so that a fixture running at concurrency > 1 can supply the remaining workers.
+    EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_)).RetiresOnSaturation();
     // Drain notifications are scheduled whenever a listener or its filter chains begin draining.
     // They are not the focus of these tests, so allow them in any number.
     EXPECT_CALL(*worker_, onListenerDrain(_, _)).Times(::testing::AnyNumber());
@@ -115,10 +96,6 @@ protected:
     manager_ = std::make_unique<ListenerManagerImpl>(server_, std::move(listener_factory_ptr_),
                                                      worker_factory_, enable_dispatcher_stats_,
                                                      server_.quic_stat_names_);
-
-    // Use the real UDP listener factory creation by default.
-    ON_CALL(listener_factory_, createUdpListenerFactory(_, _, _, _))
-        .WillByDefault(Invoke(ProdListenerComponentFactory::createUdpListenerFactoryImpl));
 
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))

@@ -948,26 +948,154 @@ TEST_P(ListenerManagerImplQuicOnlyTest, CidGeneratorRegistersInitTarget) {
   EXPECT_EQ(Init::Manager::State::Initialized, server_init_mgr.state());
 }
 
-class ListenerManagerImplQuicWorkerRoutingTest : public ListenerManagerImplQuicOnlyTest {};
+class ListenerManagerImplQuicWorkerRoutingTest : public ListenerManagerImplQuicOnlyTest {
+public:
+  static constexpr absl::string_view init_failure_msg_ = "worker routing init failure";
+  static constexpr uint32_t concurrency_ = 2;
+
+  ListenerManagerImplQuicWorkerRoutingTest()
+      : cid_config_factory_registration_(cid_config_factory_) {
+    server_.options_.concurrency_ = concurrency_;
+    EXPECT_CALL(worker_factory_, createWorker_())
+        .Times(concurrency_ - 1)
+        .WillRepeatedly(Invoke([this]() -> Worker* {
+          extra_workers_.push_back(new NiceMock<MockWorker>());
+          return extra_workers_.back();
+        }));
+  }
+
+  void callAddCompletionOnWorkers() {
+    worker_->callAddCompletion();
+    for (MockWorker* worker : extra_workers_) {
+      worker->callAddCompletion();
+    }
+  }
+
+  // A listener naming the mock connection ID generator.
+  // @param max_rx_datagram_size is used to modify the config, so that an update is not a no-op.
+  envoy::config::listener::v3::Listener quicListener(uint32_t max_rx_datagram_size = 0) {
+    envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(getBasicConfig());
+    listener.set_name("quic_listener");
+    auto* cid_generator_config = listener.mutable_udp_listener_config()
+                                     ->mutable_quic_options()
+                                     ->mutable_connection_id_generator_config();
+    cid_generator_config->set_name("envoy.quic.mock_connection_id_generator");
+    std::ignore =
+        cid_generator_config->mutable_typed_config()->PackFrom(test::common::config::DummyConfig());
+    if (max_rx_datagram_size != 0) {
+      listener.mutable_udp_listener_config()
+          ->mutable_downstream_socket_config()
+          ->mutable_max_rx_datagram_size()
+          ->set_value(max_rx_datagram_size);
+    }
+    return listener;
+  }
+
+  void startWorkers() {
+    EXPECT_CALL(*worker_, start);
+    ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  }
+
+  void expectWorkerRoutingInit(const absl::Status& worker_routing_status,
+                               Init::Target* init_target = nullptr) {
+    absl::StatusOr<Network::Socket::OptionConstSharedPtr> bpf_option =
+        std::make_shared<NiceMock<Network::MockSocketOption>>();
+    if (!worker_routing_status.ok()) {
+      bpf_option = worker_routing_status;
+    }
+    EXPECT_CALL(cid_config_factory_, createQuicConnectionIdGeneratorFactory)
+        .WillOnce(Invoke([bpf_option, init_target](const Protobuf::Message&,
+                                                   ProtobufMessage::ValidationVisitor&,
+                                                   Configuration::FactoryContext& context)
+                             -> Quic::EnvoyQuicConnectionIdGeneratorFactoryPtr {
+          if (init_target != nullptr) {
+            context.initManager().add(*init_target);
+          }
+          auto generator_factory =
+              std::make_unique<NiceMock<Quic::MockEnvoyQuicConnectionIdGeneratorFactory>>();
+          EXPECT_CALL(*generator_factory, createCompatibleLinuxBpfSocketOption(concurrency_))
+              .WillOnce(Return(bpf_option));
+          return generator_factory;
+        }));
+  }
+
+  void expectCreateUdpListenSocket() {
+    EXPECT_CALL(listener_factory_,
+                createListenSocket(_, _, _, ListenerComponentFactory::BindType::ReusePort, _, _))
+        .Times(concurrency_);
+  }
+
+  Quic::MockEnvoyQuicConnectionIdGeneratorConfigFactory cid_config_factory_;
+  Registry::InjectFactory<Quic::EnvoyQuicConnectionIdGeneratorConfigFactory>
+      cid_config_factory_registration_;
+  std::vector<MockWorker*> extra_workers_;
+};
+
+TEST_P(ListenerManagerImplQuicWorkerRoutingTest, ListenerRejectedOnInitFailure) {
+  expectWorkerRoutingInit(absl::InternalError(init_failure_msg_));
+  expectCreateUdpListenSocket();
+
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(quicListener()), EnvoyException, init_failure_msg_);
+  EXPECT_EQ(0UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  EXPECT_EQ(0UL, manager_->listeners(ListenerManager::WARMING).size());
+  checkStats(__LINE__, 0, 0, 0, 0, 0, 0, 0);
+}
+
+TEST_P(ListenerManagerImplQuicWorkerRoutingTest, UpdateRejectedOnInitFailure) {
+  expectWorkerRoutingInit(absl::OkStatus());
+  expectCreateUdpListenSocket();
+  EXPECT_TRUE(addOrUpdateListener(quicListener(), "version1"));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  expectWorkerRoutingInit(absl::InternalError(init_failure_msg_));
+  // The listener clones the socket factory, duplicating every socket.
+  EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(concurrency_);
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(quicListener(1500), "version2"), EnvoyException,
+                          init_failure_msg_);
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  // The original listener is intact, adding the original config is a no-op
+  EXPECT_FALSE(addOrUpdateListener(quicListener(), "version1"));
+}
+
+TEST_P(ListenerManagerImplQuicWorkerRoutingTest, WarmingListenerUpdateRejectedOnInitFailure) {
+  startWorkers();
+
+  // The connection ID generator registers an init target to keep the listener warming
+  Init::ExpectableTargetImpl init_target("cid-generator-target");
+  expectWorkerRoutingInit(absl::OkStatus(), &init_target);
+  expectCreateUdpListenSocket();
+  init_target.expectInitialize();
+  EXPECT_TRUE(addOrUpdateListener(quicListener(), "version1"));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+
+  expectWorkerRoutingInit(absl::InternalError(init_failure_msg_));
+  EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(concurrency_);
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(quicListener(1500), "version2"), EnvoyException,
+                          init_failure_msg_);
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+
+  // The original warming listener finishes warming
+  EXPECT_CALL(*worker_, addListener);
+  init_target.ready();
+  callAddCompletionOnWorkers();
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+}
 
 TEST_P(ListenerManagerImplQuicWorkerRoutingTest, InPlaceUpdateDoesNotReinitializeWorkerRouting) {
-  EXPECT_CALL(*worker_, start);
-  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  startWorkers();
 
-  auto udp_listener_factory = std::make_unique<NiceMock<MockUdpListenerFactory>>();
-  ON_CALL(*udp_listener_factory, isTransportConnectionless()).WillByDefault(Return(false));
-  EXPECT_CALL(*udp_listener_factory, initializeWorkerRouting).WillOnce(Return(absl::OkStatus()));
-  EXPECT_CALL(listener_factory_, createUdpListenerFactory)
-      .WillOnce(Return(testing::ByMove(
-          absl::StatusOr<Network::ActiveUdpListenerFactoryPtr>(std::move(udp_listener_factory)))));
+  expectWorkerRoutingInit(absl::OkStatus());
 
   ListenerHandle* listener1 = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_,
-              createListenSocket(_, _, _, ListenerComponentFactory::BindType::ReusePort, _, 0));
+  expectCreateUdpListenSocket();
   EXPECT_CALL(*worker_, addListener);
-  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(getBasicConfig());
+  const envoy::config::listener::v3::Listener listener = quicListener();
   EXPECT_TRUE(addOrUpdateListener(listener, "version1"));
-  worker_->callAddCompletion();
+  callAddCompletionOnWorkers();
+
+  // The updated listener shares the origin's listener factory, which must not be initialized again.
+  ::testing::Mock::VerifyAndClearExpectations(&cid_config_factory_);
+  EXPECT_CALL(cid_config_factory_, createQuicConnectionIdGeneratorFactory(_, _, _)).Times(0);
 
   envoy::config::listener::v3::Listener update_proto = listener;
   update_proto.mutable_filter_chains(0)
@@ -986,7 +1114,8 @@ TEST_P(ListenerManagerImplQuicWorkerRoutingTest, InPlaceUpdateDoesNotReinitializ
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplQuicWorkerRoutingTest,
-                         ::testing::Values(std::make_tuple(false, true)));
+                         ::testing::Values(std::make_tuple(/*use_matcher=*/false,
+                                                           /*defer_worker_routing_init=*/true)));
 #endif
 
 } // namespace
