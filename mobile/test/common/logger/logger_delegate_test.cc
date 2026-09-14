@@ -79,8 +79,8 @@ TEST_F(LambdaDelegateTest, ReleaseCb) {
 class LambdaDelegateWithLevelTest : public testing::TestWithParam<Levels> {};
 
 INSTANTIATE_TEST_SUITE_P(LogLevel, LambdaDelegateWithLevelTest,
-                         testing::Values(Levels::trace, Levels::debug, Levels::info,
-                                         Levels::warn, Levels::error, Levels::critical));
+                         testing::Values(Levels::trace, Levels::debug, Levels::info, Levels::warn,
+                                         Levels::error, Levels::critical));
 
 TEST_P(LambdaDelegateWithLevelTest, Log) {
   std::string expected_msg = "Hello LambdaDelegate";
