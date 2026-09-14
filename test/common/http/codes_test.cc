@@ -674,13 +674,13 @@ TEST(CodeStatsParityTest, UnknownResponseCodesDifferOnlyByLeaflessCounters) {
   ChargedStats legacy = chargeAndCollect<CodeStatsImpl>(unknownResponseCodes());
   const ChargedStats tagged = chargeAndCollect<TaggedCodeStatsImpl>(unknownResponseCodes());
 
-  for (const std::string& name :
+  for (const std::string name :
        {"vhost.test-vhost.vcluster.test-cluster", "vhost.test-vhost.route.test-route"}) {
     EXPECT_EQ(1U, legacy.global_counters.count(name)) << name;
     EXPECT_EQ(0U, tagged.global_counters.count(name)) << name;
     legacy.global_counters.erase(name);
   }
-  for (const std::string& name : {"prefix.zone.from_az.to_az", "zone.from_az.to_az"}) {
+  for (const std::string name : {"prefix.zone.from_az.to_az", "zone.from_az.to_az"}) {
     EXPECT_EQ(1U, legacy.cluster_counters.count(name)) << name;
     EXPECT_EQ(0U, tagged.cluster_counters.count(name)) << name;
     legacy.cluster_counters.erase(name);
