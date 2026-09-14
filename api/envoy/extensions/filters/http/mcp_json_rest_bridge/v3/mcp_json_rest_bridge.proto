@@ -157,17 +157,16 @@ message TraceContextExtractionOptions {
 
 // Configuration for the server metadata.
 message ServerInfo {
-  // [#not-implemented-hide:]
-  // [#comment:TODO(guoyilin42): Implement supported_protocol_versions]
-  // Lists the MCP protocol versions supported by this MCP endpoint.
+  // The maximum MCP protocol version supported by this MCP endpoint.
   //
-  // - If provided: The extension enforces version negotiation according to the MCP specification:
-  //   https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#version-negotiation
-  // - If not provided: The extension accepts any version sent by the client during negotiation and
-  //   skips validation of the mcp-protocol-version header on subsequent requests.
+  // Supported values are ``2025-11-25`` and ``2026-07-28``. Versions prior
+  // to ``2025-11-25`` are rejected because the filter unconditionally supports features
+  // up to ``2025-11-25`` and does not support downgrading below that baseline.
+  // If not provided: Defaults to ``2025-11-25``.
   //
-  // Example values: ["2025-11-25", "2025-06-18"]
-  repeated string supported_protocol_versions = 1;
+  // Example value: "2026-07-28"
+  google.protobuf.StringValue max_supported_protocol_version = 1
+      [(validate.rules).string = {in: "2025-11-25" in: "2026-07-28"}];
 
   // [#not-implemented-hide:]
   // [#comment:TODO(guoyilin42): Implement description]
@@ -178,9 +177,9 @@ message ServerInfo {
   //
   // - If provided: The extension uses this version as the fallback protocol version.
   // - If not provided: The extension uses the fallback protocol version defined in the latest MCP
-  //   specification. For example, the current latest 2025-11-25 specification designates "2025-03-26"
+  //   specification. For example, the current latest 2026-07-28 specification designates "2025-03-26"
   //   as the fallback protocol version.
-  //   See https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#protocol-version-header
+  //   See https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http#protocol-version-header
   google.protobuf.StringValue fallback_protocol_version = 3;
 }
 
