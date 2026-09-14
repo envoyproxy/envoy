@@ -33,6 +33,15 @@ namespace Runtime {
 
 constexpr absl::string_view BreakingChangesTrackerDataName = "envoy.breaking_changes_tracker";
 
+/**
+ * Filter state object that tracks occurrences of breaking changes encountered during request or
+ * stream processing.
+ *
+ * Each breaking change defined in ALL_BREAKING_CHANGES is tracked as a single-bit flag. When
+ * breaking change observability is enabled, occurrences are recorded via the
+ * OBSERVED_BREAKING_CHANGE macro and can be serialized into access logs via
+ * %FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%.
+ */
 class BreakingChangesTracker : public StreamInfo::FilterState::Object {
 public:
   BreakingChangesTracker() = default;
