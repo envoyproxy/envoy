@@ -133,7 +133,7 @@ envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degrade
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-    Stats::Scope& scope, AiFilterFactories&& ai_filter_factories)
+    Stats::Scope& scope, AiFilterFactories ai_filter_factories)
     : stats_(AiProtocolManagerStats{
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),

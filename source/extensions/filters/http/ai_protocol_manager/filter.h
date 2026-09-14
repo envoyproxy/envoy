@@ -40,7 +40,7 @@ class FilterConfig {
 public:
   FilterConfig(
       const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-      Stats::Scope& scope, AiFilterFactories&& ai_filter_factories = {});
+      Stats::Scope& scope, AiFilterFactories ai_filter_factories);
 
   static absl::StatusOr<FilterConfigSharedPtr>
   create(const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,

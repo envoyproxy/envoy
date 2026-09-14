@@ -139,7 +139,7 @@ TEST(AiProtocolManagerConfigTest, InlineStringThresholdDefaultsAndOverrides) {
   {
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
     proto_config.mutable_request_handling();
-    const FilterConfig config(proto_config, *stats_store.rootScope());
+    const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{});
     EXPECT_EQ(config.inlineStringThresholdBytes(),
               JsonWithExtBufParser::kDefaultInlineStringThresholdBytes);
   }
@@ -149,7 +149,7 @@ TEST(AiProtocolManagerConfigTest, InlineStringThresholdDefaultsAndOverrides) {
         ->mutable_limits()
         ->mutable_inline_string_threshold_bytes()
         ->set_value(4096);
-    const FilterConfig config(proto_config, *stats_store.rootScope());
+    const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{});
     EXPECT_EQ(config.inlineStringThresholdBytes(), 4096);
   }
 }

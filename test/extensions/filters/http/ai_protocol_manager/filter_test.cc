@@ -93,7 +93,8 @@ public:
           ->set_value(inline_string_threshold_bytes);
     }
     filter_ = std::make_unique<AiProtocolManagerFilter>(
-        factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope()));
+        factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
+                                                       AiFilterFactories{}));
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -468,7 +469,8 @@ public:
                      proto_config) {
     metadata_writes_.clear();
     typed_metadata_writes_.clear();
-    config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope());
+    config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
+                                             AiFilterFactories{});
     filter_ = std::make_unique<AiProtocolManagerFilter>(factory_, config_);
     // A stream filter receives both callback sets in production; encode-path
     // code may rely on the decoder callbacks (e.g. the buffer memory account).
