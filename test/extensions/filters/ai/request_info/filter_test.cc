@@ -123,7 +123,7 @@ TEST_F(RequestInfoFilterTest, PublishesTypedRecordAndForwardsPayloadUnchanged) {
 
   const auto record = published();
   ASSERT_TRUE(record.has_value());
-  EXPECT_EQ(record->api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  EXPECT_EQ(record->input_api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
   EXPECT_EQ(record->model(), "gpt-4o");
   EXPECT_TRUE(record->stream().value());
   EXPECT_EQ(record->max_output_tokens().value(), 64);
@@ -140,7 +140,7 @@ TEST_F(RequestInfoFilterTest, AbsentAttributesAreLeftUnset) {
   run(R"({"messages":[]})", ApiProtocol::AnthropicMessages, "/v1/messages");
   const auto record = published();
   ASSERT_TRUE(record.has_value());
-  EXPECT_EQ(record->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  EXPECT_EQ(record->input_api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   EXPECT_TRUE(record->model().empty());
   EXPECT_FALSE(record->has_stream());
   EXPECT_FALSE(record->has_max_output_tokens());
@@ -164,7 +164,7 @@ TEST_F(RequestInfoFilterTest, ReadsGeminiTargetFromRequestPath) {
       "/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse");
   const auto record = published();
   ASSERT_TRUE(record.has_value());
-  EXPECT_EQ(record->api_protocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+  EXPECT_EQ(record->input_api_protocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
   EXPECT_EQ(record->model(), "gemini-2.5-pro");
   EXPECT_TRUE(record->stream().value());
   EXPECT_EQ(record->max_output_tokens().value(), 32);
@@ -176,7 +176,7 @@ TEST_F(RequestInfoFilterTest, UnspecifiedProtocolPublishesSharedAttributesOnly) 
       ApiProtocol::Unspecified);
   const auto record = published();
   ASSERT_TRUE(record.has_value());
-  EXPECT_EQ(record->api_protocol(), envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED);
+  EXPECT_EQ(record->input_api_protocol(), envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED);
   EXPECT_EQ(record->model(), "m");
   EXPECT_FALSE(record->stream().value());
   EXPECT_FALSE(record->has_max_output_tokens());

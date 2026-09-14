@@ -146,7 +146,7 @@ TEST_P(RequestInfoIntegrationTest, PublishesRecordBeforeReleasingHeaders) {
 
   ASSERT_TRUE(headers_seen_.WaitForNotificationWithTimeout(absl::Seconds(5)));
   ASSERT_TRUE(record_present_);
-  EXPECT_EQ(captured_.api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  EXPECT_EQ(captured_.input_api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
   EXPECT_EQ(captured_.model(), "gpt-4o");
   ASSERT_TRUE(captured_.has_stream());
   EXPECT_FALSE(captured_.stream().value());

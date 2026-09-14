@@ -26,7 +26,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#next-free-field: 7]
 message RequestInfo {
   // The route's declared wire API. When unspecified, only ``model`` and ``stream`` are read.
-  type.ai.v3.ApiProtocol api_protocol = 1;
+  type.ai.v3.ApiProtocol input_api_protocol = 1;
 
   // The requested model.
   string model = 2;

@@ -28,7 +28,7 @@ constexpr absl::string_view DefaultMetadataNamespace{"envoy.ai.request_info"};
 
 envoy::data::ai::v3::RequestInfo toProto(const RequestAttributes& attrs) {
   envoy::data::ai::v3::RequestInfo typed;
-  typed.set_api_protocol(HttpFilters::AiProtocolManager::protocolToProto(attrs.api_protocol));
+  typed.set_input_api_protocol(HttpFilters::AiProtocolManager::protocolToProto(attrs.api_protocol));
   typed.set_model(attrs.model);
   if (attrs.stream.has_value()) {
     typed.mutable_stream()->set_value(attrs.stream.value());
