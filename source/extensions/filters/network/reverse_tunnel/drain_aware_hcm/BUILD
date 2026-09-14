@@ -13,6 +13,8 @@ envoy_cc_extension(
     srcs = ["drain_aware_config.cc"],
     hdrs = [
         "drain_aware_config.h",
+        "drain_aware_listener.h",
+        "drain_aware_read_filter.h",
         "drain_aware_server_connection.h",
     ],
     deps = [
@@ -21,6 +23,7 @@ envoy_cc_extension(
         "//envoy/http:codec_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:drain_decision_interface",
+        "//envoy/network:filter_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/http:conn_manager_lib",
         "//source/common/network:drain_close_util_lib",

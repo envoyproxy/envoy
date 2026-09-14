@@ -3605,6 +3605,62 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsShutsDownHandshakeWrappers)
   EXPECT_EQ(dispatcher_.to_delete_.size(), deferred_before + 2);
 }
 
+TEST_F(ReverseConnectionIOHandleTest, DrainStopsReplacementDialsBeforeListenerStops) {
+  setupThreadLocalSlot();
+  io_handle_ = createTestIOHandle(createDefaultTestConfig());
+
+  auto* timer = new StrictMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(timer));
+  EXPECT_CALL(*timer, enableTimer(_, _));
+  io_handle_->initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::FileTriggerType::Level,
+      Event::FileReadyType::Read);
+
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, "remote-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+
+  io_handle_->stopInitiatingConnections();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+  io_handle_->markTunnelDrainingAndDialReplacement(connection_key);
+  maintainReverseConnections();
+  EXPECT_FALSE(getHostConnectionInfo(host).connection_keys.contains(connection_key));
+  io_handle_->stopInitiatingConnections();
+}
+
+TEST_F(ReverseConnectionIOHandleTest, DrainClosesQueuedTunnelsBeforeTheyCanBeAccepted) {
+  setupThreadLocalSlot();
+  io_handle_ = createTestIOHandle(createDefaultTestConfig());
+  io_handle_->initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::FileTriggerType::Level,
+      Event::FileReadyType::Read);
+
+  auto connection = std::make_unique<StrictMock<Network::MockClientConnection>>();
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  connection->stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>(host, 12345));
+  EXPECT_CALL(*connection, connectionInfoProvider())
+      .WillOnce(ReturnRef(*connection->stream_info_.downstream_connection_info_provider_));
+  addHostConnectionInfo(host, "remote-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+  io_handle_->updateConnectionState(host, "remote-cluster", connection_key,
+                                    ReverseConnectionState::Connected);
+  EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush));
+  addConnectionToEstablishedQueue(std::move(connection));
+
+  const size_t deferred_before = dispatcher_.to_delete_.size();
+  io_handle_->stopInitiatingConnections();
+  EXPECT_EQ(getEstablishedConnectionsSize(), 0);
+  EXPECT_TRUE(getHostConnectionInfo(host).connection_keys.empty());
+  EXPECT_TRUE(getHostConnectionInfo(host).connection_states.empty());
+  EXPECT_EQ(dispatcher_.to_delete_.size(), deferred_before + 1);
+  // Listener teardown after drain must not close the same connection a second time.
+  io_handle_->resetFileEvents();
+  EXPECT_EQ(dispatcher_.to_delete_.size(), deferred_before + 1);
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions

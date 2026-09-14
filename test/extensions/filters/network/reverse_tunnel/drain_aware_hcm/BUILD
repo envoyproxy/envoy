@@ -12,6 +12,23 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "drain_aware_read_filter_test",
+    srcs = ["drain_aware_read_filter_test.cc"],
+    extension_names = [
+        "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager",
+    ],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/filters/network/reverse_tunnel/drain_aware_hcm:drain_aware_config",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "drain_aware_server_connection_test",
     srcs = ["drain_aware_server_connection_test.cc"],
     extension_names = [
@@ -25,6 +42,7 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
     ],
@@ -45,6 +63,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/reverse_tunnel/drain_aware_hcm:drain_aware_config",
         "//source/extensions/request_id/uuid:config",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
