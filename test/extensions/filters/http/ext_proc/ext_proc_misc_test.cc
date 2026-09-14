@@ -297,14 +297,14 @@ TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
 TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcCombo) { websocketExtProcTest(); }
 
 TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcComboFullDuplexStreamed) {
-  proto_config_.mutable_processing_mode()->set_request_body_mode(
-      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED);
+  auto* mode = proto_config_.mutable_processing_mode();
+  mode->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+  mode->set_request_trailer_mode(ProcessingMode::SEND);
   websocketExtProcTest();
 }
 
 TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcComboStreamed) {
-  proto_config_.mutable_processing_mode()->set_request_body_mode(
-      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   websocketExtProcTest();
 }
 

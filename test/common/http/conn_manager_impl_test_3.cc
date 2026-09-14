@@ -285,7 +285,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectEncodedHeadersCal
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
       .Times(1)
       .WillOnce(Return(FilterHeadersStatus::Continue));
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, false)).Times(1);
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
 
   encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(nullptr, false);
   // Second call does not trigger encodeHeaders again.
