@@ -531,6 +531,13 @@ WEAK_STUB(BootstrapExtensionTimerEnabled,
 
 WEAK_STUB(BootstrapExtensionTimerDelete,
           envoy_dynamic_module_callback_bootstrap_extension_timer_delete(nullptr))
+WEAK_STUB(BootstrapExtensionFileWatcherAddWatch,
+          envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(nullptr,
+                                                                                   {nullptr, 0}, 0))
+WEAK_STUB(BootstrapExtensionEnableClusterLifecycle,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(nullptr))
+WEAK_STUB(BootstrapExtensionEnableListenerLifecycle,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr))
 
 WEAK_STUB(BootstrapExtensionRegisterAdminHandler,
           envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
@@ -638,6 +645,15 @@ WEAK_STUB(ClusterLbContextSetFilterStateTyped,
           envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(nullptr,
                                                                                   {nullptr, 0},
                                                                                   {nullptr, 0}))
+WEAK_STUB(ClusterLbContextGetHostStat,
+          envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+              nullptr, nullptr, envoy_dynamic_module_type_host_stat_RqTotal))
+WEAK_STUB(ClusterLbContextSetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, 0))
+WEAK_STUB(ClusterLbContextSetDynamicMetadataString,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}))
 WEAK_STUB(ClusterLbContextSetDynamicMetadataStringBatch,
           envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
               nullptr, {nullptr, 0}, nullptr, 0))
@@ -699,6 +715,12 @@ WEAK_STUB(ClusterLbAsyncHostSelectionComplete,
 WEAK_STUB(ClusterLbGetMemberUpdateHostAddress,
           envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(nullptr, 0, true,
                                                                                   nullptr))
+WEAK_STUB(ClusterLbGetMemberUpdateHost,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_host(nullptr, 0, true))
+WEAK_STUB(ClusterLbGetMemberUpdateHostPackedAddress,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(nullptr, 0,
+                                                                                         true,
+                                                                                         nullptr))
 WEAK_STUB(ClusterUpdateHostHealth,
           envoy_dynamic_module_callback_cluster_update_host_health(
               nullptr, nullptr, envoy_dynamic_module_type_host_health_Healthy))
@@ -711,6 +733,15 @@ WEAK_STUB(ClusterSchedulerNew, envoy_dynamic_module_callback_cluster_scheduler_n
 WEAK_STUB(ClusterSchedulerDelete, envoy_dynamic_module_callback_cluster_scheduler_delete(nullptr))
 WEAK_STUB(ClusterSchedulerCommit,
           envoy_dynamic_module_callback_cluster_scheduler_commit(nullptr, 0))
+WEAK_STUB(ClusterRunOnAllWorkers,
+          envoy_dynamic_module_callback_cluster_run_on_all_workers(nullptr, 0))
+WEAK_STUB(ClusterWorkerSlotSet,
+          envoy_dynamic_module_callback_cluster_worker_slot_set(nullptr, nullptr))
+WEAK_STUB(ClusterWorkerSlotGet, envoy_dynamic_module_callback_cluster_worker_slot_get(nullptr))
+WEAK_STUB(ClusterGetName, envoy_dynamic_module_callback_cluster_get_name(nullptr, nullptr))
+WEAK_STUB(ClusterHttpCallout,
+          envoy_dynamic_module_callback_cluster_http_callout(nullptr, nullptr, {nullptr, 0},
+                                                             nullptr, 0, {nullptr, 0}, 0))
 WEAK_STUB(ClusterConfigDefineCounter,
           envoy_dynamic_module_callback_cluster_config_define_counter(nullptr, {nullptr, 0},
                                                                       nullptr, 0, nullptr))
@@ -1802,6 +1833,9 @@ WEAK_STUB(HttpSetDynamicMetadataStringBatch,
 WEAK_STUB(HttpSetDynamicMetadataStruct,
           envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(nullptr, {nullptr, 0},
                                                                          {nullptr, 0}))
+WEAK_STUB(HttpSetDynamicTypedMetadata,
+          envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(nullptr, {nullptr, 0},
+                                                                        {nullptr, 0}))
 WEAK_STUB(HttpGetMetadataString, envoy_dynamic_module_callback_http_get_metadata_string(
                                      nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                      {nullptr, 0}, {nullptr, 0}, nullptr))
