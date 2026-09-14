@@ -2065,9 +2065,17 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     headers->addReferenceKey(Http::Headers::get().SetCookie, header_value);
   }
 
-  callbacks_->streamInfo().setResponseCodeDetails(
-      StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+  const auto& upstream_response_code_details = upstream_request.streamInfo().responseCodeDetails();
+  const absl::string_view response_code_details =
+      upstream_response_code_details.has_value()
+          ? *upstream_response_code_details
+          : StreamInfo::ResponseCodeDetails::get().ViaUpstream;
+  callbacks_->streamInfo().setResponseCodeDetails(response_code_details);
 
+  if (upstream_request.streamInfo().hasResponseFlag(
+          StreamInfo::CoreResponseFlag::UpstreamProtocolError)) {
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError);
+  }
   callbacks_->streamInfo().setResponseCode(response_code);
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;
@@ -2097,8 +2105,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     onUpstreamComplete(upstream_request);
   }
 
-  callbacks_->encodeHeaders(std::move(headers), end_stream,
-                            StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+  callbacks_->encodeHeaders(std::move(headers), end_stream, response_code_details);
 }
 
 void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
