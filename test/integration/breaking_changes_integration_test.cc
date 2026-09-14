@@ -104,7 +104,7 @@ typed_config:
                   .empty());
 
   const std::string log = waitForAccessLog(access_log_name_);
-  // Since observabilitry is disabled, there is nothing in the access log.
+  // Since observability is disabled, there is nothing in the access log.
   EXPECT_THAT(log, Not(HasSubstr("test_disabled_breaking_change")));
   EXPECT_THAT(log, Not(HasSubstr("test_enabled_breaking_change")));
 }
