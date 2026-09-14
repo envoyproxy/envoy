@@ -38,6 +38,10 @@ Observability for breaking changes is disabled by default. It can be enabled by 
 all breaking changes encountered in the traffic. Envoy stops emmitting observability data when a breaking change flag
 is decommissioned.
 
+Breaking changes are subject to the
+`deprecation policy <https://github.com/envoyproxy/envoy/blob/main/CONTRIBUTING.md#breaking-change-policy>`_ and are
+removed after deprecation window ends.
+
 Adding a breaking change flag introduces Envoy reloadabale flag with the ``envoy.reloadable_features.<flag_name>``
 name and puts tracking state in the ``BreakingChangesTracker`` class. Breaking changes are enabled by setting
 the ``envoy.reloadable_features.<flag_name>`` flag in Envoy Runtime.
