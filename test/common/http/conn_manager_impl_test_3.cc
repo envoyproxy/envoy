@@ -78,8 +78,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectHeaders) {
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
 
-  Http::TestRequestHeaderMapImpl headers;
-  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(headers, false);
+  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(false);
 
   // Subsequent data is processed normally.
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
@@ -123,8 +122,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectHeadersEndStream)
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
-  Http::TestRequestHeaderMapImpl headers;
-  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(headers, true);
+  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(true);
 
   // Clean up stream by sending response.
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
@@ -155,10 +153,9 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectHeadersCalledTwic
       .Times(1)
       .WillOnce(Return(FilterHeadersStatus::Continue));
 
-  Http::TestRequestHeaderMapImpl headers;
-  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(headers, false);
+  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(false);
   // Second call does not trigger decodeHeaders on decoder_filters_[1] again.
-  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(headers, false);
+  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(false);
 
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
@@ -211,7 +208,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectEncodedHeaders) {
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
 
-  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(nullptr, false);
+  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(false);
 
   // Subsequent response data is processed normally.
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
@@ -227,9 +224,9 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectEncodedHeaders) {
   decoder_filters_[1]->callbacks_->encodeData(data, true);
 }
 
-// Encoder filter stops headers iteration for a header-only response, then injects new headers with
+// Encoder filter stops headers iteration for a header-only response, then injects headers with
 // end_stream.
-TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectEncodedHeadersWithNewHeaders) {
+TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectEncodedHeadersEndStream) {
   setup();
   setupFilterChain(2, 2);
 
@@ -250,15 +247,13 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectEncodedHeadersWit
   decoder_filters_[1]->callbacks_->encodeHeaders(
       makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
 
-  TestResponseHeaderMapImpl expected_headers{{":status", "201"}};
-  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(HeaderMapEqualRef(&expected_headers), true))
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
   expectOnDestroy();
 
-  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(
-      std::make_unique<TestResponseHeaderMapImpl>(expected_headers), true);
+  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(true);
 }
 
 // Encoder filter calls injectEncodedHeadersToFilterChain a second time, which should be a no-op.
@@ -287,9 +282,9 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectEncodedHeadersCal
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
 
-  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(nullptr, false);
+  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(false);
   // Second call does not trigger encodeHeaders again.
-  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(nullptr, false);
+  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(false);
 
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));

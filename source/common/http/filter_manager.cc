@@ -507,9 +507,7 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
-void ActiveStreamDecoderFilter::injectDecodedHeadersToFilterChain(RequestHeaderMap& headers,
-                                                                  bool end_stream) {
-  (void)headers;
+void ActiveStreamDecoderFilter::injectDecodedHeadersToFilterChain(bool end_stream) {
   if (!headers_continued_) {
     headers_continued_ = true;
     doHeaders(end_stream);
@@ -2061,11 +2059,7 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
-void ActiveStreamEncoderFilter::injectEncodedHeadersToFilterChain(ResponseHeaderMapPtr&& headers,
-                                                                  bool end_stream) {
-  if (headers != nullptr) {
-    parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
-  }
+void ActiveStreamEncoderFilter::injectEncodedHeadersToFilterChain(bool end_stream) {
   if (!headers_continued_) {
     headers_continued_ = true;
     doHeaders(end_stream);

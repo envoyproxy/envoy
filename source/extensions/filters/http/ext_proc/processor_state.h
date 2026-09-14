@@ -584,9 +584,7 @@ public:
   }
 
   void injectHeadersToFilterChain(bool end_stream) override {
-    if (request_headers_ != nullptr) {
-      decoder_callbacks_->injectDecodedHeadersToFilterChain(*request_headers_, end_stream);
-    }
+    decoder_callbacks_->injectDecodedHeadersToFilterChain(end_stream);
   }
 
   uint32_t bufferLimit() const override { return decoder_callbacks_->bufferLimit(); }
@@ -740,7 +738,7 @@ public:
   }
 
   void injectHeadersToFilterChain(bool end_stream) override {
-    encoder_callbacks_->injectEncodedHeadersToFilterChain(nullptr, end_stream);
+    encoder_callbacks_->injectEncodedHeadersToFilterChain(end_stream);
   }
 
   uint32_t bufferLimit() const override { return encoder_callbacks_->bufferLimit(); }
