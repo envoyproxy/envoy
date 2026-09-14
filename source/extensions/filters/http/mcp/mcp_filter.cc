@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/mcp/mcp_filter.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -52,6 +53,23 @@ const Http::LowerCaseString kMcpProtocolVersion{
 
 constexpr absl::string_view kBase64SentinelPrefix = "=?base64?";
 constexpr absl::string_view kBase64SentinelSuffix = "?=";
+
+constexpr std::array<absl::string_view, 5> kKnownProtocolVersions = {
+    Filters::Common::Mcp::McpConstants::MCP_VERSION_2024_11_05,
+    Filters::Common::Mcp::McpConstants::FALLBACK_PROTOCOL_VERSION,
+    Filters::Common::Mcp::McpConstants::MCP_VERSION_2025_06_18,
+    Filters::Common::Mcp::McpConstants::LATEST_SUPPORTED_MCP_VERSION,
+    Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28,
+};
+
+std::optional<size_t> protocolVersionIndex(absl::string_view version) {
+  for (size_t i = 0; i < kKnownProtocolVersions.size(); ++i) {
+    if (kKnownProtocolVersions[i] == version) {
+      return i;
+    }
+  }
+  return std::nullopt;
+}
 
 std::optional<std::string> decodeMcpHeaderValue(absl::string_view value) {
   if (!absl::StartsWith(value, kBase64SentinelPrefix) ||
@@ -161,7 +179,10 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
       request_storage_mode_(proto_config.request_storage_mode()),
       attribute_source_(proto_config.attribute_source()),
       early_terminate_when_routable_(proto_config.early_terminate_when_routable()),
-      protocol_versions_(proto_config.protocol_versions()),
+      max_supported_protocol_version_(
+          proto_config.has_max_supported_protocol_version()
+              ? std::optional<std::string>(proto_config.max_supported_protocol_version().value())
+              : std::nullopt),
       metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
@@ -171,6 +192,21 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
   parser_config_.setRejectDuplicateKeys(proto_config.has_reject_duplicate_keys()
                                             ? proto_config.reject_duplicate_keys().value()
                                             : false); // Default: last-key-wins / last-win
+}
+
+bool McpFilterConfig::isProtocolVersionSupported(absl::string_view version) const {
+  if (!max_supported_protocol_version_.has_value()) {
+    return true;
+  }
+
+  const auto version_index = protocolVersionIndex(version);
+  const auto max_version_index = protocolVersionIndex(*max_supported_protocol_version_);
+
+  if (!version_index.has_value() || !max_version_index.has_value()) {
+    return false;
+  }
+
+  return *version_index <= *max_version_index;
 }
 
 bool McpFilter::isValidMcpDeleteRequest(const Http::RequestHeaderMap& headers) const {
@@ -378,23 +414,8 @@ bool McpFilter::needsBody() const {
 }
 
 bool McpFilter::shouldUseNewSpecSemantics() const {
-  if (protocol_version_.has_value() &&
-      *protocol_version_ == Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28) {
-    return true;
-  }
-
-  const auto& supported = config_->protocolVersions().supported();
-  if (supported.empty()) {
-    return false;
-  }
-
-  for (const auto& version : supported) {
-    if (version != Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28) {
-      return false;
-    }
-  }
-
-  return true;
+  return protocol_version_.has_value() &&
+         *protocol_version_ == Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28;
 }
 
 bool McpFilter::hasCompleteHeaderAttributes() const {
@@ -691,8 +712,10 @@ void McpFilter::sendUnsupportedProtocolVersionReply(absl::string_view requested_
 
   auto* supported = (*data->mutable_fields())["supported"].mutable_list_value();
 
-  for (const auto& version : config_->protocolVersions().supported()) {
-    supported->add_values()->set_string_value(version);
+  for (const auto version : kKnownProtocolVersions) {
+    if (config_->isProtocolVersionSupported(version)) {
+      supported->add_values()->set_string_value(version);
+    }
   }
 
   (*data->mutable_fields())["requested"].set_string_value(requested_version);

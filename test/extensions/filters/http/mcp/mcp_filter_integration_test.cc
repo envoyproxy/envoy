@@ -261,9 +261,7 @@ name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   traffic_mode: PASS_THROUGH
-  protocol_versions:
-    supported:
-    - "2026-07-28"
+  max_supported_protocol_version: "2026-07-28"
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -303,9 +301,7 @@ name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   traffic_mode: PASS_THROUGH
-  protocol_versions:
-    supported:
-    - "2026-07-28"
+  max_supported_protocol_version: "2026-07-28"
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -339,9 +335,7 @@ name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   traffic_mode: PASS_THROUGH
-  protocol_versions:
-    supported:
-    - "2026-07-28"
+  max_supported_protocol_version: "2026-07-28"
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -375,9 +369,7 @@ name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   traffic_mode: PASS_THROUGH
-  protocol_versions:
-    supported:
-    - "2026-07-28"
+  max_supported_protocol_version: "2026-07-28"
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -406,15 +398,13 @@ typed_config:
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(McpFilterIntegrationTest, NewSpecOnlyRejectsMissingProtocolVersionHeader) {
+TEST_P(McpFilterIntegrationTest, MaxSupportedVersionAllowsMissingProtocolVersionHeader) {
   initializeFilter(R"EOF(
 name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   traffic_mode: PASS_THROUGH
-  protocol_versions:
-    supported:
-    - "2026-07-28"
+  max_supported_protocol_version: "2026-07-28"
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -434,12 +424,13 @@ typed_config:
                                      {"mcp-name", "task-123"}},
       request_body);
 
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("400", response->headers().getStatusValue());
+  waitForNextUpstreamRequest();
 
-  // The upstream should not receive the request because the new-spec-only
-  // configuration requires MCP-Protocol-Version.
-  EXPECT_EQ(nullptr, upstream_request_);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(McpFilterIntegrationTest, RejectsUnsupportedProtocolVersion) {
@@ -448,9 +439,7 @@ name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   traffic_mode: PASS_THROUGH
-  protocol_versions:
-    supported:
-    - "2026-07-28"
+  max_supported_protocol_version: "2025-11-25"
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -466,7 +455,7 @@ typed_config:
                                      {"accept", "application/json"},
                                      {"accept", "text/event-stream"},
                                      {"content-type", "application/json"},
-                                     {"mcp-protocol-version", "2025-11-25"}},
+                                     {"mcp-protocol-version", "2026-07-28"}},
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
@@ -481,9 +470,7 @@ name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   traffic_mode: PASS_THROUGH
-  protocol_versions:
-    supported:
-    - "2026-07-28"
+  max_supported_protocol_version: "2025-11-25"
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -499,7 +486,7 @@ typed_config:
                                      {"accept", "application/json"},
                                      {"accept", "text/event-stream"},
                                      {"content-type", "application/json"},
-                                     {"mcp-protocol-version", "2025-11-25"}},
+                                     {"mcp-protocol-version", "2026-07-28"}},
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
@@ -509,7 +496,7 @@ typed_config:
 
   EXPECT_THAT(response->body(), testing::HasSubstr("\"jsonrpc\":\"2.0\""));
   EXPECT_THAT(response->body(), testing::HasSubstr("\"code\":-32022"));
-  EXPECT_THAT(response->body(), testing::HasSubstr("\"requested\":\"2025-11-25\""));
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"requested\":\"2026-07-28\""));
   EXPECT_THAT(response->body(), testing::HasSubstr("\"2026-07-28\""));
 
   EXPECT_EQ(nullptr, upstream_request_);
@@ -521,9 +508,7 @@ name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   traffic_mode: PASS_THROUGH
-  protocol_versions:
-    supported:
-    - "2026-07-28"
+  max_supported_protocol_version: "2026-07-28"
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -549,9 +534,7 @@ name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   traffic_mode: PASS_THROUGH
-  protocol_versions:
-    supported:
-    - "2026-07-28"
+  max_supported_protocol_version: "2026-07-28"
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -577,9 +560,7 @@ name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   traffic_mode: PASS_THROUGH
-  protocol_versions:
-    supported:
-    - "2025-11-25"
+  max_supported_protocol_version: "2025-11-25"
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -607,9 +588,7 @@ name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   traffic_mode: PASS_THROUGH
-  protocol_versions:
-    supported:
-    - "2025-11-25"
+  max_supported_protocol_version: "2025-11-25"
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
