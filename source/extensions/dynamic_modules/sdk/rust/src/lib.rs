@@ -384,8 +384,8 @@ macro_rules! envoy_log {
       #[cfg(not(test))]
       {
         let level = $level;
-        // SAFETY: envoy_dynamic_module_callback_log_enabled and envoy_dynamic_module_callback_log
-        // are FFI calls provided by the Envoy host.
+        // SAFETY: envoy_dynamic_module_callback_log_enabled and
+        // envoy_dynamic_module_callback_log_v2 are FFI calls provided by the Envoy host.
         let enabled = unsafe { $crate::abi::envoy_dynamic_module_callback_log_enabled(level) };
         if enabled {
           let message = format!($($arg)*);
@@ -395,7 +395,7 @@ macro_rules! envoy_log {
           let source_file = file!();
           let source_file_bytes = source_file.as_bytes();
           unsafe {
-            $crate::abi::envoy_dynamic_module_callback_log(
+            $crate::abi::envoy_dynamic_module_callback_log_v2(
               level,
               $crate::abi::envoy_dynamic_module_type_module_buffer {
                 ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,

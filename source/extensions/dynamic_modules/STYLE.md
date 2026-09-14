@@ -5,7 +5,7 @@
 
 This document defines the naming conventions and style guidelines for the Dynamic Modules ABI header (`abi.h`). All ABI definitions must follow these conventions to maintain consistency and clarity across the codebase.
 
-This document covers naming and documentation conventions only. For the compatibility guarantees of the ABI, and the process a change to an already released ABI entity must follow, see the ABI compatibility policy at the top of [abi.h](abi/abi.h).
+This document covers naming and documentation conventions only. For the ABI compatibility guarantees and the process for changing an already released ABI entity, see the ABI compatibility policy at the top of [abi.h](abi/abi.h).
 
 ## Function Signature Style
 

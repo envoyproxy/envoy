@@ -175,8 +175,8 @@ TEST(CommonAbiImplTest, LogUsesModuleSuppliedSourceLocation) {
   uint32_t line = 10;
   for (const auto& [abi_level, spdlog_level] : cases) {
     sink.captured_ = false;
-    envoy_dynamic_module_callback_log(abi_level, {message.data(), message.size()},
-                                      {file.data(), file.size()}, line);
+    envoy_dynamic_module_callback_log_v2(abi_level, {message.data(), message.size()},
+                                         {file.data(), file.size()}, line);
     EXPECT_TRUE(sink.captured_);
     EXPECT_EQ(file, sink.filename_);
     EXPECT_EQ(static_cast<int>(line), sink.line_);
@@ -197,8 +197,8 @@ TEST(CommonAbiImplTest, LogHandlesEmptySourceFile) {
   SourceLocationCapturingSink sink(Logger::Registry::getSink());
 
   const std::string message = "no source file";
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info,
-                                    {message.data(), message.size()}, {nullptr, 0}, 0);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Info,
+                                       {message.data(), message.size()}, {nullptr, 0}, 0);
   EXPECT_TRUE(sink.captured_);
   EXPECT_EQ("", sink.filename_);
 
@@ -228,9 +228,9 @@ TEST(CommonAbiImplTest, LogHonorsSourceFileLengthAcrossReusedBuffer) {
   uint32_t line = 1;
   for (const auto& [source_file, expected_filename] : cases) {
     sink.captured_ = false;
-    envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info,
-                                      {message.data(), message.size()},
-                                      {source_file.data(), source_file.size()}, line);
+    envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Info,
+                                         {message.data(), message.size()},
+                                         {source_file.data(), source_file.size()}, line);
     EXPECT_TRUE(sink.captured_);
     EXPECT_EQ(expected_filename, sink.filename_);
     EXPECT_EQ(static_cast<int>(line), sink.line_);
@@ -249,16 +249,16 @@ TEST(CommonAbiImplTest, LogIgnoresOffAndOutOfRangeLevels) {
 
   const std::string message = "ignored";
   const std::string file = "my_module.rs";
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Off,
-                                    {message.data(), message.size()}, {file.data(), file.size()},
-                                    1);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Off,
+                                       {message.data(), message.size()}, {file.data(), file.size()},
+                                       1);
   EXPECT_FALSE(sink.captured_);
   // A value further outside the enum range would be undefined behavior to load, so use one past
   // Off.
   const auto out_of_range =
       static_cast<envoy_dynamic_module_type_log_level>(envoy_dynamic_module_type_log_level_Off + 1);
-  envoy_dynamic_module_callback_log(out_of_range, {message.data(), message.size()},
-                                    {file.data(), file.size()}, 1);
+  envoy_dynamic_module_callback_log_v2(out_of_range, {message.data(), message.size()},
+                                       {file.data(), file.size()}, 1);
   EXPECT_FALSE(sink.captured_);
 
   logger.set_level(original_level);
@@ -274,16 +274,46 @@ TEST(CommonAbiImplTest, LogRespectsConfiguredLevel) {
 
   const std::string message = "level gated";
   const std::string file = "my_module.rs";
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info,
-                                    {message.data(), message.size()}, {file.data(), file.size()},
-                                    1);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Info,
+                                       {message.data(), message.size()}, {file.data(), file.size()},
+                                       1);
   EXPECT_FALSE(sink.captured_);
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Error,
-                                    {message.data(), message.size()}, {file.data(), file.size()},
-                                    42);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Error,
+                                       {message.data(), message.size()}, {file.data(), file.size()},
+                                       42);
   EXPECT_TRUE(sink.captured_);
   EXPECT_EQ(file, sink.filename_);
   EXPECT_EQ(42, sink.line_);
+
+  logger.set_level(original_level);
+}
+
+// Verifies that the deprecated two-argument callback still logs at every level and reports an empty
+// source location.
+TEST(CommonAbiImplTest, LogDeprecatedOverloadReportsEmptySourceLocation) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "deprecated overload message";
+  const std::pair<envoy_dynamic_module_type_log_level, spdlog::level::level_enum> cases[] = {
+      {envoy_dynamic_module_type_log_level_Trace, spdlog::level::trace},
+      {envoy_dynamic_module_type_log_level_Debug, spdlog::level::debug},
+      {envoy_dynamic_module_type_log_level_Info, spdlog::level::info},
+      {envoy_dynamic_module_type_log_level_Warn, spdlog::level::warn},
+      {envoy_dynamic_module_type_log_level_Error, spdlog::level::err},
+      {envoy_dynamic_module_type_log_level_Critical, spdlog::level::critical},
+  };
+  for (const auto& [abi_level, spdlog_level] : cases) {
+    sink.captured_ = false;
+    envoy_dynamic_module_callback_log(abi_level, {message.data(), message.size()});
+    EXPECT_TRUE(sink.captured_);
+    EXPECT_EQ("", sink.filename_);
+    EXPECT_EQ(0, sink.line_);
+    EXPECT_EQ(spdlog_level, sink.level_);
+    EXPECT_NE(std::string::npos, sink.formatted_.find(message));
+  }
 
   logger.set_level(original_level);
 }

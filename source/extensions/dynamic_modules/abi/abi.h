@@ -31,24 +31,24 @@
 // =============================================================================
 //
 // Modules may be built and shipped independently of the Envoy binary that loads them, so there is
-// no recompilation step that would surface an incompatibility: a mismatch shows up as a failed
-// symbol resolution at config load time, or, worse, as undefined behavior at request time.
-// Everything declared in this file - types (envoy_dynamic_module_type_*), event hooks
-// (envoy_dynamic_module_on_*) and callbacks (envoy_dynamic_module_callback_*), collectively "ABI
-// entities" - is therefore governed by the following rules. See also the user-facing summary in
-// docs/root/intro/arch_overview/advanced/dynamic_modules.rst.
+// no recompilation step that would surface an incompatibility. A mismatch instead shows up as a
+// failed symbol resolution at config load time, or, worse, as undefined behavior at request time.
+// Everything declared in this file is an ABI entity. That covers types
+// (envoy_dynamic_module_type_*), event hooks (envoy_dynamic_module_on_*) and callbacks
+// (envoy_dynamic_module_callback_*), and all of them are governed by the following rules. See also
+// the user-facing summary in docs/root/intro/arch_overview/advanced/dynamic_modules.rst.
 //
 // 1. A released ABI entity is never changed in place.
 //
 //    An entity is "released" once it is present in this file on a cut Envoy release branch, that
 //    is, once it has shipped in any Envoy vX.Y.0.
 //
-//    From then on none of the following may change: the name of a function, type, struct field or
-//    enum value; a function's parameter count, order, types or return type; a struct's layout (no
-//    adding, removing, reordering or resizing a field, and no giving one a new meaning); an enum's
-//    numbering or the meaning of an existing enumerator; or the documented semantics - ownership,
-//    buffer lifetime, threading and reentrancy constraints, which values may be null, and the
-//    meaning of each return value.
+//    From then on none of the following may change. The name of a function, type, struct field or
+//    enum value stays fixed. A function keeps its parameter count, order, types and return type. A
+//    struct keeps its layout, so no field may be added, removed, reordered, resized or given a new
+//    meaning. An enum keeps its numbering and the meaning of every existing enumerator. The
+//    documented semantics also stay fixed, including ownership, buffer lifetime, threading and
+//    reentrancy constraints, which values may be null, and the meaning of each return value.
 //
 // 2. An ABI entity that has never been released may be changed freely.
 //
@@ -59,26 +59,26 @@
 // 3. Iterate by adding, never by mutating.
 //
 //    When a released entity needs a different signature or different semantics, add a new entity
-//    alongside it and deprecate the old one, using one of two naming schemes:
+//    alongside it and deprecate the old one. There are two naming schemes.
 //
-//    a. Append a _v2 suffix to the existing name, then _v3, and so on. This is the default, for
-//       when the new entity is the same operation with a changed signature or semantics, so the
-//       name still describes it accurately. The original unsuffixed name is implicitly _v1 and
-//       must never be renamed to _v1, which would itself be a breaking change. Suffixes are
-//       monotonic and never reused, even if an intermediate version is later removed.
+//    a. Append a _v2 suffix to the existing name, then _v3, and so on. This is the default for a
+//       new entity that is the same operation with a changed signature or semantics, so the name
+//       still describes it accurately. The original unsuffixed name is implicitly _v1 and must
+//       never be renamed to _v1, which would itself be a breaking change. Suffixes are monotonic
+//       and never reused, even if an intermediate version is later removed.
 //
 //    b. Give the replacement an entirely new, descriptive name when the concept itself changed.
 //
-//    Prefer (a) when in doubt: a numeric suffix needs no naming debate and makes the lineage
-//    obvious.
+//    Prefer (a) when in doubt, because a numeric suffix needs no naming debate and makes the
+//    lineage obvious.
 //
 //    Adding a brand new callback or type is always additive and needs none of the above. Adding a
-//    new event hook to an existing extension point needs care: a module built against an older SDK
+//    new event hook to an existing extension point needs care. A module built against an older SDK
 //    does not export a hook that was added later, so every newly added hook must be resolved
 //    optionally on the Envoy side, treating an unresolved symbol as "the module does not implement
 //    this hook" rather than as a config failure. A new hook resolved as mandatory is a breaking
-//    change. Likewise, appending an enumerator is safe only for enums that flow from a module into
-//    Envoy, since an older module never returns the new value; appending to an enum that Envoy
+//    change. Appending an enumerator is likewise safe only for enums that flow from a module into
+//    Envoy, because an older module never returns the new value. Appending to an enum that Envoy
 //    passes into a module breaks modules built before the value existed.
 //
 // 4. Deprecate for at least four Envoy release cycles before removing.
@@ -96,10 +96,10 @@
 // ENVOY_DYNAMIC_MODULES_ABI_VERSION is a diagnostic marker. It is deliberately not part of the
 // compatibility policy above, and nothing in Envoy or in a module should depend on it.
 //
-// It records which revision of this file a binary was built against. But Envoy never strictly
+// It records which revision of this file a binary was built against, but Envoy never strictly
 // validates it. A module reports the value it was built against from
 // envoy_dynamic_module_on_program_init, and a value that differs from Envoy's own is logged and
-// otherwise ignored - the module still loads and runs.
+// otherwise ignored, so the module still loads and runs.
 //
 // Note(internal): We could use the Envoy's version such as "v1.38.0" here, there are several
 // reasons as to why we use a static version string instead:
@@ -136,7 +136,7 @@ const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
 /**
  * envoy_dynamic_module_type_abi_version_module_ptr represents a null-terminated string that
  * contains the ABI version the dynamic module was built against. Envoy logs it and does not
- * otherwise act on it: it is a diagnostic marker, not a compatibility gate, and a value that
+ * otherwise act on it. It is a diagnostic marker, not a compatibility gate, and a value that
  * differs from Envoy's own does not prevent the module from loading. See the ABI compatibility
  * policy at the top of this file.
  *
@@ -524,7 +524,7 @@ typedef enum envoy_dynamic_module_type_socket_direction {
  *
  * For Envoy, the return value is recorded and logged for diagnostics only. Envoy does not
  * validate it against its own ABI version, so returning a version that differs from Envoy's does
- * not fail the load; only returning null does.
+ * not fail the load. Only returning null does.
  *
  * For dynamic modules, this is useful when they need to perform some process-wide
  * initialization or check if the module is compatible with the platform, such as CPU features.
@@ -545,8 +545,23 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 // --------------------------------- Logging -----------------------------------
 
 /**
+ * @deprecated Use envoy_dynamic_module_callback_log_v2 instead, which additionally reports the
+ * module source location of the log statement.
+ *
  * envoy_dynamic_module_callback_log is called by the module to log a message as part
  * of the standard Envoy logging stream under [dynamic_modules] Id.
+ *
+ * @param level is the log level of the message.
+ * @param message is the log message to be logged. The buffer is only read during the call.
+ *
+ */
+void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
+                                       envoy_dynamic_module_type_module_buffer message);
+
+/**
+ * envoy_dynamic_module_callback_log_v2 is called by the module to log a message as part of the
+ * standard Envoy logging stream under [dynamic_modules] Id, reporting the module source location of
+ * the log statement instead of a location inside Envoy.
  *
  * @param level is the log level of the message.
  * @param message is the log message to be logged. The buffer is only read during the call.
@@ -555,10 +570,10 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
  * @param source_line is the line number of the log statement within source_file.
  *
  */
-void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
-                                       envoy_dynamic_module_type_module_buffer message,
-                                       envoy_dynamic_module_type_module_buffer source_file,
-                                       uint32_t source_line);
+void envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level level,
+                                          envoy_dynamic_module_type_module_buffer message,
+                                          envoy_dynamic_module_type_module_buffer source_file,
+                                          uint32_t source_line);
 
 /**
  * envoy_dynamic_module_callback_log_enabled is called by the module to check if the log level is
