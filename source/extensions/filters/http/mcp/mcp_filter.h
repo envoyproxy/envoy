@@ -74,10 +74,6 @@ public:
   }
   bool earlyTerminateWhenRoutable() const { return early_terminate_when_routable_; }
 
-  const std::optional<std::string>& maxSupportedProtocolVersion() const {
-    return max_supported_protocol_version_;
-  }
-
   bool isProtocolVersionSupported(absl::string_view version) const;
 
   const ParserConfig& parserConfig() const { return parser_config_; }
