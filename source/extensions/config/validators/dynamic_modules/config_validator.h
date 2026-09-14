@@ -70,6 +70,8 @@ public:
   DynamicModuleConfigValidator(absl::string_view type_url,
                                DynamicModuleConfigValidatorConfigSharedPtr config);
 
+  absl::string_view typeUrl() const override { return type_url_; }
+
   void validate(const Server::Instance& server,
                 const std::vector<Envoy::Config::DecodedResourcePtr>& resources) override;
 

@@ -36,11 +36,12 @@ std::string extensionConfigBytesOrThrow(const DynamicModuleConfigValidatorProto&
 }
 
 std::string typeUrlOrThrow(const DynamicModuleConfigValidatorProto& proto_config) {
-  const std::string& type_url = proto_config.type_url();
+  // The proto validation rules guarantee exactly one entry, so index zero is always populated.
+  const std::string& type_url = proto_config.type_urls(0);
   const absl::string_view descriptor_full_name = TypeUtil::typeUrlToDescriptorFullName(type_url);
   if (descriptor_full_name.empty() ||
       TypeUtil::descriptorFullNameToTypeUrl(descriptor_full_name) != type_url) {
-    throwEnvoyExceptionOrPanic("dynamic module config validator type_url must use the canonical "
+    throwEnvoyExceptionOrPanic("dynamic module config validator type_urls must use the canonical "
                                "type.googleapis.com/<message> form");
   }
   return type_url;
@@ -76,18 +77,6 @@ Envoy::Config::ConfigValidatorPtr DynamicModuleConfigValidatorFactory::createCon
 
 Envoy::ProtobufTypes::MessagePtr DynamicModuleConfigValidatorFactory::createEmptyConfigProto() {
   return std::make_unique<DynamicModuleConfigValidatorProto>();
-}
-
-std::string DynamicModuleConfigValidatorFactory::typeUrl() const {
-  IS_ENVOY_BUG("dynamic module config validator type URL requires typed configuration");
-  return "";
-}
-
-std::string DynamicModuleConfigValidatorFactory::typeUrlFromConfig(
-    const Protobuf::Any& config, ProtobufMessage::ValidationVisitor& validation_visitor) const {
-  const auto& proto_config = MessageUtil::anyConvertAndValidate<DynamicModuleConfigValidatorProto>(
-      config, validation_visitor);
-  return typeUrlOrThrow(proto_config);
 }
 
 REGISTER_FACTORY(DynamicModuleConfigValidatorFactory, Envoy::Config::ConfigValidatorFactory);

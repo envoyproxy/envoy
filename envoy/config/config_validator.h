@@ -12,6 +12,8 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -28,6 +30,13 @@ namespace Config {
 class ConfigValidator {
 public:
   virtual ~ConfigValidator() = default;
+
+  /**
+   * Returns the xDS type url that this validator applies to. Only updates carrying this type url
+   * are passed to the validate() methods. The returned view must remain valid for the lifetime of
+   * the validator.
+   */
+  virtual absl::string_view typeUrl() const PURE;
 
   /**
    * Validates a given set of resources matching a State-of-the-World update.
@@ -67,20 +76,6 @@ public:
                         ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.config.validators"; }
-
-  /**
-   * Returns the xDS service type url that the config validator expects to receive.
-   */
-  virtual std::string typeUrl() const PURE;
-
-  /**
-   * Returns the xDS type url resolved from the validator's typed configuration, for extensions
-   * whose target type is configuration-dependent. Defaults to typeUrl().
-   */
-  virtual std::string typeUrlFromConfig(const Protobuf::Any&,
-                                        ProtobufMessage::ValidationVisitor&) const {
-    return typeUrl();
-  }
 };
 
 } // namespace Config

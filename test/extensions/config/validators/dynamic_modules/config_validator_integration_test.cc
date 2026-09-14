@@ -117,7 +117,7 @@ public:
       config.mutable_dynamic_module_config()->set_name("config_validator_test");
       config.mutable_dynamic_module_config()->set_do_not_close(true);
       config.set_extension_name(extension_name);
-      config.set_type_url(Config::TestTypeUrl::get().Cluster);
+      config.add_type_urls(Config::TestTypeUrl::get().Cluster);
 
       Protobuf::StringValue extension_config;
       extension_config.set_value(extension_config_value);

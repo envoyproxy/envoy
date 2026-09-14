@@ -46,7 +46,7 @@ public:
     proto_config.mutable_dynamic_module_config()->set_name(std::string(module_name));
     proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
     proto_config.set_extension_name(std::string(extension_name));
-    proto_config.set_type_url(std::string(type_url));
+    proto_config.add_type_urls(std::string(type_url));
 
     Protobuf::StringValue string_value;
     string_value.set_value("cluster_0");
@@ -61,7 +61,7 @@ public:
         std::string(filename));
     proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
     proto_config.set_extension_name("accept_all");
-    proto_config.set_type_url(std::string(type_url));
+    proto_config.add_type_urls(std::string(type_url));
     return proto_config;
   }
 
@@ -73,7 +73,7 @@ public:
     remote->mutable_http_uri()->mutable_timeout()->set_seconds(1);
     remote->set_sha256("0123456789abcdef");
     proto_config.set_extension_name("accept_all");
-    proto_config.set_type_url(std::string(type_url));
+    proto_config.add_type_urls(std::string(type_url));
     return proto_config;
   }
 
@@ -139,17 +139,17 @@ TEST_F(DynamicModuleConfigValidatorTest, CreateEmptyConfigProto) {
   EXPECT_NE(nullptr, dynamic_cast<DynamicModuleConfigValidatorProto*>(proto.get()));
 }
 
-TEST_F(DynamicModuleConfigValidatorTest, TypeUrlFromConfig) {
+TEST_F(DynamicModuleConfigValidatorTest, ValidatorReportsTypeUrl) {
   const auto proto_config =
       makeProto("config_validator_test", "required_clusters", cluster_type_url_);
-  EXPECT_EQ(cluster_type_url_,
-            factory_.typeUrlFromConfig(pack(proto_config),
-                                       ProtobufMessage::getStrictValidationVisitor()));
+  auto validator = factory_.createConfigValidator(pack(proto_config),
+                                                  ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_EQ(cluster_type_url_, validator->typeUrl());
 }
 
 TEST_F(DynamicModuleConfigValidatorTest, InvalidConfigRejected) {
   auto proto_config = makeProto("config_validator_test", "required_clusters", cluster_type_url_);
-  proto_config.clear_type_url();
+  proto_config.clear_type_urls();
 
   EXPECT_THROW(factory_.createConfigValidator(pack(proto_config),
                                               ProtobufMessage::getStrictValidationVisitor()),
@@ -160,18 +160,20 @@ TEST_F(DynamicModuleConfigValidatorTest, NonCanonicalTypeUrlRejected) {
   const auto proto_config =
       makeProto("config_validator_test", "required_clusters", "envoy.config.cluster.v3.Cluster");
 
-  EXPECT_THROW_WITH_REGEX(
-      factory_.typeUrlFromConfig(pack(proto_config), ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException, "type_url must use the canonical type.googleapis.com/<message> form");
+  EXPECT_THROW_WITH_REGEX(factory_.createConfigValidator(
+                              pack(proto_config), ProtobufMessage::getStrictValidationVisitor()),
+                          EnvoyException,
+                          "type_urls must use the canonical type.googleapis.com/<message> form");
 }
 
 TEST_F(DynamicModuleConfigValidatorTest, EmptyDescriptorTypeUrlRejected) {
   const auto proto_config =
       makeProto("config_validator_test", "required_clusters", "type.googleapis.com/");
 
-  EXPECT_THROW_WITH_REGEX(
-      factory_.typeUrlFromConfig(pack(proto_config), ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException, "type_url must use the canonical type.googleapis.com/<message> form");
+  EXPECT_THROW_WITH_REGEX(factory_.createConfigValidator(
+                              pack(proto_config), ProtobufMessage::getStrictValidationVisitor()),
+                          EnvoyException,
+                          "type_urls must use the canonical type.googleapis.com/<message> form");
 }
 
 TEST_F(DynamicModuleConfigValidatorTest, ModuleNotFoundRejected) {
@@ -357,10 +359,6 @@ TEST_F(DynamicModuleConfigValidatorTest, DeltaEmptyRejectionMessageUsesGenericEr
   EXPECT_THROW_WITH_MESSAGE(
       validator->validate(server_, added_resources, removed_resources), EnvoyException,
       absl::StrCat("dynamic module config validator rejected ", cluster_type_url_, " update"));
-}
-
-TEST_F(DynamicModuleConfigValidatorTest, TypeUrlWithoutConfigIsEnvoyBug) {
-  EXPECT_ENVOY_BUG(factory_.typeUrl(), "requires typed configuration");
 }
 
 TEST_F(DynamicModuleConfigValidatorTest, SetRejectionMessageWithNullContextIsEnvoyBug) {

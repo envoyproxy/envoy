@@ -13,9 +13,12 @@ namespace {
 
 class FakeConfigValidator : public ConfigValidator {
 public:
-  FakeConfigValidator(bool should_reject) : should_reject_(should_reject) {}
+  FakeConfigValidator(bool should_reject, absl::string_view type_url)
+      : should_reject_(should_reject), type_url_(type_url) {}
 
   // ConfigValidator
+  absl::string_view typeUrl() const override { return type_url_; }
+
   void validate(const Server::Instance&,
                 const std::vector<Envoy::Config::DecodedResourcePtr>&) override {
     if (should_reject_) {
@@ -31,6 +34,7 @@ public:
   }
 
   bool should_reject_;
+  const std::string type_url_;
 };
 
 class FakeConfigValidatorFactory : public ConfigValidatorFactory {
@@ -39,7 +43,8 @@ public:
 
   ConfigValidatorPtr createConfigValidator(const Protobuf::Any&,
                                            ProtobufMessage::ValidationVisitor&) override {
-    return std::make_unique<FakeConfigValidator>(should_reject_);
+    return std::make_unique<FakeConfigValidator>(
+        should_reject_, Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>());
   }
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -53,21 +58,18 @@ public:
                         should_reject_ ? "reject" : "accept");
   }
 
-  std::string typeUrl() const override {
-    return Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-  }
-
   bool should_reject_;
 };
 
-// A factory whose target type url depends on the typed configuration. typeUrl() returns Cluster
-// while typeUrlFromConfig(config, visitor) returns ClusterLoadAssignment, so a test can prove the
-// configuration-dependent overload is the one used for keying.
+// A factory whose validator targets a type url derived from the typed configuration. The created
+// validator reports ClusterLoadAssignment, so a test can prove the instance's typeUrl() is what
+// keys the validator rather than any fixed default.
 class ConfigDependentFakeConfigValidatorFactory : public ConfigValidatorFactory {
 public:
   ConfigValidatorPtr createConfigValidator(const Protobuf::Any&,
                                            ProtobufMessage::ValidationVisitor&) override {
-    return std::make_unique<FakeConfigValidator>(true);
+    return std::make_unique<FakeConfigValidator>(
+        true, Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>());
   }
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -77,15 +79,6 @@ public:
 
   std::string name() const override {
     return "envoy.config.validators.fake_config_dependent_validator";
-  }
-
-  std::string typeUrl() const override {
-    return Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-  }
-
-  std::string typeUrlFromConfig(const Protobuf::Any&,
-                                ProtobufMessage::ValidationVisitor&) const override {
-    return Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
   }
 };
 
@@ -225,8 +218,8 @@ TEST_F(CustomConfigValidatorsImplTest, ReturnFalseDifferentTypeConfigValidator) 
   }
 }
 
-// Validates that a validator with a configuration-dependent target type url is keyed under the
-// type url returned by typeUrlFromConfig(config, visitor).
+// Validates that a validator is keyed under the type url reported by the validator instance's
+// typeUrl(), even when it differs from the type url used to look up the factory.
 TEST_F(CustomConfigValidatorsImplTest, UsesConfigDependentTypeUrl) {
   const std::string endpoint_type_url{
       Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()};

@@ -45,8 +45,13 @@ message DynamicModuleConfigValidator {
   // the wrapper. Otherwise the serialized bytes of the configured message are passed.
   google.protobuf.Any extension_config = 3;
 
-  // The xDS resource type URL handled by this validator. Only updates whose type URL matches this
-  // value invoke the module. The value must use the canonical ``type.googleapis.com/<message>``
-  // form. This field is required.
-  string type_url = 4 [(validate.rules).string = {min_len: 1}];
+  // The xDS resource type URLs handled by this validator. Only updates whose type URL matches one
+  // of these values invoke the module. Each value must use the canonical
+  // ``type.googleapis.com/<message>`` form. Exactly one type URL is supported today; this
+  // restriction may be relaxed in the future. This field is required.
+  repeated string type_urls = 4 [(validate.rules).repeated = {
+    min_items: 1
+    max_items: 1
+    items {string {min_len: 1}}
+  }];
 }
