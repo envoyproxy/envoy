@@ -221,6 +221,20 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_examples")
     external_http_archive("envoy_toolshed")
+    external_http_archive(
+        "sq_linux_x86_64",
+        build_file_content = """
+exports_files(["bin/sq"])
+filegroup(name = "sq", srcs = ["bin/sq"], visibility = ["//visibility:public"])
+""",
+    )
+    external_http_archive(
+        "sq_linux_arm64",
+        build_file_content = """
+exports_files(["bin/sq"])
+filegroup(name = "sq", srcs = ["bin/sq"], visibility = ["//visibility:public"])
+""",
+    )
 
     _com_github_maxmind_libmaxminddb()
 

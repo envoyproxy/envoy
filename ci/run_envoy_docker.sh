@@ -43,9 +43,7 @@ fi
 export DOCKER_COMMAND="${*:-bash}"
 
 COMPOSE_SERVICE="envoy-build"
-if [[ -n "$MOUNT_GPG_HOME" ]]; then
-    COMPOSE_SERVICE="envoy-build-gpg"
-elif [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
+if [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
     COMPOSE_SERVICE="envoy-build-dind"
 fi
 
