@@ -92,7 +92,7 @@ envoy_cc_test(
     ],
     external_deps = ["ssl"],
     rbe_pool = "linux_x64_small",
-    shard_count = 5,
+    shard_count = 10,
     deps = [
         ":ssl_certs_test_lib",
         ":test_private_key_method_provider_test_lib",
