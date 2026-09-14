@@ -173,6 +173,18 @@ public:
 
   const Schema& rootSchema() const { return root_schema_; }
 
+  // Pins the inline-string threshold for payloads on this schema, overriding
+  // the filter's configured default. Declare it where what must stay inline is
+  // a property of the wire API rather than of the deployment; left unset, the
+  // filter's default applies.
+  RequestSchema& inlineStringThresholdBytes(uint32_t bytes) {
+    inline_string_threshold_bytes_ = bytes;
+    return *this;
+  }
+  std::optional<uint32_t> inlineStringThresholdBytes() const {
+    return inline_string_threshold_bytes_;
+  }
+
   // Returns the declared canonical ordering of streamable / offloadable field paths.
   const std::vector<std::string>& streamableFieldOrder() const { return streamable_field_order_; }
 
@@ -191,6 +203,7 @@ public:
 private:
   Schema root_schema_;
   std::vector<std::string> streamable_field_order_;
+  std::optional<uint32_t> inline_string_threshold_bytes_;
 };
 
 // Response schema definition. Left empty / placeholder for now as response
@@ -234,6 +247,11 @@ public:
   // Returns all offloadable field paths declared in the request schema.
   std::vector<std::string> requestOffloadableFieldPaths() const {
     return request_schema_.offloadableFieldPaths();
+  }
+
+  // The request schema's own inline-string threshold, if it declares one.
+  std::optional<uint32_t> requestInlineStringThresholdBytes() const {
+    return request_schema_.inlineStringThresholdBytes();
   }
 
   absl::Status validateRequest(const JsonWithExtBuf& payload) const {

@@ -38,19 +38,19 @@ message OAuth2 {
   }
 
   // Credentials to authenticate client to the authorization server.
-  // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-2.3) for details.
+  // Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-2.3>`__ for details.
   message ClientCredentials {
     // Client ID.
-    // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1) for details.
+    // Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1>`__ for details.
     string client_id = 1 [(validate.rules).string = {min_len: 1}];
 
     // Client secret.
-    // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1) for details.
+    // Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1>`__ for details.
     transport_sockets.tls.v3.SdsSecretConfig client_secret = 2
         [(validate.rules).message = {required: true}];
 
     // The method to use when sending credentials to the authorization server.
-    // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1) for details.
+    // Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1>`__ for details.
     AuthType auth_type = 3;
   }
 
@@ -66,18 +66,18 @@ message OAuth2 {
   }
 
   // Endpoint on the authorization server to retrieve the access token from.
-  // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-3.2) for details.
+  // Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-3.2>`__ for details.
   config.core.v3.HttpUri token_endpoint = 1 [(validate.rules).message = {required: true}];
 
   // Optional list of OAuth scopes to be claimed in the authorization request.
-  // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-4.4.2) for details.
+  // Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-4.4.2>`__ for details.
   repeated string scopes = 2;
 
   oneof flow_type {
     option (validate.required) = true;
 
     // Client Credentials Grant.
-    // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-4.4) for details.
+    // Refer to `RFC 6749: The OAuth 2.0 Authorization Framework <https://www.rfc-editor.org/rfc/rfc6749#section-4.4>`__ for details.
     ClientCredentials client_credentials = 3;
   }
 

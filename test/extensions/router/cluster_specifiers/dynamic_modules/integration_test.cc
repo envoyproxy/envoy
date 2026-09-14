@@ -408,6 +408,44 @@ TEST_P(DynamicModuleClusterSpecifierIntegrationTest, NoOverrideDoesNotMirrorRequ
   EXPECT_EQ(0, test_server_->counter("cluster.mirror-cluster.upstream_rq_total")->value());
 }
 
+// The route metadata the module set is layered onto the matched route, so the METADATA(ROUTE)
+// formatter that a response header uses observes every metadata entry end to end.
+TEST_P(DynamicModuleClusterSpecifierIntegrationTest, ModuleRouteMetadataVisibleToFormatter) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        const auto add_header = [virtual_host](absl::string_view name, absl::string_view key) {
+          auto* header = virtual_host->add_response_headers_to_add()->mutable_header();
+          header->set_key(std::string(name));
+          header->set_value(absl::StrCat("%METADATA(ROUTE:envoy.test.route:", key, ")%"));
+        };
+        add_header("x-route-metadata-string", "string_key");
+        add_header("x-route-metadata-number", "number_key");
+        add_header("x-route-metadata-bool", "bool_key");
+        add_header("x-route-metadata-struct", "struct_key");
+      });
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response =
+      codec_client_->makeHeaderOnlyRequest(requestHeaders({{"env", "prod"},
+                                                           {"x-route-meta-string", "shard-a"},
+                                                           {"x-route-meta-number", "0.5"},
+                                                           {"x-route-meta-bool", "true"},
+                                                           {"x-route-meta-struct", "1"}}));
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  const auto header_value = [&response](absl::string_view name) -> std::string {
+    const auto values = response->headers().get(Http::LowerCaseString(name));
+    return values.empty() ? "" : std::string(values[0]->value().getStringView());
+  };
+  EXPECT_EQ("shard-a", header_value("x-route-metadata-string"));
+  EXPECT_EQ("0.5", header_value("x-route-metadata-number"));
+  EXPECT_EQ("true", header_value("x-route-metadata-bool"));
+  EXPECT_EQ("struct-val", header_value("x-route-metadata-struct"));
+}
+
 // Tests that drive the upstream response so that the properties the module selected are observable.
 class DynamicModuleClusterSpecifierUpstreamIntegrationTest
     : public DynamicModuleClusterSpecifierIntegrationTest {

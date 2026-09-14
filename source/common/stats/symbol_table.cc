@@ -674,7 +674,7 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
   }
 }
 
-SymbolTable::StoragePtr SymbolTable::join(const StatNameVec& stat_names) const {
+SymbolTable::StoragePtr SymbolTable::join(absl::Span<const StatName> stat_names) const {
   size_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
     if (!stat_name.empty()) {
@@ -688,6 +688,31 @@ SymbolTable::StoragePtr SymbolTable::join(const StatNameVec& stat_names) const {
   }
   ASSERT(mem_block.capacityRemaining() == 0);
   return mem_block.release();
+}
+
+void StatNameJoiner::join(absl::Span<const StatName> stat_names, const SymbolTable& symbol_table) {
+  // A join with at most one non-empty name produces bytes identical to that name, so the
+  // allocation can be skipped and the name referenced directly.
+  StatName sole_name;
+  bool needs_join = false;
+  for (StatName stat_name : stat_names) {
+    if (stat_name.empty()) {
+      continue;
+    }
+    if (!sole_name.empty()) {
+      needs_join = true;
+      break;
+    }
+    sole_name = stat_name;
+  }
+
+  if (needs_join) {
+    storage_ = symbol_table.join(stat_names);
+    stat_name_ = StatName(storage_.get());
+  } else {
+    storage_.reset();
+    stat_name_ = sole_name;
+  }
 }
 
 void SymbolTable::populateList(const StatName* names, uint32_t num_names, StatNameList& list) {

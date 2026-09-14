@@ -5754,8 +5754,6 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
 TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseData) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream", "true");
 

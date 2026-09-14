@@ -18,12 +18,6 @@ on:
         type: string
       arch:
         type: string
-      bazel-cache:
-        type: boolean
-        default: false
-      bazel-cache-output-base:
-        type: string
-        default: base
       bazel-extra:
         type: string
       bazel-rbe-jobs:
@@ -93,6 +87,8 @@ on:
           ERROR
           error:
           Error:
+          FAILED
+          FAIL:
       fail-match:
         type: string
       import-gpg:
@@ -281,38 +277,6 @@ jobs:
             else . end
           | "${{ inputs.template-docker-configure }}"
 
-    # Caches
-    - uses: envoyproxy/toolshed/actions/cache/restore@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
-      if: >-
-        fromJSON(inputs.bazel-cache)
-      name: >-
-        Restore Bazel cache
-        (${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }})
-      with:
-        artifact-id: >-
-          ${{ inputs.bazel-cache-output-base == 'docs'
-              && fromJSON(inputs.request).config.ci.cache.bazel['docs-x64']
-              || (inputs.bazel-cache-output-base == 'external'
-                  && fromJSON(inputs.request).config.ci.cache.bazel['external-x64']
-                  || (inputs.arch == 'arm64'
-                      && fromJSON(inputs.request).config.ci.cache.bazel.arm64
-                      || fromJSON(inputs.request).config.ci.cache.bazel.x64)) }}
-        artifact-name: >-
-          ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{
-            inputs.bazel-cache-output-base != 'base'
-            && format('{0}-', inputs.bazel-cache-output-base)
-            || ''
-          }}${{ inputs.arch || 'x64' }}
-        artifact-wf-path: .github/workflows/request.yml
-        cache-type: artifact
-        key: >-
-          ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{
-            inputs.bazel-cache-output-base != 'base'
-            && format('{0}-', inputs.bazel-cache-output-base)
-            || ''
-          }}${{ inputs.arch || 'x64' }}
-        path: ${{ runner.temp }}/container/bazel_root
-
     # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
     - if: ${{ inputs.cache-build-image }}
       id: cache-lookup
@@ -351,7 +315,7 @@ jobs:
           ref: ${{ inputs.trusted && fromJSON(inputs.request).request.sha || fromJSON(inputs.request).request.ref }}
         fetch-merge-commit: false
         pr: ${{ fromJSON(inputs.request).request.pr }}
-        ssh-key: ${{ inputs.trusted && inputs.ssh-key || '' }}
+        ssh-key: ${{ inputs.trusted && secrets.ssh-key || '' }}
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
@@ -361,7 +325,7 @@ jobs:
       if: ${{ inputs.checkout-extra }}
       with:
         config: ${{ inputs.checkout-extra }}
-        ssh-key: ${{ inputs.trusted && inputs.ssh-key-extra || '' }}
+        ssh-key: ${{ inputs.trusted && secrets.ssh-key-extra || '' }}
 
     - name: Import GPG key
       uses: envoyproxy/toolshed/actions/gpg/import@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23

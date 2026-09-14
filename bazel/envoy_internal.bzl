@@ -145,7 +145,7 @@ EXTERNAL_DEPS_MAP = {
     "api_httpbody_protos": "@googleapis//google/api:httpbody_cc_proto",
     "http_api_protos": "@googleapis//google/api:annotations_cc_proto",
     # nghttp2
-    "nghttp2": "@envoy//bazel/foreign_cc:nghttp2",
+    "nghttp2": "@envoy//bazel/deps:nghttp2",
     # gRPC
     "grpc": "@grpc//:grpc++",
     "grpc_health_proto": "@grpc//src/proto/grpc/health/v1:health_cc_proto",
@@ -198,7 +198,7 @@ def tcmalloc_external_dep(repository):
             _repo("//bazel:debug_tcmalloc"),
             _repo("//bazel:gperftools_tcmalloc"),
         ): _repo("//bazel/external:gperftools"),
-        (_repo("//bazel:jemalloc_enabled"),): _repo("//bazel/foreign_cc:jemalloc"),
+        (_repo("//bazel:jemalloc_enabled"),): _repo("//bazel/deps:jemalloc"),
         "//conditions:default": _repo("//bazel:tcmalloc_lib"),
     })
 

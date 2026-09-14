@@ -29,8 +29,8 @@ BufferManager::BufferManager(ExternalBufferFactory& buffer_factory, FilterChainB
 void BufferManager::onDestroy() {
   destroyed_ = true;
   bridge_->unregisterReplayWatermarks();
-  // Cancel any pending replay continuation so it cannot fire after teardown.
-  replay_cb_->cancel();
+  // Cancel any requested or in-flight replay operation and disarm callbacks.
+  cancelReplay();
   // Dropping the buffer cancels any pending write/read completion callbacks.
   buffer_.reset();
 }
@@ -65,7 +65,13 @@ void BufferManager::endStream() {
 
 void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback done) {
   // One replay at a time: the caller chains sub-ranges from the done callback.
-  ASSERT(!replaying_ && !replay_requested_);
+  if (replay_cancelled_ || replaying_ || replay_requested_) {
+    IS_ENVOY_BUG("replay is in progress, or has been cancelled. currently only one pending replay "
+                 "is supported. and if cancelReplay is called, no more replay is allowed.");
+    done(absl::InternalError("replay is in progress, or has been cancelled"));
+    return;
+  }
+  replay_source_ = ReplaySource::ExternalBuffer;
   replay_offset_ = offset;
   replay_end_ = offset + length;
   replay_done_ = std::move(done);
@@ -80,6 +86,37 @@ void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback 
   // completion starts replay via maybeStartReplay() instead.
   if (!write_in_flight_ && pending_.length() == 0) {
     replay_cb_->scheduleCallbackCurrentIteration();
+  }
+}
+
+void BufferManager::replay(Buffer::Instance& data, ReplayDoneCallback done) {
+  // One replay at a time: the caller chains sub-ranges from the done callback.
+  if (replay_cancelled_ || replaying_ || replay_requested_) {
+    IS_ENVOY_BUG("replay is in progress, or has been cancelled. currently only one pending replay "
+                 "is supported. and if cancelReplay is called, no more replay is allowed.");
+    done(absl::InternalError("replay is in progress, or has been cancelled"));
+    return;
+  }
+  replay_source_ = ReplaySource::InMemory;
+  replay_in_memory_data_.move(data);
+  replay_done_ = std::move(done);
+  replay_requested_ = true;
+  ENVOY_LOG(debug, "ai_protocol_manager: in-memory replay requested for {} bytes",
+            replay_in_memory_data_.length());
+  if (!write_in_flight_ && pending_.length() == 0) {
+    replay_cb_->scheduleCallbackCurrentIteration();
+  }
+}
+
+void BufferManager::cancelReplay() {
+  replay_cancelled_ = true;
+  replay_requested_ = false;
+  replaying_ = false;
+  replay_source_ = ReplaySource::None;
+  replay_done_ = nullptr;
+  replay_in_memory_data_.drain(replay_in_memory_data_.length());
+  if (replay_cb_) {
+    replay_cb_->cancel();
   }
 }
 
@@ -132,13 +169,18 @@ void BufferManager::onWriteComplete(ExternalBufferStatus status) {
 void BufferManager::maybeStartReplay() {
   // Start only once the caller has requested a replay and every accepted byte is
   // durable. Consumes the request; the range was set by replay().
-  if (replaying_ || !replay_requested_ || write_in_flight_ || pending_.length() > 0) {
+  if (replay_cancelled_ || replaying_ || !replay_requested_ || write_in_flight_ ||
+      pending_.length() > 0) {
     return;
   }
   replay_requested_ = false;
   replaying_ = true;
-  ENVOY_LOG(debug, "ai_protocol_manager: replaying [{}, {})", replay_offset_, replay_end_);
-  maybeReadNextChunk();
+  if (replay_source_ == ReplaySource::InMemory) {
+    maybeDrainInMemoryReplay();
+  } else if (replay_source_ == ReplaySource::ExternalBuffer) {
+    ENVOY_LOG(debug, "ai_protocol_manager: replaying [{}, {})", replay_offset_, replay_end_);
+    maybeReadNextChunk();
+  }
 }
 
 void BufferManager::updateIngestBackpressure() {
@@ -158,6 +200,38 @@ void BufferManager::updateIngestBackpressure() {
     ENVOY_LOG(debug, "ai_protocol_manager: ingest low watermark ({} bytes not durable)", unacked);
     bridge_->resumeSource();
   }
+}
+
+void BufferManager::maybeDrainInMemoryReplay() {
+  ASSERT(!destroyed_);
+  if (!replaying_) {
+    return;
+  }
+
+  replay_sync_chunks_ = 0;
+  while (replay_in_memory_data_.length() > 0) {
+    if (replay_high_watermark_count_ > 0) {
+      ENVOY_LOG(trace, "ai_protocol_manager: in-memory replay paused (chain back-pressure)");
+      return;
+    }
+    if (replay_sync_chunks_ >= ReplayChunksPerIteration) {
+      ENVOY_LOG(trace, "ai_protocol_manager: in-memory replay yielding after {} chunks",
+                replay_sync_chunks_);
+      replay_cb_->scheduleCallbackNextIteration();
+      return;
+    }
+    ++replay_sync_chunks_;
+    const uint64_t to_inject =
+        std::min(ReadChunkSize, static_cast<uint64_t>(replay_in_memory_data_.length()));
+    Buffer::OwnedImpl chunk;
+    chunk.move(replay_in_memory_data_, to_inject);
+    bridge_->injectData(chunk);
+    if (destroyed_ || !replaying_) {
+      return;
+    }
+  }
+
+  finishReplay();
 }
 
 void BufferManager::maybeReadNextChunk() {
@@ -225,6 +299,9 @@ void BufferManager::maybeReadNextChunk() {
 void BufferManager::onReplayContinuation() {
   // onDestroy() cancels replay_cb_, so the continuation never fires once detached.
   ASSERT(!destroyed_);
+  if (replay_cancelled_) {
+    return;
+  }
   // Off the caller's stack: either start replay deferred from replay() (the
   // offload was already durable when the caller requested it), resume after the
   // per-iteration burst budget was spent, or resume after chain back-pressure
@@ -233,7 +310,9 @@ void BufferManager::onReplayContinuation() {
   // advancing a fresh burst twice.
   if (!replaying_) {
     maybeStartReplay();
-  } else {
+  } else if (replay_source_ == ReplaySource::InMemory) {
+    maybeDrainInMemoryReplay();
+  } else if (replay_source_ == ReplaySource::ExternalBuffer) {
     maybeReadNextChunk();
   }
 }
@@ -244,6 +323,9 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
   // below ends the stream -- handled by the runtime check after injectData().)
   ASSERT(!destroyed_);
   read_in_flight_ = false;
+  if (replay_cancelled_ || !replaying_) {
+    return;
+  }
   if (status != ExternalBufferStatus::Ok) {
     onExternalBufferError();
     return;
@@ -263,7 +345,7 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
   // callback into a torn-down stream) or reading another chunk from the released
   // buffer -- and it is what keeps maybeReadNextChunk()'s ASSERT(!destroyed_) valid.
   bridge_->injectData(*data);
-  if (destroyed_) {
+  if (destroyed_ || !replaying_) {
     return;
   }
   if (replay_offset_ >= replay_end_) {
@@ -279,13 +361,14 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
 
 void BufferManager::finishReplay() {
   replaying_ = false;
-  ENVOY_LOG(trace, "ai_protocol_manager: replay range [.., {}) complete", replay_end_);
+  replay_source_ = ReplaySource::None;
+  ENVOY_LOG(trace, "ai_protocol_manager: replay complete");
   // Hand control back to the caller. Its callback may start the next sub-range or
   // terminate the stream; move the callback out first so it can re-arm replay().
   ReplayDoneCallback done = std::move(replay_done_);
   replay_done_ = nullptr;
   if (done) {
-    done();
+    done(absl::OkStatus());
   }
 }
 

@@ -277,7 +277,8 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_,
+                                                            &server_factory_context_.serverScope());
   }
 
   void configToUseSds(
@@ -651,7 +652,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
       ClientSslTransportOptions()
           .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
           .setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256"}),
-      context_manager_, *api_);
+      context_manager_, *api_, &server_factory_context_.serverScope());
   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   cleanupUpstreamAndDownstream();
@@ -659,7 +660,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
       ClientSslTransportOptions()
           .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
           .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
-      context_manager_, *api_);
+      context_manager_, *api_, &server_factory_context_.serverScope());
   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
@@ -700,7 +701,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, MultipleCerts) {
           .setSni("www.lyft.com")
           .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
           .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
-      context_manager_, *api_);
+      context_manager_, *api_, &server_factory_context_.serverScope());
   auto ssl_client1 = makeSslClientConnection();
   codec_client_ = makeRawHttpConnection(std::move(ssl_client1), std::nullopt);
   EXPECT_TRUE(codec_client_->connected());
@@ -718,7 +719,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, MultipleCerts) {
           .setSni("www.lyft2.com")
           .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
           .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
-      context_manager_, *api_);
+      context_manager_, *api_, &server_factory_context_.serverScope());
   auto ssl_client2 = makeSslClientConnection();
   codec_client_ = makeRawHttpConnection(std::move(ssl_client2), std::nullopt);
   EXPECT_TRUE(codec_client_->connected());
@@ -862,7 +863,8 @@ public:
 
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});
-    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_,
+                                                            &server_factory_context_.serverScope());
   }
 
   void configureInlinedCerts(
@@ -912,9 +914,8 @@ public:
 
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
-    static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-               std::move(cfg), context_manager_, *upstream_stats_store->rootScope())
+               std::move(cfg), context_manager_, server_factory_context_.serverScope())
         .value();
   }
 
@@ -1095,7 +1096,8 @@ public:
     // SDS cluster for the first cluster.
     addFakeUpstream(Http::CodecType::HTTP2);
     // FakeUpstream with SSL/TLS for the second cluster.
-    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_, test_quic_),
+    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_, test_quic_,
+                                             &server_factory_context_.serverScope()),
                     upstreamProtocol(), /*autonomous_upstream=*/false);
     xds_upstream_ = fake_upstreams_.front().get();
   }

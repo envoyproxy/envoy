@@ -8,6 +8,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 
+#include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 
@@ -48,7 +49,7 @@ using envoy::extensions::upstreams::http::v3::HttpProtocolOptions;
 
 class TestingService final : public ReverseTunnelReportingService::Service {
   absl::flat_hash_map<std::string, ReverseTunnelEvent::Connected> state_;
-  std::atomic<std::size_t> num_events_;
+  std::atomic<std::size_t> num_events_{0};
   std::optional<std::chrono::milliseconds> newInterval;
 
 public:
@@ -132,10 +133,14 @@ struct GrpcServer {
 };
 
 class GrpcClientIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                  public BaseIntegrationTest {
+                                  public HttpIntegrationTest {
 public:
   GrpcClientIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfigNoListeners()) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(),
+                            ConfigHelper::baseConfigNoListeners()) {
+    drain_strategy_ = Server::DrainStrategy::Immediate;
+    drain_time_ = std::chrono::seconds(1);
+  }
 
   void initialize() override {
     use_lds_ = true;
@@ -148,11 +153,13 @@ public:
     addBootstrapExtension(getDownstreamExtension(), config_helper_);
     addCluster(getDownstreamCluster(localhost), config_helper_);
     addListener(getUpstreamListener(anyhost), config_helper_, current_listeners_);
+    addListener(getEgressListener(anyhost), config_helper_, current_listeners_);
 
     auto cluster = getUpstreamCluster(localhost);
     addCluster(getHttp2Cluster(cluster), config_helper_);
+    addCluster(getRevConnCluster(enable_tenant_isolation_), config_helper_);
 
-    BaseIntegrationTest::initialize();
+    HttpIntegrationTest::initialize();
 
     current_config_ = ConfigHelper{version_, config_helper_.bootstrap()};
   }
@@ -262,6 +269,24 @@ protected:
     }
 
     return names;
+  }
+
+  IntegrationStreamDecoderPtr makeClientRequest(std::string path,
+                                                IntegrationCodecClientPtr& client) {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"},
+        {":path", path},
+        {":scheme", "http"},
+        {":authority", "localhost"},
+        {"x-computed-host-id", "node-1"},
+    };
+
+    return client->makeHeaderOnlyRequest(request_headers);
+  }
+
+  void completeReq(std::chrono::milliseconds delay, IntegrationStreamDecoderPtr& resp) {
+    ASSERT_TRUE(resp->waitForEndStream(delay));
+    EXPECT_EQ("200", resp->headers().getStatusValue());
   }
 
   void setNewSendInterval(std::chrono::milliseconds ms) { grpc_server_->service_.setInterval(ms); }
@@ -429,6 +454,10 @@ TEST_P(GrpcClientIntegrationTest, ServerSentTime) {
   initialize();
   makeNewServer();
 
+  // initialize() starts the client before the server exists. Wait for the retry
+  // to connect and the first message to be processed.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(sendInterval * 3));
+
   std::size_t num_events_1 = numEvents();
   timeSystem().advanceTimeWait(std::chrono::milliseconds(2 * sendInterval));
   std::size_t num_events_2 = numEvents();
@@ -476,6 +505,126 @@ TEST_P(GrpcClientIntegrationTest, LoadTest) {
   validateEqual(std::chrono::milliseconds(sendInterval * 10), getConns({}));
 }
 #endif // defined(NDEBUG)
+
+TEST_P(GrpcClientIntegrationTest, ListenerDrain) {
+  drain_time_ = slowRouteDelay + std::chrono::seconds(3);
+  initialize();
+  makeNewServer();
+
+  addListenerLds(getDownstreamListener("node-1", 1));
+  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active", testing::Eq(1),
+                             std::chrono::milliseconds(sendInterval * 3));
+  validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-1"}));
+
+  // keep one request open on the downstream listener.
+  auto client = makeHttpConnection(egressPort);
+  auto resp = makeClientRequest("/slow", client);
+  test_server_->waitForGauge("http.node-1.downstream_cx_active", testing::Eq(1),
+                             std::chrono::milliseconds(sendInterval * 3));
+
+  removeListenerLds("node-1");
+  // Now wait for the notification on the server side.
+  // 1000 ms for the drain aware hcm to send the goaway and for it to be received.
+  validateEqual(std::chrono::milliseconds(sendInterval * 3 + 1000), getConns({}));
+
+  // wait for the response to be received successfully.
+  ASSERT_TRUE(
+      resp->waitForEndStream(std::chrono::milliseconds((slowRouteDelay.count() + 1) * 1000)));
+  EXPECT_EQ("200", resp->headers().getStatusValue());
+}
+
+TEST_P(GrpcClientIntegrationTest, ListenerDrainMaxDuration) {
+  initialize();
+  makeNewServer();
+
+  addListenerLds(getDownstreamListener("node-1", 1, std::chrono::seconds(5)));
+  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active", testing::Eq(1),
+                             std::chrono::milliseconds(sendInterval * 3));
+  validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-1"}));
+
+  auto client = makeHttpConnection(egressPort);
+  auto resp = makeClientRequest("/slow", client);
+  test_server_->waitForGauge("http.node-1.downstream_cx_active", testing::Eq(1),
+                             std::chrono::milliseconds(sendInterval * 3));
+
+  // New tunnel too will be alive.
+  test_server_->waitForGauge("http.node-1.downstream_cx_active", testing::Eq(2),
+                             std::chrono::milliseconds(sendInterval * 3 + 5000));
+  // Reporter should see old tunnel going down + new tunnel being added and unique_tunnels = 1.
+  test_server_->waitForCounter("envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service."
+                               "reporters.event_reporter.reverse_tunnel_established_total",
+                               testing::Eq(2), std::chrono::milliseconds(sendInterval));
+  test_server_->waitForCounter(
+      "envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service.reporters.event_reporter."
+      "reverse_tunnel_closed_total",
+      testing::Eq(1),
+      std::chrono::milliseconds(sendInterval +
+                                1000) // with the drain timeout of the hcm to send the goaway.
+  );
+  test_server_->waitForGauge("envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service."
+                             "reporters.event_reporter.reverse_tunnel_unique_active",
+                             testing::Eq(1), std::chrono::milliseconds(sendInterval));
+
+  // Now use the new tunnel for a request.
+  auto direct_client = makeHttpConnection(egressPort);
+  auto direct_resp = makeClientRequest("/direct", direct_client);
+  completeReq(std::chrono::milliseconds(1000), direct_resp);
+
+  completeReq(std::chrono::milliseconds((slowRouteDelay.count() + 1) * 1000), resp);
+}
+
+TEST_P(GrpcClientIntegrationTest, ListenerDrainMaxDurationNoActiveRequest) {
+  initialize();
+  makeNewServer();
+
+  addListenerLds(getDownstreamListener("node-1", 1, std::chrono::seconds(5)));
+  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active", testing::Eq(1),
+                             std::chrono::milliseconds(sendInterval * 3));
+  validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-1"}));
+
+  auto client = makeHttpConnection(egressPort);
+  auto resp = makeClientRequest("/direct", client);
+  completeReq(std::chrono::milliseconds(1000), resp);
+
+  test_server_->waitForGauge("http.node-1.downstream_cx_active", testing::Eq(2),
+                             std::chrono::milliseconds(sendInterval * 3 + 5000));
+
+  test_server_->waitForCounter("envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service."
+                               "reporters.event_reporter.reverse_tunnel_established_total",
+                               testing::Eq(2), std::chrono::milliseconds(sendInterval));
+  test_server_->waitForCounter(
+      "envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service.reporters.event_reporter."
+      "reverse_tunnel_closed_total",
+      testing::Eq(1),
+      std::chrono::milliseconds(sendInterval +
+                                1000) // with the drain timeout of the hcm to send the goaway.
+  );
+  test_server_->waitForGauge("envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service."
+                             "reporters.event_reporter.reverse_tunnel_unique_active",
+                             testing::Eq(1), std::chrono::milliseconds(sendInterval));
+
+  auto new_client = makeHttpConnection(egressPort);
+  auto new_resp = makeClientRequest("/direct", new_client);
+  completeReq(std::chrono::milliseconds(1000), new_resp);
+}
+
+TEST_P(GrpcClientIntegrationTest, ListenerDrainNoActiveRequest) {
+  initialize();
+  makeNewServer();
+
+  addListenerLds(getDownstreamListener("node-1", 1));
+  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active", testing::Eq(1),
+                             std::chrono::milliseconds(sendInterval * 3));
+  validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-1"}));
+
+  auto client = makeHttpConnection(egressPort);
+  auto resp = makeClientRequest("/direct", client);
+  completeReq(std::chrono::milliseconds(1000), resp);
+
+  removeListenerLds("node-1");
+  // shld send a drain in 1s and then some time for the data to get to our server.
+  validateEqual(std::chrono::milliseconds(sendInterval * 3 + 1000), getConns({}));
+}
 
 } // namespace ReverseConnection
 } // namespace Bootstrap

@@ -2803,6 +2803,30 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeString) {
       filterPtr(), envoy_dynamic_module_type_attribute_id_ResponseFlags, &result));
 }
 
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeXdsListenerValues) {
+  auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+  ON_CALL(*listener_info, direction())
+      .WillByDefault(testing::Return(envoy::config::core::v3::INBOUND));
+  connection_.stream_info_.downstream_connection_info_provider_->setListenerInfo(listener_info);
+  auto filter_chain_info = std::make_shared<NiceMock<Network::MockFilterChainInfo>>();
+  filter_chain_info->filter_chain_name_ = "network_filter_chain";
+  connection_.stream_info_.downstream_connection_info_provider_->setFilterChainInfo(
+      filter_chain_info);
+
+  uint64_t int_result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_attribute_int(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_XdsListenerDirection, &int_result));
+  EXPECT_EQ(static_cast<uint64_t>(envoy::config::core::v3::INBOUND), int_result);
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_XdsFilterChainName, &string_result));
+  EXPECT_EQ("network_filter_chain", absl::string_view(string_result.ptr, string_result.length));
+  connection_.stream_info_.downstream_connection_info_provider_->setFilterChainInfo(nullptr);
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_XdsFilterChainName, &string_result));
+  EXPECT_EQ(0, string_result.length);
+}
+
 } // namespace NetworkFilters
 } // namespace DynamicModules
 } // namespace Extensions

@@ -106,7 +106,8 @@ public:
     payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
     ssl_client_ = dispatcher_->createClientConnection(
         address, Network::Address::InstanceConstSharedPtr(),
         context_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);

@@ -79,10 +79,12 @@ const nlohmann::json* readObject(const nlohmann::json& json, const std::string& 
 
 std::optional<uint64_t> addCounts(std::optional<uint64_t> base,
                                   const std::optional<uint64_t>& extra, bool& overflow) {
-  if (!base.has_value() || !extra.has_value()) {
+  if (!extra.has_value()) {
     return base;
   }
-  const uint64_t sum = base.value() + extra.value();
+  // Both operands are bounded by MaxSafeCount at read time, so the sum cannot
+  // wrap.
+  const uint64_t sum = base.value_or(0) + extra.value();
   if (sum > MaxSafeCount) {
     overflow = true;
     return std::nullopt;

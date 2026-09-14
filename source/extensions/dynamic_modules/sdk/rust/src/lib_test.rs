@@ -4715,6 +4715,130 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_async_host_selection_
 ) {
 }
 
+/// Records what the resolve-and-record wrappers did so a test can assert them. Resolution reports
+/// `MetricNotFound` for id 0 so the failure arm is reachable, and otherwise hands back a handle
+/// derived from the id.
+pub(crate) static MOCK_CLUSTER_METRIC_OPS: std::sync::Mutex<Vec<(String, usize, u64)>> =
+  std::sync::Mutex::new(Vec::new());
+
+fn record_cluster_metric_op(op: &str, handle: *mut std::ffi::c_void, value: u64) {
+  MOCK_CLUSTER_METRIC_OPS
+    .lock()
+    .unwrap()
+    .push((op.to_owned(), handle as usize, value));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_resolve_counter_vec(
+  _config: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  counter_ptr: *mut abi::envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  if id == 0 {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  unsafe { *counter_ptr = (0x1000 + id) as _ };
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec(
+  _config: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  gauge_ptr: *mut abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  if id == 0 {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  unsafe { *gauge_ptr = (0x2000 + id) as _ };
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec(
+  _config: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  histogram_ptr: *mut abi::envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  if id == 0 {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  unsafe { *histogram_ptr = (0x3000 + id) as _ };
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_counter_add(
+  counter: abi::envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("counter_add", counter, value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_gauge_set(
+  gauge: abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("gauge_set", gauge, value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_gauge_add(
+  gauge: abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("gauge_add", gauge, value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_gauge_sub(
+  gauge: abi::envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("gauge_sub", gauge, value);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_metric_histogram_record(
+  histogram: abi::envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr,
+  value: u64,
+) {
+  record_cluster_metric_op("histogram_record", histogram, value);
+}
+
+// Records the batched entries so a test can assert the wrapper flattened them in order.
+pub(crate) static MOCK_CLUSTER_LB_CONTEXT_METADATA_BATCH: std::sync::Mutex<Vec<(String, String)>> =
+  std::sync::Mutex::new(Vec::new());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _ns: abi::envoy_dynamic_module_type_module_buffer,
+  entries: *const abi::envoy_dynamic_module_type_module_key_value_pair,
+  entries_size: usize,
+) -> bool {
+  let mut recorded = MOCK_CLUSTER_LB_CONTEXT_METADATA_BATCH.lock().unwrap();
+  recorded.clear();
+  for i in 0..entries_size {
+    let entry = unsafe { &*entries.add(i) };
+    let key = unsafe { std::slice::from_raw_parts(entry.key_ptr as *const u8, entry.key_length) };
+    let value =
+      unsafe { std::slice::from_raw_parts(entry.value_ptr as *const u8, entry.value_length) };
+    recorded.push((
+      String::from_utf8_lossy(key).into_owned(),
+      String::from_utf8_lossy(value).into_owned(),
+    ));
+  }
+  true
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
   _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
@@ -4730,6 +4854,49 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
   _index: usize,
 ) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
   std::ptr::null_mut()
+}
+
+/// Maps each priority to a scenario so the SDK wrapper's size-then-fill handshake is exercised end
+/// to end.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  priority: u32,
+  hosts_out: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  hosts_capacity: usize,
+  hosts_size_out: *mut usize,
+) -> bool {
+  const HOSTS: [usize; 2] = [0xAB, 0xCD];
+  match priority {
+    // Two healthy hosts, filled once the buffer is large enough.
+    0 => {
+      unsafe { *hosts_size_out = HOSTS.len() };
+      if hosts_capacity < HOSTS.len() {
+        return false;
+      }
+      for (i, addr) in HOSTS.iter().enumerate() {
+        unsafe {
+          *hosts_out.add(i) = *addr as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr
+        };
+      }
+      true
+    },
+    // Existing but empty partition. A zero buffer already holds it.
+    1 => {
+      unsafe { *hosts_size_out = 0 };
+      true
+    },
+    // A partition that never fits, so the fill call keeps failing.
+    2 => {
+      unsafe { *hosts_size_out = HOSTS.len() };
+      false
+    },
+    // No such priority level.
+    _ => {
+      unsafe { *hosts_size_out = 0 };
+      false
+    },
+  }
 }
 
 #[no_mangle]
@@ -9100,6 +9267,11 @@ struct StubSpecifierSelection {
   priority: Option<abi::envoy_dynamic_module_type_resource_priority>,
   cluster_not_found_response_code: Option<u32>,
   route_action_override: Option<String>,
+  route_metadata_number: Option<(String, String, f64)>,
+  route_metadata_string: Option<(String, String, String)>,
+  route_metadata_bool: Option<(String, String, bool)>,
+  route_metadata_struct: Option<(String, Vec<u8>)>,
+  route_typed_metadata: Option<(String, Vec<u8>)>,
 }
 
 static STUB_SPECIFIER_SELECTION: std::sync::Mutex<StubSpecifierSelection> =
@@ -9111,6 +9283,11 @@ static STUB_SPECIFIER_SELECTION: std::sync::Mutex<StubSpecifierSelection> =
     priority: None,
     cluster_not_found_response_code: None,
     route_action_override: None,
+    route_metadata_number: None,
+    route_metadata_string: None,
+    route_metadata_bool: None,
+    route_metadata_struct: None,
+    route_typed_metadata: None,
   });
 
 // Copies a module buffer into an owned string the way Envoy copies it out of the module.
@@ -9120,6 +9297,11 @@ unsafe fn stub_specifier_string(buffer: abi::envoy_dynamic_module_type_module_bu
     buffer.length,
   ))
   .into_owned()
+}
+
+// Copies a module buffer into owned bytes, used for the serialized metadata setters.
+unsafe fn stub_specifier_bytes(buffer: abi::envoy_dynamic_module_type_module_buffer) -> Vec<u8> {
+  std::slice::from_raw_parts(buffer.ptr as *const u8, buffer.length).to_vec()
 }
 
 // Points the result buffer at a static value and reports it as present.
@@ -9380,6 +9562,82 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_acti
     .unwrap()
     .route_action_override = Some(name);
   true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  value: f64,
+) {
+  STUB_SPECIFIER_SELECTION
+    .lock()
+    .unwrap()
+    .route_metadata_number = Some((
+    unsafe { stub_specifier_string(ns) },
+    unsafe { stub_specifier_string(key) },
+    value,
+  ));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  value: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  STUB_SPECIFIER_SELECTION
+    .lock()
+    .unwrap()
+    .route_metadata_string = Some((
+    unsafe { stub_specifier_string(ns) },
+    unsafe { stub_specifier_string(key) },
+    unsafe { stub_specifier_string(value) },
+  ));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  value: bool,
+) {
+  STUB_SPECIFIER_SELECTION.lock().unwrap().route_metadata_bool = Some((
+    unsafe { stub_specifier_string(ns) },
+    unsafe { stub_specifier_string(key) },
+    value,
+  ));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  serialized_struct: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  STUB_SPECIFIER_SELECTION
+    .lock()
+    .unwrap()
+    .route_metadata_struct = Some((unsafe { stub_specifier_string(ns) }, unsafe {
+    stub_specifier_bytes(serialized_struct)
+  }));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  serialized_any: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  STUB_SPECIFIER_SELECTION
+    .lock()
+    .unwrap()
+    .route_typed_metadata = Some((unsafe { stub_specifier_string(ns) }, unsafe {
+    stub_specifier_bytes(serialized_any)
+  }));
 }
 
 #[test]
@@ -9661,6 +9919,11 @@ fn test_cluster_specifier_context_records_selection() {
   ctx.set_priority(ResourcePriority::High);
   assert!(ctx.set_cluster_not_found_response_code(404));
   assert!(ctx.set_route_action_override(STUB_SPECIFIER_OVERRIDE_NAME));
+  ctx.set_route_metadata_number("envoy.lb", "weight", 0.75);
+  ctx.set_route_metadata_string("envoy.lb", "shard", "a");
+  ctx.set_route_metadata_bool("envoy.lb", "canary", true);
+  ctx.set_route_metadata_struct("envoy.filters.http.ext_authz", b"struct-bytes");
+  ctx.set_route_typed_metadata("envoy.filters.http.ext_authz", b"any-bytes");
 
   {
     let selection = STUB_SPECIFIER_SELECTION.lock().unwrap();
@@ -9676,6 +9939,32 @@ fn test_cluster_specifier_context_records_selection() {
     assert_eq!(
       Some(STUB_SPECIFIER_OVERRIDE_NAME.to_string()),
       selection.route_action_override
+    );
+    assert_eq!(
+      Some(("envoy.lb".to_string(), "weight".to_string(), 0.75)),
+      selection.route_metadata_number
+    );
+    assert_eq!(
+      Some(("envoy.lb".to_string(), "shard".to_string(), "a".to_string())),
+      selection.route_metadata_string
+    );
+    assert_eq!(
+      Some(("envoy.lb".to_string(), "canary".to_string(), true)),
+      selection.route_metadata_bool
+    );
+    assert_eq!(
+      Some((
+        "envoy.filters.http.ext_authz".to_string(),
+        b"struct-bytes".to_vec()
+      )),
+      selection.route_metadata_struct
+    );
+    assert_eq!(
+      Some((
+        "envoy.filters.http.ext_authz".to_string(),
+        b"any-bytes".to_vec()
+      )),
+      selection.route_typed_metadata
     );
   }
 

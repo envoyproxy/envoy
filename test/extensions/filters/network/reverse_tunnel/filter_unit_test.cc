@@ -1614,8 +1614,9 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionReportsConn
   EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
     auto reporter =
         std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
-    EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                 testing::Eq(tenant_id), testing::_));
+    EXPECT_CALL(*reporter,
+                reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                      testing::Eq(tenant_id), testing::_, testing::Eq(100)));
     return reporter;
   }));
 
@@ -1671,7 +1672,8 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
         std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
     EXPECT_CALL(*reporter,
                 reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                      testing::Eq(tenant_id), testing::Eq(initiation_time_ms)));
+                                      testing::Eq(tenant_id), testing::Eq(initiation_time_ms),
+                                      testing::Eq(100)));
     return reporter;
   }));
 
@@ -1767,7 +1769,8 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
     auto reporter =
         std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
     EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                 testing::Eq(tenant_id), testing::Eq(int64_t(0))));
+                                                 testing::Eq(tenant_id), testing::Eq(int64_t(0)),
+                                                 testing::Eq(100)));
     return reporter;
   }));
 
@@ -1823,7 +1826,8 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
     auto reporter =
         std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
     EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                 testing::Eq(tenant_id), testing::Eq(int64_t(0))));
+                                                 testing::Eq(tenant_id), testing::Eq(int64_t(0)),
+                                                 testing::Eq(100)));
     return reporter;
   }));
 

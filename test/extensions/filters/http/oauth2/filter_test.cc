@@ -429,6 +429,34 @@ public:
     return makeFilterConfig(p, secret_reader).value();
   }
 
+  // Builds a minimal valid config whose retry_policy carries `retry_on` and three retries. Used to
+  // pin down which retry conditions the OAuth server requests end up with.
+  FilterConfigSharedPtr getConfigWithRetryPolicy(const std::string& retry_on) {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
+    p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+
+    auto* retry_policy = p.mutable_retry_policy();
+    retry_policy->mutable_num_retries()->set_value(3);
+    retry_policy->set_retry_on(retry_on);
+
+    auto credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+
+    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+
+    auto secret_reader = std::make_shared<MockSecretReader>();
+    return makeFilterConfig(p, secret_reader).value();
+  }
+
   // Test helpers exposing private OAuth2Filter methods. OAuth2Filter declares
   // `friend class OAuth2Test`, but `TEST_F(OAuth2Test, ...)` expands to a class
   // *derived* from OAuth2Test, and C++ friendship is not inherited — so the
@@ -736,6 +764,40 @@ TEST_F(OAuth2Test, InvalidAuthorizationEndpoint) {
   EXPECT_THAT(makeFilterConfig(p, secret_reader),
               StatusHelpers::HasStatusMessage(
                   "OAuth2 filter: invalid authorization endpoint URL 'INVALID_URL' in config."));
+}
+
+// A configured retry_on reaches the parsed policy instead of being overridden by the filter.
+TEST_F(OAuth2Test, RetryPolicyRespectsConfiguredRetryOn) {
+  auto config = getConfigWithRetryPolicy("connect-failure,refused-stream");
+
+  ASSERT_NE(config->retryPolicy(), nullptr);
+  EXPECT_EQ(config->retryPolicy()->retryOn(), Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE |
+                                                  Router::RetryPolicy::RETRY_ON_REFUSED_STREAM);
+  EXPECT_EQ(config->retryPolicy()->numRetries(), 3);
+}
+
+// With the guard off, the legacy hardcoded conditions still override the configured retry_on.
+TEST_F(OAuth2Test, RetryPolicyLegacyRetryOnOverride) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.oauth2_client_retries_respect_user_retry_on", "false"}});
+
+  auto config = getConfigWithRetryPolicy("connect-failure,refused-stream");
+
+  ASSERT_NE(config->retryPolicy(), nullptr);
+  EXPECT_EQ(config->retryPolicy()->retryOn(), Router::RetryPolicy::RETRY_ON_5XX |
+                                                  Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR |
+                                                  Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE |
+                                                  Router::RetryPolicy::RETRY_ON_RESET);
+}
+
+// A retry_policy that omits retry_on no longer inherits the legacy conditions, so nothing is
+// retried: num_retries on its own does not enable retries.
+TEST_F(OAuth2Test, RetryPolicyWithoutRetryOnRetriesNothing) {
+  auto config = getConfigWithRetryPolicy("");
+
+  ASSERT_NE(config->retryPolicy(), nullptr);
+  EXPECT_EQ(config->retryPolicy()->retryOn(), 0);
 }
 
 // Verifies that the OAuth config is created with a default value for auth_scopes field when it is

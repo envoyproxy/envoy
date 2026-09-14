@@ -6698,6 +6698,54 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterGridTest) {
   }
 }
 
+TEST(SubstitutionFormatterTest, CoalesceFormatterEmptyValues) {
+  StreamInfo::MockStreamInfo stream_info;
+  // ":authority" is present but empty while "x-envoy-original-host" has a value.
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", ""},
+                                                 {"x-envoy-original-host", "original.example.com"}};
+
+  const std::string format =
+      R"(%COALESCE({"operators": [{"command": "REQ", "param": ":authority"}, {"command": "REQ", "param": "x-envoy-original-host"}]})%)";
+
+  // By default a value that is present but empty is accepted as the result.
+  {
+    auto providers = *SubstitutionFormatParser::parse(format);
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_EQ("", formatForTest(*providers[0], {&request_headers}, stream_info));
+    EXPECT_THAT(formatValueForTest(*providers[0], {&request_headers}, stream_info),
+                ProtoEq(ValueUtil::stringValue("")));
+  }
+
+  // With the runtime guard disabled, the empty value is skipped and the next operator is used.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.coalesce_formatter_accept_empty_values", "false"}});
+
+    auto providers = *SubstitutionFormatParser::parse(format);
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_EQ("original.example.com",
+              formatForTest(*providers[0], {&request_headers}, stream_info));
+    EXPECT_THAT(formatValueForTest(*providers[0], {&request_headers}, stream_info),
+                ProtoEq(ValueUtil::stringValue("original.example.com")));
+  }
+
+  // With the runtime guard disabled and no non-empty operator, no value is produced.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.coalesce_formatter_accept_empty_values", "false"}});
+
+    Http::TestRequestHeaderMapImpl empty_headers{{":authority", ""}};
+    auto providers = *SubstitutionFormatParser::parse(
+        R"(%COALESCE({"operators": [{"command": "REQ", "param": ":authority"}]})%)");
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_FALSE(formatForTest(*providers[0], {&empty_headers}, stream_info).has_value());
+    EXPECT_THAT(formatValueForTest(*providers[0], {&empty_headers}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+}
+
 TEST(SubstitutionFormatterTest, CoalesceFormatterErrorCases) {
   // Empty JSON config.
   {

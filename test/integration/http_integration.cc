@@ -507,15 +507,35 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   // will interpret that as an unexpected disconnect. The codec client is not
   // subject to the same failure mode.
   if (fake_upstream_connection_) {
-    AssertionResult result = fake_upstream_connection_->close();
+    AssertionResult result = AssertionSuccess();
+    const bool is_http3 = fake_upstream_connection_->type() == Http::CodecType::HTTP3;
+    if (is_http3) {
+      // QUIC connections do not support half-close.
+      result = fake_upstream_connection_->close();
+    } else {
+      // A local close only proves that the fake upstream dispatcher closed its socket. Initiate a
+      // fake-upstream FIN; closing the downstream below also makes TCP proxy and CONNECT paths that
+      // enable upstream half-close fully close their paired upstream.
+      result = fake_upstream_connection_->halfCloseForCleanup();
+    }
     RELEASE_ASSERT(result, result.message());
+    if (codec_client_) {
+      codec_client_->close();
+    }
     result = fake_upstream_connection_->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
+
+    // Envoy closes its socket before raising connection callbacks, so run a worker barrier after
+    // observing its close to ensure the callback has removed the connection from its connection
+    // pool. Some fixtures stop the server before cleaning up their fake upstreams; they cannot
+    // issue another request, so no worker barrier is needed.
+    if (!is_http3 && test_server_) {
+      test_server_->waitForWorkerThreads();
+    }
     result = fake_upstream_connection_->waitForNoPost();
     RELEASE_ASSERT(result, result.message());
     fake_upstream_connection_.reset();
-  }
-  if (codec_client_) {
+  } else if (codec_client_) {
     codec_client_->close();
   }
 }

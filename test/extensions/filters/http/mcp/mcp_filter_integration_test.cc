@@ -119,6 +119,107 @@ TEST_P(McpFilterIntegrationTest, ValidJsonRpcPostRequest) {
   EXPECT_TRUE(metadata_verified);
 }
 
+TEST_P(McpFilterIntegrationTest, HeadersAttributeSourceUsesHeaderMetadata) {
+  FakeAccessLogFactory factory;
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
+
+  bool metadata_verified = false;
+  factory.setLogCallback(
+      [&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
+
+        auto it = dynamic_metadata.find("envoy.filters.http.mcp");
+        ASSERT_NE(it, dynamic_metadata.end());
+
+        const auto& metadata = it->second;
+
+        EXPECT_EQ("tasks/get", metadata.fields().at("method").string_value());
+
+        const auto& params = metadata.fields().at("params").struct_value();
+
+        EXPECT_EQ("header-task", params.fields().at("taskId").string_value());
+
+        metadata_verified = true;
+      });
+
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    auto* access_log = hcm.add_access_log();
+    access_log->set_name("envoy.access_loggers.test");
+
+    test::integration::accesslog::FakeAccessLog access_log_config;
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  request_storage_mode: DYNAMIC_METADATA
+  attribute_source: HEADERS
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"body-task"}})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-method", "tasks/get"},
+                                     {"mcp-name", "header-task"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_TRUE(metadata_verified);
+}
+
+TEST_P(McpFilterIntegrationTest, VerifyRejectsHeaderBodyMismatch) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: PASS_THROUGH
+  attribute_source: VERIFY
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"body-task"}})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-method", "tasks/get"},
+                                     {"mcp-name", "header-task"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("400", response->headers().getStatusValue());
+
+  // The upstream should NOT receive a request because the filter sends a local reply.
+  EXPECT_EQ(nullptr, upstream_request_);
+}
+
 // Test that an MCP request with malformed JSON is rejected with a 400.
 TEST_P(McpFilterIntegrationTest, InvalidJsonBodyRejected) {
   FakeAccessLogFactory factory;

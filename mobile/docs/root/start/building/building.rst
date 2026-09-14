@@ -39,17 +39,9 @@ Make sure that Java 8 set on `PATH` and that `JAVA_HOME` is set to the appropria
 Android requirements
 --------------------
 
-- Android SDK Platform 30
-- Android NDK 21
-
-For local builds, set ``ANDROID_HOME`` and ``ANDROID_NDK_HOME`` to point to the location of these installs. For example,
-
-.. code-block:: bash
-
-  ANDROID_HOME=$HOME/Library/Android/sdk
-  ANDROID_NDK_HOME=$HOME/Library/Android/ndk/21.3.6528147
-
-See `ci/mac_ci_setup.sh` or `ci/linux_ci_setup.sh` for the specific NDK version used during builds.
+The Android SDK (platform 30, build-tools 35.0.0) and NDK (r29, api level 23) are fetched
+automatically by Bazel via hermetic toolchains. No local Android SDK/NDK installation or
+``ANDROID_HOME``/``ANDROID_NDK_HOME`` environment variables are required for local builds.
 
 .. _ios_requirements:
 

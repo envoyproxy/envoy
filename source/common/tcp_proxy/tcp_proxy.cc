@@ -217,6 +217,15 @@ Config::SharedConfig::SharedConfig(
     proxy_protocol_tlvs_ =
         parseTLVs(config.proxy_protocol_tlvs(), context, dynamic_tlv_formatters_);
   }
+
+  Server::OverloadManager& overload_manager =
+      context.shouldBypassOverloadManager() ? context.serverFactoryContext().nullOverloadManager()
+                                            : context.serverFactoryContext().overloadManager();
+  tcp_proxy_on_data_loadshed_point_ =
+      overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData);
+  ENVOY_LOG_ONCE_MISC_IF(
+      trace, tcp_proxy_on_data_loadshed_point_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.tcp_proxy_on_data is not found. Is it configured?");
 }
 
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
@@ -1092,6 +1101,16 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
                  read_callbacks_->connection(), data.length(), end_stream, upstream_ != nullptr,
                  receive_before_connect_, static_cast<int>(connect_mode_));
   getStreamInfo().getDownstreamBytesMeter()->addWireBytesReceived(data.length());
+
+  if (config_->tcpProxyOnDataLoadShedPoint() != nullptr &&
+      config_->tcpProxyOnDataLoadShedPoint()->shouldShedLoad()) {
+    ENVOY_CONN_LOG(trace, "load shedding in onData", read_callbacks_->connection());
+    config_->stats().downstream_cx_overload_close_.inc();
+    getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::OverloadManager);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                        StreamInfo::LocalCloseReasons::get().OverloadManagerClose);
+    return Network::FilterStatus::StopIteration;
+  }
 
   if (upstream_) {
     getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(data.length());

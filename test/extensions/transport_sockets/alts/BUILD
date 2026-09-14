@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.transport_sockets.alts"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/extensions/transport_sockets/alts:config",
         "//source/extensions/transport_sockets/alts:tsi_socket",
@@ -128,6 +129,7 @@ envoy_extension_cc_test(
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/network:address_interface",
+        "//source/common/network:transport_socket_options_lib",
         "//source/extensions/transport_sockets/alts:tsi_socket",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
@@ -162,6 +164,7 @@ envoy_extension_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/transport_sockets/alts:config",
         "//source/extensions/transport_sockets/alts:tsi_socket",

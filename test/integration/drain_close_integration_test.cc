@@ -304,6 +304,64 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrainSkipExit) {
   ASSERT_TRUE(waitForPortAvailable(http_port));
 }
 
+// A non-graceful drain with skip_exit drains the existing connections without stopping the
+// listeners, so the listeners keep accepting new connections.
+TEST_P(DrainCloseIntegrationTest, AdminNonGracefulDrainSkipExit) {
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  // Long enough that nothing here depends on the drain period elapsing.
+  drain_time_ = std::chrono::seconds(999);
+  initialize();
+  uint32_t http_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(http_port);
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  // The request is completed but the connection remains open.
+  EXPECT_TRUE(codec_client_->connected());
+
+  // Invoke /drain_listeners without graceful: the connections drain immediately, but skip_exit
+  // leaves the listeners running.
+  BufferingStreamDecoderPtr admin_response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners?skip_exit",
+                                         "", downstreamProtocol(), version_);
+  EXPECT_THAT(admin_response->headers(), Http::HttpStatusIs("200"));
+
+  // Listeners should remain open.
+  EXPECT_EQ(test_server_->counter("listener_manager.listener_stopped")->value(), 0);
+
+  // The already-established connection is drained: it terminates once the request completes.
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  if (downstream_protocol_ == Http::CodecType::HTTP2) {
+    EXPECT_TRUE(codec_client_->sawGoAway());
+  } else {
+    EXPECT_EQ("close", response->headers().getConnectionValue());
+  }
+
+  // New connections can still be made.
+  auto second_codec_client_ = makeRawHttpConnection(makeClientConnection(http_port), std::nullopt);
+  EXPECT_TRUE(second_codec_client_->connected());
+
+  // Invoke /drain_listeners and shut down listeners.
+  second_codec_client_->rawConnection().close(Network::ConnectionCloseType::NoFlush);
+  admin_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
+  EXPECT_THAT(admin_response->headers(), Http::HttpStatusIs("200"));
+
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
+  ASSERT_TRUE(waitForPortAvailable(http_port));
+}
+
 INSTANTIATE_TEST_SUITE_P(Protocols, DrainCloseIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP1, Http::CodecType::HTTP2},

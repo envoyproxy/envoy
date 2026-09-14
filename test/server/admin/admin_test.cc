@@ -23,6 +23,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -33,6 +34,10 @@ using testing::StartsWith;
 
 namespace Envoy {
 namespace Server {
+
+MATCHER_P(HasEventStrategy, m, "") {
+  return testing::ExplainMatchResult(m, arg.strategy, result_listener);
+}
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -74,10 +79,66 @@ TEST_P(AdminInstanceTest, GracefulDrainNotifiesListeners) {
               onServerDrainStart(Network::DrainDirection::InboundOnly, _));
   EXPECT_EQ(Http::Code::OK,
             postCallback("/drain_listeners?graceful&inboundonly", header_map, data));
+}
 
-  // A non-graceful drain stops the listeners outright; there is no drain window to notify about.
-  EXPECT_CALL(server_.listener_manager_, onServerDrainStart(_, _)).Times(0);
+// A non-graceful drain stops the listeners immediately, but the connections they own still have to
+// be told that a drain has begun -- otherwise nothing about them drains at all.
+TEST_P(AdminInstanceTest, NonGracefulDrainNotifiesListeners) {
+  Buffer::OwnedImpl data;
+  Http::TestResponseHeaderMapImpl header_map;
+
+  // The `graceful` parameter only decides whether the listeners keep accepting for a drain period,
+  // so the notification carries the server-wide strategy just as a graceful drain's does.
+  ON_CALL(server_.options_, drainStrategy())
+      .WillByDefault(testing::Return(Server::DrainStrategy::Gradual));
+  EXPECT_CALL(server_.listener_manager_,
+              onServerDrainStart(Network::DrainDirection::All,
+                                 HasEventStrategy(Server::DrainStrategy::Gradual)));
+
+  EXPECT_CALL(server_.listener_manager_, stopListeners(ListenerManager::StopListenersType::All, _));
   EXPECT_EQ(Http::Code::OK, postCallback("/drain_listeners", header_map, data));
+
+  // Inbound-only drains pass the narrower direction through, as for a graceful drain.
+  EXPECT_CALL(server_.listener_manager_,
+              onServerDrainStart(Network::DrainDirection::InboundOnly,
+                                 HasEventStrategy(Server::DrainStrategy::Gradual)));
+  EXPECT_CALL(server_.listener_manager_,
+              stopListeners(ListenerManager::StopListenersType::InboundOnly, _));
+  EXPECT_EQ(Http::Code::OK, postCallback("/drain_listeners?inboundonly", header_map, data));
+}
+
+// skip_exit applies to a non-graceful drain too: the connections are drained, but the listeners are
+// left running rather than being stopped -- the same thing graceful&skip_exit does, since the drain
+// period only delays stopping the listeners.
+TEST_P(AdminInstanceTest, NonGracefulDrainSkipExitDoesNotStopListeners) {
+  Buffer::OwnedImpl data;
+  Http::TestResponseHeaderMapImpl header_map;
+
+  EXPECT_CALL(server_.listener_manager_, onServerDrainStart(Network::DrainDirection::All, _));
+  EXPECT_CALL(server_.drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
+  EXPECT_CALL(server_.listener_manager_, stopListeners(_, _)).Times(0);
+  EXPECT_EQ(Http::Code::OK, postCallback("/drain_listeners?skip_exit", header_map, data));
+}
+
+// With the guard disabled, a non-graceful drain only stops the listeners and skip_exit is rejected.
+TEST_P(AdminInstanceTest, NonGracefulDrainNotifyRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.non_graceful_drain_notifies_connections", "false"}});
+
+  Buffer::OwnedImpl data;
+  Http::TestResponseHeaderMapImpl header_map;
+
+  EXPECT_CALL(server_.listener_manager_, onServerDrainStart(_, _)).Times(0);
+  EXPECT_CALL(server_.drain_manager_, startDrainSequence(_, _)).Times(0);
+  EXPECT_CALL(server_.listener_manager_, stopListeners(ListenerManager::StopListenersType::All, _));
+  EXPECT_EQ(Http::Code::OK, postCallback("/drain_listeners", header_map, data));
+
+  Buffer::OwnedImpl skip_exit_data;
+  EXPECT_CALL(server_.listener_manager_, stopListeners(_, _)).Times(0);
+  EXPECT_EQ(Http::Code::BadRequest,
+            postCallback("/drain_listeners?skip_exit", header_map, skip_exit_data));
+  EXPECT_EQ("skip_exit requires graceful\n", skip_exit_data.toString());
 }
 
 TEST_P(AdminInstanceTest, Getters) {
@@ -189,7 +250,7 @@ TEST_P(AdminInstanceTest, Help) {
       enable: enables the CPU profiler; One of (y, n)
   /drain_listeners (POST): drain listeners
       graceful: When draining listeners, enter a graceful drain period prior to closing listeners. This behaviour and duration is configurable via server options or CLI
-      skip_exit: When draining listeners, do not exit after the drain period. This must be used with graceful
+      skip_exit: When draining listeners, drain the connections but never stop the listeners. The graceful parameter has no effect when this is set, since the drain period only delays stopping the listeners
       inboundonly: Drains all inbound listeners. traffic_direction field in envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a listener is inbound or outbound.
   /healthcheck/fail (POST): cause the server to fail health checks
   /healthcheck/ok (POST): cause the server to pass health checks

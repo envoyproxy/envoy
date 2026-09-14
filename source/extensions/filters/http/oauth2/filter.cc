@@ -782,8 +782,16 @@ FilterConfig::FilterConfig(
   }
 
   if (proto_config.has_retry_policy()) {
-    auto retry_policy = Http::Utility::convertCoreToRouteRetryPolicy(
-        proto_config.retry_policy(), "5xx,gateway-error,connect-failure,reset");
+    // convertCoreToRouteRetryPolicy()'s retry_on argument is an override, not a fallback: a
+    // non-empty value replaces the configured retry_on outright, so "" is what lets the user's
+    // value through. With the guard off, the override restores the legacy hardcoded conditions.
+    const std::string retry_on_override =
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.oauth2_client_retries_respect_user_retry_on")
+            ? ""
+            : "5xx,gateway-error,connect-failure,reset";
+    auto retry_policy = Http::Utility::convertCoreToRouteRetryPolicy(proto_config.retry_policy(),
+                                                                     retry_on_override);
     // Use the null validation visitor for the backward compatibility. The proto should already
     // been validated during the config load.
     auto parsed_policy_or_error = Router::RetryPolicyImpl::create(

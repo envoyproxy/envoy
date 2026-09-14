@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = [
         "background_fetch_manager.cc",
         "dynamic_module_stats.cc",
+        "worker_index.cc",
     ] + select({
         "//bazel:windows_x86_64": ["win32/dynamic_modules.cc"],
         "//conditions:default": ["posix/dynamic_modules.cc"],
@@ -22,6 +23,7 @@ envoy_cc_library(
         "background_fetch_manager.h",
         "dynamic_module_stats.h",
         "dynamic_modules.h",
+        "worker_index.h",
     ],
     external_deps = ["ssl"],
     deps = [
@@ -31,6 +33,7 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//envoy/singleton:manager_interface",
         "//envoy/stats:stats_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",

@@ -1,9 +1,5 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_address.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include <cstring>
 #include <functional>
 

@@ -2,7 +2,11 @@
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/rds/util.h"
+#include "source/common/stats/prefix_utility.h"
+
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Rds {
@@ -23,6 +27,28 @@ absl::StatusOr<std::unique_ptr<RdsRouteConfigSubscription>> RdsRouteConfigSubscr
   return ret;
 }
 
+namespace {
+
+// Creates the '<stat_prefix><rds type>.<route config name>.' scope of a subscription, with the
+// route config name carried by an explicit 'envoy.rds_route_config' tag rather than being
+// recovered from the stat name by a tag extractor.
+//
+// `stat_prefix` is the parent prefix alone, for example 'http.<stat_prefix>.', so that
+// mergeStatPrefix() can extract its tag; the type token this subscription contributes is derived
+// from `rds_type` and becomes part of the subscription's own name.
+Stats::ScopeSharedPtr createStatsScope(Stats::Scope& scope, absl::string_view stat_prefix,
+                                       absl::string_view rds_type,
+                                       absl::string_view route_config_name) {
+  const std::string type_prefix = absl::StrCat(absl::AsciiStrToLower(rds_type), ".");
+  const Stats::TaggedStatName prefix =
+      Stats::mergeStatPrefix(scope.symbolTable(), stat_prefix, type_prefix,
+                             {{Envoy::Config::TagNames::get().RDS_ROUTE_CONFIG, route_config_name}},
+                             absl::StrCat(type_prefix, route_config_name, "."));
+  return scope.scopeFromTaggedName(prefix.baseName(), prefix.tags(), prefix.name());
+}
+
+} // namespace
+
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     RouteConfigUpdatePtr&& config_update,
     Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
@@ -32,7 +58,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const std::string& rds_type, RouteConfigProviderManager& route_config_provider_manager,
     absl::Status& creation_status)
     : route_config_name_(route_config_name),
-      scope_(factory_context.scope().createScope(stat_prefix + route_config_name_ + ".")),
+      scope_(createStatsScope(factory_context.scope(), stat_prefix, rds_type, route_config_name_)),
       factory_context_(factory_context),
       parent_init_target_(
           fmt::format("RdsRouteConfigSubscription {} init {}", rds_type, route_config_name_),

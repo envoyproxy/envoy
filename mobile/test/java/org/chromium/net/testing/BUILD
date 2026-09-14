@@ -98,6 +98,8 @@ envoy_mobile_android_test(
     test_class = "org.chromium.net.testing.Http2TestServerTest",
     deps = [
         ":testing",
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
+        "//library/java/io/envoyproxy/envoymobile/utilities:network_utilities",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
     ],
 )
@@ -119,6 +121,7 @@ envoy_mobile_android_test(
     test_class = "org.chromium.net.testing.AndroidEnvoyExplicitH2FlowTest",
     deps = [
         ":testing",
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
     ],
 )

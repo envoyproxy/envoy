@@ -128,11 +128,9 @@ public:
 
   void canonicalizeUsage(TokenUsage& usage, bool& overflow) const override {
     // Native input excludes the two disjoint cache buckets.
-    if (usage.input_tokens.has_value()) {
-      usage.input_tokens =
-          addCounts(addCounts(usage.input_tokens, usage.cached_input_tokens, overflow),
-                    usage.cache_creation_input_tokens, overflow);
-    }
+    usage.input_tokens =
+        addCounts(addCounts(usage.input_tokens, usage.cached_input_tokens, overflow),
+                  usage.cache_creation_input_tokens, overflow);
   }
 
   bool isTerminalEvent(const nlohmann::json& json) const override {
@@ -194,13 +192,12 @@ public:
   const PayloadSchema* schema() const override { return nullptr; }
 
   void canonicalizeUsage(TokenUsage& usage, bool& overflow) const override {
-    // Native prompt/candidates counts exclude tool-use and thoughts.
-    if (usage.input_tokens.has_value()) {
-      usage.input_tokens = addCounts(usage.input_tokens, usage.tool_use_input_tokens, overflow);
-    }
-    if (usage.output_tokens.has_value()) {
-      usage.output_tokens = addCounts(usage.output_tokens, usage.reasoning_tokens, overflow);
-    }
+    // Native prompt/candidates counts exclude tool-use and thoughts, and are
+    // themselves absent when the model produced only the adjunct: a response
+    // truncated at MAX_TOKENS while still thinking reports
+    // `thoughtsTokenCount` with no `candidatesTokenCount` at all.
+    usage.input_tokens = addCounts(usage.input_tokens, usage.tool_use_input_tokens, overflow);
+    usage.output_tokens = addCounts(usage.output_tokens, usage.reasoning_tokens, overflow);
   }
 
   // No in-band terminator; extraction finalizes at end of stream.

@@ -101,6 +101,23 @@ void IntegrationTestServer::waitUntilListenersReady() {
   ENVOY_LOG(info, "listener wait complete");
 }
 
+void IntegrationTestServer::waitForWorkerThreads() {
+  absl::Notification done;
+  ThreadLocal::TypedSlotPtr<> slot;
+  server().dispatcher().post([&] {
+    slot = ThreadLocal::TypedSlot<>::makeUnique(server().threadLocal());
+    slot->set([](Event::Dispatcher&) -> std::shared_ptr<ThreadLocal::ThreadLocalObject> {
+      return nullptr;
+    });
+    slot->runOnAllThreads([](OptRef<ThreadLocal::ThreadLocalObject>) {},
+                          [&] {
+                            slot.reset(nullptr);
+                            done.Notify();
+                          });
+  });
+  done.WaitForNotification();
+}
+
 void IntegrationTestServer::setDynamicContextParam(absl::string_view resource_type_url,
                                                    absl::string_view key, absl::string_view value) {
   server().dispatcher().post([this, resource_type_url, key, value]() {

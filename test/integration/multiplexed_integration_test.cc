@@ -2631,12 +2631,16 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   FakeRawConnectionPtr fake_upstream_connection2;
   sendFrame(Http2Frame::makePostRequest(3, "host", "/path/to/long/url"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  uint64_t bytes_read =
+      test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total")->value();
   ASSERT_TRUE(fake_upstream_connection2->write(std::string(settings_frame)));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                               Ge(bytes_read + settings_data.size()));
   test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(2));
   test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(2));
 
   // Adjust the max concurrent streams of one connection created above to 2.
-  auto bytes_read = test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total");
+  bytes_read = test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total")->value();
   const Http2Frame settings_frame2 = Http2Frame::makeSettingsFrame(
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 3}});
   std::string settings_data2(settings_frame2);

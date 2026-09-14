@@ -170,6 +170,40 @@ public:
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(PassthroughConfigFactory, "passthrough");
 
+// Only records that its response-headers callback ran. Used to check that the callback still fires
+// when the response is a local reply the module did not send, such as a `direct_response` route.
+class LocalReplyResponseHeadersFilter : public HttpFilter {
+public:
+  HeadersStatus onRequestHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap& headers, bool) override {
+    headers.set("on-response-headers", "called");
+    return HeadersStatus::Continue;
+  }
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+};
+
+class LocalReplyResponseHeadersFilterFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle&) override {
+    return std::make_unique<LocalReplyResponseHeadersFilter>();
+  }
+};
+
+class LocalReplyResponseHeadersConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<LocalReplyResponseHeadersFilterFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(LocalReplyResponseHeadersConfigFactory,
+                                    "local_reply_response_headers");
+
 // -----------------------------------------------------------------------------
 // HeaderCallbacks
 // -----------------------------------------------------------------------------

@@ -2,10 +2,11 @@
 
 #include <memory>
 
-#include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
 #include "source/common/common/assert.h"
+
+#include "absl/status/status.h"
 
 namespace Envoy {
 namespace Server {
@@ -35,9 +36,9 @@ public:
 
   /**
    * Called when the request for updated resource usage fails.
-   * @param error the exception caught when trying to get updated resource usage
+   * @param error the status describing the failure
    */
-  virtual void onFailure(const EnvoyException& error) PURE;
+  virtual void onFailure(const absl::Status& error) PURE;
 };
 
 class ResourceMonitor {

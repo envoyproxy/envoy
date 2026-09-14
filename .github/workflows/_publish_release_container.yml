@@ -49,7 +49,7 @@ concurrency:
 
 jobs:
   push-manifests:
-    name: Create manifests (${{ inputs.trustred && 'dry run' || 'push' }})
+    name: Create manifests (${{ (! inputs.trusted || (inputs.target-branch != 'main' && inputs.dev)) && 'dry run' || 'push' }})
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -139,7 +139,7 @@ jobs:
     - name: Generate manifest configuration (release)
       uses: envoyproxy/toolshed/actions/jq@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
       id: release-config
-      if: ${{ ! inputs.dev || ! inputs.target-branch != 'main' }}
+      if: ${{ ! inputs.dev || inputs.target-branch != 'main' }}
       with:
         input-format: yaml
         filter: >-

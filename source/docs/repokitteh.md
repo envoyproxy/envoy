@@ -33,15 +33,17 @@ Adds `@someone` as an assignee to the issue or pull request that this comment is
 Removes `@someone` as an assignee.
 
 ```
-/assign-from @envoyproxy/some-team [@envoyproxy/another-team..]
+/assign-from envoyproxy/some-team [envoyproxy/another-team..]
 ```
-Assign a random member from `@envoyproxy/some-team` to an issue or pull request. Additional teams may be specified as
-extra args. Example teams include:
-- `@envoyproxy/senior-maintainers` (Senior maintainers)
-- `@envoyproxy/maintainers` (All maintainers)
-- `@envoyproxy/api-shepherds` (API shepherds)
-- `@envoyproxy/dependency-shepherds` (Dependency shepherds)
-- `@envoyproxy/first-pass-reviewers` (Contributors that provide first-pass
+Assign a random member from `envoyproxy/some-team` to an issue or pull request. Additional teams may be specified as
+extra args. Do not prefix team names with `@`, as doing so subscribes the entire team to the issue or pull request.
+Team names prefixed with `@` are still accepted for compatibility, but the bot will remind the user to omit it in
+future commands. Example teams include:
+- `envoyproxy/senior-maintainers` (Senior maintainers)
+- `envoyproxy/maintainers` (All maintainers)
+- `envoyproxy/api-shepherds` (API shepherds)
+- `envoyproxy/dependency-shepherds` (Dependency shepherds)
+- `envoyproxy/first-pass-reviewers` (Contributors that provide first-pass
   reviews, typically non-senior maintainers and maintainer applicants)
 
 Only organization members can assign or unassign other users, who must be organization members as well.
