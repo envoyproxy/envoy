@@ -493,10 +493,7 @@ MetadataMapVector& ActiveStreamDecoderFilter::addDecodedMetadata() {
 
 void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
-  if (!headers_continued_) {
-    headers_continued_ = true;
-    doHeaders(false);
-  }
+  injectDecodedHeadersToFilterChain(false);
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
     parent_.state().observed_decode_end_stream_ = end_stream;
@@ -2045,10 +2042,7 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
-  if (!headers_continued_) {
-    headers_continued_ = true;
-    doHeaders(false);
-  }
+  injectEncodedHeadersToFilterChain(false);
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
     parent_.state_.observed_encode_end_stream_ = end_stream;
