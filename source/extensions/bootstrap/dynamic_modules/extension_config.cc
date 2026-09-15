@@ -128,22 +128,17 @@ void DynamicModuleBootstrapExtensionConfig::getActiveResourceNames(
   }
   switch (kind) {
   case envoy_dynamic_module_type_bootstrap_active_resource_kind_FilterChain: {
-    // Inline filter chains across all active listeners.
+    // Filter chains across all active listeners. filterChainNames() returns the listener's inline
+    // chains plus, for an fcds_config listener, the FCDS chains its matcher references that are
+    // active. Reporting only via active listeners ties a reported name to being routable (an active
+    // listener's matcher dispatches to it) and active: a chain active in the process-wide FCDS
+    // manager but not yet referenced by an active listener's matcher is not reported.
     if (listener_manager_ != nullptr) {
       for (Network::ListenerConfig& listener :
            listener_manager_->listeners(Server::ListenerManager::ListenerState::ACTIVE)) {
         for (absl::string_view name : listener.filterChainManager().filterChainNames()) {
           emit(name);
         }
-      }
-    }
-    // Active FCDS filter chains. When a listener uses fcds_config its filter chains live in the
-    // shared FCDS manager (not the listener's inline FilterChainManager). Emits nothing when FCDS
-    // is unused (the singleton is never created).
-    if (auto fcds_manager = Server::getFcdsSharedFilterChainManager(context_.singletonManager());
-        fcds_manager != nullptr) {
-      for (absl::string_view name : fcds_manager->activeFilterChainNames()) {
-        emit(name);
       }
     }
     break;
