@@ -147,8 +147,7 @@ TEST_F(DynamicModuleConfigValidatorTest, ValidatorReportsTypeUrl) {
   EXPECT_EQ(cluster_type_url_, validator->typeUrl());
 }
 
-// The type url is resolved from the validator instance, so the deprecated factory-level typeUrl()
-// is left at its empty default.
+// The type url comes from the validator instance, so the deprecated factory typeUrl() stays empty.
 TEST_F(DynamicModuleConfigValidatorTest, FactoryTypeUrlDefaultsToEmpty) {
   EXPECT_TRUE(factory_.typeUrl().empty());
 }

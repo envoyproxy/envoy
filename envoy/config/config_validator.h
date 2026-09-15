@@ -32,14 +32,9 @@ public:
   virtual ~ConfigValidator() = default;
 
   /**
-   * Returns the xDS type url that this validator applies to. Only updates carrying this type url
-   * are passed to the validate() methods. The returned view must remain valid for the lifetime of
-   * the validator.
-   *
-   * This is the method Envoy uses, and the one new validators should implement. It defaults to an
-   * empty value. When empty, Envoy falls back to the deprecated
-   * `ConfigValidatorFactory::typeUrl()`. The default and the fallback will be removed once
-   * `ConfigValidatorFactory::typeUrl()` is removed.
+   * Returns the xDS type url this validator applies to. Only matching updates reach validate().
+   * Defaults to empty, in which case Envoy uses the deprecated ConfigValidatorFactory::typeUrl().
+   * The default is removed once that method is removed.
    */
   virtual absl::string_view typeUrl() const { return {}; }
 
@@ -85,9 +80,8 @@ public:
   /**
    * Returns the xDS service type url that the config validator expects to receive.
    *
-   * @deprecated Implement ConfigValidator::typeUrl() instead. This factory-level method is retained
-   * for backward compatibility, is only consulted when ConfigValidator::typeUrl() returns empty,
-   * and will be removed after two release cycles.
+   * @deprecated Implement ConfigValidator::typeUrl() instead. Consulted only when that method
+   * returns empty. Removed after two release cycles.
    */
   [[deprecated("Implement ConfigValidator::typeUrl() instead")]]
   virtual std::string typeUrl() const {

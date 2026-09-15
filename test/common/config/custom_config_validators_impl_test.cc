@@ -82,8 +82,7 @@ public:
   }
 };
 
-// A validator that does not implement typeUrl(), relying on the base-class default (empty). This
-// models an extension that has not migrated to ConfigValidator::typeUrl().
+// A validator that leaves typeUrl() at the empty default, modeling an unmigrated extension.
 class NoTypeUrlFakeConfigValidator : public ConfigValidator {
 public:
   void validate(const Server::Instance&,
@@ -97,8 +96,8 @@ public:
   }
 };
 
-// A factory that has not migrated to ConfigValidator::typeUrl(): its validator reports an empty
-// type url, so keying must fall back to the deprecated factory-level typeUrl().
+// An unmigrated factory whose validator reports an empty type url, so keying falls back to the
+// deprecated factory typeUrl().
 class LegacyFakeConfigValidatorFactory : public ConfigValidatorFactory {
 public:
   ConfigValidatorPtr createConfigValidator(const Protobuf::Any&,
@@ -264,8 +263,7 @@ TEST_F(CustomConfigValidatorsImplTest, ReturnFalseDifferentTypeConfigValidator) 
   }
 }
 
-// Validates that a validator is keyed under the type url reported by the validator instance's
-// typeUrl(), even when it differs from the type url used to look up the factory.
+// A validator is keyed under the type url reported by its instance typeUrl().
 TEST_F(CustomConfigValidatorsImplTest, UsesConfigDependentTypeUrl) {
   const std::string endpoint_type_url{
       Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()};
@@ -289,8 +287,7 @@ TEST_F(CustomConfigValidatorsImplTest, UsesConfigDependentTypeUrl) {
   }
 }
 
-// Validates that a validator whose instance typeUrl() is empty is keyed under the deprecated
-// factory-level typeUrl(), preserving backward compatibility for validators that have not migrated.
+// A validator with an empty instance typeUrl() is keyed under the deprecated factory typeUrl().
 TEST_F(CustomConfigValidatorsImplTest, FallsBackToDeprecatedFactoryTypeUrl) {
   const std::string endpoint_type_url{
       Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()};

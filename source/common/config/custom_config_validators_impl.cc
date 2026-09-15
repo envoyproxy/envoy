@@ -19,9 +19,8 @@ CustomConfigValidatorsImpl::CustomConfigValidatorsImpl(
     Config::ConfigValidatorPtr validator =
         factory.createConfigValidator(validator_config.typed_config(), validation_visitor);
 
-    // Prefer the validator's own type url. Fall back to the deprecated factory-level type url for
-    // validators that have not migrated to ConfigValidator::typeUrl(). Both this fallback and the
-    // deprecated factory method will be removed once the migration is complete.
+    // Prefer the validator type url, falling back to the deprecated factory type url for validators
+    // that have not migrated.
     absl::string_view type_url = validator->typeUrl();
     std::string factory_type_url;
     if (type_url.empty()) {

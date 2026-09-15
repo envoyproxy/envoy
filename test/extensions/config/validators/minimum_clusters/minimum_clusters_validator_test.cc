@@ -15,8 +15,7 @@ namespace {
 
 using ::testing::Return;
 
-// These tests exercise validate() only; the concrete type url is immaterial, so a fixed Cluster
-// type url is used to satisfy the constructor.
+// These tests exercise validate() only, so any fixed type url satisfies the constructor.
 constexpr char ClusterTypeUrl[] = "type.googleapis.com/envoy.config.cluster.v3.Cluster";
 
 class MinimumClustersValidatorTest : public testing::Test {
