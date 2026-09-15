@@ -19773,17 +19773,9 @@
             "https://files.pythonhosted.org/packages/ae/b6/03bb70946330e88ffec97aefd3ea75ba575cb2e762061e0e62a213befee8/docutils-0.22.4.tar.gz": "4db53b1fde9abecbb74d91230d32ab626d94f6badfc575d6db9194a49df29968",
             "https://files.pythonhosted.org/packages/ae/ed/aefcc8cd0ba62a0560c3c18c33925362d46c6075480bfa4df87b28e169a9/docutils-0.21.2.tar.gz": "3a6b18732edf182daa3cd12775bbb338cf5691468f91eeeb109deff6ebfa986f"
           },
-          "envoy-base-utils": {
-            "https://files.pythonhosted.org/packages/94/8b/aed2ee446b06c254de6d0b2a53959dd06916f7f059bc17e1e94b47cad45c/envoy_base_utils-0.6.9.tar.gz": "b088b7621b5075005c48cdbef5db5675827b7b63550be7d880d395261fdcdb20",
-            "https://files.pythonhosted.org/packages/c4/71/86288c14c8e557bbc3489d6bd2963caed7e54f478976b0c359f9b3597bf2/envoy_base_utils-0.6.9-py3-none-any.whl": "664dcc19ee12125398222a7628bdcbb40e265b3846e197e4014434fcd273fd61"
-          },
           "envoy-ci-report": {
             "https://files.pythonhosted.org/packages/43/c9/24aceda89afab59b701ea7f9f004c422a9e4adfb63003e086692a3c9a0dc/envoy_ci_report-0.1.1.tar.gz": "481115be4d05941b83ffbbd8fdac241f10e9823c076f850d8bef7f0308aa382d",
             "https://files.pythonhosted.org/packages/85/a8/d694c1b8d931b985f75146f8ac0168f7fe2ece7679a0cf66653efe1c0f22/envoy_ci_report-0.1.1-py3-none-any.whl": "a38da2e996b266b32ff80f2f404018d1887f156ad086e3fa8fd4233bb4cd6fe7"
-          },
-          "envoy-code-check": {
-            "https://files.pythonhosted.org/packages/c9/8b/340c8898dec2341b36d6fbc1cc93ee03d23061dd94d2af89834a8324f520/envoy_code_check-0.6.7-py3-none-any.whl": "7b7fbc99c114f663126be738095945d479e0b4c6f71d3d784bc234d9d9098a8d",
-            "https://files.pythonhosted.org/packages/de/0a/0850dc942e491cd40d3ab96bfc7c7e4a063307c4f2b93563dfa9ea333033/envoy_code_check-0.6.7.tar.gz": "76b0edf0b95d8a31b5d78481b3a7f5ae4a2925c04d2158e77cc3549653a4213e"
           },
           "envoy-dependency-check": {
             "https://files.pythonhosted.org/packages/06/7c/afcea506f6d304321ce8deca1ff7e21e6fc4c34e6431e66409219afb49b3/envoy_dependency_check-0.2.1-py3-none-any.whl": "a037ab34b7db9893ecf07247c8e9149481148de26f340f1c27e4adfa7a48e227",
