@@ -10,31 +10,6 @@
   <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
 
   <header class="envoy-doc-topbar">
-    <a class="envoy-doc-logo" href="{{ pathto(master_doc) }}"
-       aria-label="Envoy documentation home">
-      <img class="envoy-logo-light" src="{{ pathto('_static/img/envoy-logo.png', 1) }}" alt="Envoy">
-      <img class="envoy-logo-dark" src="{{ pathto('_static/img/envoy-logo-dark.png', 1) }}" alt="" aria-hidden="true">
-    </a>
-    <span class="envoy-doc-wordmark">Docs</span>
-
-    <details class="envoy-version-menu">
-      <summary>
-        <span>{{ version }}</span>
-        {%- if 'dev' in version %}<span class="envoy-version-tag">pre</span>{% endif %}
-        <span aria-hidden="true">&#9662;</span>
-      </summary>
-      {#- Only what this build actually knows: the versions injected from above,
-          or failing that just its own, plus a link out to the full index. #}
-      <div class="envoy-version-options">
-        {%- for release in envoy_versions %}
-        <a href="{{ release.url }}"{% if release.name == version %} aria-current="true"{% endif %}>{{ release.name }}</a>
-        {%- else %}
-        <span class="envoy-version-current" aria-current="true">{{ version }}</span>
-        {%- endfor %}
-        <a class="envoy-version-index" href="{{ envoy_versions_url|default('/docs/', true) }}">All versions</a>
-      </div>
-    </details>
-
     <button class="envoy-search-button" type="button" data-envoy-search-open
             aria-label="Search the documentation">
       <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -46,13 +21,6 @@
     </button>
 
     <nav class="envoy-doc-actions" aria-label="Documentation actions">
-      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
-         aria-label="Envoy on GitHub">
-        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
-          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
-        </svg>
-        <span class="envoy-action-label">GitHub</span>
-      </a>
       <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
               data-envoy-theme-toggle>
         <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"

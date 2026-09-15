@@ -262,11 +262,11 @@ class NamedLogTest : public Loggable<Id::assert>, public testing::Test {};
 TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
   MockLogSink sink(Envoy::Logger::Registry::getSink());
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   // Log level is above debug, so we shouldn't get any logs.
   ENVOY_LOG_EVENT(debug, "test_event", "not logged");
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Levels::debug);
 
   EXPECT_CALL(sink, log(_, _));
   EXPECT_CALL(sink, logWithStableName("test_event", "debug", "assert", "test log 1"));
@@ -283,7 +283,7 @@ TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
 TEST_F(NamedLogTest, FineGrainNamedLogsAreSentToSink) {
   MockLogSink sink(Envoy::Logger::Registry::getSink());
 
-  Registry::setLogLevel(spdlog::level::info);
+  Registry::setLogLevel(Levels::info);
 
   // Enable fine grain logging.
   Context::enableFineGrainLogger();
@@ -302,7 +302,7 @@ TEST_F(NamedLogTest, FineGrainNamedLogsAreSentToSink) {
 TEST_F(NamedLogTest, FineGrainTaggedLogsAreSentToSink) {
   MockLogSink sink(Envoy::Logger::Registry::getSink());
 
-  Registry::setLogLevel(spdlog::level::info);
+  Registry::setLogLevel(Levels::info);
 
   // Enable fine grain logging.
   Context::enableFineGrainLogger();
@@ -317,7 +317,7 @@ TEST_F(NamedLogTest, FineGrainTaggedLogsAreSentToSink) {
 }
 
 TEST(LoggerTest, LogWithLogDetails) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
 
@@ -343,7 +343,7 @@ TEST(LoggerTest, TestJsonFormatError) {
 }
 
 TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
 
   {
     Protobuf::Struct log_struct;
@@ -370,7 +370,7 @@ TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
 
 TEST(LoggerTest, TestJsonFormatEmptyStruct) {
   Protobuf::Struct log_struct;
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
@@ -388,7 +388,7 @@ TEST(LoggerTest, TestJsonFormatNullAndFixedField) {
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
   (*log_struct.mutable_fields())["NullField"].set_null_value(Protobuf::NULL_VALUE);
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
@@ -407,7 +407,7 @@ TEST(LoggerTest, TestJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
@@ -442,7 +442,7 @@ TEST(LoggerTest, TestJsonFormatWithNestedJsonMessage) {
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
@@ -638,7 +638,7 @@ TEST(TaggedLogTest, TestConnEventLogWithJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
@@ -722,7 +722,7 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
@@ -755,7 +755,7 @@ TEST(TaggedLogTest, TestTaggedConnLogWithJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
@@ -799,7 +799,7 @@ TEST(TaggedLogTest, TestConnLogWithJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
@@ -824,7 +824,7 @@ TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
@@ -871,7 +871,7 @@ TEST(TaggedLogTest, TestStreamLogWithJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
@@ -898,7 +898,7 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormatMultipleJFlags) {
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message1"].set_string_value("%j");
   (*log_struct.mutable_fields())["Message2"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 

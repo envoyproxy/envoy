@@ -65,8 +65,10 @@ const Protobuf::Value& dynamicMetadataValue(const StreamInfo::StreamInfo& stream
                                             envoy_dynamic_module_type_module_buffer filter_name,
                                             envoy_dynamic_module_type_module_buffer path) {
   std::string filter_name_str(filter_name.ptr, filter_name.length);
-  std::string path_str(path.ptr, path.length);
-  std::vector<std::string> path_parts = absl::StrSplit(path_str, '.');
+  // Keep a non-null empty view for an absent path so the split result is unchanged.
+  const absl::string_view path_view =
+      path.ptr == nullptr ? absl::string_view("") : absl::string_view(path.ptr, path.length);
+  std::vector<std::string> path_parts = absl::StrSplit(path_view, '.');
   const auto& metadata = stream_info.dynamicMetadata();
   return Envoy::Config::Metadata::metadataValue(&metadata, filter_name_str, path_parts);
 }
@@ -170,6 +172,15 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
     break;
   }
   case envoy_dynamic_module_type_attribute_id_XdsVirtualHostName: {
+    const auto virtual_host = stream_info.virtualHost();
+    if (virtual_host.has_value()) {
+      const auto& name = virtual_host->name();
+      *result = {const_cast<char*>(name.data()), name.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName: {
     const auto& name = stream_info.virtualClusterName();
     if (name.has_value() && !name->empty()) {
       *result = {const_cast<char*>(name->data()), name->size()};
@@ -275,6 +286,13 @@ bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_in
     }
     break;
   }
+  case envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName:
+    return getUpstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          return ssl->sni();
+        },
+        result);
   case envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion:
     return getDownstreamSslAttribute(
         stream_info,
@@ -640,6 +658,25 @@ void ContextAccessor::setDynamicMetadataStringBatch(
         absl::string_view(entry.value_ptr, entry.value_length));
   }
   stream_info.setDynamicMetadata(std::string(filter_name), metadata_value);
+}
+
+bool ContextAccessor::getFilterStateBytes(const StreamInfo::StreamInfo& stream_info,
+                                          envoy_dynamic_module_type_module_buffer key,
+                                          envoy_dynamic_module_type_envoy_buffer* result) {
+  if (result == nullptr) {
+    return false;
+  }
+  const absl::string_view key_view(key.ptr, key.length);
+  const auto* accessor =
+      stream_info.filterState().getDataReadOnly<Router::StringAccessor>(key_view);
+  if (accessor == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "key '{}' not found in filter state", key_view);
+    return false;
+  }
+  const absl::string_view value = accessor->asString();
+  *result = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
+  return true;
 }
 
 bool ContextAccessor::setFilterStateBytes(

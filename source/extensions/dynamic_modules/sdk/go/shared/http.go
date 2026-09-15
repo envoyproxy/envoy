@@ -91,8 +91,10 @@ const (
 )
 
 // Span is a tracing span associated with the current HTTP stream. It is owned by Envoy and is
-// valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span -
-// it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module owns.
+// valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span
+// because it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module
+// owns. A span may be stored and used in a later event hook on the same worker thread. Do not use
+// a span after the stream has ended or move it to another goroutine.
 type Span interface {
 	// SetTag sets a key/value tag on the span.
 	SetTag(key, value string)
@@ -136,7 +138,8 @@ type Span interface {
 }
 
 // ChildSpan is a tracing span owned by the module. It must be finished by calling Finish when
-// the module is done with it.
+// the module is done with it. A child span may be stored and finished in a later event hook on the
+// same worker thread, for example to cover off-thread work that resumes in a scheduled callback.
 type ChildSpan interface {
 	Span
 

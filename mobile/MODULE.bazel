@@ -44,7 +44,7 @@ bazel_dep(name = "rules_swift", version = "2.4.0", repo_name = "build_bazel_rule
 bazel_dep(name = "rules_xcodeproj", version = "2.4.0", repo_name = "com_github_buildbuddy_io_rules_xcodeproj")
 bazel_dep(name = "toolchains_llvm", version = "1.9.0.envoy")
 bazel_dep(name = "zlib-ng", version = "2.3.2.envoy")
-bazel_dep(name = "zstd", version = "1.5.7")
+bazel_dep(name = "zstd", version = "1.5.7.bcr.1")
 
 local_path_override(
     module_name = "envoy",

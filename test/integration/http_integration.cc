@@ -20,6 +20,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread_annotations.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
@@ -384,6 +385,11 @@ HttpIntegrationTest::~HttpIntegrationTest() {
         << "test requires explicit cleanupUpstreamAndDownstream";
   }
   cleanupUpstreamAndDownstream();
+  // Reset last, once the connections are torn down. The server's workers outlive this destructor
+  // (`test_server_` belongs to the base class), so they may still read the flag; it is atomic for
+  // that reason.
+  Http::HeaderUtility::disable_request_header_validation_for_tests_.store(
+      false, std::memory_order_relaxed);
 }
 
 void HttpIntegrationTest::initialize() {

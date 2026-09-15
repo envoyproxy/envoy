@@ -76,7 +76,6 @@ envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
     rbe_pool = "linux_x64_small",
-    # TODO: Decrease to 5 once "envoy.restart_features.defer_worker_routing_init" is removed
     shard_count = 10,
     deps = [
         ":listener_manager_impl_test_lib",

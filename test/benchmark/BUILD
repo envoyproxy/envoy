@@ -13,6 +13,7 @@ envoy_cc_test_library(
     srcs = ["main.cc"],
     hdrs = ["main.h"],
     deps = [
+        "//envoy/common:logger",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//test/test_common:environment_lib",

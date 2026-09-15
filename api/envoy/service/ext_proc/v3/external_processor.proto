@@ -371,7 +371,7 @@ message ProcessingResponse {
   // 4. The ext_proc server continues processing all subsequent request body
   //    chunks until it sees the body chunk with the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.HttpBody.drain_complete>`
-  //    field set to true.  When sending back its response to that last body
+  //    field set to true. When sending back its response to that last body
   //    chunk, the ext_proc server will set the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.StreamedBodyResponse.drain_complete>`
   //    field to true to let the data plane know that it has finished draining.
@@ -414,7 +414,7 @@ message ProcessingResponse {
   // 4. The ext_proc server continues processing all subsequent response body
   //    chunks until it sees the body chunk with the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.HttpBody.drain_complete>`
-  //    field set to true.  When sending back its response to that last body
+  //    field set to true. When sending back its response to that last body
   //    chunk, the ext_proc server will set the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.StreamedBodyResponse.drain_complete>`
   //    field to true to let the data plane know that it has finished draining.
