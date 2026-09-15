@@ -12,6 +12,8 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/registry/registry.h"
 
@@ -29,6 +31,9 @@
 
 #include "test/common/http/http2/http2_frame.h"
 #include "test/common/upstream/utility.h"
+#include "test/config/integration/certs/cacert_info.h"
+#include "test/config/integration/certs/client2cert_hash.h"
+#include "test/config/integration/certs/intermediate_ca_2cert_info.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/socket_interface_swap.h"
@@ -44,6 +49,8 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_replace.h"
 #include "absl/time/time.h"
 #include "gtest/gtest.h"
 
@@ -779,6 +786,166 @@ TEST_P(ProtocolIntegrationTest, PeriodicAccessLog) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Verifies the upstream peer certificate details are available to access log formatters over
+// TLS upstream connections of every protocol. Over HTTP/3 upstreams these previously logged
+// empty values because the QUIC connection info did not expose the peer certificate.
+TEST_P(ProtocolIntegrationTest, UpstreamPeerCertAccessLog) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+    // HTTP/3 upstreams are always TLS; enable TLS explicitly for the TCP-based upstreams.
+    upstream_tls_ = true;
+    config_helper_.configureUpstreamTls();
+  }
+  useAccessLog("%UPSTREAM_PEER_SUBJECT%;%UPSTREAM_PEER_ISSUER%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  checkSimpleRequestSuccess(0, 0, response.get());
+
+  // The subject and issuer of the fake upstream's TLS certificate.
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("Test Upstream Server"));
+  EXPECT_THAT(log, HasSubstr("Test Upstream CA"));
+}
+
+void ProtocolIntegrationTest::setDownstreamClientCertValidation(const std::string& trusted_ca,
+                                                                bool accept_untrusted) {
+  const std::string ca_path =
+      TestEnvironment::runfilesPath("test/config/integration/certs/" + trusted_ca);
+  auto configure_validation =
+      [=](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+        auto* validation_context = common_tls_context.mutable_validation_context();
+        validation_context->Clear();
+        validation_context->mutable_trusted_ca()->set_filename(ca_path);
+        if (accept_untrusted) {
+          validation_context->set_trust_chain_verification(
+              envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+                  ACCEPT_UNTRUSTED);
+        }
+      };
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    // The QUIC transport socket is already configured for HTTP/3 downstreams; add the client
+    // certificate requirement to it.
+    config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* transport_socket = bootstrap.mutable_static_resources()
+                                   ->mutable_listeners(0)
+                                   ->mutable_filter_chains(0)
+                                   ->mutable_transport_socket();
+      envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
+      ASSERT_TRUE(
+          MessageUtil::unpackTo(*transport_socket->mutable_typed_config(), quic_config).ok());
+      auto* tls_context = quic_config.mutable_downstream_tls_context();
+      tls_context->mutable_require_client_certificate()->set_value(true);
+      configure_validation(*tls_context->mutable_common_tls_context());
+      ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(quic_config));
+    });
+    return;
+  }
+  config_helper_.addSslConfig();
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* transport_socket = bootstrap.mutable_static_resources()
+                                 ->mutable_listeners(0)
+                                 ->mutable_filter_chains(0)
+                                 ->mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    ASSERT_TRUE(MessageUtil::unpackTo(*transport_socket->mutable_typed_config(), tls_context).ok());
+    configure_validation(*tls_context.mutable_common_tls_context());
+    ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(tls_context));
+  });
+}
+
+Network::ClientConnectionPtr ProtocolIntegrationTest::makeDownstreamMtlsConnection(
+    const Ssl::ClientSslTransportOptions& options) {
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    // initialize() created the QUIC client transport socket factory with the default client
+    // certificate; replace it with one presenting the requested certificate.
+    quic_transport_socket_factory_ = IntegrationUtil::createQuicUpstreamTransportSocketFactory(
+        *api_, stats_store_, context_manager_, thread_local_,
+        Ssl::ClientSslTransportOptions(options)
+            .setAlpn(true)
+            .setSan(san_to_match_)
+            .setSni("lyft.com"));
+    return makeClientConnection(lookupPort("http"));
+  }
+  downstream_mtls_transport_socket_factory_ = Ssl::createClientSslTransportSocketFactory(
+      options, context_manager_, *api_, &server_factory_context_.serverScope());
+  Network::Address::InstanceConstSharedPtr address = *Network::Utility::resolveUrl(fmt::format(
+      "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
+  return dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      downstream_mtls_transport_socket_factory_->createTransportSocket(nullptr, nullptr), nullptr,
+      nullptr);
+}
+
+// Verifies the downstream peer certificate details are available to access log formatters over
+// mTLS downstream connections of every protocol, including the issuer fingerprint, which is
+// served from the chain built during validation.
+TEST_P(ProtocolIntegrationTest, DownstreamPeerCertAccessLog) {
+  setDownstreamClientCertValidation("cacert.pem");
+  useAccessLog("%DOWNSTREAM_PEER_SUBJECT%;%DOWNSTREAM_PEER_ISSUER%;"
+               "%DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256%");
+  initialize();
+
+  codec_client_ =
+      makeHttpConnection(makeDownstreamMtlsConnection(Ssl::ClientSslTransportOptions()));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  checkSimpleRequestSuccess(0, 0, response.get());
+
+  // The client certificate is issued directly by the trusted CA.
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("CN=Test Frontend Team"));
+  EXPECT_THAT(log, HasSubstr("CN=Test CA"));
+  EXPECT_THAT(log, testing::EndsWith(absl::StrCat(";", TEST_CA_CERT_256_HASH)));
+}
+
+// The validated-issuer accessors are served from the chain built during validation, never from
+// the list the peer sent. The client presents only its leaf certificate and the issuing
+// intermediate CA comes from the server's trust store, so an implementation reading the presented
+// list would log an empty issuer fingerprint.
+TEST_P(ProtocolIntegrationTest, DownstreamPeerIssuerFromValidatedChain) {
+  setDownstreamClientCertValidation("intermediate_ca_cert_chain.pem");
+  useAccessLog("%DOWNSTREAM_PEER_ISSUER%;%DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeDownstreamMtlsConnection(
+      Ssl::ClientSslTransportOptions().setClientCertWithoutIntermediates(true)));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  checkSimpleRequestSuccess(0, 0, response.get());
+
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("CN=Test Intermediate CA 2"));
+  EXPECT_THAT(log, testing::EndsWith(absl::StrCat(";", TEST_INTERMEDIATE_CA_2_CERT_256_HASH)));
+}
+
+// With ACCEPT_UNTRUSTED a presented certificate that fails validation is still accepted but not
+// validated: the peer fingerprint is logged while the issuer fingerprint stays empty because no
+// validated chain exists.
+TEST_P(ProtocolIntegrationTest, DownstreamPeerIssuerEmptyWhenNotValidated) {
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    // QUIC rejects ACCEPT_UNTRUSTED together with a client certificate requirement at
+    // configuration load time, so this case cannot exist over HTTP/3.
+    testing_upstream_intentionally_ = true;
+    return;
+  }
+  // The trusted CA cannot build a chain for a leaf issued by an intermediate it does not know.
+  setDownstreamClientCertValidation("cacert.pem", /*accept_untrusted=*/true);
+  useAccessLog("%DOWNSTREAM_PEER_FINGERPRINT_256%;%DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeDownstreamMtlsConnection(
+      Ssl::ClientSslTransportOptions().setClientCertWithoutIntermediates(true)));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  checkSimpleRequestSuccess(0, 0, response.get());
+
+  const std::string client2_fingerprint =
+      absl::AsciiStrToLower(absl::StrReplaceAll(TEST_CLIENT2_CERT_HASH, {{":", ""}}));
+  EXPECT_EQ(absl::StrCat(client2_fingerprint, ";-"), waitForAccessLog(access_log_name_));
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/9873
