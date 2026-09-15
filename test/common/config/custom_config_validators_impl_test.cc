@@ -82,12 +82,51 @@ public:
   }
 };
 
+// A validator that does not implement typeUrl(), relying on the base-class default (empty). This
+// models an extension that has not migrated to ConfigValidator::typeUrl().
+class NoTypeUrlFakeConfigValidator : public ConfigValidator {
+public:
+  void validate(const Server::Instance&,
+                const std::vector<Envoy::Config::DecodedResourcePtr>&) override {
+    throw EnvoyException("Emulating fake action throw exception (SotW)");
+  }
+
+  void validate(const Server::Instance&, const std::vector<Envoy::Config::DecodedResourcePtr>&,
+                const Protobuf::RepeatedPtrField<std::string>&) override {
+    throw EnvoyException("Emulating fake action throw exception (Delta)");
+  }
+};
+
+// A factory that has not migrated to ConfigValidator::typeUrl(): its validator reports an empty type
+// url, so keying must fall back to the deprecated factory-level typeUrl().
+class LegacyFakeConfigValidatorFactory : public ConfigValidatorFactory {
+public:
+  ConfigValidatorPtr createConfigValidator(const Protobuf::Any&,
+                                           ProtobufMessage::ValidationVisitor&) override {
+    return std::make_unique<NoTypeUrlFakeConfigValidator>();
+  }
+
+  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    // Using BoolValue instead of a custom empty config proto. This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::BoolValue()};
+  }
+
+  std::string name() const override {
+    return "envoy.config.validators.legacy_fake_config_validator";
+  }
+
+  std::string typeUrl() const override {
+    return Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+  }
+};
+
 class CustomConfigValidatorsImplTest : public testing::Test {
 public:
   CustomConfigValidatorsImplTest()
       : factory_accept_(false), factory_reject_(true), register_factory_accept_(factory_accept_),
         register_factory_reject_(factory_reject_),
-        register_config_dependent_factory_(config_dependent_factory_) {}
+        register_config_dependent_factory_(config_dependent_factory_),
+        register_legacy_factory_(legacy_factory_) {}
 
   static envoy::config::core::v3::TypedExtensionConfig parseConfig(const std::string& config) {
     envoy::config::core::v3::TypedExtensionConfig proto;
@@ -98,9 +137,11 @@ public:
   FakeConfigValidatorFactory factory_accept_;
   FakeConfigValidatorFactory factory_reject_;
   ConfigDependentFakeConfigValidatorFactory config_dependent_factory_;
+  LegacyFakeConfigValidatorFactory legacy_factory_;
   Registry::InjectFactory<ConfigValidatorFactory> register_factory_accept_;
   Registry::InjectFactory<ConfigValidatorFactory> register_factory_reject_;
   Registry::InjectFactory<ConfigValidatorFactory> register_config_dependent_factory_;
+  Registry::InjectFactory<ConfigValidatorFactory> register_legacy_factory_;
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   const testing::NiceMock<Server::MockInstance> server_;
   const std::string type_url_{Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()};
@@ -120,6 +161,11 @@ public:
       typed_config:
         "@type": type.googleapis.com/google.protobuf.StringValue
         value: endpoint
+  )EOF";
+  static constexpr char LegacyValidatorConfig[] = R"EOF(
+      name: envoy.config.validators.legacy_fake_config_validator
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.BoolValue
   )EOF";
 };
 
@@ -226,6 +272,31 @@ TEST_F(CustomConfigValidatorsImplTest, UsesConfigDependentTypeUrl) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> configs_list;
   auto* entry = configs_list.Add();
   *entry = parseConfig(ConfigDependentValidatorConfig);
+  CustomConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
+  {
+    const std::vector<DecodedResourcePtr> resources;
+    validators.executeValidators(type_url_, resources);
+    EXPECT_THROW_WITH_MESSAGE(validators.executeValidators(endpoint_type_url, resources),
+                              EnvoyException, "Emulating fake action throw exception (SotW)");
+  }
+  {
+    const std::vector<DecodedResourcePtr> added_resources;
+    const Protobuf::RepeatedPtrField<std::string> removed_resources;
+    validators.executeValidators(type_url_, added_resources, removed_resources);
+    EXPECT_THROW_WITH_MESSAGE(
+        validators.executeValidators(endpoint_type_url, added_resources, removed_resources),
+        EnvoyException, "Emulating fake action throw exception (Delta)");
+  }
+}
+
+// Validates that a validator whose instance typeUrl() is empty is keyed under the deprecated
+// factory-level typeUrl(), preserving backward compatibility for validators that have not migrated.
+TEST_F(CustomConfigValidatorsImplTest, FallsBackToDeprecatedFactoryTypeUrl) {
+  const std::string endpoint_type_url{
+      Envoy::Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()};
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> configs_list;
+  auto* entry = configs_list.Add();
+  *entry = parseConfig(LegacyValidatorConfig);
   CustomConfigValidatorsImpl validators(validation_visitor_, server_, configs_list);
   {
     const std::vector<DecodedResourcePtr> resources;

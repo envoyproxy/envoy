@@ -147,6 +147,12 @@ TEST_F(DynamicModuleConfigValidatorTest, ValidatorReportsTypeUrl) {
   EXPECT_EQ(cluster_type_url_, validator->typeUrl());
 }
 
+// The type url is resolved from the validator instance, so the deprecated factory-level typeUrl()
+// is left at its empty default.
+TEST_F(DynamicModuleConfigValidatorTest, FactoryTypeUrlDefaultsToEmpty) {
+  EXPECT_TRUE(factory_.typeUrl().empty());
+}
+
 TEST_F(DynamicModuleConfigValidatorTest, InvalidConfigRejected) {
   auto proto_config = makeProto("config_validator_test", "required_clusters", cluster_type_url_);
   proto_config.clear_type_urls();
