@@ -424,7 +424,7 @@ private:
   const envoy_dynamic_module_type_listener_filter_envoy_ptr host_plugin_ptr_ = nullptr;
 };
 
-class ListenerFilterConfigHandleImpl : public ListenerFilterConfigHandle {
+class ListenerFilterConfigHandleImpl : public CommonHandleImpl<ListenerFilterConfigHandle> {
 public:
   explicit ListenerFilterConfigHandleImpl(
       envoy_dynamic_module_type_listener_filter_config_envoy_ptr host_config_ptr)

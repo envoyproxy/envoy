@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/logger.h"
+
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/version/version_string.h"
@@ -290,7 +292,7 @@ TEST_F(NamedLogTest, FineGrainNamedLogsAreSentToSink) {
   EXPECT_TRUE(Context::useFineGrainLogger());
 
   // Set fine grain level to DEBUG.
-  Context::changeAllLogLevels(spdlog::level::debug);
+  Context::changeAllLogLevels(Levels::debug);
 
   EXPECT_CALL(sink, log(_, _));
   EXPECT_CALL(sink, logWithStableName("test_event", "debug", "assert", "test log 1"));
@@ -308,7 +310,7 @@ TEST_F(NamedLogTest, FineGrainTaggedLogsAreSentToSink) {
   Context::enableFineGrainLogger();
 
   // Set fine grain level to DEBUG.
-  Context::changeAllLogLevels(spdlog::level::debug);
+  Context::changeAllLogLevels(Levels::debug);
 
   EXPECT_CALL(sink, log(_, _));
   ENVOY_TAGGED_LOG(debug, (std::map<std::string, std::string>{{"key", "val"}}), "test log");
