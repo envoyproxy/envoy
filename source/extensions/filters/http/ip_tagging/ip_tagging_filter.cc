@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/config/datasource.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
@@ -134,10 +135,13 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
   // A provider owns the stats for the tags it loads, so two configs may only share one when
   // they agree on both the file and where its stats land. Keying on the scope prefix and the
   // filter's stat prefix as well as the filename keeps listeners with distinct stat prefixes
-  // from silently reporting into the first one's counters. Every part is always emitted, empty
-  // or not, so the separators keep the parts unambiguous.
-  std::string key = absl::StrCat(scope.symbolTable().toString(scope.prefix()), "|", stat_prefix,
-                                 "|", ip_tags_datasource.filename());
+  // from silently reporting into the first one's counters. Any of the parts may itself contain
+  // the separator, so each is base64 encoded before joining; the base64 alphabet has no '|', so
+  // the parts stay unambiguous and distinct configs cannot collide on one key.
+  std::string key =
+      absl::StrJoin({Base64::encode(scope.symbolTable().toString(scope.prefix())),
+                     Base64::encode(stat_prefix), Base64::encode(ip_tags_datasource.filename())},
+                    "|");
   auto it = ip_tags_registry_.find(key);
   if (it != ip_tags_registry_.end()) {
     if (std::shared_ptr<IpTagsProvider> provider = it->second.lock()) {

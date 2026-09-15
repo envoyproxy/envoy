@@ -1329,6 +1329,48 @@ ip_tags:
   cb(filter_callbacks);
 }
 
+// The registry key is built from the scope prefix, the stat prefix and the file name. Those are
+// config supplied strings that may contain the character used to join them, so two configs that
+// publish to different places must still get different keys.
+TEST_F(IpTaggingFilterTest, DifferentIpTagsProviderInstanceForAmbiguousStatPrefixSplit) {
+  envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),
+                            proto_config);
+  // The scope prefix and the stat prefix concatenate to the same "a|b|c." either way, so joining
+  // the raw parts with '|' would hand both configs one shared provider even though their stats
+  // land under "a|b.c.ip_tagging." and "a.b|c.ip_tagging." respectively.
+  Stats::ScopeSharedPtr scope1 = scope_->createScope("a|b");
+  Stats::ScopeSharedPtr scope2 = scope_->createScope("a");
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config1_result =
+      IpTaggingFilterConfig::create(proto_config, "c.", *singleton_manager_, *scope1, runtime_,
+                                    *api_, tls_, *dispatcher_, validation_visitor_);
+  EXPECT_OK(config1_result);
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config2_result =
+      IpTaggingFilterConfig::create(proto_config, "b|c.", *singleton_manager_, *scope2, runtime_,
+                                    *api_, tls_, *dispatcher_, validation_visitor_);
+  EXPECT_OK(config2_result);
+  auto provider1 = IpTaggingFilterConfigPeer::ipTagsProvider(*config1_result.value());
+  auto provider2 = IpTaggingFilterConfigPeer::ipTagsProvider(*config2_result.value());
+  EXPECT_NE(nullptr, provider1);
+  EXPECT_NE(nullptr, provider2);
+  EXPECT_NE(provider1, provider2);
+
+  // Each config records into its own counters rather than the first one's.
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  for (const auto& config : {config1_result.value(), config2_result.value()}) {
+    auto filter = std::make_unique<IpTaggingFilter>(config);
+    filter->setDecoderFilterCallbacks(filter_callbacks_);
+    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+    filter->onDestroy();
+  }
+  EXPECT_EQ(stats_.counterFromString("a|b.c.ip_tagging.total").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("a.b|c.ip_tagging.total").value(), 1);
+}
+
 } // namespace
 } // namespace IpTagging
 } // namespace HttpFilters
