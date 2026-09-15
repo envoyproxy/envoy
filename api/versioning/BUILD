@@ -15,6 +15,7 @@ proto_library(
         "//contrib/envoy/extensions/filters/common/workload_discovery/v3:pkg",
         "//contrib/envoy/extensions/filters/http/alpn/v3:pkg",
         "//contrib/envoy/extensions/filters/http/checksum/v3alpha:pkg",
+        "//contrib/envoy/extensions/filters/http/client_cert/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/dynamo/v3:pkg",
         "//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/istio_stats/v3:pkg",
