@@ -103,6 +103,8 @@ public:
 
   void closeIdleQuicConnections(bool is_saturated);
 
+  void configureLoadShedPoints(Server::LoadShedPointProvider& load_shed_point_provider);
+
 protected:
   // quic::QuicDispatcher
   std::unique_ptr<quic::QuicSession> CreateQuicSession(
@@ -110,6 +112,11 @@ protected:
       const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
       const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo,
       quic::ConnectionIdGeneratorInterface& connection_id_generator) override;
+
+  // quic::QuicDispatcher
+  quic::QuicDispatcher::QuicPacketFate
+  ValidityChecksOnFullChlo(const quic::ReceivedPacketInfo& packet_info,
+                           const quic::ParsedClientHello& parsed_chlo) const override;
 
   // quic::QuicDispatcher
   // Sets current_packet_dispatch_success_ to false for processPacket's return value,
@@ -148,6 +155,8 @@ private:
   // doing any work. Session is added to this list when it has no active
   // streams, and it is removed from this list when a new stream is created.
   std::unique_ptr<Http::SessionIdleListInterface> session_idle_list_;
+  Server::LoadShedPoint* h3_go_away_and_close_on_dispatch_{nullptr};
+  Server::LoadShedPoint* h3_go_away_on_dispatch_{nullptr};
 };
 
 } // namespace Quic

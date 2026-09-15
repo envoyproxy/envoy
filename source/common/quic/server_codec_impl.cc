@@ -30,10 +30,6 @@ QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
   quic_session.setHttpConnectionCallbacks(callbacks);
   quic_session.setMaxIncomingHeadersCount(max_request_headers_count);
   quic_session.set_max_inbound_header_list_size(max_request_headers_kb * 1024u);
-  quic_session.setH3GoAwayLoadShedPoints(
-      overload_manager.getLoadShedPoint(
-          Server::LoadShedPointName::get().H3ServerGoAwayAndCloseOnDispatch),
-      overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().H3ServerGoAwayOnDispatch));
 }
 
 void QuicHttpServerConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
