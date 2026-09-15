@@ -21,7 +21,9 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.mcp]
 
 // This filter will inspect and get attributes from MCP traffic.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
+
+// [#next-free-field: 12]
 message Mcp {
   // Traffic handling mode for non-MCP traffic.
   enum TrafficMode {
@@ -162,6 +164,12 @@ message Mcp {
   //
   // Defaults to false.
   bool early_terminate_when_routable = 10;
+
+  // The latest MCP protocol revision supported by the filter.
+  //
+  // Requests using a known protocol revision newer than this value are rejected.
+  // When unset, no protocol-version restriction is applied.
+  google.protobuf.StringValue max_supported_protocol_version = 11;
 }
 
 // Parser configuration with method-specific rules.
