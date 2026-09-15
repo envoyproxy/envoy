@@ -338,6 +338,7 @@ envoy_cc_library(
         "//source/common/http:session_idle_list_lib",
         "//source/common/runtime:runtime_features_lib",
         "@quiche//:quic_server_http_spdy_session_lib",
+        "@quiche//:quic_core_http_server_initiated_spdy_stream_lib",
     ]) + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
     ]),
@@ -376,6 +377,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "@quiche//:quic_core_http_client_lib",
         "@quiche//:quic_core_error_codes_lib",
+        "@quiche//:quic_core_utils_lib",
     ]) + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
         ":web_transport_session_bridge_lib",

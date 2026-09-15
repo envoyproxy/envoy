@@ -42,6 +42,7 @@
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_server_session_base_peer.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_stream_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
@@ -66,6 +67,7 @@ public:
     return false;
   }
 
+  using EnvoyQuicServerSession::CreateOutgoingBidirectionalStream;
   using EnvoyQuicServerSession::GetCryptoStream;
   using EnvoyQuicServerSession::GetSSLConfig;
 };
@@ -212,6 +214,19 @@ public:
         std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // Drives real WebTransport negotiation by delivering the peer SETTINGS a WebTransport-capable
+  // client sends. SupportsWebTransport() additionally needs H3 datagram support and extended
+  // CONNECT, so the caller must have enabled both before calling this.
+  void negotiateWebTransport() {
+    quic::SettingsFrame settings;
+    settings.values[quic::SETTINGS_H3_DATAGRAM] = 1;
+    settings.values[quic::SETTINGS_WEBTRANS_DRAFT00] = 1;
+    settings.values[quic::SETTINGS_ENABLE_CONNECT_PROTOCOL] = 1;
+    EXPECT_TRUE(envoy_quic_session_.OnSettingsFrame(settings));
+  }
+#endif
 
   bool installReadFilter() {
     // Setup read filter.
@@ -1354,6 +1369,54 @@ TEST_F(EnvoyQuicServerSessionTest, WebTransportNegotiationGatedByRuntimeFlag) {
   EXPECT_FALSE(envoy_quic_session_.WillNegotiateWebTransport());
 
   installReadFilter();
+}
+
+// Server initiated bidirectional streams stay disallowed on a plain HTTP/3 session.
+TEST_F(EnvoyQuicServerSessionTest, OutgoingBidirectionalStreamRejectedWithoutWebTransport) {
+  installReadFilter();
+  ASSERT_FALSE(envoy_quic_session_.SupportsWebTransport());
+  EXPECT_ENVOY_BUG(EXPECT_EQ(nullptr, envoy_quic_session_.CreateOutgoingBidirectionalStream()),
+                   "Unexpected disallowed server initiated stream");
+}
+
+// On a WebTransport session the stream is created so the bridge can mirror a backend initiated
+// stream to the downstream client. It is a QUICHE WebTransport data stream, never an HTTP request.
+TEST_F(EnvoyQuicServerSessionTest, OutgoingBidirectionalStreamCreatedForWebTransport) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
+  // Set on the fixture's options: installReadFilter() builds the codec, which re-applies them and
+  // would otherwise clear allow_extended_connect.
+  http3_options_.set_allow_extended_connect(true);
+  installReadFilter();
+  negotiateWebTransport();
+  ASSERT_TRUE(envoy_quic_session_.SupportsWebTransport());
+
+  quic::QuicSpdyStream* stream = envoy_quic_session_.CreateOutgoingBidirectionalStream();
+  ASSERT_NE(nullptr, stream);
+  EXPECT_TRUE(quic::test::QuicSessionPeer::IsStreamCreated(&envoy_quic_session_, stream->id()));
+  EXPECT_EQ(nullptr, dynamic_cast<EnvoyQuicServerStream*>(stream));
+}
+
+// Running out of stream credit is a normal condition, not a bug: return nullptr rather than
+// tripping the ENVOY_BUG, so the bridge can reset the paired upstream stream. (In debug builds an
+// ENVOY_BUG aborts, so reaching the end of this test is itself the assertion that none fired.)
+TEST_F(EnvoyQuicServerSessionTest, OutgoingBidirectionalStreamRespectsStreamCredit) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
+  http3_options_.set_allow_extended_connect(true);
+  installReadFilter();
+  negotiateWebTransport();
+  ASSERT_TRUE(envoy_quic_session_.SupportsWebTransport());
+
+  // Exhaust the peer-granted outgoing bidirectional stream credit. QuicSessionPeer only ever raises
+  // the limit, so it cannot be forced to zero; open streams until the session refuses.
+  int created = 0;
+  while (envoy_quic_session_.CreateOutgoingBidirectionalStream() != nullptr) {
+    ASSERT_LT(++created, 1000) << "stream credit never ran out";
+  }
+  EXPECT_GT(created, 0);
+  // Still nullptr once exhausted, and still no ENVOY_BUG.
+  EXPECT_EQ(nullptr, envoy_quic_session_.CreateOutgoingBidirectionalStream());
 }
 #endif
 
