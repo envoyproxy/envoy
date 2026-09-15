@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.mcp_router.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/type/metadata/v3/metadata.proto";
 
 import "google/protobuf/duration.proto";
@@ -132,4 +133,18 @@ message McpRouter {
   // This avoids blocking the client ``initialize`` on slow or misbehaving backends.
   // Default is false (eager initialization of all backends during ``initialize``).
   bool lazy_initialization = 3;
+
+  // Optional key used to integrity-protect composite session IDs with HMAC-SHA256.
+  //
+  // When set, every session ID minted by this filter carries a MAC over the session blob, and a
+  // presented session ID whose MAC does not verify is rejected with a 400 error. This binds every
+  // field of the session blob, including the subject checked by the ``ENFORCE`` validation mode,
+  // to this server-held key, so a client cannot rewrite the blob it was issued (for example to
+  // rebind another principal's session to the client's own identity).
+  //
+  // When not set, session IDs are Base64 encoded only and clients can read and modify them. In
+  // that mode the ``ENFORCE`` subject check compares two values that are both ultimately
+  // client-controlled, so it does not bind the session to the authenticated identity and should
+  // only be relied on as a consistency check.
+  envoy.config.core.v3.DataSource session_signing_key = 4;
 }
