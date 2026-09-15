@@ -1649,6 +1649,8 @@ func newDymStreamPluginHandle(
 }
 
 type dymConfigHandle struct {
+	dymCommonHandle
+
 	hostConfigPtr    C.envoy_dynamic_module_type_http_filter_config_envoy_ptr
 	calloutCallbacks map[uint64]shared.HttpCalloutCallback
 	streamCallbacks  map[uint64]shared.HttpStreamCallback
@@ -1980,7 +1982,9 @@ func (h *dymConfigHandle) GetScheduler() shared.Scheduler {
 	return h.scheduler
 }
 
-type dymRouteConfigHandle struct{}
+type dymRouteConfigHandle struct {
+	dymCommonHandle
+}
 
 func (h *dymRouteConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
 	hostLog(level, format, args)
@@ -2576,6 +2580,8 @@ type statSinkWrapper struct {
 // configuration pointer used to define and set gauges and, lazily, a scheduler
 // whose committed tasks run on the main thread.
 type dymStatSinkHandle struct {
+	dymCommonHandle
+
 	hostConfigPtr C.envoy_dynamic_module_type_stat_sink_config_envoy_ptr
 	scheduler     *dymScheduler
 }

@@ -88,6 +88,7 @@ envoy_cc_library(
     srcs = ["abi_impl.cc"],
     deps = [
         ":dynamic_modules_lib",
+        "//envoy/runtime:runtime_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
@@ -100,6 +101,7 @@ envoy_cc_library(
 go_library(
     name = "go_sdk_shared",
     srcs = [
+        "sdk/go/shared/common.go",
         "sdk/go/shared/early_header_mutation.go",
         "sdk/go/shared/early_header_mutation_api.go",
         "sdk/go/shared/http.go",
@@ -144,6 +146,7 @@ go_library(
 go_library(
     name = "go_sdk_abi",
     srcs = [
+        "sdk/go/abi/common.go",
         "sdk/go/abi/early_header_mutation.go",
         "sdk/go/abi/internal.go",
         "sdk/go/abi/listener.go",
