@@ -56,9 +56,9 @@ constexpr absl::string_view kBase64SentinelSuffix = "?=";
 
 constexpr std::array<absl::string_view, 5> kKnownProtocolVersions = {
     Filters::Common::Mcp::McpConstants::MCP_VERSION_2024_11_05,
-    Filters::Common::Mcp::McpConstants::FALLBACK_PROTOCOL_VERSION,
+    Filters::Common::Mcp::McpConstants::MCP_VERSION_2025_03_26,
     Filters::Common::Mcp::McpConstants::MCP_VERSION_2025_06_18,
-    Filters::Common::Mcp::McpConstants::LATEST_SUPPORTED_MCP_VERSION,
+    Filters::Common::Mcp::McpConstants::MCP_VERSION_2025_11_25,
     Filters::Common::Mcp::McpConstants::MCP_VERSION_2026_07_28,
 };
 
