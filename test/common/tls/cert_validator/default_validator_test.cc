@@ -1129,6 +1129,8 @@ TEST(CrlCacheTest, CrlListKeepsCacheAlive) {
 // Two validators created from the same factory context share a single parsed
 // CRL, which is the behavior that prevents a separate copy per TLS context.
 TEST(DefaultCertValidatorTest, SharesCrlAcrossContexts) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.cache_parsed_tls_certificates", "true"}});
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::TestUtil::TestStore store;
   SslStats stats = generateSslStats(*store.rootScope());
@@ -1289,6 +1291,8 @@ TEST(CaCertCacheTest, CaCertListKeepsCacheAlive) {
 // trust bundle, which is the behavior that prevents a separate copy of the CA
 // certificates per TLS context.
 TEST(DefaultCertValidatorTest, SharesCaCertsAcrossContexts) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.cache_parsed_tls_certificates", "true"}});
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::TestUtil::TestStore store;
   SslStats stats = generateSslStats(*store.rootScope());

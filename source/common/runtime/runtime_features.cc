@@ -35,6 +35,11 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
+// When enabled, the parsed client/server certificate chain and private key are shared across TLS
+// contexts that reference identical PEM material through a process-wide cache, so a cluster with
+// many per-endpoint certificates (or a resend of such a cluster) parses each distinct certificate
+// only once instead of once per context. Defaults off pending broad soak of the shared parsed key.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_cache_parsed_tls_certificates);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_formatter_accept_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
