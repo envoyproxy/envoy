@@ -486,6 +486,11 @@ message HeaderValueOption {
 
   // Is the header value allowed to be empty? If false (default), custom headers with empty values are dropped,
   // otherwise they are added.
+  //
+  // .. note::
+  //   In any context other than the router filter, we always act as if keep_empty_value is true,
+  //   regardless of the setting of this field.
+  //
   bool keep_empty_value = 4;
 }
 

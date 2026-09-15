@@ -3,23 +3,21 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/init/target_impl.h"
-#include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/metric_registry.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/functional/function_ref.h"
@@ -227,7 +225,7 @@ public:
 
   // File watchers created by
   // envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch. Envoy owns the
-  // lifetime — watchers are destroyed when the config is destroyed.
+  // lifetime, so watchers are destroyed when the config is destroyed.
   std::vector<Filesystem::WatcherPtr> file_watchers_;
 
   // The server factory context for accessing cluster manager lazily. ClusterManager is not
@@ -243,184 +241,15 @@ public:
   std::unique_ptr<Init::TargetImpl> init_target_;
 
   // ----------------------------- Metrics Support -----------------------------
-  // Handle classes for storing defined metrics. These follow the same pattern as the HTTP
-  // filter config metrics support.
+  // The shared registry holding all module-defined metrics.
+  Extensions::DynamicModules::MetricRegistry& metrics() { return metrics_; }
 
-  class ModuleCounterHandle {
-  public:
-    ModuleCounterHandle(Stats::Counter& counter) : counter_(counter) {}
-    void add(uint64_t value) const { counter_.add(value); }
-
-  private:
-    Stats::Counter& counter_;
-  };
-
-  class ModuleCounterVecHandle {
-  public:
-    ModuleCounterVecHandle(Stats::StatName name, Stats::StatNameVec label_names)
-        : name_(name), label_names_(label_names) {}
-
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::counterFromElements(scope, {name_}, tags).add(amount);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-  };
-
-  class ModuleGaugeHandle {
-  public:
-    ModuleGaugeHandle(Stats::Gauge& gauge) : gauge_(gauge) {}
-    void add(uint64_t value) const { gauge_.add(value); }
-    void sub(uint64_t value) const { gauge_.sub(value); }
-    void set(uint64_t value) const { gauge_.set(value); }
-
-  private:
-    Stats::Gauge& gauge_;
-  };
-
-  class ModuleGaugeVecHandle {
-  public:
-    ModuleGaugeVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
-                         Stats::Gauge::ImportMode import_mode)
-        : name_(name), label_names_(label_names), import_mode_(import_mode) {}
-
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-
-    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).add(amount);
-    }
-    void sub(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).sub(amount);
-    }
-    void set(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).set(amount);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-    Stats::Gauge::ImportMode import_mode_;
-  };
-
-  class ModuleHistogramHandle {
-  public:
-    ModuleHistogramHandle(Stats::Histogram& histogram) : histogram_(histogram) {}
-    void recordValue(uint64_t value) const { histogram_.recordValue(value); }
-
-  private:
-    Stats::Histogram& histogram_;
-  };
-
-  class ModuleHistogramVecHandle {
-  public:
-    ModuleHistogramVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
-                             Stats::Histogram::Unit unit)
-        : name_(name), label_names_(label_names), unit_(unit) {}
-
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-
-    void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
-                     uint64_t value) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags).recordValue(value);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-    Stats::Histogram::Unit unit_;
-  };
-
-// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
-// for our internal storage. These helper functions do that conversion.
-#define ID_TO_INDEX(id) ((id) - 1)
-
-  size_t addCounter(ModuleCounterHandle&& counter) {
-    counters_.push_back(std::move(counter));
-    return counters_.size();
-  }
-
-  size_t addCounterVec(ModuleCounterVecHandle&& counter_vec) {
-    counter_vecs_.push_back(std::move(counter_vec));
-    return counter_vecs_.size();
-  }
-
-  size_t addGauge(ModuleGaugeHandle&& gauge) {
-    gauges_.push_back(std::move(gauge));
-    return gauges_.size();
-  }
-
-  size_t addGaugeVec(ModuleGaugeVecHandle&& gauge_vec) {
-    gauge_vecs_.push_back(std::move(gauge_vec));
-    return gauge_vecs_.size();
-  }
-
-  size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    histograms_.push_back(std::move(histogram));
-    return histograms_.size();
-  }
-
-  size_t addHistogramVec(ModuleHistogramVecHandle&& histogram_vec) {
-    histogram_vecs_.push_back(std::move(histogram_vec));
-    return histogram_vecs_.size();
-  }
-
-  OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id == 0 || id > counters_.size()) {
-      return {};
-    }
-    return counters_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
-    if (id == 0 || id > counter_vecs_.size()) {
-      return {};
-    }
-    return counter_vecs_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id == 0 || id > gauges_.size()) {
-      return {};
-    }
-    return gauges_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
-    if (id == 0 || id > gauge_vecs_.size()) {
-      return {};
-    }
-    return gauge_vecs_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id == 0 || id > histograms_.size()) {
-      return {};
-    }
-    return histograms_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
-    if (id == 0 || id > histogram_vecs_.size()) {
-      return {};
-    }
-    return histogram_vecs_[ID_TO_INDEX(id)];
-  }
-
-#undef ID_TO_INDEX
-
-  // Stats scope for metric creation.
+  // Owns the scope the registry references. Must precede metrics_ so it initializes first.
   const Stats::ScopeSharedPtr stats_scope_;
-  Stats::StatNamePool stat_name_pool_;
+  // Shared metrics registry composed from stats_scope_.
+  Extensions::DynamicModules::MetricRegistry metrics_;
   // We only allow the module to create stats during on_bootstrap_extension_config_new, and not
-  // later from worker threads, so that we don't have to wrap stat_name_pool_ in a lock.
+  // later from worker threads, so that we don't have to wrap the metrics registry pool in a lock.
   // Per-request label values use a stack-local Stats::StatNameDynamicPool in the increment
   // callbacks (see abi_impl.cc).
   bool stat_creation_frozen_ = false;
@@ -464,14 +293,6 @@ private:
   absl::flat_hash_map<uint64_t,
                       std::unique_ptr<DynamicModuleBootstrapExtensionConfig::HttpCalloutCallback>>
       http_callouts_;
-
-  // Metric storage.
-  std::vector<ModuleCounterHandle> counters_;
-  std::vector<ModuleCounterVecHandle> counter_vecs_;
-  std::vector<ModuleGaugeHandle> gauges_;
-  std::vector<ModuleGaugeVecHandle> gauge_vecs_;
-  std::vector<ModuleHistogramHandle> histograms_;
-  std::vector<ModuleHistogramVecHandle> histogram_vecs_;
 
   // Cluster lifecycle callback handle. Set when the module enables cluster lifecycle events
   // via enableClusterLifecycle(). Reset during shutdown to avoid use-after-free since the

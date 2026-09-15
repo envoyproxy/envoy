@@ -48,6 +48,93 @@ fn test_log_level_callbacks() {
   assert!(is_log_enabled(Level::Trace));
 }
 
+// Mock runtime backing the runtime callbacks so the unit tests can exercise the SDK wrappers
+// without the Envoy host symbols. Keys absent from the map fall back to the caller's default,
+// mirroring the host behavior for an unknown key or an unreachable runtime.
+static MOCK_RUNTIME_BOOLS: std::sync::Mutex<Option<std::collections::HashMap<String, bool>>> =
+  std::sync::Mutex::new(None);
+static MOCK_RUNTIME_INTEGERS: std::sync::Mutex<Option<std::collections::HashMap<String, u64>>> =
+  std::sync::Mutex::new(None);
+static MOCK_RUNTIME_NUMBERS: std::sync::Mutex<Option<std::collections::HashMap<String, f64>>> =
+  std::sync::Mutex::new(None);
+
+// Reconstructs the key the SDK wrapper passed across the ABI boundary, honoring the explicit
+// length rather than assuming the buffer is null terminated.
+fn module_buffer_to_string(key: abi::envoy_dynamic_module_type_module_buffer) -> String {
+  let bytes = unsafe { std::slice::from_raw_parts(key.ptr as *const u8, key.length) };
+  String::from_utf8(bytes.to_vec()).unwrap()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_get_runtime_bool(
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  default_value: bool,
+) -> bool {
+  MOCK_RUNTIME_BOOLS
+    .lock()
+    .unwrap()
+    .as_ref()
+    .and_then(|values| values.get(&module_buffer_to_string(key)).copied())
+    .unwrap_or(default_value)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_get_runtime_int(
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  default_value: u64,
+) -> u64 {
+  MOCK_RUNTIME_INTEGERS
+    .lock()
+    .unwrap()
+    .as_ref()
+    .and_then(|values| values.get(&module_buffer_to_string(key)).copied())
+    .unwrap_or(default_value)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_get_runtime_number(
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  default_value: f64,
+) -> f64 {
+  MOCK_RUNTIME_NUMBERS
+    .lock()
+    .unwrap()
+    .as_ref()
+    .and_then(|values| values.get(&module_buffer_to_string(key)).copied())
+    .unwrap_or(default_value)
+}
+
+#[test]
+fn test_runtime_callbacks() {
+  *MOCK_RUNTIME_BOOLS.lock().unwrap() = Some(std::collections::HashMap::from([
+    ("some.flag".to_string(), true),
+    ("other.flag".to_string(), false),
+  ]));
+  *MOCK_RUNTIME_INTEGERS.lock().unwrap() = Some(std::collections::HashMap::from([(
+    "some.limit".to_string(),
+    42,
+  )]));
+  // A fractional value, which `get_runtime_int` would truncate toward zero, and a negative one,
+  // which it stores no integer for and would answer with its default.
+  *MOCK_RUNTIME_NUMBERS.lock().unwrap() = Some(std::collections::HashMap::from([
+    ("some.ratio".to_string(), 0.25),
+    ("other.ratio".to_string(), -1.5),
+  ]));
+
+  // Known keys return the configured value regardless of the default passed in.
+  assert!(get_runtime_bool("some.flag", false));
+  assert!(!get_runtime_bool("other.flag", true));
+  assert_eq!(get_runtime_int("some.limit", 7), 42);
+  assert_eq!(get_runtime_number("some.ratio", 0.5), 0.25);
+  assert_eq!(get_runtime_number("other.ratio", 0.5), -1.5);
+
+  // Unknown keys return the caller's default rather than a fixed value.
+  assert!(get_runtime_bool("missing.flag", true));
+  assert!(!get_runtime_bool("missing.flag", false));
+  assert_eq!(get_runtime_int("missing.limit", 1234), 1234);
+  assert_eq!(get_runtime_number("missing.ratio", 2.5), 2.5);
+}
+
 // A value hook defined through `ffi_export!` returns its fallback when the body panics.
 crate::ffi_export! {
   fn ffi_export_test_value_hook() -> u32 {

@@ -14,6 +14,8 @@
 #include <string_view>
 #include <vector>
 
+#include "sdk_common.h"
+
 namespace Envoy {
 namespace DynamicModules {
 
@@ -1017,9 +1019,9 @@ public:
                    std::source_location location = std::source_location::current()) = 0;
 };
 
-class HttpFilterConfigHandle {
+class HttpFilterConfigHandle : public CommonHandle {
 public:
-  virtual ~HttpFilterConfigHandle();
+  ~HttpFilterConfigHandle() override;
 
   /**
    * Defines a histogram metric with a name and optional tag keys.

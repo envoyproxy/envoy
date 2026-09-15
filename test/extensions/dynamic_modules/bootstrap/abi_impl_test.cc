@@ -877,8 +877,8 @@ TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounter) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify the counter was defined and is accessible.
-  EXPECT_TRUE(config.value()->getCounterById(counter_id).has_value());
-  EXPECT_FALSE(config.value()->getCounterById(counter_id + 1).has_value());
+  EXPECT_TRUE(config.value()->metrics().getCounterById(counter_id).has_value());
+  EXPECT_FALSE(config.value()->metrics().getCounterById(counter_id + 1).has_value());
 }
 
 // Test incrementing a counter with an invalid ID.
@@ -933,8 +933,8 @@ TEST_F(BootstrapAbiImplTest, DefineAndManipulateGauge) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify the gauge was defined and is accessible.
-  EXPECT_TRUE(config.value()->getGaugeById(gauge_id).has_value());
-  EXPECT_FALSE(config.value()->getGaugeById(gauge_id + 1).has_value());
+  EXPECT_TRUE(config.value()->metrics().getGaugeById(gauge_id).has_value());
+  EXPECT_FALSE(config.value()->metrics().getGaugeById(gauge_id + 1).has_value());
 }
 
 // Test gauge operations with an invalid ID.
@@ -1055,10 +1055,10 @@ TEST_F(BootstrapAbiImplTest, DefineMultipleMetrics) {
             envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify all counters and gauges are accessible by their IDs.
-  EXPECT_TRUE(config.value()->getCounterById(counter_id_0).has_value());
-  EXPECT_TRUE(config.value()->getCounterById(counter_id_1).has_value());
-  EXPECT_TRUE(config.value()->getGaugeById(gauge_id_0).has_value());
-  EXPECT_TRUE(config.value()->getGaugeById(gauge_id_1).has_value());
+  EXPECT_TRUE(config.value()->metrics().getCounterById(counter_id_0).has_value());
+  EXPECT_TRUE(config.value()->metrics().getCounterById(counter_id_1).has_value());
+  EXPECT_TRUE(config.value()->metrics().getGaugeById(gauge_id_0).has_value());
+  EXPECT_TRUE(config.value()->metrics().getGaugeById(gauge_id_1).has_value());
 }
 
 // -----------------------------------------------------------------------------
@@ -1093,8 +1093,8 @@ TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounterVec) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify the counter vec was defined and is accessible.
-  EXPECT_TRUE(config.value()->getCounterVecById(counter_vec_id).has_value());
-  EXPECT_FALSE(config.value()->getCounterVecById(counter_vec_id + 1).has_value());
+  EXPECT_TRUE(config.value()->metrics().getCounterVecById(counter_vec_id).has_value());
+  EXPECT_FALSE(config.value()->metrics().getCounterVecById(counter_vec_id + 1).has_value());
 }
 
 // Test incrementing a counter vec with mismatched label count.
@@ -1160,7 +1160,7 @@ TEST_F(BootstrapAbiImplTest, DefineAndManipulateGaugeVec) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify the gauge vec was defined and is accessible.
-  EXPECT_TRUE(config.value()->getGaugeVecById(gauge_vec_id).has_value());
+  EXPECT_TRUE(config.value()->metrics().getGaugeVecById(gauge_vec_id).has_value());
 }
 
 // Test defining and recording a histogram vec with labels.
@@ -1191,7 +1191,7 @@ TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogramVec) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify the histogram vec was defined and is accessible.
-  EXPECT_TRUE(config.value()->getHistogramVecById(histogram_vec_id).has_value());
+  EXPECT_TRUE(config.value()->metrics().getHistogramVecById(histogram_vec_id).has_value());
 }
 
 // Test vec metric operations with an invalid vec ID and mismatched label count.
@@ -1862,7 +1862,7 @@ TEST_F(BootstrapAbiImplTest, MetricsFrozenAfterInit) {
 }
 
 // Drives concurrent labeled increments from multiple threads to verify no data race in the
-// shared `stat_name_pool_`. Run under `--config=tsan` to verify.
+// registry's shared stat name pool. Run under `--config=tsan` to verify.
 TEST_F(BootstrapAbiImplTest, MetricsConcurrentIncrementCounterVecNoRace) {
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);

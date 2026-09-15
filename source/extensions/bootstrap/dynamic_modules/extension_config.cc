@@ -23,7 +23,7 @@ DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
     : dynamic_module_(std::move(dynamic_module)), main_thread_dispatcher_(main_thread_dispatcher),
       context_(context), stats_store_(stats_store),
       stats_scope_(stats_store.createScope(absl::StrCat(metrics_namespace, "."))),
-      stat_name_pool_(stats_scope_->symbolTable()) {
+      metrics_(*stats_scope_) {
   ASSERT(dynamic_module_ != nullptr);
   ASSERT(extension_name.data() != nullptr);
   ASSERT(extension_config.data() != nullptr);

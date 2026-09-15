@@ -52,6 +52,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "metric_registry",
+    hdrs = ["metric_registry.h"],
+    deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/stats:stats_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "abi_context_accessors_lib",
     srcs = ["abi_context_accessors.cc"],
     hdrs = ["abi_context_accessors.h"],
@@ -76,6 +88,7 @@ envoy_cc_library(
     srcs = ["abi_impl.cc"],
     deps = [
         ":dynamic_modules_lib",
+        "//envoy/runtime:runtime_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
@@ -88,6 +101,7 @@ envoy_cc_library(
 go_library(
     name = "go_sdk_shared",
     srcs = [
+        "sdk/go/shared/common.go",
         "sdk/go/shared/early_header_mutation.go",
         "sdk/go/shared/early_header_mutation_api.go",
         "sdk/go/shared/http.go",
@@ -132,6 +146,7 @@ go_library(
 go_library(
     name = "go_sdk_abi",
     srcs = [
+        "sdk/go/abi/common.go",
         "sdk/go/abi/early_header_mutation.go",
         "sdk/go/abi/internal.go",
         "sdk/go/abi/listener.go",

@@ -27,6 +27,7 @@ envoy_cc_library(
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
     ],
 )
 
