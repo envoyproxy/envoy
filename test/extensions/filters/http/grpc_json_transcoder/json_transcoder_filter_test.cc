@@ -753,6 +753,36 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostChunked) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+
+  Buffer::OwnedImpl request_data;
+  request_data.add("{\"theme\"");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(request_data, false));
+  EXPECT_EQ(request_data.length(), 0); // Consumed
+
+  request_data.add(": \"Children\"}");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(request_data, false));
+  EXPECT_EQ(request_data.length(), 0); // Consumed
+  
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true)); // EOS
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  std::ignore = decoder.decode(request_data, frames);
+
+  EXPECT_EQ(1, frames.size());
+  bookstore::Shelf shelf;
+  EXPECT_TRUE(shelf.ParseFromString(frames[0].data_->toString()));
+  EXPECT_EQ("Children", shelf.theme());
+}
+
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMethodPath) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/json"},
