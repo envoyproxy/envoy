@@ -153,6 +153,13 @@ message HealthCheck {
     repeated type.v3.Int64Range retriable_statuses = 12;
 
     // Use specified application protocol for health checks.
+    //
+    // When the health check connection negotiates ``h2`` or ``http/1.1`` via ALPN, the negotiated
+    // protocol selects the codec instead. This field is used when nothing is negotiated, i.e. for
+    // plaintext health checks, peers that do not support ALPN, and negotiated protocols other than
+    // those two. ``HTTP3`` is always used as configured. See :ref:`tls_options
+    // <envoy_v3_api_field_config.core.v3.HealthCheck.tls_options>` for what a health check
+    // connection advertises.
     type.v3.CodecClientType codec_client_type = 10 [(validate.rules).enum = {defined_only: true}];
 
     // An optional service name parameter which is used to validate the identity of
@@ -260,7 +267,10 @@ message HealthCheck {
     // Specifies the ALPN protocols for health check connections. This is useful if the
     // corresponding upstream is using ALPN-based :ref:`FilterChainMatch
     // <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>` along with different protocols for health checks
-    // versus data connections. If empty, no ALPN protocols will be set on health check connections.
+    // versus data connections. If empty, health check connections advertise the ALPN protocols of
+    // the cluster's TLS context, if any. When the connection negotiates ``h2`` or ``http/1.1``,
+    // the negotiated protocol selects the health check codec, see :ref:`codec_client_type
+    // <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.codec_client_type>`.
     repeated string alpn_protocols = 1;
   }
 
