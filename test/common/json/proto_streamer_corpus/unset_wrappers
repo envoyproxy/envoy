@@ -1,0 +1,15 @@
+sensitive {
+  sensitive_wrapped_int {
+  }
+  sensitive_wrapped_string {
+  }
+}
+any {
+  [type.googleapis.com/envoy.test.Sensitive] {
+    sensitive_wrapped_string {
+    }
+    sensitive_wrapped_int {
+      value: 7
+    }
+  }
+}
