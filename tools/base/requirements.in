@@ -18,7 +18,7 @@ pep8-naming
 protobuf<7.36.0
 ply
 pygithub
-pyjwt[crypto]>=2.13.0
+pyjwt[crypto]>=2.14.0
 cryptography>49.0.0
 pyopenssl>=26.3.0
 pyyaml
