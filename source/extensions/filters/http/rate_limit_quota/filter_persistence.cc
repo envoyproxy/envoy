@@ -26,7 +26,7 @@ using TlsStore = GlobalTlsStores::TlsStore;
 // settings.
 absl::StatusOr<std::shared_ptr<TlsStore>>
 initTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-             Server::Configuration::FactoryContext& context, absl::string_view target_address,
+             Server::Configuration::ServerFactoryContext& context, absl::string_view target_address,
              absl::string_view domain) {
   // Quota bucket & global client TLS objects are created with the config and
   // kept alive via shared_ptr to a storage struct. The local rate limit client
@@ -58,7 +58,7 @@ initTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
 // only be called during RLQS filter factory creation on the main thread.
 absl::StatusOr<std::shared_ptr<TlsStore>>
 GlobalTlsStores::getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                             Server::Configuration::FactoryContext& context,
+                             Server::Configuration::ServerFactoryContext& context,
                              absl::string_view target_address, absl::string_view domain) {
   TlsStoreIndex index = std::make_pair(std::string(target_address), std::string(domain));
   // Find existing TlsStore or initialize a new one.

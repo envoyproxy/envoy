@@ -124,6 +124,200 @@ TEST(CommonAbiImplTest, GetLogLevelReflectsConfiguredLevel) {
   logger.set_level(original_level);
 }
 
+// Sink delegate that records the spdlog source location of the last dynamic modules log record so
+// tests can assert the module-supplied location flows through to spdlog.
+class SourceLocationCapturingSink : public Logger::SinkDelegate {
+public:
+  explicit SourceLocationCapturingSink(Logger::DelegatingLogSinkSharedPtr log_sink)
+      : Logger::SinkDelegate(log_sink) {
+    setDelegate();
+  }
+  ~SourceLocationCapturingSink() override { restoreDelegate(); }
+
+  void log(absl::string_view msg, const spdlog::details::log_msg& log_msg) override {
+    previousDelegate()->log(msg, log_msg);
+    const absl::string_view logger_name(log_msg.logger_name.data(), log_msg.logger_name.size());
+    if (logger_name != "dynamic_modules") {
+      return;
+    }
+    captured_ = true;
+    filename_ = log_msg.source.filename == nullptr ? "" : std::string(log_msg.source.filename);
+    line_ = log_msg.source.line;
+    level_ = log_msg.level;
+    formatted_ = std::string(msg);
+  }
+  void flush() override { previousDelegate()->flush(); }
+
+  bool captured_{false};
+  std::string filename_;
+  int line_{0};
+  spdlog::level::level_enum level_{spdlog::level::off};
+  std::string formatted_;
+};
+
+// Verifies that the module-supplied source file and line are forwarded to spdlog for every level.
+TEST(CommonAbiImplTest, LogUsesModuleSuppliedSourceLocation) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "module log message";
+  const std::string file = "my_module.rs";
+  const std::pair<envoy_dynamic_module_type_log_level, spdlog::level::level_enum> cases[] = {
+      {envoy_dynamic_module_type_log_level_Trace, spdlog::level::trace},
+      {envoy_dynamic_module_type_log_level_Debug, spdlog::level::debug},
+      {envoy_dynamic_module_type_log_level_Info, spdlog::level::info},
+      {envoy_dynamic_module_type_log_level_Warn, spdlog::level::warn},
+      {envoy_dynamic_module_type_log_level_Error, spdlog::level::err},
+      {envoy_dynamic_module_type_log_level_Critical, spdlog::level::critical},
+  };
+  uint32_t line = 10;
+  for (const auto& [abi_level, spdlog_level] : cases) {
+    sink.captured_ = false;
+    envoy_dynamic_module_callback_log_v2(abi_level, {message.data(), message.size()},
+                                         {file.data(), file.size()}, line);
+    EXPECT_TRUE(sink.captured_);
+    EXPECT_EQ(file, sink.filename_);
+    EXPECT_EQ(static_cast<int>(line), sink.line_);
+    EXPECT_EQ(spdlog_level, sink.level_);
+    EXPECT_NE(std::string::npos, sink.formatted_.find(message));
+    ++line;
+  }
+
+  logger.set_level(original_level);
+}
+
+// Verifies that a missing source file is handled without crashing and yields an empty spdlog
+// filename.
+TEST(CommonAbiImplTest, LogHandlesEmptySourceFile) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "no source file";
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Info,
+                                       {message.data(), message.size()}, {nullptr, 0}, 0);
+  EXPECT_TRUE(sink.captured_);
+  EXPECT_EQ("", sink.filename_);
+
+  logger.set_level(original_level);
+}
+
+// Verifies that the reused source file buffer reflects only the bytes reported by each call, so a
+// shorter path never inherits stale trailing bytes from a longer one and the module-supplied
+// length is honored even when the module bytes are not null-terminated.
+TEST(CommonAbiImplTest, LogHonorsSourceFileLengthAcrossReusedBuffer) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "reuse buffer";
+  const std::string long_file = "a/very/long/module/source/path/handler.rs";
+  const std::string short_file = "a.rs";
+  // The trailing bytes past the reported length prove only the length is copied.
+  const std::string backing = "prefix.rs_TRAILING";
+  const std::pair<absl::string_view, absl::string_view> cases[] = {
+      {long_file, long_file},
+      {short_file, short_file},
+      {absl::string_view(backing.data(), 9), "prefix.rs"},
+      {absl::string_view(nullptr, 0), ""},
+  };
+  uint32_t line = 1;
+  for (const auto& [source_file, expected_filename] : cases) {
+    sink.captured_ = false;
+    envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Info,
+                                         {message.data(), message.size()},
+                                         {source_file.data(), source_file.size()}, line);
+    EXPECT_TRUE(sink.captured_);
+    EXPECT_EQ(expected_filename, sink.filename_);
+    EXPECT_EQ(static_cast<int>(line), sink.line_);
+    ++line;
+  }
+
+  logger.set_level(original_level);
+}
+
+// Verifies that Off and out-of-range levels are dropped without reaching spdlog.
+TEST(CommonAbiImplTest, LogIgnoresOffAndOutOfRangeLevels) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "ignored";
+  const std::string file = "my_module.rs";
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Off,
+                                       {message.data(), message.size()}, {file.data(), file.size()},
+                                       1);
+  EXPECT_FALSE(sink.captured_);
+  // A value further outside the enum range would be undefined behavior to load, so use one past
+  // Off.
+  const auto out_of_range =
+      static_cast<envoy_dynamic_module_type_log_level>(envoy_dynamic_module_type_log_level_Off + 1);
+  envoy_dynamic_module_callback_log_v2(out_of_range, {message.data(), message.size()},
+                                       {file.data(), file.size()}, 1);
+  EXPECT_FALSE(sink.captured_);
+
+  logger.set_level(original_level);
+}
+
+// Verifies that a message below the configured level is dropped while an enabled one is emitted
+// with the module-supplied location.
+TEST(CommonAbiImplTest, LogRespectsConfiguredLevel) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::err);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "level gated";
+  const std::string file = "my_module.rs";
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Info,
+                                       {message.data(), message.size()}, {file.data(), file.size()},
+                                       1);
+  EXPECT_FALSE(sink.captured_);
+  envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level_Error,
+                                       {message.data(), message.size()}, {file.data(), file.size()},
+                                       42);
+  EXPECT_TRUE(sink.captured_);
+  EXPECT_EQ(file, sink.filename_);
+  EXPECT_EQ(42, sink.line_);
+
+  logger.set_level(original_level);
+}
+
+// Verifies that the deprecated two-argument callback still logs at every level and reports an empty
+// source location.
+TEST(CommonAbiImplTest, LogDeprecatedOverloadReportsEmptySourceLocation) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::trace);
+  SourceLocationCapturingSink sink(Logger::Registry::getSink());
+
+  const std::string message = "deprecated overload message";
+  const std::pair<envoy_dynamic_module_type_log_level, spdlog::level::level_enum> cases[] = {
+      {envoy_dynamic_module_type_log_level_Trace, spdlog::level::trace},
+      {envoy_dynamic_module_type_log_level_Debug, spdlog::level::debug},
+      {envoy_dynamic_module_type_log_level_Info, spdlog::level::info},
+      {envoy_dynamic_module_type_log_level_Warn, spdlog::level::warn},
+      {envoy_dynamic_module_type_log_level_Error, spdlog::level::err},
+      {envoy_dynamic_module_type_log_level_Critical, spdlog::level::critical},
+  };
+  for (const auto& [abi_level, spdlog_level] : cases) {
+    sink.captured_ = false;
+    envoy_dynamic_module_callback_log(abi_level, {message.data(), message.size()});
+    EXPECT_TRUE(sink.captured_);
+    EXPECT_EQ("", sink.filename_);
+    EXPECT_EQ(0, sink.line_);
+    EXPECT_EQ(spdlog_level, sink.level_);
+    EXPECT_NE(std::string::npos, sink.formatted_.find(message));
+  }
+
+  logger.set_level(original_level);
+}
+
 // =============================================================================
 // Function Registry Tests
 // =============================================================================
@@ -337,6 +531,13 @@ WEAK_STUB(BootstrapExtensionTimerEnabled,
 
 WEAK_STUB(BootstrapExtensionTimerDelete,
           envoy_dynamic_module_callback_bootstrap_extension_timer_delete(nullptr))
+WEAK_STUB(BootstrapExtensionFileWatcherAddWatch,
+          envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(nullptr,
+                                                                                   {nullptr, 0}, 0))
+WEAK_STUB(BootstrapExtensionEnableClusterLifecycle,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(nullptr))
+WEAK_STUB(BootstrapExtensionEnableListenerLifecycle,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr))
 
 WEAK_STUB(BootstrapExtensionRegisterAdminHandler,
           envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
@@ -404,6 +605,9 @@ WEAK_STUB(ClusterLbGetHealthyHostCount,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(nullptr, 0))
 WEAK_STUB(ClusterLbGetHealthyHost,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host(nullptr, 0, 0))
+WEAK_STUB(ClusterLbGetHealthyHosts,
+          envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(nullptr, 0, nullptr, 0,
+                                                                     nullptr))
 WEAK_STUB(ClusterLbContextComputeHashKey,
           envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(nullptr, nullptr))
 WEAK_STUB(ClusterLbContextGetDownstreamHeadersSize,
@@ -441,6 +645,18 @@ WEAK_STUB(ClusterLbContextSetFilterStateTyped,
           envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(nullptr,
                                                                                   {nullptr, 0},
                                                                                   {nullptr, 0}))
+WEAK_STUB(ClusterLbContextGetHostStat,
+          envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+              nullptr, nullptr, envoy_dynamic_module_type_host_stat_RqTotal))
+WEAK_STUB(ClusterLbContextSetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, 0))
+WEAK_STUB(ClusterLbContextSetDynamicMetadataString,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}))
+WEAK_STUB(ClusterLbContextSetDynamicMetadataStringBatch,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+              nullptr, {nullptr, 0}, nullptr, 0))
 WEAK_STUB(ClusterLbGetClusterName,
           envoy_dynamic_module_callback_cluster_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(ClusterLbGetHostsCount,
@@ -499,6 +715,12 @@ WEAK_STUB(ClusterLbAsyncHostSelectionComplete,
 WEAK_STUB(ClusterLbGetMemberUpdateHostAddress,
           envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(nullptr, 0, true,
                                                                                   nullptr))
+WEAK_STUB(ClusterLbGetMemberUpdateHost,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_host(nullptr, 0, true))
+WEAK_STUB(ClusterLbGetMemberUpdateHostPackedAddress,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(nullptr, 0,
+                                                                                         true,
+                                                                                         nullptr))
 WEAK_STUB(ClusterUpdateHostHealth,
           envoy_dynamic_module_callback_cluster_update_host_health(
               nullptr, nullptr, envoy_dynamic_module_type_host_health_Healthy))
@@ -511,6 +733,15 @@ WEAK_STUB(ClusterSchedulerNew, envoy_dynamic_module_callback_cluster_scheduler_n
 WEAK_STUB(ClusterSchedulerDelete, envoy_dynamic_module_callback_cluster_scheduler_delete(nullptr))
 WEAK_STUB(ClusterSchedulerCommit,
           envoy_dynamic_module_callback_cluster_scheduler_commit(nullptr, 0))
+WEAK_STUB(ClusterRunOnAllWorkers,
+          envoy_dynamic_module_callback_cluster_run_on_all_workers(nullptr, 0))
+WEAK_STUB(ClusterWorkerSlotSet,
+          envoy_dynamic_module_callback_cluster_worker_slot_set(nullptr, nullptr))
+WEAK_STUB(ClusterWorkerSlotGet, envoy_dynamic_module_callback_cluster_worker_slot_get(nullptr))
+WEAK_STUB(ClusterGetName, envoy_dynamic_module_callback_cluster_get_name(nullptr, nullptr))
+WEAK_STUB(ClusterHttpCallout,
+          envoy_dynamic_module_callback_cluster_http_callout(nullptr, nullptr, {nullptr, 0},
+                                                             nullptr, 0, {nullptr, 0}, 0))
 WEAK_STUB(ClusterConfigDefineCounter,
           envoy_dynamic_module_callback_cluster_config_define_counter(nullptr, {nullptr, 0},
                                                                       nullptr, 0, nullptr))
@@ -531,6 +762,22 @@ WEAK_STUB(ClusterConfigDefineHistogram,
 WEAK_STUB(ClusterConfigRecordHistogramValue,
           envoy_dynamic_module_callback_cluster_config_record_histogram_value(nullptr, 0, nullptr,
                                                                               0, 0))
+WEAK_STUB(ClusterConfigResolveCounterVec,
+          envoy_dynamic_module_callback_cluster_config_resolve_counter_vec(nullptr, 0, nullptr, 0,
+                                                                           nullptr))
+WEAK_STUB(ClusterConfigResolveGaugeVec,
+          envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec(nullptr, 0, nullptr, 0,
+                                                                         nullptr))
+WEAK_STUB(ClusterConfigResolveHistogramVec,
+          envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec(nullptr, 0, nullptr, 0,
+                                                                             nullptr))
+WEAK_STUB(ClusterMetricCounterAdd,
+          envoy_dynamic_module_callback_cluster_metric_counter_add(nullptr, 0))
+WEAK_STUB(ClusterMetricGaugeSet, envoy_dynamic_module_callback_cluster_metric_gauge_set(nullptr, 0))
+WEAK_STUB(ClusterMetricGaugeAdd, envoy_dynamic_module_callback_cluster_metric_gauge_add(nullptr, 0))
+WEAK_STUB(ClusterMetricGaugeSub, envoy_dynamic_module_callback_cluster_metric_gauge_sub(nullptr, 0))
+WEAK_STUB(ClusterMetricHistogramRecord,
+          envoy_dynamic_module_callback_cluster_metric_histogram_record(nullptr, 0))
 WEAK_STUB(ClusterWorkerTimerNew, envoy_dynamic_module_callback_cluster_worker_timer_new(nullptr))
 WEAK_STUB(ClusterWorkerTimerEnable,
           envoy_dynamic_module_callback_cluster_worker_timer_enable(nullptr, 0))
@@ -632,6 +879,12 @@ WEAK_STUB(MatcherGetHeaderValue,
           envoy_dynamic_module_callback_matcher_get_header_value(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
               nullptr, 0, nullptr))
+WEAK_STUB(MatcherDataInputGetHeaderValue,
+          envoy_dynamic_module_callback_matcher_data_input_get_header_value(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
+              nullptr, 0, nullptr))
+WEAK_STUB(MatcherDataInputSetResult,
+          envoy_dynamic_module_callback_matcher_data_input_set_result(nullptr, {nullptr, 0}))
 
 WEAK_STUB(NetworkFilterWrite,
           envoy_dynamic_module_callback_network_filter_write(nullptr, {nullptr, 0}, false))
@@ -768,6 +1021,8 @@ WEAK_STUB(NetworkFilterHasUpstreamHost,
           envoy_dynamic_module_callback_network_filter_has_upstream_host(nullptr))
 WEAK_STUB(NetworkFilterGetUpstreamConnectionId,
           envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(nullptr))
+WEAK_STUB(NetworkFilterStartDownstreamSecureTransport,
+          envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(nullptr))
 WEAK_STUB(NetworkFilterStartUpstreamSecureTransport,
           envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(nullptr))
 WEAK_STUB(NetworkFilterReadEnabled,
@@ -1578,6 +1833,9 @@ WEAK_STUB(HttpSetDynamicMetadataStringBatch,
 WEAK_STUB(HttpSetDynamicMetadataStruct,
           envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(nullptr, {nullptr, 0},
                                                                          {nullptr, 0}))
+WEAK_STUB(HttpSetDynamicTypedMetadata,
+          envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(nullptr, {nullptr, 0},
+                                                                        {nullptr, 0}))
 WEAK_STUB(HttpGetMetadataString, envoy_dynamic_module_callback_http_get_metadata_string(
                                      nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                      {nullptr, 0}, {nullptr, 0}, nullptr))
@@ -1833,8 +2091,89 @@ WEAK_STUB(ClusterSpecifierSetRequestBodyBufferLimit,
 WEAK_STUB(ClusterSpecifierSetRouteActionOverride,
           envoy_dynamic_module_callback_cluster_specifier_set_route_action_override(nullptr,
                                                                                     {nullptr, 0}))
+WEAK_STUB(ClusterSpecifierSetRouteMetadataBool,
+          envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool(
+              nullptr, {nullptr, 0}, {nullptr, 0}, false))
+WEAK_STUB(ClusterSpecifierSetRouteMetadataNumber,
+          envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, 0))
+WEAK_STUB(ClusterSpecifierSetRouteMetadataString,
+          envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}))
+WEAK_STUB(ClusterSpecifierSetRouteMetadataStruct,
+          envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct(nullptr,
+                                                                                    {nullptr, 0},
+                                                                                    {nullptr, 0}))
+WEAK_STUB(ClusterSpecifierSetRouteTypedMetadata,
+          envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata(nullptr,
+                                                                                   {nullptr, 0},
+                                                                                   {nullptr, 0}))
 WEAK_STUB(ClusterSpecifierSetTimeout,
           envoy_dynamic_module_callback_cluster_specifier_set_timeout(nullptr, 0))
+WEAK_STUB(ClusterSpecifierConfigDefineCounter,
+          envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(ClusterSpecifierConfigIncrementCounter,
+          envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(nullptr, 0,
+                                                                                   nullptr, 0, 0))
+WEAK_STUB(ClusterSpecifierConfigDefineGauge,
+          envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(nullptr, {nullptr, 0},
+                                                                              nullptr, 0, nullptr))
+WEAK_STUB(ClusterSpecifierConfigSetGauge,
+          envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(nullptr, 0, nullptr, 0,
+                                                                           0))
+WEAK_STUB(ClusterSpecifierConfigIncrementGauge,
+          envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(nullptr, 0,
+                                                                                 nullptr, 0, 0))
+WEAK_STUB(ClusterSpecifierConfigDecrementGauge,
+          envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(nullptr, 0,
+                                                                                 nullptr, 0, 0))
+WEAK_STUB(ClusterSpecifierConfigDefineHistogram,
+          envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(ClusterSpecifierConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(nullptr, 0,
+                                                                                        nullptr, 0,
+                                                                                        0))
+
+WEAK_STUB(EarlyHeaderMutationAddHeader,
+          envoy_dynamic_module_callback_early_header_mutation_add_header(nullptr, {nullptr, 0},
+                                                                         {nullptr, 0}))
+WEAK_STUB(EarlyHeaderMutationGetAttributeBool,
+          envoy_dynamic_module_callback_early_header_mutation_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetAttributeInt,
+          envoy_dynamic_module_callback_early_header_mutation_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetAttributeString,
+          envoy_dynamic_module_callback_early_header_mutation_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetDynamicMetadata,
+          envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetDynamicMetadataBool,
+          envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_bool(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetFilterStateBytes,
+          envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes(nullptr,
+                                                                                     {nullptr, 0},
+                                                                                     nullptr))
+WEAK_STUB(EarlyHeaderMutationGetHeaderValue,
+          envoy_dynamic_module_callback_early_header_mutation_get_header_value(nullptr,
+                                                                               {nullptr, 0},
+                                                                               nullptr, 0, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetHeaders,
+          envoy_dynamic_module_callback_early_header_mutation_get_headers(nullptr, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetHeadersSize,
+          envoy_dynamic_module_callback_early_header_mutation_get_headers_size(nullptr))
+WEAK_STUB(EarlyHeaderMutationRemoveHeader,
+          envoy_dynamic_module_callback_early_header_mutation_remove_header(nullptr, {nullptr, 0}))
+WEAK_STUB(EarlyHeaderMutationSetHeader,
+          envoy_dynamic_module_callback_early_header_mutation_set_header(nullptr, {nullptr, 0},
+                                                                         {nullptr, 0}))
 
 WEAK_STUB(FormatterGetAccessLogType,
           envoy_dynamic_module_callback_formatter_get_access_log_type(nullptr))

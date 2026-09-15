@@ -15,7 +15,7 @@ UpstreamReverseConnectionIOHandle::UpstreamReverseConnectionIOHandle(
     Network::ConnectionSocketPtr socket, const std::string& cluster_name,
     UpstreamSocketThreadLocal& registry)
     : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), cluster_name_(cluster_name),
-      owned_socket_(std::move(socket)), registry_{registry},
+      owned_socket_(std::move(socket)),
       cx_post_upgrade_lifetime_{*registry.cx_post_upgrade_lifetime_,
                                 registry.dispatcher().timeSource()} {
   ENVOY_LOG(trace, "reverse_tunnel: created IO handle for cluster: {}, fd: {}", cluster_name_, fd_);
@@ -40,8 +40,9 @@ Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::close() {
   if (owned_socket_) {
     ENVOY_LOG(debug, "reverse_tunnel: releasing socket for cluster: {}", cluster_name_);
 
-    auto* socket_manager = registry_.socketManager();
-    socket_manager->markSocketDead(fd_);
+    if (auto* socket_manager = ReverseTunnelAcceptorExtension::getThreadLocalSocketManager()) {
+      socket_manager->markSocketDead(fd_);
+    }
 
     owned_socket_.reset();
     SET_SOCKET_INVALID(fd_);

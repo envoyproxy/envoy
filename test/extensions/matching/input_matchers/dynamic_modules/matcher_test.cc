@@ -16,6 +16,15 @@ namespace {
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::MatchResult;
 
+// Wraps the in-module configuration so it is destroyed exactly once when the matcher is released,
+// matching the ownership the production factory sets up.
+std::shared_ptr<const void>
+makeConfigHolder(envoy_dynamic_module_type_matcher_config_module_ptr in_module_config,
+                 OnMatcherConfigDestroyType on_config_destroy) {
+  return std::shared_ptr<const void>(
+      in_module_config, [on_config_destroy](const void* config) { on_config_destroy(config); });
+}
+
 class DynamicModuleMatcherTest : public testing::Test {
 public:
   DynamicModuleMatcherTest() {
@@ -52,8 +61,8 @@ TEST_F(DynamicModuleMatcherTest, AlwaysMatchModule) {
   auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
   ASSERT_NE(nullptr, in_module_config);
 
-  auto matcher = std::make_unique<DynamicModuleInputMatcher>(module, on_config_destroy.value(),
-                                                             on_match.value(), in_module_config);
+  auto matcher = std::make_unique<DynamicModuleInputMatcher>(
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()));
 
   // Create matching data with DynamicModuleMatchData.
   auto match_data = std::make_shared<Http::DynamicModules::DynamicModuleMatchData>();
@@ -92,8 +101,8 @@ TEST_F(DynamicModuleMatcherTest, HeaderCheckModule) {
   auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
   ASSERT_NE(nullptr, in_module_config);
 
-  auto matcher = std::make_unique<DynamicModuleInputMatcher>(module, on_config_destroy.value(),
-                                                             on_match.value(), in_module_config);
+  auto matcher = std::make_unique<DynamicModuleInputMatcher>(
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()));
 
   // Test with matching header.
   {
@@ -148,8 +157,8 @@ TEST_F(DynamicModuleMatcherTest, SupportedDataInputTypes) {
   envoy_dynamic_module_type_envoy_buffer config_buf = {"", 0};
   auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
 
-  auto matcher = std::make_unique<DynamicModuleInputMatcher>(module, on_config_destroy.value(),
-                                                             on_match.value(), in_module_config);
+  auto matcher = std::make_unique<DynamicModuleInputMatcher>(
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()));
 
   EXPECT_TRUE(matcher->supportsDataInputType("dynamic_module_data_input"));
   EXPECT_FALSE(matcher->supportsDataInputType("string"));
@@ -177,8 +186,8 @@ TEST_F(DynamicModuleMatcherTest, NonDynamicModuleCustomMatchDataReturnsFalse) {
   envoy_dynamic_module_type_envoy_buffer config_buf = {"", 0};
   auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
 
-  auto matcher = std::make_unique<DynamicModuleInputMatcher>(module, on_config_destroy.value(),
-                                                             on_match.value(), in_module_config);
+  auto matcher = std::make_unique<DynamicModuleInputMatcher>(
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()));
 
   // Pass a CustomMatchData that is not DynamicModuleMatchData.
   auto other_data = std::make_shared<OtherCustomMatchData>();
@@ -206,8 +215,8 @@ TEST_F(DynamicModuleMatcherTest, NonCustomMatchDataReturnsFalse) {
   envoy_dynamic_module_type_envoy_buffer config_buf = {"", 0};
   auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
 
-  auto matcher = std::make_unique<DynamicModuleInputMatcher>(module, on_config_destroy.value(),
-                                                             on_match.value(), in_module_config);
+  auto matcher = std::make_unique<DynamicModuleInputMatcher>(
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()));
 
   // Pass a string variant instead of CustomMatchData.
   auto input = DataInputGetResult::CreateString("not_custom_data");
@@ -233,8 +242,8 @@ TEST_F(DynamicModuleMatcherTest, NullRequestHeaders) {
   envoy_dynamic_module_type_envoy_buffer config_buf = {"x-test", 6};
   auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
 
-  auto matcher = std::make_unique<DynamicModuleInputMatcher>(module, on_config_destroy.value(),
-                                                             on_match.value(), in_module_config);
+  auto matcher = std::make_unique<DynamicModuleInputMatcher>(
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()));
 
   // Create match data with no headers set.
   auto match_data = std::make_shared<Http::DynamicModules::DynamicModuleMatchData>();

@@ -15,9 +15,12 @@ public:
   // FormatterProvider
   std::optional<std::string> format(const Context& context,
                                     const StreamInfo::StreamInfo& stream_info) const override;
-
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class TestCommandParser : public CommandParser {
@@ -42,9 +45,12 @@ public:
   // FormatterProvider
   std::optional<std::string> format(const Context& context,
                                     const StreamInfo::StreamInfo& stream_info) const override;
-
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class AdditionalCommandParser : public CommandParser {

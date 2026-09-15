@@ -396,5 +396,215 @@ TEST(ThreadLocalInstanceImplDispatcherTest, DestroySlotOnWorker) {
   tls.shutdownThread();
 }
 
+TEST_F(ThreadLocalInstanceImplTest, RegisterThreadReplaysActiveSlot) {
+  TypedSlotPtr<> slot = TypedSlot<>::makeUnique(tls_);
+  uint32_t init_calls = 0;
+
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  slot->set([&init_calls](Event::Dispatcher&) {
+    init_calls++;
+    return std::make_shared<ThreadLocalObject>();
+  });
+  EXPECT_EQ(2, init_calls); // Main thread + fixture worker thread
+
+  NiceMock<Event::MockDispatcher> new_worker_dispatcher{"new_worker_thread"};
+  std::list<Event::PostCb> holder;
+
+  // registerThread should post the dispatcher setter and the active slot callback.
+  EXPECT_CALL(new_worker_dispatcher, post(_))
+      .Times(2)
+      .WillRepeatedly(Invoke([&holder](Event::PostCb cb) { holder.push_back(std::move(cb)); }));
+
+  tls_.registerThread(new_worker_dispatcher, false);
+  EXPECT_EQ(2, holder.size());
+
+  while (!holder.empty()) {
+    holder.front()();
+    holder.pop_front();
+  }
+
+  EXPECT_EQ(3, init_calls); // 2 existing threads + 1 new worker
+
+  tls_.shutdownGlobalThreading();
+  tls_.shutdownThread();
+}
+
+TEST_F(ThreadLocalInstanceImplTest, RegisterThreadReplaySlotDeletedBeforeRunning) {
+  TypedSlotPtr<> slot = TypedSlot<>::makeUnique(tls_);
+  uint32_t init_calls = 0;
+
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  slot->set([&init_calls](Event::Dispatcher&) {
+    init_calls++;
+    return std::make_shared<ThreadLocalObject>();
+  });
+  EXPECT_EQ(2, init_calls); // Main thread + fixture worker thread
+
+  NiceMock<Event::MockDispatcher> new_worker_dispatcher{"new_worker_thread"};
+  std::list<Event::PostCb> holder;
+
+  EXPECT_CALL(new_worker_dispatcher, post(_))
+      .Times(2)
+      .WillRepeatedly(Invoke([&holder](Event::PostCb cb) { holder.push_back(std::move(cb)); }));
+
+  tls_.registerThread(new_worker_dispatcher, false);
+  EXPECT_EQ(2, holder.size());
+
+  // Reset slot before running the callbacks on worker.
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  EXPECT_CALL(new_worker_dispatcher, post(_));
+  slot.reset();
+
+  // Run the queued callbacks. The slot initialize callback should not run because
+  // the slot was destroyed (weak pointer expired).
+  while (!holder.empty()) {
+    holder.front()();
+    holder.pop_front();
+  }
+
+  EXPECT_EQ(2, init_calls); // Worker callback was skipped.
+
+  tls_.shutdownGlobalThreading();
+  tls_.shutdownThread();
+}
+
+TEST_F(ThreadLocalInstanceImplTest, RegisterThreadReplaySlotReallocated) {
+  TypedSlotPtr<> slot1 = TypedSlot<>::makeUnique(tls_);
+  uint32_t slot1_init_calls = 0;
+
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  slot1->set([&slot1_init_calls](Event::Dispatcher&) {
+    slot1_init_calls++;
+    return std::make_shared<ThreadLocalObject>();
+  });
+  EXPECT_EQ(2, slot1_init_calls); // Main thread + fixture worker thread
+
+  // Free slot1
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  slot1.reset();
+
+  // Allocate new slot which reuses slot1's index, and set a new callback.
+  TypedSlotPtr<> slot2 = TypedSlot<>::makeUnique(tls_);
+  uint32_t slot2_init_calls = 0;
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  slot2->set([&slot2_init_calls](Event::Dispatcher&) {
+    slot2_init_calls++;
+    return std::make_shared<ThreadLocalObject>();
+  });
+  EXPECT_EQ(2, slot2_init_calls); // Main thread + fixture worker thread
+
+  NiceMock<Event::MockDispatcher> new_worker_dispatcher{"new_worker_thread"};
+  std::list<Event::PostCb> holder;
+
+  // registerThread should post dispatcher setter and slot2 callback only (not slot1).
+  EXPECT_CALL(new_worker_dispatcher, post(_))
+      .Times(2)
+      .WillRepeatedly(Invoke([&holder](Event::PostCb cb) { holder.push_back(std::move(cb)); }));
+
+  tls_.registerThread(new_worker_dispatcher, false);
+  EXPECT_EQ(2, holder.size());
+
+  while (!holder.empty()) {
+    holder.front()();
+    holder.pop_front();
+  }
+
+  EXPECT_EQ(2, slot1_init_calls); // Untouched
+  EXPECT_EQ(3, slot2_init_calls); // 2 existing + 1 new worker
+
+  tls_.shutdownGlobalThreading();
+  tls_.shutdownThread();
+}
+
+TEST(ThreadLocalInstanceImplDispatcherTest, NewDispatcherReplaysActiveSlotsRealThreads) {
+  InstanceImpl tls;
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr main_dispatcher(api->allocateDispatcher("test_main_thread"));
+  Event::DispatcherPtr worker_dispatcher(api->allocateDispatcher("test_worker_thread"));
+
+  tls.registerThread(*main_dispatcher, true);
+  main_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  TypedSlotPtr<StringSlotObject> slot = TypedSlot<StringSlotObject>::makeUnique(tls);
+  slot->set([](Event::Dispatcher&) -> std::shared_ptr<StringSlotObject> {
+    auto s = std::make_shared<StringSlotObject>();
+    s->str_ = "hello";
+    return s;
+  });
+  EXPECT_EQ("hello", slot->get()->str_);
+
+  tls.registerThread(*worker_dispatcher, false);
+
+  Thread::ThreadPtr worker_thread =
+      Thread::threadFactoryForTest().createThread([&worker_dispatcher, &slot]() {
+        worker_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+        EXPECT_EQ("hello", slot->get()->str_);
+      });
+
+  worker_thread->join();
+
+  tls.shutdownGlobalThreading();
+  tls.shutdownThread();
+}
+
+TEST(ThreadLocalInstanceImplDispatcherTest, DestroySlotOnWorkerBeforeRegisterThread) {
+  InstanceImpl tls;
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher main_dispatcher{"test_main_thread"};
+  Event::DispatcherPtr thread_dispatcher(api->allocateDispatcher("test_worker_thread"));
+
+  tls.registerThread(main_dispatcher, true);
+  tls.registerThread(*thread_dispatcher, false);
+
+  auto slot = TypedSlot<>::makeUnique(tls);
+  uint32_t init_calls = 0;
+  slot->set([&init_calls](Event::Dispatcher&) {
+    init_calls++;
+    return std::make_shared<ThreadLocalObject>();
+  });
+
+  Event::PostCb remove_slot_cb;
+
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread(
+      [&main_dispatcher, &thread_dispatcher, &slot, &remove_slot_cb]() {
+        thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+        Thread::SkipAsserts skip;
+
+        EXPECT_CALL(main_dispatcher, isThreadSafe()).WillOnce(Return(false));
+        // Capture the removeSlot callback posted from worker to main dispatcher.
+        EXPECT_CALL(main_dispatcher, post(_)).WillOnce(Invoke([&remove_slot_cb](Event::PostCb cb) {
+          remove_slot_cb = std::move(cb);
+        }));
+
+        slot.reset();
+
+        // Overwrite the freed memory on the worker thread.
+        std::vector<std::vector<char>> clobber;
+        for (int i = 0; i < 100; ++i) {
+          clobber.emplace_back(256, 0x5a);
+        }
+
+        thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+      });
+  thread->join();
+
+  // At this point, slot has been destroyed on the worker thread, but remove_slot_cb has not run
+  // yet. Registering a new thread here should NOT try to replay or access the destroyed slot!
+  Event::DispatcherPtr new_worker_dispatcher(api->allocateDispatcher("new_worker_thread"));
+  tls.registerThread(*new_worker_dispatcher, false);
+  new_worker_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Now run the removeSlot callback.
+  if (remove_slot_cb != nullptr) {
+    remove_slot_cb();
+  }
+
+  tls.shutdownGlobalThreading();
+  tls.shutdownThread();
+}
+
 } // namespace ThreadLocal
 } // namespace Envoy

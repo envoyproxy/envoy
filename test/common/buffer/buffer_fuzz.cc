@@ -2,6 +2,8 @@
 
 #include <fcntl.h>
 
+#include <optional>
+
 #include "envoy/common/platform.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -31,6 +33,9 @@ constexpr uint32_t BufferCount = 3;
 // deallocation, just keep them around until the fuzz run is over.
 struct Context {
   std::vector<std::unique_ptr<Buffer::BufferFragmentImpl>> fragments_;
+  // Bytes extracted the buffer by the current extract*FrontSlice action.
+  // Consumed by the linear buffer to stay in sync.
+  std::optional<uint64_t> extract_size_;
 };
 
 // Bound the maximum allocation size per action. We want this to be able to at
@@ -147,12 +152,22 @@ public:
 
   uint64_t length() const override { return size_; }
 
+  uint64_t sliceCount() const override { PANIC("not implemented"); }
+
   void* linearize(uint32_t /*size*/) override {
     // Sketchy, but probably will work for test purposes.
     return mutableStart();
   }
 
-  Buffer::SliceDataPtr extractMutableFrontSlice() override { PANIC("not implemented"); }
+  Buffer::SliceDataPtr extractMutableFrontSlice() override {
+    // No concept of slices, kept in sync via drain
+    PANIC("not implemented");
+  }
+
+  Buffer::SliceDataPtr extractImmutableFrontSlice() override {
+    // No concept of slices, kept in sync via drain
+    PANIC("not implemented");
+  }
 
   void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }
 
@@ -466,6 +481,36 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     const std::string data = target_buffer.toString();
     FUZZ_ASSERT(target_buffer.startsWith(action.starts_with()) ==
                 (data.find(action.starts_with()) == 0));
+    break;
+  }
+  case test::common::buffer::Action::kExtractMutableFrontSlice:
+  case test::common::buffer::Action::kExtractImmutableFrontSlice: {
+    // Extracting from an empty buffer is undefined by the interface contract.
+    if (target_buffer.length() == 0) {
+      break;
+    }
+    // StringBuffer has no slices, drain as many bytes as OwnedImpl extracted to keep it in sync.
+    if (auto* linear_buffer = dynamic_cast<StringBuffer*>(&target_buffer)) {
+      FUZZ_ASSERT(ctxt.extract_size_.has_value());
+      linear_buffer->drain(*ctxt.extract_size_);
+      ctxt.extract_size_.reset();
+      break;
+    }
+    const bool extract_mutable =
+        action.action_selector_case() == test::common::buffer::Action::kExtractMutableFrontSlice;
+    const std::string before = target_buffer.toString();
+    const uint64_t front_size = target_buffer.frontSlice().len_;
+    const Buffer::SliceDataPtr slice = extract_mutable ? target_buffer.extractMutableFrontSlice()
+                                                       : target_buffer.extractImmutableFrontSlice();
+    const absl::Span<const uint8_t> data = slice->getImmutableData();
+    FUZZ_ASSERT(data.size() == front_size);
+    FUZZ_ASSERT(target_buffer.length() + data.size() == before.size());
+    FUZZ_ASSERT(::memcmp(data.data(), before.data(), data.size()) == 0);
+    ctxt.extract_size_ = data.size();
+    if (extract_mutable) {
+      // Check if an immutable fragment was extracted instead of copied.
+      std::ignore = slice->getMutableData();
+    }
     break;
   }
   default:

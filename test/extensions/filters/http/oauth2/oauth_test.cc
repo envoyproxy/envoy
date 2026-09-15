@@ -48,13 +48,12 @@ public:
   OAuth2ClientTest()
       : mock_callbacks_(std::make_shared<MockCallbacks>()),
         request_(&cm_.thread_local_cluster_.async_client_) {
-    envoy::config::core::v3::HttpUri uri;
-    uri.set_cluster("auth");
-    uri.set_uri("auth.com/oauth/token");
-    uri.mutable_timeout()->set_seconds(1);
+    uri_.set_cluster("auth");
+    uri_.set_uri("auth.com/oauth/token");
+    uri_.mutable_timeout()->set_seconds(1);
     cm_.initializeThreadLocalClusters({"auth"});
 
-    client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, nullptr, 0s);
+    client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri_, nullptr, 0s);
   }
 
   ABSL_MUST_USE_RESULT
@@ -72,6 +71,8 @@ public:
   std::shared_ptr<MockCallbacks> mock_callbacks_;
   Http::MockAsyncClientRequest request_;
   std::deque<Http::AsyncClient::Callbacks*> callbacks_;
+  // The client holds a reference to the token endpoint, so it must outlive the client.
+  envoy::config::core::v3::HttpUri uri_;
   std::shared_ptr<OAuth2Client> client_;
 };
 
@@ -170,11 +171,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenDefaultExpiresIn) {
             return &request_;
           }));
 
-  envoy::config::core::v3::HttpUri uri;
-  uri.set_cluster("auth");
-  uri.set_uri("auth.com/oauth/token");
-  uri.mutable_timeout()->set_seconds(1);
-  client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, nullptr, 2000s);
+  client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri_, nullptr, 2000s);
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("a", "b", "c", "d", "e");
   EXPECT_EQ(1, callbacks_.size());
@@ -415,6 +412,26 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenSuccessBasicAuthType) {
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+}
+
+// Refresh tokens are commonly base64-ish and contain characters that are reserved in an
+// x-www-form-urlencoded body. They must be encoded with the same reserved set as every other
+// token endpoint request, including on the BASIC_AUTH path where the body carries no credentials.
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenBasicAuthEncodesRefreshToken) {
+  EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ("grant_type=refresh_token&refresh_token=a%2Bb%2Fc%3D%26d",
+                      message->bodyAsString());
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncRefreshAccessToken("a+b/c=&d", "client", "secret", AuthType::BasicAuth);
+  EXPECT_EQ(1, callbacks_.size());
 }
 
 TEST_F(OAuth2ClientTest, RequestAccessTokenTlsClientAuthNoClientSecret) {
@@ -710,11 +727,6 @@ TEST_F(OAuth2ClientTest, NoClusterRefreshTokenAllowFailed) {
 }
 
 TEST_F(OAuth2ClientTest, RequestAccessTokenRetryPolicy) {
-  envoy::config::core::v3::HttpUri uri;
-  uri.set_cluster("auth");
-  uri.set_uri("auth.com/oauth/token");
-  uri.mutable_timeout()->set_seconds(1);
-
   envoy::config::route::v3::RetryPolicy retry_policy;
   retry_policy.set_retry_on("5xx,reset");
   retry_policy.mutable_retry_back_off()->mutable_base_interval()->set_seconds(1);
@@ -726,7 +738,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenRetryPolicy) {
       retry_policy, ProtobufMessage::getNullValidationVisitor(), server_factory_context);
 
   client_ =
-      std::make_shared<OAuth2ClientImpl>(cm_, uri, std::move(parsed_retry_policy.value()), 2000s);
+      std::make_shared<OAuth2ClientImpl>(cm_, uri_, std::move(parsed_retry_policy.value()), 2000s);
 
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(Invoke(

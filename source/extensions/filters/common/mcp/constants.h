@@ -35,13 +35,11 @@ constexpr absl::string_view IS_ERROR_FIELD = "isError";
 constexpr absl::string_view ERROR_FIELD = "error";
 
 // MCP Initialize constants
-constexpr absl::string_view LATEST_SUPPORTED_MCP_VERSION = "2025-11-25";
-// Based on the 2025-11-25 spec, if the MCP-Protocol-Version header is not
-// provided, the fallback protocol version is 2025-03-26.
-// https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#protocol-version-header
-constexpr absl::string_view FALLBACK_PROTOCOL_VERSION = "2025-03-26";
 constexpr absl::string_view MCP_VERSION_2024_11_05 = "2024-11-05";
+constexpr absl::string_view MCP_VERSION_2025_03_26 = "2025-03-26";
 constexpr absl::string_view MCP_VERSION_2025_06_18 = "2025-06-18";
+constexpr absl::string_view MCP_VERSION_2025_11_25 = "2025-11-25";
+constexpr absl::string_view MCP_VERSION_2026_07_28 = "2026-07-28";
 constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";
 constexpr absl::string_view CAPABILITIES_FIELD = "capabilities";
 constexpr absl::string_view TOOLS_FIELD = "tools";
@@ -67,6 +65,8 @@ constexpr absl::string_view BODY_TOO_LARGE = "mcp_body_too_large";
 // HTTP header names
 constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
 constexpr absl::string_view MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version";
+constexpr absl::string_view MCP_METHOD_HEADER = "mcp-method";
+constexpr absl::string_view MCP_NAME_HEADER = "mcp-name";
 
 // Method names
 namespace Methods {

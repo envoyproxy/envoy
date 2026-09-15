@@ -51,6 +51,47 @@ Protobuf::Value BodyFormatterProvider::formatValue(const Formatter::Context& con
   return Config::Metadata::structValue(body, path_);
 }
 
+bool BodyFormatterProvider::formatTo(std::string& sink, const Formatter::Context& context,
+                                     const StreamInfo::StreamInfo&) const {
+  auto value = getBodyValue(context);
+  if (!value.has_value()) {
+    return false;
+  }
+  if (value->kind_case() == Protobuf::Value::kStringValue) {
+    sink.append(value->string_value());
+  } else {
+    Json::Utility::appendValueToString(*value, sink);
+  }
+  return true;
+}
+
+void BodyFormatterProvider::formatValueTo(Formatter::ValueSink& sink,
+                                          const Formatter::Context& context,
+                                          const StreamInfo::StreamInfo&) const {
+  auto value = getBodyValue(context);
+  if (!value.has_value()) {
+    return;
+  }
+  sink.addValue(*value);
+}
+
+OptRef<const Protobuf::Value>
+BodyFormatterProvider::getBodyValue(const Formatter::Context& context) const {
+  const auto extension = context.typedExtension<BodyContextExtension>();
+  if (!extension.has_value()) {
+    return {};
+  }
+  const auto& body = request_body_ ? extension->request_body : extension->response_body;
+  const Protobuf::Value& value = Config::Metadata::structValue(body, path_);
+  // A missing path yields a null/unset value; report it as no value at all
+  // so that the caller decides how to render it.
+  if (value.kind_case() == Protobuf::Value::kNullValue ||
+      value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+    return {};
+  }
+  return makeOptRef<const Protobuf::Value>(value);
+}
+
 /**
  * CommandParser for BodyFormatterProvider.
  */

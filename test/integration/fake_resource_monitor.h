@@ -30,7 +30,7 @@ private:
 class FakeResourceMonitorFactory : public Server::Configuration::ResourceMonitorFactory {
 public:
   // Server::Configuration::ResourceMonitorFactory
-  Server::ResourceMonitorPtr
+  absl::StatusOr<Server::ResourceMonitorPtr>
   createResourceMonitor(const Protobuf::Message& config,
                         Server::Configuration::ResourceMonitorFactoryContext& context) override;
 

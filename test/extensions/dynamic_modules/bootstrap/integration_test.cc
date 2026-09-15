@@ -316,6 +316,67 @@ typed_config:
   }
 }
 
+const std::string AWS_REQUEST_SIGNING_UPSTREAM_FILTER = R"EOF(
+name: envoy.filters.http.aws_request_signing
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
+  service_name: execute-api
+  region: us-east-1
+  signing_algorithm: aws_sigv4
+  credential_provider:
+    custom_credential_provider_chain: true
+    container_credential_provider: {}
+)EOF";
+
+class DynamicModulesBootstrapAwsSigningIntegrationTest
+    : public DynamicModulesBootstrapIntegrationTest {
+public:
+  DynamicModulesBootstrapAwsSigningIntegrationTest() {
+    // Nothing is listening here, so the fetch fails, anonymous credentials are installed, and the
+    // callout goes out unsigned. That doesn't matter. The deadlock is in clearing the pending flag,
+    // not in the signature, and both the success and the failure path of the fetch reach it
+    // through setCredentialsToAllThreads().
+    TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI",
+                               "http://127.0.0.1:1/path/to/creds", 1);
+  }
+
+  ~DynamicModulesBootstrapAwsSigningIntegrationTest() override {
+    // Undo environment changes.
+    TestEnvironment::unsetEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI");
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesBootstrapAwsSigningIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Regression test for a deadlock between the bootstrap init target and AWS credential resolution.
+// The module holds its init target open until an HTTP callout through cluster_0 completes, and
+// cluster_0 carries an upstream aws_request_signing filter whose credentials chain has no
+// synchronous provider, so signing has to wait on an async metadata fetch.
+//
+// That fetch resolves on the main thread before any worker thread exists. While the resulting
+// "credentials are no longer pending" notification was driven from the all-threads-complete
+// callback of runOnAllThreads(), it could never fire here: that callback waits for every
+// registered worker dispatcher to run the update, worker dispatchers do not run until
+// startWorkers(), and startWorkers() waits on the very init manager this module is holding open.
+// The signing filter then held the callout until its deadline. Reaching the module's success log at
+// all is the assertion; a regression instead fails on the harness giving up waiting for listeners,
+// and the module budgets its retries so it cannot spin indefinitely behind that.
+TEST_P(DynamicModulesBootstrapAwsSigningIntegrationTest, SignedCalloutGatingInitTarget) {
+  // Nothing is servicing the fake upstream while the server is still initializing, so it has to
+  // answer the callout on its own.
+  autonomous_upstream_ = true;
+  config_helper_.prependFilter(AWS_REQUEST_SIGNING_UPSTREAM_FILTER, /*downstream=*/false);
+  // cluster_0 carries no protocol options in the base config, and upstream_protocol_options is a
+  // required field once any are set. This fills it in without disturbing the filter chain above.
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+
+  EXPECT_LOG_CONTAINS(
+      "info", "Bootstrap signed callout test completed successfully!",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_signed_callout_test"));
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions

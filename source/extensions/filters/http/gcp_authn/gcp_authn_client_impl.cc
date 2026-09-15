@@ -7,6 +7,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/jwt/jwt.h"
 #include "source/common/jwt/verify.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
@@ -38,6 +39,38 @@ Http::RequestMessagePtr buildRequest(absl::string_view url) {
            {Envoy::Http::LowerCaseString(MetadataFlavorKey), MetadataFlavor}});
 
   return std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
+}
+
+Http::RequestMessagePtr
+buildIamPostRequest(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                    const std::string& authorization) {
+  Http::RequestHeaderMapPtr headers =
+      Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
+          {{Envoy::Http::Headers::get().Method, "POST"},
+           {Envoy::Http::Headers::get().Host, "iamcredentials.googleapis.com"},
+           {Envoy::Http::Headers::get().Path,
+            absl::StrCat("/v1/projects/-/serviceAccounts/", audience.iam_access_token().account(),
+                         ":generateAccessToken")},
+           {Envoy::Http::CustomHeaders::get().Authorization, authorization},
+           {Envoy::Http::Headers::get().ContentType, "application/json; charset=utf-8"}});
+
+  Protobuf::Struct request_body_struct;
+  auto* fields = request_body_struct.mutable_fields();
+  auto* list_value = (*fields)["scope"].mutable_list_value();
+  if (audience.iam_access_token().scopes().empty()) {
+    list_value->add_values()->set_string_value("https://www.googleapis.com/auth/cloud-platform");
+  } else {
+    for (const auto& scope : audience.iam_access_token().scopes()) {
+      list_value->add_values()->set_string_value(scope);
+    }
+  }
+  (*fields)["lifetime"].set_string_value("3600s");
+  std::string body;
+  std::ignore = Protobuf::util::MessageToJsonString(request_body_struct, &body);
+
+  auto message = std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
+  message->body().add(body);
+  return message;
 }
 
 absl::StatusOr<GcpToken>
@@ -75,6 +108,35 @@ parseAccessTokenResponse(const std::string& response_body,
   }
   uint64_t expires_at = DateUtil::nowToSeconds(time_source) + expires_in;
   return GcpToken{access_token, expires_at, audience, fingerprint};
+}
+
+absl::StatusOr<GcpToken> parseIamAccessTokenResponse(
+    const std::string& response_body,
+    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience) {
+  auto json_or_error = Json::Factory::loadFromString(response_body);
+  if (!json_or_error.ok()) {
+    return absl::InternalError("Failed to parse IAM access token response as JSON.");
+  }
+  auto json = json_or_error.value();
+  auto access_token_or_error = json->getString("accessToken");
+  auto expire_time_or_error = json->getString("expireTime");
+  if (!access_token_or_error.ok() || !expire_time_or_error.ok()) {
+    return absl::InternalError("Failed to extract accessToken or expireTime from response.");
+  }
+  std::string access_token = access_token_or_error.value();
+  std::string expire_time = expire_time_or_error.value();
+  if (access_token.empty()) {
+    return absl::InternalError("Extracted accessToken is empty.");
+  }
+  Protobuf::Timestamp timestamp;
+  if (!Protobuf::util::TimeUtil::FromString(expire_time, &timestamp)) {
+    return absl::InternalError("Failed to parse expireTime timestamp.");
+  }
+  int64_t expires_at = Protobuf::util::TimeUtil::TimestampToSeconds(timestamp);
+  if (expires_at <= 0) {
+    return absl::InternalError("Parsed expireTime is non-positive.");
+  }
+  return GcpToken{access_token, static_cast<uint64_t>(expires_at), audience};
 }
 } // namespace
 
@@ -122,9 +184,23 @@ void GcpAuthnClientImpl::fetchBoundAccessToken(
   makeTokenRequest(TokenType::BoundAccessToken, audience, final_url, fingerprint, callbacks);
 }
 
+void GcpAuthnClientImpl::fetchIamAccessToken(
+    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+    const std::string& authorization, GcpAuthnClient::Callbacks& callbacks) {
+  sendRequest(TokenType::IamAccessToken, audience, std::nullopt,
+              buildIamPostRequest(audience, authorization), callbacks);
+}
+
 void GcpAuthnClientImpl::makeTokenRequest(
     TokenType token_type, const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
     const std::string& final_url, const std::optional<std::string>& fingerprint,
+    GcpAuthnClient::Callbacks& callbacks) {
+  sendRequest(token_type, audience, fingerprint, buildRequest(final_url), callbacks);
+}
+
+void GcpAuthnClientImpl::sendRequest(
+    TokenType token_type, const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+    const std::optional<std::string>& fingerprint, Http::RequestMessagePtr request,
     GcpAuthnClient::Callbacks& callbacks) {
   // Cancel any active requests.
   cancel();
@@ -163,7 +239,7 @@ void GcpAuthnClientImpl::makeTokenRequest(
 
   token_type_ = token_type;
   active_request_ =
-      thread_local_cluster->httpAsyncClient().send(buildRequest(final_url), *this, options);
+      thread_local_cluster->httpAsyncClient().send(std::move(request), *this, options);
 }
 
 void GcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
@@ -187,6 +263,8 @@ void GcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
   absl::StatusOr<GcpToken> token_or_error;
   if (token_type_ == TokenType::Jwt || token_type_ == TokenType::BoundJwt) {
     token_or_error = parseJwtResponse(response_body, audience_, fingerprint_);
+  } else if (token_type_ == TokenType::IamAccessToken) {
+    token_or_error = parseIamAccessTokenResponse(response_body, audience_);
   } else {
     token_or_error =
         parseAccessTokenResponse(response_body, audience_, fingerprint_, context_.timeSource());

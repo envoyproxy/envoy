@@ -37,6 +37,7 @@ const static bool should_log = true;
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
   FUNCTION(a2a)                                                                                    \
   FUNCTION(admin)                                                                                  \
+  FUNCTION(ai_protocol_manager)                                                                    \
   FUNCTION(alternate_protocols_cache)                                                              \
   FUNCTION(aws)                                                                                    \
   FUNCTION(assert)                                                                                 \
@@ -337,7 +338,9 @@ public:
    * Sets the minimum log severity required to print messages.
    * Messages below this loglevel will be suppressed.
    */
-  static void setLogLevel(spdlog::level::level_enum log_level);
+  static void setLogLevel(Levels log_level);
+  [[deprecated("Use setLogLevel(Levels) instead")]] static void
+  setLogLevel(spdlog::level::level_enum log_level);
 
   /**
    * Sets the log format.

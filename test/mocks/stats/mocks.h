@@ -83,6 +83,8 @@ public:
       }
     }
   }
+  bool noTagExtraction() const override { return no_tag_extraction_; }
+  void markAsNoTagExtraction() override { no_tag_extraction_ = true; }
 
   TestUtil::TestSymbolTable symbol_table_; // Must outlive name_.
   MetricName name_;
@@ -120,6 +122,7 @@ private:
   std::string tag_extracted_name_;
   StatNamePool tag_pool_;
   std::unique_ptr<StatNameManagedStorage> tag_extracted_stat_name_;
+  bool no_tag_extraction_{false};
 };
 
 template <class BaseClass> class MockStatWithRefcount : public MockMetric<BaseClass> {

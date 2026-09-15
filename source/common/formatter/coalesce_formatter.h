@@ -32,6 +32,11 @@ namespace Formatter {
  *   ]
  * }
  *
+ * By default an operator that produces a value which is present but empty is accepted as the
+ * result. Setting the runtime guard
+ * ``envoy.reloadable_features.coalesce_formatter_accept_empty_values`` to false restores the
+ * legacy behavior where an empty result is skipped and the next operator is evaluated.
+ *
  * Note that the JSON parameter cannot contain literal ')' characters as they would
  * interfere with the command parser regex.
  */
@@ -46,15 +51,28 @@ public:
   static absl::StatusOr<FormatterProviderPtr> create(absl::string_view json_config,
                                                      std::optional<size_t> max_length);
 
+  /**
+   * @param formatters the operator formatters to evaluate in order.
+   * @param max_length optional maximum length for the output.
+   * @param accept_empty_values whether a value that is present but empty is accepted as a result
+   *        rather than skipped. This is evaluated from the
+   *        ``envoy.reloadable_features.coalesce_formatter_accept_empty_values`` runtime guard when
+   *        the formatter is created.
+   */
   CoalesceFormatter(std::vector<FormatterProviderPtr>&& formatters,
-                    std::optional<size_t> max_length)
-      : formatters_(std::move(formatters)), max_length_(max_length) {}
+                    std::optional<size_t> max_length, bool accept_empty_values)
+      : formatters_(std::move(formatters)), max_length_(max_length),
+        accept_empty_values_(accept_empty_values) {}
 
   // FormatterProvider interface.
   std::optional<std::string> format(const Context& context,
                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   /**
@@ -77,6 +95,7 @@ private:
 
   std::vector<FormatterProviderPtr> formatters_;
   std::optional<size_t> max_length_;
+  const bool accept_empty_values_;
 };
 
 } // namespace Formatter

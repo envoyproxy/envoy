@@ -12,9 +12,7 @@ namespace ReverseTunnel {
 /**
  * Stats for the drain-aware reverse-tunnel upstream (client) codec.
  */
-#define ALL_REVERSE_TUNNEL_UPSTREAM_CODEC_STATS(COUNTER)                                           \
-  COUNTER(goaway_received)                                                                         \
-  COUNTER(goaway_sent)
+#define ALL_REVERSE_TUNNEL_UPSTREAM_CODEC_STATS(COUNTER) COUNTER(goaway_sent)
 
 struct ReverseTunnelUpstreamCodecStats {
   ALL_REVERSE_TUNNEL_UPSTREAM_CODEC_STATS(GENERATE_COUNTER_STRUCT)

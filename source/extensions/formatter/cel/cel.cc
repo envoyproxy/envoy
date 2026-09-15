@@ -76,6 +76,37 @@ Protobuf::Value CELFormatter::formatValue(const Envoy::Formatter::Context& conte
   }
 }
 
+bool CELFormatter::formatTo(std::string& sink, const Envoy::Formatter::Context& context,
+                            const StreamInfo::StreamInfo& stream_info) const {
+  const std::optional<std::string> value = format(context, stream_info);
+  if (!value.has_value()) {
+    return false;
+  }
+  sink.append(*value);
+  return true;
+}
+
+void CELFormatter::formatValueTo(Envoy::Formatter::ValueSink& sink,
+                                 const Envoy::Formatter::Context& context,
+                                 const StreamInfo::StreamInfo& stream_info) const {
+  if (!typed_) {
+    // The untyped form is always a string.
+    const std::optional<std::string> value = format(context, stream_info);
+    if (!value.has_value()) {
+      return;
+    }
+    sink.addString(*value);
+    return;
+  }
+  // The typed form produces a genuine proto value, so hand it to the sink as one.
+  const Protobuf::Value value = formatValue(context, stream_info);
+  if (value.kind_case() == Protobuf::Value::kNullValue ||
+      value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+    return;
+  }
+  sink.addValue(value);
+}
+
 absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 CELFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
                                  std::optional<size_t> max_length) const {

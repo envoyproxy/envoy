@@ -513,6 +513,28 @@ TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
   testRouterHeaderOnlyRequestAndResponse();
 }
 
+TEST_P(IntegrationTest, CleanupWithIncompleteUpstreamRequest) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"content-length", "10"}});
+  Http::RequestEncoder& encoder = encoder_decoder.first;
+
+  Buffer::OwnedImpl partial_body("a");
+  codec_client_->sendData(encoder, partial_body, false);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 1));
+
+  // Cleanup must not interpret the resulting EOF as part of the incomplete HTTP/1 request.
+  cleanupUpstreamAndDownstream();
+}
+
 TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
   testRouterUpstreamDisconnectBeforeRequestComplete();
 }

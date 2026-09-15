@@ -167,12 +167,13 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
           *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
-      stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
-                                      POOL_GAUGE(*fake_stats_.rootScope()),
-                                      POOL_HISTOGRAM(*fake_stats_.rootScope()))},
-             "", *fake_stats_.rootScope()),
+      stats_({ALL_HTTP_CONN_MAN_STATS(
+                 POOL_COUNTER(*fake_stats_.rootScope()), POOL_GAUGE(*fake_stats_.rootScope()),
+                 POOL_HISTOGRAM(*fake_stats_.rootScope()), POOL_COUNTER(*fake_stats_.rootScope()))},
+             *fake_stats_.rootScope()),
 
-      listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))}),
+      listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_),
+                                               POOL_COUNTER(fake_listener_stats_))}),
       request_id_extension_(
           Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(random_)),
       local_reply_(LocalReply::Factory::createDefault()) {
@@ -226,10 +227,16 @@ void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
       ->setRequestedServerName(server_name_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setSslConnection(
       ssl_connection_);
+  // The connection manager reads the drain type from the listener that accepted the connection,
+  // in initializeReadFilterCallbacks() below.
+  ON_CALL(*listener_info_, drainType()).WillByDefault(Return(drain_type_));
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setListenerInfo(
+      listener_info_);
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       std::make_shared<ConnectionManagerConfigProxyObject>(*this), drain_close_, random_,
       http_context_, runtime_, local_info_, cluster_manager_, overload_manager_,
-      test_time_.timeSystem(), factory_context_.listenerInfo().direction());
+      test_time_.timeSystem(), factory_context_.listenerInfo().direction(),
+      factory_context_.server_factory_context_);
 
   conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 

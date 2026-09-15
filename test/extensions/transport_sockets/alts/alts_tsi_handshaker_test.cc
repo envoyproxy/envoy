@@ -270,6 +270,31 @@ TEST_P(AltsTsiHandshakerTest, ClientSideFullHandshake) {
               StatusCodeIs(absl::StatusCode::kInternal));
 }
 
+// Check that a client-side AltsTsiHandshaker can successfully complete a full
+// client-side ALTS handshake when a target_name is supplied.
+TEST_P(AltsTsiHandshakerTest, ClientSideFullHandshakeWithTargetName) {
+  startFakeHandshakerService();
+  auto handshaker = AltsTsiHandshaker::createForClient(getChannel(), "custom.service.target");
+
+  // Get the ClientInit.
+  CapturingHandshaker capturing_handshaker;
+  EXPECT_OK(handshaker->next(&capturing_handshaker,
+                             /*received_bytes=*/nullptr,
+                             /*received_bytes_size=*/0, onNextDoneImpl));
+  EXPECT_EQ(capturing_handshaker.getBytesToSend(), ClientInit);
+  EXPECT_OK(capturing_handshaker.getStatus());
+  EXPECT_THAT(capturing_handshaker.getAltsHandshakeResult(), IsNull());
+
+  // Get the ClientFinished and the handshake result.
+  std::string handshake_message = absl::StrCat(ServerInit, ServerFinished);
+  EXPECT_OK(handshaker->next(&capturing_handshaker,
+                             reinterpret_cast<const unsigned char*>(handshake_message.c_str()),
+                             handshake_message.size(), onNextDoneImpl));
+  EXPECT_EQ(capturing_handshaker.getBytesToSend(), ClientFinished);
+  EXPECT_OK(capturing_handshaker.getStatus());
+  EXPECT_THAT(capturing_handshaker.getAltsHandshakeResult(), NotNull());
+}
+
 // Check that several client-side handshaker can successfully complete concurrent, full
 // client-side ALTS handshakes over the same channel to the handshaker service.
 TEST_P(AltsTsiHandshakerTest, ConcurrentClientSideFullHandshakes) {

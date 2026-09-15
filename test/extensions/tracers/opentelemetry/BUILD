@@ -58,6 +58,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
+        "//source/extensions/tracers/opentelemetry:trace_exporter",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/server:tracer_factory_mocks",
         "//test/test_common:utility_lib",

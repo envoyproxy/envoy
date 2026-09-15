@@ -109,6 +109,11 @@ public:
     return constSymbolTable().toString(this->tagExtractedStatName());
   }
 
+  // Allocator-backed stats, the only ones transferred across hot restart, override these with a
+  // flag-backed implementation; other metrics do not track the flag.
+  bool noTagExtraction() const override { return false; }
+  void markAsNoTagExtraction() override {}
+
 protected:
   void clear(SymbolTable& symbol_table) { helper_.clear(symbol_table); }
 

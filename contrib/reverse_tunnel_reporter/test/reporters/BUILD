@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["event_reporter_test.cc"],
     deps = [
         "//contrib/reverse_tunnel_reporter/source/reporters/event_reporter:event_reporter_lib",
+        "//envoy/common:logger",
         "//source/common/api:api_lib",
         "//source/common/config:utility_lib",
         "//test/mocks:common_lib",

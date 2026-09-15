@@ -75,6 +75,7 @@ envoy_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/wasm:wasm_lib",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/test_common:environment_lib",
     ],
 )

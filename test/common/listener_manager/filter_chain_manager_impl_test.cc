@@ -538,6 +538,16 @@ TEST(ListenerInfoImplTest, DefaultConstructor) {
   info.typedMetadata();
 }
 
+TEST(ListenerInfoImplTest, DrainTypeConstructor) {
+  ListenerInfoImpl info(envoy::config::listener::v3::Listener::MODIFY_ONLY);
+  EXPECT_EQ(info.drainType(), envoy::config::listener::v3::Listener::MODIFY_ONLY);
+  // Every other field keeps its default-constructed value.
+  EXPECT_TRUE(info.name().empty());
+  EXPECT_EQ(info.direction(), envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+  EXPECT_FALSE(info.isQuic());
+  EXPECT_FALSE(info.shouldBypassOverloadManager());
+}
+
 TEST(ListenerInfoImplTest, FromConfig) {
   envoy::config::listener::v3::Listener config;
   config.set_name("test_listener");

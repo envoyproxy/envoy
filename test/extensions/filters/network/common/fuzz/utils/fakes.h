@@ -25,6 +25,9 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
   bool isQuic() const override { return is_quic_; }
   bool shouldBypassOverloadManager() const override { return bypass_overload_manager_; }
+  envoy::config::listener::v3::Listener::DrainType drainType() const override {
+    return envoy::config::listener::v3::Listener::DEFAULT;
+  }
 
 private:
   const std::string name_;

@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/extensions/formatter/req_without_query:config",
         "//source/extensions/formatter/req_without_query:req_without_query_lib",
+        "//test/common/formatter:formatter_test_utility_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:status_utility_lib",

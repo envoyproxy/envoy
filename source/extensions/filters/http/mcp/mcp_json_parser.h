@@ -53,6 +53,10 @@ public:
   // Get extraction policy for a specific method
   const std::vector<AttributeExtractionRule>& getFieldsForMethod(const std::string& method) const;
 
+  // Get the attribute path corresponding to Mcp-Name for a method.
+  // Returns empty when the method has no name-like attribute.
+  std::string getNameAttributePath(const std::string& method) const;
+
   // Get merged requirements for a specific method (global + method-specific).
   const FieldRequirements& getFieldRequirementsForMethod(const std::string& method) const;
 

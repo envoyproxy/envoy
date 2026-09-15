@@ -18,7 +18,7 @@ public:
   InjectedResourceMonitorFactory() : FactoryBase("envoy.resource_monitors.injected_resource") {}
 
 private:
-  Server::ResourceMonitorPtr createResourceMonitorFromProtoTyped(
+  absl::StatusOr<Server::ResourceMonitorPtr> createResourceMonitorFromProtoTyped(
       const envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig&
           config,
       Server::Configuration::ResourceMonitorFactoryContext& context) override;

@@ -237,7 +237,7 @@ private:
   const std::string cluster_name_;
   Upstream::ClusterManager& cm_;
   Common::Redis::Client::ClientFactory& client_factory_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotSharedPtr tls_;
   Common::Redis::Client::ConfigSharedPtr config_;
   Api::Api& api_;
   Stats::ScopeSharedPtr stats_scope_;

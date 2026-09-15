@@ -21,18 +21,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message OpenTelemetryConfig {
   // The upstream gRPC cluster that will receive OTLP traces.
   // Note that the tracer drops traces if the server does not read data fast enough.
   // This field can be left empty to disable reporting traces to the gRPC service.
-  // Only one of ``grpc_service``, ``http_service`` may be used.
+  // Only one of ``grpc_service``, ``http_service``, ``exporter`` may be used.
   core.v3.GrpcService grpc_service = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
 
   // The upstream HTTP cluster that will receive OTLP traces.
   // This field can be left empty to disable reporting traces to the HTTP service.
-  // Only one of ``grpc_service``, ``http_service`` may be used.
+  // Only one of ``grpc_service``, ``http_service``, ``exporter`` may be used.
   //
   // .. note::
   //
@@ -40,6 +40,14 @@ message OpenTelemetryConfig {
   //   substitution formatters. The formatters cannot access any HTTP or connection properties, but
   //   can load content such as environment variables or files or secrets.
   core.v3.HttpService http_service = 3
+      [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
+
+  // Specifies the custom exporter to be used by the OpenTelemetry tracer.
+  // Only one of ``grpc_service``, ``http_service``, ``exporter`` may be used.
+  //
+  // [#extension-category: envoy.tracers.opentelemetry.exporters]
+  // [#not-implemented-hide:]
+  core.v3.TypedExtensionConfig exporter = 10
       [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
 
   // The name for the service. This will be populated in the ResourceSpan Resource attributes.
