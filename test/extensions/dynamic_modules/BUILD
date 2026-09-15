@@ -65,6 +65,16 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "metric_registry_test",
+    srcs = ["metric_registry_test.cc"],
+    deps = [
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "util",
     srcs = ["util.cc"],
