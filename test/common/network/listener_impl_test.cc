@@ -40,7 +40,7 @@ static void errorCallbackTest(Address::IpVersion version) {
       Network::Test::getCanonicalLoopbackAddress(version));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener = std::make_unique<Network::TcpListenerImpl>(
       *dispatcher, api->randomGenerator(), runtime, socket, listener_callbacks,
       listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
@@ -80,7 +80,7 @@ public:
                       Runtime::Loader& runtime, SocketSharedPtr socket, TcpListenerCallbacks& cb,
                       bool bind_to_port, bool ignore_global_conn_limit,
                       bool bypass_overload_manager,
-                      Server::ThreadLocalOverloadStateOptRef overload_state)
+                      Server::ThreadLocalOverloadStateSharedPtr overload_state)
       : TestTcpListenerImpl(dispatcher, random_generator, runtime, socket, cb, bind_to_port,
                             ignore_global_conn_limit, bypass_overload_manager,
                             Network::DefaultMaxConnectionsToAcceptPerSocketEvent, overload_state) {}
@@ -90,7 +90,7 @@ public:
                       bool bind_to_port, bool ignore_global_conn_limit,
                       bool bypass_overload_manager,
                       uint32_t max_connections_to_accept_per_socket_event,
-                      Server::ThreadLocalOverloadStateOptRef overload_state)
+                      Server::ThreadLocalOverloadStateSharedPtr overload_state)
       : TcpListenerImpl(dispatcher, random_generator, runtime, socket, cb, bind_to_port,
                         ignore_global_conn_limit, bypass_overload_manager,
                         max_connections_to_accept_per_socket_event, overload_state) {}
@@ -110,7 +110,7 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
   Network::MockTcpListenerCallbacks listener_callbacks1;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                         listener_callbacks1, true, false, false, overload_state);
@@ -153,7 +153,7 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener = std::make_unique<Network::TcpListenerImpl>(
       *dispatcher_, api_->randomGenerator(), scoped_runtime.loader(), socket, listener_callbacks,
       listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
@@ -228,7 +228,7 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
   EXPECT_CALL(listener_config, ignoreGlobalConnLimit()).WillOnce(Return(true));
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener = std::make_unique<Network::TcpListenerImpl>(
       *dispatcher_, api_->randomGenerator(), scoped_runtime.loader(), socket, listener_callbacks,
       listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
@@ -279,7 +279,7 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
   Network::MockTcpListenerCallbacks listener_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                         listener_callbacks, true, false, false, overload_state);
@@ -326,7 +326,7 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
   NiceMock<Runtime::MockLoader> runtime;
 
   ASSERT_TRUE(socket->connectionInfoProvider().localAddress()->ip()->isAnyAddress());
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                         listener_callbacks, true, false, false, overload_state);
@@ -371,7 +371,7 @@ TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                listener_callbacks, true, false, false, overload_state);
 
@@ -415,7 +415,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionZero) {
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                listener_callbacks, true, false, false, overload_state);
 
@@ -449,7 +449,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                listener_callbacks, true, false, false, overload_state);
 
@@ -517,7 +517,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionAll) {
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                listener_callbacks, true, false, false, overload_state);
 
@@ -552,7 +552,7 @@ TEST_P(TcpListenerImplTest, LoadShedPointCanRejectConnection) {
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                listener_callbacks, true, false, false, overload_state);
 
@@ -612,7 +612,9 @@ TEST_P(TcpListenerImplTest, LoadShedPointRejectDeallocatesGlobalConnectionResour
       tryAllocateResource(Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1))
       .WillByDefault(Return(true));
 
-  Server::ThreadLocalOverloadStateOptRef overload_state_ref(mock_overload_state);
+  // No-op deleter: mock_overload_state is stack-owned by this test, not by the shared_ptr.
+  Server::ThreadLocalOverloadStateSharedPtr overload_state_ref(
+      &mock_overload_state, [](Server::ThreadLocalOverloadState*) {});
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                listener_callbacks, true, false, false, overload_state_ref);
 
@@ -670,7 +672,7 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
   MockConnectionCallbacks connection_callbacks2;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                listener_callbacks, true, false, false, overload_state);
 
@@ -745,7 +747,7 @@ TEST_P(TcpListenerImplTest, ShouldOnlyAcceptTheMaxNumberOfConnectionsConfiguredP
   MockTcpListenerCallbacks listener_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   const uint32_t max_connections_to_accept_per_socket_event = 1;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                listener_callbacks, true, false, false,

@@ -6374,7 +6374,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillRepeatedly(Return(-1));
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),
                                      Network::Address::InstanceConstSharedPtr{
                                          new Network::Address::Ipv4Instance("127.0.0.1", 1234)},
@@ -6460,7 +6460,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
   Network::MockListenerFilterManager manager;
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::AcceptedSocketImpl socket(
       std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
@@ -6526,7 +6526,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
   EXPECT_CALL(os_sys_calls_, ioctl(_, _, _, _, _, _, _))
       .WillRepeatedly(testing::Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));
 #endif
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::AcceptedSocketImpl socket(
       std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
@@ -6576,7 +6576,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::AcceptedSocketImpl socket(
       std::move(io_handle), std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678), overload_state, false);
@@ -6660,7 +6660,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
   Network::MockListenerFilterManager manager;
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::AcceptedSocketImpl socket(
       std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv6Instance>("::0001", 1234),

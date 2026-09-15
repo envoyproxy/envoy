@@ -36,6 +36,7 @@ public:
                OverloadActionCb callback));
   MOCK_METHOD(Event::ScaledRangeTimerManagerFactory, scaledTimerFactory, (), (override));
   MOCK_METHOD(ThreadLocalOverloadState&, getThreadLocalOverloadState, ());
+  MOCK_METHOD(ThreadLocalOverloadStateSharedPtr, getThreadLocalOverloadStateShared, ());
   MOCK_METHOD(LoadShedPoint*, getLoadShedPoint, (absl::string_view));
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(std::optional<envoy::config::overload::v3::ShrinkHeapConfig>, getShrinkHeapConfig, (),

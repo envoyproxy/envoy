@@ -771,7 +771,7 @@ public:
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     NiceMock<Network::MockListenerConfig> listener_config;
-    Server::ThreadLocalOverloadStateOptRef overload_state;
+    Server::ThreadLocalOverloadStateSharedPtr overload_state;
     listener_ = std::make_unique<Network::TcpListenerImpl>(
         *dispatcher_, api_->randomGenerator(), runtime_, socket_, *server_,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),

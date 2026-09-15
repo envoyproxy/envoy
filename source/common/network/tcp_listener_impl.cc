@@ -149,7 +149,7 @@ TcpListenerImpl::TcpListenerImpl(Event::Dispatcher& dispatcher, Random::RandomGe
                                  TcpListenerCallbacks& cb, bool bind_to_port,
                                  bool ignore_global_conn_limit, bool bypass_overload_manager,
                                  uint32_t max_connections_to_accept_per_socket_event,
-                                 Server::ThreadLocalOverloadStateOptRef overload_state)
+                                 Server::ThreadLocalOverloadStateSharedPtr overload_state)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), random_(random), runtime_(runtime),
       bind_to_port_(bind_to_port), reject_fraction_(0.0),
       ignore_global_conn_limit_(ignore_global_conn_limit),

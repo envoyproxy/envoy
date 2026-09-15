@@ -58,7 +58,7 @@ public:
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
                Runtime::Loader& runtime, Random::RandomGenerator& random,
                const Network::ListenerConfig& listener_config,
-               Server::ThreadLocalOverloadStateOptRef overload_state));
+               Server::ThreadLocalOverloadStateSharedPtr overload_state));
 };
 
 class ConnectionHandlerTest : public testing::Test,
@@ -351,7 +351,7 @@ public:
               Invoke([listener, listener_callbacks](
                          Network::SocketSharedPtr&&, Network::TcpListenerCallbacks& cb,
                          Runtime::Loader&, Random::RandomGenerator&, const Network::ListenerConfig&,
-                         Server::ThreadLocalOverloadStateOptRef) -> Network::ListenerPtr {
+                         Server::ThreadLocalOverloadStateSharedPtr) -> Network::ListenerPtr {
                 if (listener_callbacks != nullptr) {
                   *listener_callbacks = &cb;
                 }
@@ -413,7 +413,7 @@ public:
                                  Network::SocketSharedPtr&& socket,
                                  Network::TcpListenerCallbacks& cb, Runtime::Loader&,
                                  Random::RandomGenerator&, const Network::ListenerConfig&,
-                                 Server::ThreadLocalOverloadStateOptRef) -> Network::ListenerPtr {
+                                 Server::ThreadLocalOverloadStateSharedPtr) -> Network::ListenerPtr {
               auto listener_callbacks_iter = listener_callbacks_map.find(
                   socket->connectionInfoProvider().localAddress()->asString());
               EXPECT_NE(listener_callbacks_iter, listener_callbacks_map.end());
