@@ -36,6 +36,7 @@ envoy_extension_cc_test(
         ":mocks",
         "//source/common/common:hash_lib",
         "//source/common/formatter:formatter_extension_lib",
+        "//source/common/network:socket_option_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/extensions/access_loggers/file:config",
