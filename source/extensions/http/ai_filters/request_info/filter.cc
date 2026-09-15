@@ -1,4 +1,4 @@
-#include "source/extensions/filters/ai/request_info/filter.h"
+#include "source/extensions/http/ai_filters/request_info/filter.h"
 
 #include <utility>
 
@@ -6,8 +6,8 @@
 
 #include "source/common/coroutine/status_macros.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/ai/request_info/extractor.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_conversion.h"
+#include "source/extensions/http/ai_filters/request_info/extractor.h"
 
 #include "nlohmann/json.hpp"
 
@@ -48,7 +48,8 @@ envoy::data::ai::v3::RequestInfo toProto(const RequestAttributes& attrs) {
 } // namespace
 
 RequestInfoFilterConfig::RequestInfoFilterConfig(
-    const envoy::extensions::filters::ai::request_info::v3::RequestInfo& proto, Stats::Scope& scope)
+    const envoy::extensions::http::ai_filters::request_info::v3::RequestInfo& proto,
+    Stats::Scope& scope)
     : stats_(RequestInfoFilterStats{ALL_REQUEST_INFO_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "ai_protocol_manager.request_info."))}),
       metadata_namespace_(proto.metadata_namespace().empty() ? std::string(DefaultMetadataNamespace)

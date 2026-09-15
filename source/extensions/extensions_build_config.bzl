@@ -157,11 +157,6 @@ EXTENSIONS = {
     "envoy.string_matcher.lua":                         "//source/extensions/string_matcher/lua:config",
 
     #
-    # AI filters
-    #
-    "envoy.filters.ai.request_info":                    "//source/extensions/filters/ai/request_info:config",
-
-    #
     # HTTP filters
     #
 
@@ -495,6 +490,11 @@ EXTENSIONS = {
     # External Processing Response Processors
     #
     "envoy.http.ext_proc.response_processors.save_processing_response":         "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
+
+    #
+    # AI filters
+    #
+    "envoy.http.ai_filters.request_info":               "//source/extensions/http/ai_filters/request_info:config",
 
     #
     # Injected credentials

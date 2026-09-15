@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/filters/ai/request_info/v3/request_info.pb.h"
-#include "envoy/extensions/filters/ai/request_info/v3/request_info.pb.validate.h"
+#include "envoy/extensions/http/ai_filters/request_info/v3/request_info.pb.h"
+#include "envoy/extensions/http/ai_filters/request_info/v3/request_info.pb.validate.h"
 
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 
@@ -19,10 +19,10 @@ public:
                         Stats::Scope& scope) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::filters::ai::request_info::v3::RequestInfo>();
+    return std::make_unique<envoy::extensions::http::ai_filters::request_info::v3::RequestInfo>();
   }
 
-  std::string name() const override { return "envoy.filters.ai.request_info"; }
+  std::string name() const override { return "envoy.http.ai_filters.request_info"; }
 };
 
 } // namespace RequestInfo

@@ -38,7 +38,7 @@ envoy_cc_library(
         "//source/extensions/filters/http/ai_protocol_manager:api_protocol_conversion_lib",
         "@abseil-cpp//absl/status",
         "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/ai/request_info/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/ai_filters/request_info/v3:pkg_cc_proto",
         "@nlohmann_json//:json",
     ],
 )
@@ -52,6 +52,6 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
-        "@envoy_api//envoy/extensions/filters/ai/request_info/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/ai_filters/request_info/v3:pkg_cc_proto",
     ],
 )

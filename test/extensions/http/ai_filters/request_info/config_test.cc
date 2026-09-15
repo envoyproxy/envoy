@@ -1,9 +1,9 @@
-#include "envoy/extensions/filters/ai/request_info/v3/request_info.pb.h"
+#include "envoy/extensions/http/ai_filters/request_info/v3/request_info.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/filters/ai/request_info/config.h"
-#include "source/extensions/filters/ai/request_info/filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
+#include "source/extensions/http/ai_filters/request_info/config.h"
+#include "source/extensions/http/ai_filters/request_info/filter.h"
 
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
@@ -26,10 +26,10 @@ using HttpFilters::AiProtocolManager::AiFilterContext;
 using HttpFilters::AiProtocolManager::ApiProtocol;
 
 TEST(RequestInfoConfigTest, IsRegistered) {
-  auto* factory =
-      Registry::FactoryRegistry<AiFilterConfigFactory>::getFactory("envoy.filters.ai.request_info");
+  auto* factory = Registry::FactoryRegistry<AiFilterConfigFactory>::getFactory(
+      "envoy.http.ai_filters.request_info");
   ASSERT_NE(factory, nullptr);
-  EXPECT_EQ(factory->category(), "envoy.filters.ai");
+  EXPECT_EQ(factory->category(), "envoy.http.ai_filters");
   EXPECT_THAT(factory,
               testing::WhenDynamicCastTo<RequestInfoFilterConfigFactory*>(testing::NotNull()));
 }
@@ -53,7 +53,7 @@ TEST(RequestInfoConfigTest, CreatesFilterFromEmptyConfig) {
 
 TEST(RequestInfoConfigTest, NamespaceDefaultsAndOverrides) {
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
-  envoy::extensions::filters::ai::request_info::v3::RequestInfo proto;
+  envoy::extensions::http::ai_filters::request_info::v3::RequestInfo proto;
   EXPECT_EQ(RequestInfoFilterConfig(proto, *stats_store.rootScope()).metadataNamespace(),
             "envoy.ai.request_info");
   proto.set_metadata_namespace("custom.ns");

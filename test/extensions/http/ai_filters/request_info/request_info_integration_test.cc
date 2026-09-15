@@ -93,9 +93,9 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
   request_handling: {}
   filters:
-  - name: envoy.filters.ai.request_info
+  - name: envoy.http.ai_filters.request_info
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.ai.request_info.v3.RequestInfo
+      "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
 )EOF");
 
     initialize();

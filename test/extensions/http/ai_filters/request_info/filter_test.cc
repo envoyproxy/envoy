@@ -4,15 +4,15 @@
 #include <vector>
 
 #include "envoy/data/ai/v3/request_info.pb.h"
-#include "envoy/extensions/filters/ai/request_info/v3/request_info.pb.h"
+#include "envoy/extensions/http/ai_filters/request_info/v3/request_info.pb.h"
 
 #include "source/common/stream_info/stream_info_impl.h"
-#include "source/extensions/filters/ai/request_info/filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
+#include "source/extensions/http/ai_filters/request_info/filter.h"
 
 #include "test/extensions/filters/http/ai_protocol_manager/fake_bridge.h"
 #include "test/mocks/stats/mocks.h"
@@ -51,7 +51,7 @@ public:
   ~RequestInfoFilterTest() override { buffer_manager_.onDestroy(); }
 
   RequestInfoFilterConfigSharedPtr makeConfig(const std::string& metadata_namespace = "") {
-    envoy::extensions::filters::ai::request_info::v3::RequestInfo proto;
+    envoy::extensions::http::ai_filters::request_info::v3::RequestInfo proto;
     proto.set_metadata_namespace(metadata_namespace);
     return std::make_shared<const RequestInfoFilterConfig>(proto, *stats_store_.rootScope());
   }

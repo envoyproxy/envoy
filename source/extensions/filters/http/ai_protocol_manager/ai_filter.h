@@ -121,7 +121,7 @@ public:
                         Server::Configuration::ServerFactoryContext& context,
                         Stats::Scope& scope) PURE;
 
-  std::string category() const override { return "envoy.filters.ai"; }
+  std::string category() const override { return "envoy.http.ai_filters"; }
 };
 
 } // namespace AiProtocolManager

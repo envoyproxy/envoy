@@ -157,7 +157,7 @@ After a declared AI endpoint's payload is parsed and validated, and before it
 is replayed, the filter runs the configured :ref:`AI filters
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.filters>`
 in order over the parsed document; they require ``request_handling``. An AI
-filter (category ``envoy.filters.ai``)
+filter (category ``envoy.http.ai_filters``)
 may read or modify the document, or reject the request with a local reply.
 Routes without a per-route request declaration, and requests without a body,
 run no AI filters.
@@ -166,7 +166,7 @@ Request info
 ~~~~~~~~~~~~
 
 The :ref:`request info filter
-<envoy_v3_api_msg_extensions.filters.ai.request_info.v3.RequestInfo>` publishes
+<envoy_v3_api_msg_extensions.http.ai_filters.request_info.v3.RequestInfo>` publishes
 the requested model, streaming preference, output token cap, and message and
 tool counts as :ref:`envoy.data.ai.v3.RequestInfo
 <envoy_v3_api_msg_data.ai.v3.RequestInfo>` typed dynamic metadata, under
@@ -180,9 +180,9 @@ tool counts as :ref:`envoy.data.ai.v3.RequestInfo
       "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
       request_handling: {}
       filters:
-      - name: envoy.filters.ai.request_info
+      - name: envoy.http.ai_filters.request_info
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.ai.request_info.v3.RequestInfo
+          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
 
 Attributes are read according to the route's declared :ref:`wire API
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.api_protocol>`:

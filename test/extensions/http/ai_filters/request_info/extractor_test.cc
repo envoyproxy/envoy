@@ -1,8 +1,8 @@
 #include <string>
 
-#include "source/extensions/filters/ai/request_info/extractor.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
+#include "source/extensions/http/ai_filters/request_info/extractor.h"
 
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"

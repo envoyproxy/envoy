@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/ai/request_info/v3/request_info.pb.h"
+#include "envoy/extensions/http/ai_filters/request_info/v3/request_info.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -29,7 +29,7 @@ struct RequestInfoFilterStats {
 class RequestInfoFilterConfig {
 public:
   RequestInfoFilterConfig(
-      const envoy::extensions::filters::ai::request_info::v3::RequestInfo& proto,
+      const envoy::extensions::http::ai_filters::request_info::v3::RequestInfo& proto,
       Stats::Scope& scope);
 
   const std::string& metadataNamespace() const { return metadata_namespace_; }

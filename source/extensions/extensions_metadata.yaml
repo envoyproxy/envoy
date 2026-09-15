@@ -291,13 +291,6 @@ envoy.content_parsers.json:
   status: alpha
   type_urls:
   - envoy.extensions.content_parsers.json.v3.JsonContentParser
-envoy.filters.ai.request_info:
-  categories:
-  - envoy.filters.ai
-  security_posture: unknown
-  status: alpha
-  type_urls:
-  - envoy.extensions.filters.ai.request_info.v3.RequestInfo
 envoy.filters.http.a2a:
   categories:
   - envoy.filters.http
@@ -2368,6 +2361,13 @@ envoy.http.ext_proc.response_processors.save_processing_response:
   - envoy.http.ext_proc.response_processors
   security_posture: unknown
   status: wip
+envoy.http.ai_filters.request_info:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
 envoy.config_subscription.rest:
   categories:
   - envoy.config_subscription

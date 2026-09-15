@@ -20,7 +20,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#protodoc-title: AI request info]
 
 // Request attributes published as typed dynamic metadata by the :ref:`request info AI
-// filter <envoy_v3_api_msg_extensions.filters.ai.request_info.v3.RequestInfo>`. Values are
+// filter <envoy_v3_api_msg_extensions.http.ai_filters.request_info.v3.RequestInfo>`. Values are
 // client-declared and unverified. A value the client sent that Envoy cannot use, such as one
 // of the wrong type, out of range, or a string over 256 bytes, is ignored.
 // [#next-free-field: 7]

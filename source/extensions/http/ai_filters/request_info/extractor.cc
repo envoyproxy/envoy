@@ -1,4 +1,4 @@
-#include "source/extensions/filters/ai/request_info/extractor.h"
+#include "source/extensions/http/ai_filters/request_info/extractor.h"
 
 #include <string>
 #include <utility>
