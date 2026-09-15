@@ -420,6 +420,16 @@ public:
   virtual bool removeCluster(absl::string_view cluster, const bool remove_ignored = false) PURE;
 
   /**
+   * Remove a set of clusters via API. Only clusters added via addOrUpdateCluster() can
+   * be removed in this manner. Statically defined clusters present when Envoy starts cannot be
+   * removed.
+   * Clusters created using `addOrUpdateCluster()` with `avoid_cds_removal` set to true
+   * can be removed by setting `remove_ignored` to true.
+   * @return vector of cluster names that were actually removed.
+   */
+  virtual std::vector<std::string> removeClusters(const std::vector<std::string>& clusters, const bool remove_ignored = false) PURE;
+
+  /**
    * Shutdown the cluster manager prior to destroying connection pools and other thread local data.
    */
   virtual void shutdown() PURE;
