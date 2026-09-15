@@ -45,10 +45,20 @@ public:
                              yield_callback_);
   }
 
+  // Raises the error the same way the DECLARE_LUA_FUNCTION_EX() thunk does: the status is
+  // destroyed before the call that unwinds the C++ stack.
   static int luaTestPrint(lua_State* state) {
-    const char* message = luaL_checkstring(state, 1);
-    getPrinter().testPrint(message);
-    return 0;
+    LuaErrorMessage error_message;
+    {
+      const absl::StatusOr<absl::string_view> message =
+          coercibleStringOrError(state, 1, "testPrint() message");
+      if (message.ok()) {
+        getPrinter().testPrint(std::string(*message));
+        return 0;
+      }
+      error_message.set(message.status());
+    }
+    return luaL_error(state, "%s", error_message.c_str());
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
