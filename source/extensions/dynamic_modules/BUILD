@@ -52,6 +52,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "metric_registry",
+    hdrs = ["metric_registry.h"],
+    deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/stats:stats_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "abi_context_accessors_lib",
     srcs = ["abi_context_accessors.cc"],
     hdrs = ["abi_context_accessors.h"],

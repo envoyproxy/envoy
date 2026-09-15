@@ -180,6 +180,32 @@ TEST(ResponseCacheControl, StreamingTest) {
   EXPECT_EQ(os.str(), "{must_validate, no_store, no_transform, no_stale, max-age=0}");
 }
 
+TEST(RequestCacheControl, DirectiveNamesAreCaseInsensitive) {
+  EXPECT_EQ(RequestCacheControl("no-cache, no-store, no-transform, only-if-cached, max-age=600, "
+                                "min-fresh=10, max-stale=20"),
+            RequestCacheControl("No-Cache, No-Store, No-Transform, Only-If-Cached, Max-Age=600, "
+                                "Min-Fresh=10, Max-Stale=20"));
+}
+
+TEST(ResponseCacheControl, DirectiveNamesAreCaseInsensitive) {
+  EXPECT_EQ(ResponseCacheControl("no-cache, no-store, no-transform, must-revalidate, public, "
+                                 "max-age=600, s-maxage=300"),
+            ResponseCacheControl("No-Cache, No-Store, No-Transform, Must-Revalidate, Public, "
+                                 "Max-Age=600, S-Maxage=300"));
+  EXPECT_EQ(ResponseCacheControl("proxy-revalidate, max-age=600"),
+            ResponseCacheControl("Proxy-Revalidate, Max-Age=600"));
+}
+
+TEST(ResponseCacheControl, StorageDirectivesAreCaseInsensitive) {
+  for (const absl::string_view directive : {"private", "Private", "PRIVATE", "pRiVaTe", "no-store",
+                                            "No-Store", "NO-STORE", "nO-sToRe"}) {
+    SCOPED_TRACE(directive);
+    const ResponseCacheControl cache_control(absl::StrCat("max-age=600, ", directive));
+    EXPECT_EQ(cache_control.max_age_, Seconds(600));
+    EXPECT_TRUE(cache_control.no_store_);
+  }
+}
+
 struct TestResponseCacheControl : public ResponseCacheControl {
   TestResponseCacheControl(bool must_validate, bool no_store, bool no_transform, bool no_stale,
                            bool is_public, OptionalDuration max_age) {
