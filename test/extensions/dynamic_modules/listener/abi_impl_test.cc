@@ -3082,7 +3082,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeInt) {
 
   // A request attribute that is not backed by stream info returns false.
   EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_attribute_int(
-      filterPtr(), envoy_dynamic_module_type_attribute_id_RequestPath, &result));
+      filterPtr(), envoy_dynamic_module_type_attribute_id_RequestSize, &result));
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeBool) {
