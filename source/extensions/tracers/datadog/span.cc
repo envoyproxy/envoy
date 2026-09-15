@@ -95,7 +95,7 @@ void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::Up
   span_->inject(writer);
 }
 
-Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& name,
+Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& name,
                                   SystemTime start_time) {
   if (!span_) {
     // I don't expect this to happen. This means that `spawnChild` was called
@@ -103,18 +103,22 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
     return std::make_unique<Tracing::NullSpan>();
   }
 
-  // The OpenTracing implementation ignored the `Tracing::Config` argument,
-  // so we will as well.
-  // The `name` parameter to this function more closely matches Datadog's
-  // concept of "resource name." Datadog's "span name," or "operation name,"
-  // instead describes the category of operation being performed, which here
-  // we hard-code.
-  datadog::tracing::SpanConfig config;
-  config.name = "envoy.proxy";
-  config.resource = name;
-  config.start = estimateTime(start_time);
+  datadog::tracing::SpanConfig span_config;
+  span_config.name = "envoy.proxy";
+  span_config.resource = name;
+  span_config.start = estimateTime(start_time);
 
-  return std::make_unique<Span>(span_->create_child(config));
+  // Set span.kind for child spans based on the traffic direction.
+  switch (config.operationName()) {
+  case Tracing::OperationName::Ingress:
+    span_config.tags["span.kind"] = "server";
+    break;
+  case Tracing::OperationName::Egress:
+    span_config.tags["span.kind"] = "client";
+    break;
+  }
+
+  return std::make_unique<Span>(span_->create_child(span_config));
 }
 
 void Span::setSampled(bool sampled) {
