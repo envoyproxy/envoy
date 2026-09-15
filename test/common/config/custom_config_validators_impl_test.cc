@@ -97,8 +97,8 @@ public:
   }
 };
 
-// A factory that has not migrated to ConfigValidator::typeUrl(): its validator reports an empty type
-// url, so keying must fall back to the deprecated factory-level typeUrl().
+// A factory that has not migrated to ConfigValidator::typeUrl(): its validator reports an empty
+// type url, so keying must fall back to the deprecated factory-level typeUrl().
 class LegacyFakeConfigValidatorFactory : public ConfigValidatorFactory {
 public:
   ConfigValidatorPtr createConfigValidator(const Protobuf::Any&,

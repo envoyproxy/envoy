@@ -37,8 +37,9 @@ public:
    * the validator.
    *
    * This is the method Envoy uses, and the one new validators should implement. It defaults to an
-   * empty value. When empty, Envoy falls back to the deprecated `ConfigValidatorFactory::typeUrl()`.
-   * The default and the fallback will be removed once `ConfigValidatorFactory::typeUrl()` is removed.
+   * empty value. When empty, Envoy falls back to the deprecated
+   * `ConfigValidatorFactory::typeUrl()`. The default and the fallback will be removed once
+   * `ConfigValidatorFactory::typeUrl()` is removed.
    */
   virtual absl::string_view typeUrl() const { return {}; }
 
