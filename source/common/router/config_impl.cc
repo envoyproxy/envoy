@@ -1822,6 +1822,63 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
       routes_.emplace_back(route_or_error.value());
     }
   }
+
+  if (virtual_host.has_route_provider()) {
+    const auto& provider_config = virtual_host.route_provider();
+    if (provider_config.shadow_mode() && !hasBaseline()) {
+      creation_status = absl::InvalidArgumentError(
+          "route provider shadow_mode requires routes or matcher on the virtual host");
+      return;
+    }
+
+    auto provider = std::make_unique<RouteProvider>();
+    provider->shadow_mode = provider_config.shadow_mode();
+    provider->default_template_id = provider_config.default_template_id();
+    provider->templates.reserve(provider_config.route_templates().size());
+    for (const auto& route_template : provider_config.route_templates()) {
+      if (provider->templates.contains(route_template.template_id())) {
+        creation_status = absl::InvalidArgumentError(
+            fmt::format("duplicate route provider template id '{}'", route_template.template_id()));
+        return;
+      }
+      auto route_or_error = RouteCreator::createAndValidateRoute(
+          route_template.route(), shared_virtual_host_, factory_context, validator, init_manager,
+          validate_clusters);
+      SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
+      provider->templates.emplace(route_template.template_id(), std::move(route_or_error.value()));
+    }
+    if (!provider->default_template_id.empty() &&
+        !provider->templates.contains(provider->default_template_id)) {
+      creation_status = absl::InvalidArgumentError(
+          fmt::format("route provider default_template_id '{}' does not match any template",
+                      provider->default_template_id));
+      return;
+    }
+
+    auto* factory =
+        Envoy::Config::Utility::getFactory<RouteProviderFactory>(provider_config.resolver());
+    if (factory == nullptr) {
+      creation_status = absl::InvalidArgumentError(fmt::format(
+          "Didn't find a registered route provider resolver for '{}' with type URL: '{}'",
+          provider_config.resolver().name(),
+          Envoy::Config::Utility::getFactoryType(provider_config.resolver().typed_config())));
+      return;
+    }
+    auto resolver_config = Envoy::Config::Utility::translateToFactoryConfig(
+        provider_config.resolver(), validator, *factory);
+    auto resolver_or_error = factory->createRouteResolver(*resolver_config, factory_context);
+    SET_AND_RETURN_IF_NOT_OK(resolver_or_error.status(), creation_status);
+    provider->resolver = std::move(resolver_or_error.value());
+
+    Stats::StatNameManagedStorage provider_stat_name("route_provider",
+                                                     factory_context.scope().symbolTable());
+    provider->scope = Stats::Utility::scopeFromStatNames(
+        scope, {shared_virtual_host_->statName(), provider_stat_name.statName()});
+    provider->stats = std::make_unique<RouteProviderStats>(
+        RouteProviderStats{ALL_ROUTE_PROVIDER_STATS(POOL_COUNTER(*provider->scope))});
+
+    route_provider_ = std::move(provider);
+  }
 }
 
 RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
@@ -1885,6 +1942,16 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     return ssl_redirect_route_;
   }
 
+  if (route_provider_ != nullptr) {
+    return getRouteFromProvider(cb, headers, stream_info, random_value);
+  }
+
+  return getRouteFromMatcherOrRoutes(cb, headers, stream_info, random_value);
+}
+
+RouteConstSharedPtr VirtualHostImpl::getRouteFromMatcherOrRoutes(
+    const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+    const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const {
   // Constructed once per request; derived values (query params, cookies, etc.) are computed
   // lazily on first access and reused across all route entries evaluated for this request.
   const RouteMatchContext route_match_context(
@@ -1919,6 +1986,102 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
 
   // Check for a route that matches the request.
   return getRouteFromRoutes(cb, route_match_context, stream_info, random_value, routes_);
+}
+
+namespace {
+// Compare the provider route and the baseline route for a shadow mode result. Routes are treated as
+// equivalent when both are absent, when they route to the same cluster, or when they are both
+// direct responses with the same status code.
+bool routesEquivalent(const RouteConstSharedPtr& provider_route,
+                      const RouteConstSharedPtr& baseline_route) {
+  if (provider_route == nullptr || baseline_route == nullptr) {
+    return provider_route == baseline_route;
+  }
+  const RouteEntry* provider_entry = provider_route->routeEntry();
+  const RouteEntry* baseline_entry = baseline_route->routeEntry();
+  if ((provider_entry == nullptr) != (baseline_entry == nullptr)) {
+    return false;
+  }
+  if (provider_entry != nullptr) {
+    return provider_entry->clusterName() == baseline_entry->clusterName();
+  }
+  // Neither route is a route entry, so compare them as direct responses. A route that is neither a
+  // route entry nor a direct response has no outcome to compare, so treat both-absent as
+  // equivalent.
+  const DirectResponseEntry* provider_direct = provider_route->directResponseEntry();
+  const DirectResponseEntry* baseline_direct = baseline_route->directResponseEntry();
+  if (provider_direct == nullptr || baseline_direct == nullptr) {
+    return provider_direct == baseline_direct;
+  }
+  return provider_direct->responseCode() == baseline_direct->responseCode();
+}
+} // namespace
+
+RouteConstSharedPtr VirtualHostImpl::getRouteFromProvider(const RouteCallback& cb,
+                                                          const Http::RequestHeaderMap& headers,
+                                                          const StreamInfo::StreamInfo& stream_info,
+                                                          uint64_t random_value) const {
+  const RouteDecision decision =
+      route_provider_->resolver->resolve(headers, stream_info, random_value);
+  RouteConstSharedPtr provider_route =
+      materializeProviderRoute(decision, headers, stream_info, random_value);
+
+  if (route_provider_->shadow_mode) {
+    RouteConstSharedPtr baseline_route =
+        getRouteFromMatcherOrRoutes(cb, headers, stream_info, random_value);
+    if (routesEquivalent(provider_route, baseline_route)) {
+      route_provider_->stats->shadow_match_.inc();
+    } else {
+      route_provider_->stats->shadow_mismatch_.inc();
+    }
+    route_provider_->resolver->onShadowResult(provider_route, baseline_route, headers, stream_info);
+    return baseline_route;
+  }
+
+  if (provider_route != nullptr) {
+    if (cb == nullptr) {
+      return provider_route;
+    }
+    const RouteEvalStatus eval_status =
+        hasBaseline() ? RouteEvalStatus::HasMoreRoutes : RouteEvalStatus::NoMoreRoutes;
+    if (cb(provider_route, eval_status) == RouteMatchStatus::Accept) {
+      return provider_route;
+    }
+  }
+
+  if (hasBaseline()) {
+    return getRouteFromMatcherOrRoutes(cb, headers, stream_info, random_value);
+  }
+  return nullptr;
+}
+
+RouteConstSharedPtr VirtualHostImpl::materializeProviderRoute(
+    const RouteDecision& decision, const Http::RequestHeaderMap& headers,
+    const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const {
+  const RouteEntryImplBase* selected = nullptr;
+  switch (decision.kind) {
+  case RouteDecision::Kind::SelectTemplate: {
+    const auto it = route_provider_->templates.find(decision.template_id);
+    if (it == route_provider_->templates.end()) {
+      ENVOY_LOG(debug, "route provider selected unknown template '{}'", decision.template_id);
+      return nullptr;
+    }
+    selected = it->second.get();
+    break;
+  }
+  case RouteDecision::Kind::UseDefault: {
+    if (route_provider_->default_template_id.empty()) {
+      return nullptr;
+    }
+    const auto it = route_provider_->templates.find(route_provider_->default_template_id);
+    ASSERT(it != route_provider_->templates.end());
+    selected = it->second.get();
+    break;
+  }
+  case RouteDecision::Kind::ContinueMatching:
+    return nullptr;
+  }
+  return selected->clusterEntry(headers, stream_info, random_value);
 }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
