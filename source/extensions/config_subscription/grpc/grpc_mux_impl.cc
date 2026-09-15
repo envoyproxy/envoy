@@ -75,6 +75,7 @@ GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
       target_xds_authority_(grpc_mux_context.target_xds_authority_),
       load_stats_reporter_factory_(grpc_mux_context.load_stats_reporter_factory_),
+      cluster_manager_(grpc_mux_context.cluster_manager_),
       dynamic_update_callback_handle_(
           grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(
               [this](absl::string_view resource_type_url) {
@@ -411,6 +412,15 @@ void GrpcMuxImpl::onDiscoveryResponse(
   // see https://github.com/envoyproxy/envoy/issues/11477.
   same_type_resume = pause(type_url);
   TRY_ASSERT_MAIN_THREAD {
+    // When handling EDS (ClusterLoadAssignment) responses, create an RAII cluster update batch.
+    // This batches all thread-local cluster endpoint updates triggered during discovery response
+    // processing across worker threads into a single TLS dispatch when the batch goes out of scope.
+    Upstream::ClusterUpdateBatchPtr batch;
+    if (cluster_manager_.has_value() &&
+        type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()) {
+      batch = cluster_manager_->createSourceBatch();
+    }
+
     std::vector<DecodedResourcePtr> resources;
     OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;
 
@@ -696,8 +706,8 @@ public:
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
          XdsResourcesDelegateOptRef xds_resources_delegate,
-         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory)
-      override {
+         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory,
+         OptRef<Upstream::ClusterManager> cluster_manager) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
     THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
@@ -718,7 +728,8 @@ public:
         /*target_xds_authority_=*/Config::Utility::getGrpcControlPlane(ads_config).value_or(""),
         /*eds_resources_cache_=*/std::make_unique<EdsResourcesCacheImpl>(dispatcher),
         /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only(),
-        /*load_stats_reporter_factory_=*/load_stats_reporter_factory};
+        /*load_stats_reporter_factory_=*/load_stats_reporter_factory,
+        /*cluster_manager_=*/cluster_manager};
     return std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context);
   }
 };

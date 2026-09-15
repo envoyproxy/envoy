@@ -249,6 +249,7 @@ private:
   XdsConfigTrackerOptRef xds_config_tracker_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   EdsResourcesCachePtr eds_resources_cache_;
+  OptRef<Upstream::ClusterManager> cluster_manager_;
   const std::string target_xds_authority_;
 
   // Used to track whether initial_resource_versions should be populated on the
