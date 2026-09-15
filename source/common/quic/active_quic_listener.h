@@ -66,6 +66,9 @@ public:
   const Network::IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const override {
     return udp_save_cmsg_config_;
   }
+  void configureLoadShedPoints(Server::LoadShedPointProvider& provider) override {
+    quic_dispatcher_->configureLoadShedPoints(provider);
+  }
 
   // ActiveListenerImplBase
   void pauseListening() override;
