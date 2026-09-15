@@ -5819,6 +5819,78 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessingStreamed) {
   EXPECT_EQ("mmmmmnnnn", response->body());
 }
 
+TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamedWithTrailers) {
+  two_ext_proc_filters_ = true;
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
+    // Filter-1
+    proto_config_1_.mutable_processing_mode()->Clear();
+    auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
+    processing_mode_1->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode_1->set_response_header_mode(ProcessingMode::SKIP);
+    processing_mode_1->set_request_body_mode(ProcessingMode::STREAMED);
+    addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
+                               "envoy.filters.http.ext_proc_1");
+    // Filter-0
+    proto_config_.mutable_processing_mode()->Clear();
+    auto* processing_mode = proto_config_.mutable_processing_mode();
+    processing_mode->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode->set_response_header_mode(ProcessingMode::SKIP);
+    processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
+    addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
+                               "envoy.filters.http.ext_proc");
+  });
+
+  initializeConfigDuplexStreamed(false);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl default_headers;
+  HttpTestUtility::addDefaultHeaders(default_headers);
+
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+      codec_client_->startRequest(default_headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+
+  // The ext_proc_server_0 receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderReq(header_request);
+  // The ext_proc_server_0 sends back the header response.
+  serverSendHeaderResp();
+
+  timeSystem().advanceTimeWaitImpl(20ms);
+  codec_client_->sendData(*request_encoder_, "sss", false);
+  codec_client_->sendData(*request_encoder_, "xxx", false);
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-request-trailer-foo", "yes"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
+
+  timeSystem().advanceTimeWaitImpl(20ms);
+  // The ext_proc_server_1 receives the headers.
+  server1ReceiveHeaderReq(header_request);
+  // The ext_proc_server_1 sends back the header response.
+  server1SendHeaderResp();
+
+  timeSystem().advanceTimeWaitImpl(50ms);
+  // The ext_proc_server_0 now sends back the last chunk of the body responses.
+  processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
+
+  for (int i = 0; i < 2; i++) {
+    ProcessingRequest body_request;
+    ProcessingResponse body_response;
+    // The ext_proc_server_1 receives one body chunk.
+    EXPECT_TRUE(processor_stream_1_->waitForGrpcMessage(*dispatcher_, body_request));
+    EXPECT_TRUE(body_request.has_request_body());
+    // Send back the body response from ext_proc_1 server.
+    body_response.mutable_request_body();
+    processor_stream_1_->sendGrpcMessage(body_response);
+  }
+
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), "sssxxx");
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, PackImmediateResponseWithResponseTrailers) {
   initializeConfig();
   HttpIntegrationTest::initialize();
