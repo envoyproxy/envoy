@@ -534,6 +534,219 @@ resources:
   EXPECT_THAT(readded->body(), testing::HasSubstr("cluster_dyn"));
 }
 
+namespace {
+
+// Appends a STATIC cluster named `name`; for each entry in `match_names` it adds a transport socket
+// match of that name backed by a raw_buffer socket, so the cluster's transportSocketMatcher reports
+// exactly those match names.
+void addClusterWithTransportSocketMatches(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                          const std::string& name,
+                                          const std::vector<std::string>& match_names) {
+  auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+name: {}
+connect_timeout: 0.25s
+type: STATIC
+load_assignment:
+  cluster_name: {}
+  endpoints: []
+)EOF",
+                                        name, name),
+                            *cluster);
+  for (const std::string& match_name : match_names) {
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+name: {}
+match:
+  stage: "{}"
+transport_socket:
+  name: envoy.transport_sockets.raw_buffer
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+)EOF",
+                                          match_name, match_name),
+                              *cluster->add_transport_socket_matches());
+  }
+}
+
+} // namespace
+
+// The TransportSocketMatch accessor reports the intersection over clusters that have matches:
+// `cluster_tsm_a` carries {m1, m2} and `cluster_tsm_b` carries {m1}, so only m1 (present in both)
+// is reported.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesTransportSocketMatchIntersectionRust) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    addClusterWithTransportSocketMatches(bootstrap, "cluster_tsm_a", {"m1", "m2"});
+    addClusterWithTransportSocketMatches(bootstrap, "cluster_tsm_b", {"m1"});
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("transport_socket_matches=[m1]"));
+  EXPECT_THAT(response->body(), testing::Not(testing::HasSubstr("m2")));
+}
+
+// A cluster with no transport socket matches does not empty the intersection: `cluster_tsm_a`
+// carries {m1, m2} and `cluster_tsm_bare` carries none, so both m1 and m2 remain reported.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesTransportSocketMatchEmptyClusterRust) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    addClusterWithTransportSocketMatches(bootstrap, "cluster_tsm_a", {"m1", "m2"});
+    addClusterWithTransportSocketMatches(bootstrap, "cluster_tsm_bare", {});
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("transport_socket_matches=[m1,m2]"));
+}
+
+// A transport socket match drops from the reported set once it is no longer present in every
+// matched cluster. A dynamic cluster is delivered with {m1, m2}; rewriting it to carry only {m1}
+// shrinks the reported set to {m1}, so m2 is no longer reported.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesTransportSocketMatchRemovalRust) {
+  const std::string cds_two_matches = R"EOF(
+version_info: "1"
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cluster_tsm_dyn
+  connect_timeout: 0.25s
+  type: STATIC
+  load_assignment:
+    cluster_name: cluster_tsm_dyn
+    endpoints: []
+  transport_socket_matches:
+  - name: m1
+    match:
+      stage: "m1"
+    transport_socket:
+      name: envoy.transport_sockets.raw_buffer
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+  - name: m2
+    match:
+      stage: "m2"
+    transport_socket:
+      name: envoy.transport_sockets.raw_buffer
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+)EOF";
+  const std::string cds_one_match = R"EOF(
+version_info: "2"
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cluster_tsm_dyn
+  connect_timeout: 0.25s
+  type: STATIC
+  load_assignment:
+    cluster_name: cluster_tsm_dyn
+    endpoints: []
+  transport_socket_matches:
+  - name: m1
+    match:
+      stage: "m1"
+    transport_socket:
+      name: envoy.transport_sockets.raw_buffer
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+)EOF";
+  const std::string cds_path =
+      TestEnvironment::writeStringToFileForTest("config_names_tsm_cds.yaml", cds_two_matches);
+  config_helper_.addConfigModifier([cds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cds = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
+    cds->mutable_path_config_source()->set_path(cds_path);
+    cds->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  BufferingStreamDecoderPtr before = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", before->headers().getStatusValue());
+  EXPECT_THAT(before->body(), testing::HasSubstr("transport_socket_matches=[m1,m2]"));
+
+  // Rewrite the CDS file so the cluster carries only m1, then wait for the update to apply.
+  const std::string cds_one_path =
+      TestEnvironment::writeStringToFileForTest("config_names_tsm_cds_one.yaml", cds_one_match);
+  TestEnvironment::renameFile(cds_one_path, cds_path);
+  test_server_->waitForCounter("cluster_manager.cluster_modified", testing::Ge(1));
+
+  BufferingStreamDecoderPtr after = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", after->headers().getStatusValue());
+  EXPECT_THAT(after->body(), testing::HasSubstr("transport_socket_matches=[m1]"));
+  EXPECT_THAT(after->body(), testing::Not(testing::HasSubstr("m2")));
+}
+
+// A filter chain is reported only while it is committed in an active listener. `fc_a` is delivered
+// via FCDS and observed; removing it from the FCDS resource set drops it from the reported names.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesFcdsRemovalRust) {
+  const std::string fcds_with_fc_a = R"EOF(
+version_info: "1"
+resources:
+- "@type": type.googleapis.com/envoy.config.listener.v3.FilterChain
+  name: fc_a
+  filters:
+  - name: envoy.filters.network.http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      stat_prefix: fc_a
+      route_config:
+        name: fcds_route
+        virtual_hosts:
+        - name: fcds_vhost
+          domains: ["*"]
+          routes:
+          - match: {prefix: "/"}
+            route: {cluster: cluster_0}
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+)EOF";
+  const std::string fcds_empty = R"EOF(
+version_info: "2"
+resources: []
+)EOF";
+  const std::string fcds_path =
+      TestEnvironment::writeStringToFileForTest("fcds_removal_fc_a.yaml", fcds_with_fc_a);
+
+  config_helper_.addConfigModifier([fcds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_filter_chains()->Clear();
+    auto* config_source = listener->mutable_fcds_config()->mutable_config_source();
+    config_source->mutable_path_config_source()->set_path(fcds_path);
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    const std::string matcher_yaml = R"EOF(
+      on_no_match:
+        action:
+          name: filter-chain-name
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: fc_a
+    )EOF";
+    TestUtility::loadFromYaml(matcher_yaml, *listener->mutable_filter_chain_matcher());
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  BufferingStreamDecoderPtr before = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", before->headers().getStatusValue());
+  EXPECT_THAT(before->body(), testing::HasSubstr("fc_a"));
+
+  // Remove `fc_a` from FCDS and wait for the removal update to apply, then confirm it is no longer
+  // reported (first delivery bumps update_success to 1; the removal update bumps it to 2).
+  const std::string fcds_empty_path =
+      TestEnvironment::writeStringToFileForTest("fcds_removal_empty.yaml", fcds_empty);
+  TestEnvironment::renameFile(fcds_empty_path, fcds_path);
+  test_server_->waitForCounter("filter_chain_manager.fc_a.update_success", testing::Ge(2));
+
+  BufferingStreamDecoderPtr after = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", after->headers().getStatusValue());
+  EXPECT_THAT(after->body(), testing::Not(testing::HasSubstr("fc_a")));
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions

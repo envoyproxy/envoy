@@ -1937,6 +1937,42 @@ TEST_F(BootstrapAbiImplTest, TransportSocketMatchIntersection) {
   EXPECT_THAT(Config::transportSocketMatchIntersection({{}, {}}), testing::IsEmpty());
 }
 
+// An unrecognized resource kind emits nothing and does not crash; a valid kind with no active
+// objects likewise emits nothing.
+TEST_F(BootstrapAbiImplTest, GetActiveResourceNamesUnknownKindIsNoOp) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+
+  // Mark the server initialized so the accessor proceeds past its guard to the kind switch.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
+
+  struct Recorder {
+    int calls = 0;
+  } recorder;
+  auto name_fn = [](envoy_dynamic_module_type_envoy_buffer, void* user_data) {
+    ++static_cast<Recorder*>(user_data)->calls;
+  };
+
+  // An out-of-range kind hits the default branch: no callback, no crash.
+  envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+      config.value()->thisAsVoidPtr(),
+      static_cast<envoy_dynamic_module_type_bootstrap_active_resource_kind>(9999), name_fn,
+      &recorder);
+  EXPECT_EQ(recorder.calls, 0);
+
+  // A valid kind with no active objects also emits nothing.
+  envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+      config.value()->thisAsVoidPtr(),
+      envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster, name_fn, &recorder);
+  EXPECT_EQ(recorder.calls, 0);
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions
