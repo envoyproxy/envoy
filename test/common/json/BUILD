@@ -133,6 +133,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":json_sanitizer_test_util_lib",
         ":proto_streamer_test_proto_cc_proto",
+        "//bazel/deps:libprotobuf-mutator",
         "//source/common/buffer:buffer_lib",
         "//source/common/json:proto_streamer_lib",
         "//source/common/protobuf:utility_lib",
@@ -140,7 +141,6 @@ envoy_cc_fuzz_test(
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/strings",
-        "@libprotobuf-mutator//:libprotobuf_mutator",
         "@xds//xds/type/v3:pkg_cc_proto",
     ],
 )
