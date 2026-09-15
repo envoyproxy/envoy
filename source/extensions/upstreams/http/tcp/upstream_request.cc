@@ -34,8 +34,11 @@ void TcpConnPool::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& co
 TcpUpstream::TcpUpstream(Router::UpstreamToDownstream* upstream_request,
                          Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream)
     : upstream_request_(upstream_request), upstream_conn_data_(std::move(upstream)),
-      force_reset_on_upstream_half_close_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {
+      force_reset_on_upstream_half_close_(
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.allow_multiplexed_upstream_half_close") &&
+          !Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.tcp_tunnel_allow_upstream_half_close")) {
   upstream_conn_data_->connection().enableHalfClose(true);
   upstream_conn_data_->addUpstreamCallbacks(*this);
 }
@@ -99,24 +102,34 @@ void TcpUpstream::resetStream() {
 }
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
-  // In the TCP proxy case the filter manager used to trigger the full stream closure when the
-  // upstream server half closed its end of the TCP connection. With the
-  // allow_multiplexed_upstream_half_close enabled filter manager no longer closes stream that were
-  // half closed by upstream before downstream. To keep the behavior the same for TCP proxy the
-  // upstream force closes the connection when server half closes.
+  // How an upstream half close (end_stream) is handled depends on
+  // allow_multiplexed_upstream_half_close, and the two cases differ in whether this object is still
+  // alive once decodeData() returns. force_reset is therefore decided up front, before the call.
   //
-  // Save the indicator to close the stream before calling the decodeData since when the
-  // allow_multiplexed_upstream_half_close is false the call to decodeHeader with end_stream==true
-  // will delete the TcpUpstream object.
-  // NOTE: it this point Envoy can not support half closed TCP upstream as there is currently no
-  // distinction between half closed vs fully closed TCP peers.
+  // Guard disabled: the filter manager closes the stream when the upstream half closes, so
+  // decodeData() delivers that closure and destroys this object. force_reset is always false in
+  // this case, because allow_multiplexed_upstream_half_close is the first term of
+  // force_reset_on_upstream_half_close_, so upstream_request_ is never touched after the call.
+  //
+  // Guard enabled: the filter manager keeps the stream open for the downstream to finish, so this
+  // object survives decodeData(). The half close is propagated downstream as an end of stream, the
+  // upstream connection is left open so the downstream to upstream direction keeps working, and it
+  // is closed when the stream is torn down. A subsequent full close by the peer raises onEvent(),
+  // which ends the stream. Whether to instead force close here is selected by
+  // envoy.reloadable_features.tcp_tunnel_allow_upstream_half_close, on by default. Setting it to
+  // false restores the force close, which kept TCP proxy teardown unchanged when independent half
+  // close was introduced, but is wrong for a tunnel: downstream_complete_ is never true while the
+  // client holds its half of the tunnel open, so every upstream half close became a stream reset
+  // that discarded response data not yet written downstream.
+  //
+  // Note that a FIN does not indicate whether the peer is still reading. That only surfaces when a
+  // subsequent write to it fails.
   const bool force_reset =
       force_reset_on_upstream_half_close_ && end_stream && !downstream_complete_;
   bytes_meter_->addWireBytesReceived(data.length());
   upstream_request_->decodeData(data, end_stream);
-  // force_reset is true only when allow_multiplexed_upstream_half_close is true and in this case
-  // the decodeData will never cause the stream to be closed and as such it safe to access
-  // upstream_request_
+  // Only reachable with allow_multiplexed_upstream_half_close enabled, where the decodeData() above
+  // does not close the stream, so upstream_request_ is still valid here.
   if (force_reset && upstream_request_) {
     upstream_request_->onResetStream(Envoy::Http::StreamResetReason::ConnectionTermination,
                                      "half_close_initiated_full_close");
