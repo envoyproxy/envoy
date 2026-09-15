@@ -179,6 +179,7 @@ paths:
     - source/extensions/http/cache/file_system_http_cache/config.cc
     - source/extensions/http/custom_response
     - source/extensions/http/early_header_mutation
+    - source/extensions/http/header_formatters/dynamic_modules
     - source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/mapped_attribute_builder_factory.cc
     - source/extensions/http/injected_credentials
     - source/extensions/http/stateful_session
@@ -354,6 +355,7 @@ paths:
     - test/extensions/bootstrap/wasm/wasm_test.cc
     - test/extensions/common/wasm/wasm_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/early_header_mutation_integration_test.cc
+    - test/extensions/dynamic_modules/test_data/cpp/header_formatter_integration_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http_integration_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http.cc
     - test/extensions/dynamic_modules/test_data/cpp/listener_integration_test.cc

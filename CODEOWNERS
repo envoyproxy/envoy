@@ -443,6 +443,7 @@
 /*/extensions/tracers/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/health_checkers/dynamic_modules @basundhara-c @agrawroh @mathetake @wbpcode
 /*/extensions/http/early_header_mutation/dynamic_modules @wbpcode @agrawroh @mathetake
+/*/extensions/http/header_formatters/dynamic_modules @wbpcode @agrawroh @mathetake
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 # AI Protocol Manager filter

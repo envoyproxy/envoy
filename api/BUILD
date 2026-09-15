@@ -343,6 +343,7 @@ proto_library(
         "//envoy/extensions/http/early_header_mutation/header_mutation/v3:pkg",
         "//envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3:pkg",
         "//envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3:pkg",
+        "//envoy/extensions/http/header_formatters/dynamic_modules/v3:pkg",
         "//envoy/extensions/http/header_formatters/preserve_case/v3:pkg",
         "//envoy/extensions/http/header_validators/envoy_default/v3:pkg",
         "//envoy/extensions/http/injected_credentials/generic/v3:pkg",
