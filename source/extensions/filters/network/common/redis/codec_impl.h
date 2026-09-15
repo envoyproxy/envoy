@@ -122,6 +122,13 @@ private:
   // cap enforced as each byte is accumulated; the terminating CR validates numeric syntax and
   // moves the buffer into ``RespValue::asString()``.
   std::string pending_double_buf_;
+  // Scratch buffer for the one-or-two hex digits of a ``\xHH`` escape currently being
+  // decoded in a double-quoted inline string. The escape marker ``x`` is NOT appended
+  // to the value; digits accumulate here and are converted to a single byte only once
+  // the second hex digit arrives (matching Redis ``\xHH`` semantics). A non-hex digit
+  // or end-of-quote before the second digit flushes the literal ``x`` followed by the
+  // digits already seen.
+  std::string inline_hex_digits_;
   uint32_t consecutive_attributes_{0}; // counts toward kMaxConsecutiveAttributes
   // Number of attribute frames currently open on pending_value_stack_. Values completing while
   // this is non-zero belong to a frame that will itself be discarded, so they must not reset

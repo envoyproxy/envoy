@@ -311,6 +311,13 @@ void ClientImpl::onData(Buffer::Instance& data) {
     host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
     host_->stats().rq_error_.inc();
     connection_->close(Network::ConnectionCloseType::NoFlush);
+  } catch (std::exception& e) {
+    ENVOY_LOG(warn, "redis client: unexpected exception while decoding upstream data: {}",
+              e.what());
+    putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestFailed);
+    host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
+    host_->stats().rq_error_.inc();
+    connection_->close(Network::ConnectionCloseType::NoFlush);
   }
 }
 
