@@ -486,9 +486,8 @@ void expectStreamedRedactionMatches(const Protobuf::Message& message,
     Json::BufferStreamer streamer(buffer);
     // The streamer needs a level expecting a value, so the message lands inside an array.
     Json::BufferStreamer::ArrayPtr array = streamer.makeRootArray();
-    Json::MessageStreamer message_streamer(message, *array,
-                                           {.preserve_proto_field_names_ = true,
-                                            .redact_sensitive_fields_ = true});
+    Json::MessageStreamer message_streamer(
+        message, *array, {.preserve_proto_field_names_ = true, .redact_sensitive_fields_ = true});
     while (message_streamer.next()) {
     }
   }
