@@ -20,10 +20,10 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // MCP filter :ref:`configuration overview <config_http_filters_mcp>`.
 // [#extension: envoy.filters.http.mcp]
 
-
 // This filter will inspect and get attributes from MCP traffic.
 // [#next-free-field: 12]
 
+// [#next-free-field: 12]
 message Mcp {
   // Traffic handling mode for non-MCP traffic.
   enum TrafficMode {
