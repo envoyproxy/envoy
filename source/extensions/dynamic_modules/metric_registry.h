@@ -8,6 +8,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 
@@ -15,8 +16,8 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 
-// Shared metrics registry for dynamic module extensions. It gives every extension the same superior
-// metric set of counters, gauges, and histograms, each with optional labels, so the id-to-handle
+// Shared metrics registry for dynamic module extensions. It gives every extension the same metric
+// set of counters, gauges, and histograms, each with optional labels, so the id-to-handle
 // glue is written once instead of once per extension category. An extension composes one registry
 // from its stats scope, defines metrics on the main thread during config load, and records them by
 // the opaque 1-based id the ABI hands back.
@@ -45,7 +46,7 @@ public:
   class CounterVecHandle {
   public:
     CounterVecHandle(Stats::StatName name, Stats::StatNameVec label_names)
-        : name_(name), label_names_(label_names) {}
+        : name_(name), label_names_(std::move(label_names)) {}
     const Stats::StatNameVec& labelNames() const { return label_names_; }
     void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
       ASSERT(tags.has_value());
@@ -72,7 +73,7 @@ public:
   public:
     GaugeVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
                    Stats::Gauge::ImportMode import_mode)
-        : name_(name), label_names_(label_names), import_mode_(import_mode) {}
+        : name_(name), label_names_(std::move(label_names)), import_mode_(import_mode) {}
     const Stats::StatNameVec& labelNames() const { return label_names_; }
     void increase(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
                   uint64_t amount) const {
@@ -108,7 +109,7 @@ public:
   public:
     HistogramVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
                        Stats::Histogram::Unit unit)
-        : name_(name), label_names_(label_names), unit_(unit) {}
+        : name_(name), label_names_(std::move(label_names)), unit_(unit) {}
     const Stats::StatNameVec& labelNames() const { return label_names_; }
     void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
                      uint64_t value) const {
@@ -142,13 +143,13 @@ public:
     gauge_vecs_.push_back(std::move(gauge_vec));
     return gauge_vecs_.size();
   }
-  size_t addHistogram(HistogramHandle&& hist) {
-    hists_.push_back(std::move(hist));
-    return hists_.size();
+  size_t addHistogram(HistogramHandle&& histogram) {
+    histograms_.push_back(std::move(histogram));
+    return histograms_.size();
   }
-  size_t addHistogramVec(HistogramVecHandle&& hist_vec) {
-    hist_vecs_.push_back(std::move(hist_vec));
-    return hist_vecs_.size();
+  size_t addHistogramVec(HistogramVecHandle&& histogram_vec) {
+    histogram_vecs_.push_back(std::move(histogram_vec));
+    return histogram_vecs_.size();
   }
 
   OptRef<const CounterHandle> getCounterById(size_t id) const { return byId(counters_, id); }
@@ -157,9 +158,9 @@ public:
   }
   OptRef<const GaugeHandle> getGaugeById(size_t id) const { return byId(gauges_, id); }
   OptRef<const GaugeVecHandle> getGaugeVecById(size_t id) const { return byId(gauge_vecs_, id); }
-  OptRef<const HistogramHandle> getHistogramById(size_t id) const { return byId(hists_, id); }
+  OptRef<const HistogramHandle> getHistogramById(size_t id) const { return byId(histograms_, id); }
   OptRef<const HistogramVecHandle> getHistogramVecById(size_t id) const {
-    return byId(hist_vecs_, id);
+    return byId(histogram_vecs_, id);
   }
 
 private:
@@ -176,8 +177,8 @@ private:
   std::vector<CounterVecHandle> counter_vecs_;
   std::vector<GaugeHandle> gauges_;
   std::vector<GaugeVecHandle> gauge_vecs_;
-  std::vector<HistogramHandle> hists_;
-  std::vector<HistogramVecHandle> hist_vecs_;
+  std::vector<HistogramHandle> histograms_;
+  std::vector<HistogramVecHandle> histogram_vecs_;
 };
 
 } // namespace DynamicModules

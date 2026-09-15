@@ -71,7 +71,6 @@ envoy_cc_test(
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/dynamic_modules:metric_registry",
-        "//test/test_common:utility_lib",
     ],
 )
 
