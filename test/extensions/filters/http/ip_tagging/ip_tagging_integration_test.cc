@@ -72,8 +72,8 @@ ip_tags:
                                      {"x-forwarded-for", "1.2.3.4"}});
 
   waitForNextUpstreamRequest();
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().EnvoyIpTags)[0]->value(),
-            "external_request");
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader(Http::Headers::get().EnvoyIpTags, "external_request"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -106,13 +106,8 @@ ip_tags:
                                      {"x-forwarded-for", "1.2.3.4"}});
 
   waitForNextUpstreamRequest();
-  std::cerr << upstream_request_->headers()
-                   .get(Http::Headers::get().EnvoyIpTags)[0]
-                   ->value()
-                   .getStringView()
-            << std::endl;
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().EnvoyIpTags)[0]->value(),
-            "external_updated_request");
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader(Http::Headers::get().EnvoyIpTags, "external_updated_request"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -197,8 +192,8 @@ ip_tags:
                                      {"x-forwarded-for", "1.2.3.4"}});
 
   waitForNextUpstreamRequest();
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().EnvoyIpTags)[0]->value(),
-            "external_updated_request");
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader(Http::Headers::get().EnvoyIpTags, "external_updated_request"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
