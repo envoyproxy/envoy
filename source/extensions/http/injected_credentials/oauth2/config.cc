@@ -46,15 +46,19 @@ OAuth2CredentialInjectorFactory::createOauth2ClientCredentialInjector(
     Server::Configuration::ServerFactoryContext& context, Init::Manager& init_manager) {
   auto& cluster_manager = context.clusterManager();
 
-  const auto& client_secret_secret = proto_config.client_credentials().client_secret();
+  Common::SecretReaderConstSharedPtr secret_reader;
+  const auto auth_type = proto_config.client_credentials().auth_type();
 
-  auto client_secret_provider = secretsProvider(client_secret_secret, context, init_manager);
-  if (client_secret_provider == nullptr) {
-    throw EnvoyException("Invalid oauth2 client secret configuration");
+  if (auth_type != envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::MTLS_AUTH) {
+    const auto& client_secret_secret = proto_config.client_credentials().client_secret();
+    auto client_secret_provider = secretsProvider(client_secret_secret, context, init_manager);
+    if (client_secret_provider == nullptr) {
+      throw EnvoyException("Invalid oauth2 client secret configuration");
+    }
+    secret_reader = std::make_shared<const Common::SDSSecretReader>(
+        std::move(client_secret_provider), context.threadLocal(), context.api());
   }
 
-  auto secret_reader = std::make_shared<const Common::SDSSecretReader>(
-      std::move(client_secret_provider), context.threadLocal(), context.api());
   auto token_reader = std::make_shared<const TokenProvider>(
       secret_reader, context.threadLocal(), cluster_manager, proto_config,
       context.mainThreadDispatcher(), stats_prefix, context.scope());

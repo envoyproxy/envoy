@@ -26,27 +26,41 @@ constexpr const char* GetAccessTokenBodyFormatString =
     "grant_type=client_credentials&client_id={0}&client_secret={1}";
 constexpr const char* GetAccessTokenBodyFormatStringWithScopes =
     "grant_type=client_credentials&client_id={0}&client_secret={1}&scope={2}";
-
+constexpr const char* GetAccessTokenBodyMtlsFormatString =
+    "grant_type=client_credentials&client_id={0}";
+constexpr const char* GetAccessTokenBodyMtlsFormatStringWithScopes =
+    "grant_type=client_credentials&client_id={0}&scope={1}";
 } // namespace
 
-OAuth2Client::GetTokenResult
-OAuth2ClientImpl::asyncGetAccessToken(const std::string& client_id, const std::string& secret,
-                                      const std::string& scopes,
-                                      const std::map<std::string, std::string>& endpoint_params) {
+OAuth2Client::GetTokenResult OAuth2ClientImpl::asyncGetAccessToken(
+    const std::string& client_id, const std::string& secret, const std::string& scopes,
+    const std::map<std::string, std::string>& endpoint_params,
+    envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::AuthType auth_type) {
   if (in_flight_request_ != nullptr) {
     return GetTokenResult::NotDispatchedAlreadyInFlight;
   }
   const auto encoded_client_id = Envoy::Http::Utility::PercentEncoding::encode(client_id, ":/=&?");
-  const auto encoded_secret = Envoy::Http::Utility::PercentEncoding::encode(secret, ":/=&?");
 
   Envoy::Http::RequestMessagePtr request = createPostRequest();
   std::string body;
-  if (scopes.empty()) {
-    body = fmt::format(GetAccessTokenBodyFormatString, encoded_client_id, encoded_secret);
+
+  if (auth_type == envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::MTLS_AUTH) {
+    if (scopes.empty()) {
+      body = fmt::format(GetAccessTokenBodyMtlsFormatString, encoded_client_id);
+    } else {
+      const auto encoded_scopes = Envoy::Http::Utility::PercentEncoding::encode(scopes, ":/=&?");
+      body = fmt::format(GetAccessTokenBodyMtlsFormatStringWithScopes, encoded_client_id,
+                         encoded_scopes);
+    }
   } else {
-    const auto encoded_scopes = Envoy::Http::Utility::PercentEncoding::encode(scopes, ":/=&?");
-    body = fmt::format(GetAccessTokenBodyFormatStringWithScopes, encoded_client_id, encoded_secret,
-                       encoded_scopes);
+    const auto encoded_secret = Envoy::Http::Utility::PercentEncoding::encode(secret, ":/=&?");
+    if (scopes.empty()) {
+      body = fmt::format(GetAccessTokenBodyFormatString, encoded_client_id, encoded_secret);
+    } else {
+      const auto encoded_scopes = Envoy::Http::Utility::PercentEncoding::encode(scopes, ":/=&?");
+      body = fmt::format(GetAccessTokenBodyFormatStringWithScopes, encoded_client_id,
+                         encoded_secret, encoded_scopes);
+    }
   }
 
   for (const auto& [param_name, param_value] : endpoint_params) {

@@ -140,6 +140,33 @@ TEST(TokenProvider, FetchFailureClearsExpiredTokenAndInjectFails) {
   EXPECT_TRUE(headers.get(Envoy::Http::CustomHeaders::get().Authorization).empty());
 }
 
+TEST(TokenProvider, TokenProviderMtlsAuthNullSecretReader) {
+  const std::string yaml_string = R"EOF(
+      token_fetch_retry_interval: 5s
+      token_endpoint:
+        cluster: non-existing-cluster
+        timeout: 0.5s
+        uri: "oauth.com/token"
+      client_credentials:
+        client_id: "client-id"
+        auth_type: MTLS_AUTH
+  )EOF";
+
+  envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2 proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  auto token_provider =
+      std::make_shared<TokenProvider>(nullptr, tls, cluster_manager, proto_config, dispatcher,
+                                      "stats_prefix", context.serverFactoryContext().scope());
+  EXPECT_NO_THROW(token_provider->asyncGetAccessToken());
+  EXPECT_NO_THROW(token_provider->onGetAccessTokenSuccess("token", std::chrono::seconds(10)));
+  EXPECT_NO_THROW(
+      token_provider->onGetAccessTokenFailure(FilterCallbacks::FailureReason::StreamReset));
+}
+
 } // namespace OAuth2
 } // namespace InjectedCredentials
 } // namespace Http
