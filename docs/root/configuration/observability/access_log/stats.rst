@@ -3,7 +3,7 @@
 Statistics
 ==========
 
-Currently only the gRPC and file based access logs have statistics.
+The gRPC, file, Fluentd, and Syslog access logs emit statistics.
 
 gRPC access log statistics
 --------------------------
@@ -50,3 +50,21 @@ The Fluentd access log has statistics rooted at the *access_logs.fluentd.<stat_p
   events_sent, Counter, Total number of events (Fluentd Forward Mode events) sent to the upstream.
   reconnect_attempts, Counter, Total number of times an attempt to reconnect to the upstream has been made.
   connections_closed, Counter, Total number of times a connection to the upstream cluster was closed.
+
+Syslog access log statistics
+----------------------------
+
+The Syslog access log has statistics rooted at the
+*access_logs.syslog.<stat_prefix>.* namespace.
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 3
+
+   messages, Counter, "Total syslog messages, tagged with ``state=full`` or ``state=truncated``."
+   bytes_truncated, Counter, Bytes truncated from syslog messages that exceeded the maximum size.
+   send, Counter, Total syslog messages sent.
+   bytes_sent, Counter, "Syslog message bytes sent, including header and payload."
+
+The number of messages that were not sent is the sum of both ``messages`` state
+values minus ``send``.
