@@ -161,9 +161,17 @@ using Envoy::Platform::MobileEngineBuilder;
 
   for (EnvoyNativeFilterConfig *nativeFilterConfig in
        [self.nativeFilterChain reverseObjectEnumerator]) {
-    builder.addNativeFilter(
-        /* name */ [nativeFilterConfig.name toCXXString],
-        /* typed_config */ [nativeFilterConfig.typedConfig toCXXString]);
+    if (nativeFilterConfig.typedConfigData != nil) {
+      NSData *data = nativeFilterConfig.typedConfigData;
+      builder.addNativeFilter(
+          /* name */ [nativeFilterConfig.name toCXXString],
+          /* typed_config */
+          std::string(static_cast<const char *>([data bytes]), [data length]));
+    } else {
+      builder.addNativeFilter(
+          /* name */ [nativeFilterConfig.name toCXXString],
+          /* typed_config */ [nativeFilterConfig.typedConfig toCXXString]);
+    }
   }
   for (EnvoyHTTPFilterFactory *filterFactory in
        [self.httpPlatformFilterFactories reverseObjectEnumerator]) {

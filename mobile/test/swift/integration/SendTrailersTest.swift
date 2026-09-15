@@ -19,9 +19,6 @@ final class SendTrailersTests: XCTestCase {
   }
 
   func testSendTrailers() throws {
-    // swiftlint:disable:next line_length
-    let assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
-    let bufferFilterType = "type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer"
     let matcherTrailerName = "test-trailer"
     let matcherTrailerValue = "test.code"
 
@@ -36,12 +33,12 @@ final class SendTrailersTests: XCTestCase {
       }
       .addNativeFilter(
         name: "envoy.filters.http.assertion",
-        // swiftlint:disable:next line_length
-        typedConfig: "[\(assertionFilterType)] {match_config: {http_request_trailers_match: {headers: [{name: '\(matcherTrailerName)', exact_match: '\(matcherTrailerValue)'}]}}}"
+        typedConfigData: makeAssertionTrailersMatchAnyProto(
+          headerName: matcherTrailerName, exactMatch: matcherTrailerValue)
       )
       .addNativeFilter(
         name: "envoy.filters.http.buffer",
-        typedConfig: "[\(bufferFilterType)] { max_request_bytes: { value: 65000 } }"
+        typedConfigData: makeBufferAnyProto(maxRequestBytes: 65000)
       )
       .build()
 

@@ -30,8 +30,8 @@ final class SetEventTrackerTestNoTracker: XCTestCase {
       }
       .addNativeFilter(
         name: "envoy.filters.http.test_event_tracker",
-        // swiftlint:disable:next line_length
-        typedConfig: "[type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker] { attributes: { key: 'foo' value: 'bar'}}")
+        typedConfigData: makeTestEventTrackerAnyProto(attributes: ["foo": "bar"])
+      )
       .build()
 
     let client = engine.streamClient()
