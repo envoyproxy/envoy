@@ -63,6 +63,7 @@ envoy_extension_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/http/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
@@ -136,6 +137,19 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test_library(
+    name = "callout_state_test_lb_lib",
+    srcs = ["callout_state_test_lb.cc"],
+    hdrs = ["callout_state_test_lb.h"],
+    extension_names = ["envoy.filters.http.ext_authz"],
+    deps = [
+        "//envoy/upstream:load_balancer_interface",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/upstream:load_balancer_factory_base_lib",
+        "//test/integration/load_balancers:config_cc_proto",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "ext_authz_integration_test",
     srcs = ["ext_authz_integration_test.cc"],
@@ -144,6 +158,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_medium",
     shard_count = 8,
     deps = [
+        ":callout_state_test_lb_lib",
         ":ext_authz_fuzz_proto_cc_proto",
         ":logging_test_filter_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
