@@ -130,9 +130,11 @@ message Mcp {
   // If unset (default), do not extract or inject baggage.
   BaggagePropagationConfig propagate_baggage = 7;
 
-  // When true, reject requests that contain duplicate JSON keys at any
-  // nesting level. RFC 8259 Section 4 states that names within an object SHOULD be
-  // unique. Defaults to false (last-key-wins / last-win).
+  // When true, disallow requests that contain duplicate JSON keys at any
+  // nesting level. RFC 8259 Section 4 states that names within an object SHOULD
+  // be unique. Defaults to false (last-key-wins / last-win). If traffic mode is
+  // REJECT_NO_MCP, reject these requests; if PASS_THROUGH, log an error status
+  // but don't reject the request.
   google.protobuf.BoolValue reject_duplicate_keys = 8;
 
   // Controls whether MCP request attributes are obtained from the request body
