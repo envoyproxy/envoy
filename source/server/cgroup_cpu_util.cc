@@ -9,6 +9,7 @@
 
 #include "source/common/common/logger.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
@@ -73,15 +74,15 @@ void CgroupDetectorImpl::logResult() {
 std::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs,
                                                    CgroupDetectionDiagnostic* diag) {
   // Step 1: Mount Discovery - call once and reuse
-  std::optional<std::string> mount_opt = discoverCgroupMount(fs);
+  std::optional<CgroupMount> mount_opt = discoverCgroupMount(fs);
   if (!mount_opt.has_value()) {
     setReason(diag, "no cgroup filesystem mounts found");
     return std::nullopt;
   }
-  const std::string& mount_point = mount_opt.value();
+  const CgroupMount& mount = mount_opt.value();
 
   // Steps 2-3: Process Assignment + Path Construction
-  std::optional<CgroupInfo> cgroup_info_opt = constructCgroupPath(mount_point, fs);
+  std::optional<CgroupInfo> cgroup_info_opt = constructCgroupPath(mount, fs);
   if (!cgroup_info_opt.has_value()) {
     setReason(diag, "no valid cgroup path found");
     return std::nullopt;
@@ -201,8 +202,8 @@ std::optional<CgroupPathInfo> CgroupCpuUtil::getCurrentCgroupPath(Filesystem::In
   return CgroupPathInfo{v2_path, "v2"};
 }
 
-// Constructs complete cgroup path by combining mount point and process assignment.
-std::optional<CgroupInfo> CgroupCpuUtil::constructCgroupPath(const std::string& mount_point,
+// Constructs complete cgroup path by combining mount metadata and process assignment.
+std::optional<CgroupInfo> CgroupCpuUtil::constructCgroupPath(const CgroupMount& mount,
                                                              Filesystem::Instance& fs) {
 
   // Process Assignment - get relative path and determine version
@@ -212,17 +213,32 @@ std::optional<CgroupInfo> CgroupCpuUtil::constructCgroupPath(const std::string& 
     return std::nullopt;
   }
   const CgroupPathInfo& path_info = path_info_opt.value();
-  const std::string& relative_path = path_info.relative_path;
   const std::string& version = path_info.version;
+
+  // /proc/self/cgroup reports a path relative to the cgroup hierarchy root, while mountinfo's
+  // root may identify a subdirectory of that hierarchy. Only strip a complete path component.
+  const std::string& cgroup_path = path_info.relative_path;
+  std::string relative_path;
+  if (mount.root == "/") {
+    relative_path = cgroup_path;
+  } else if (cgroup_path == mount.root) {
+    relative_path.clear();
+  } else if (absl::StartsWith(cgroup_path, mount.root) && cgroup_path.size() > mount.root.size() &&
+             cgroup_path[mount.root.size()] == '/') {
+    relative_path = cgroup_path.substr(mount.root.size());
+  } else {
+    ENVOY_LOG_MISC(warn, "Cgroup path {} is outside mount root {}", cgroup_path, mount.root);
+    return std::nullopt;
+  }
 
   // Path Construction - combine mount point and relative path
   CgroupInfo info;
 
   // Construct full path using absl::StrCat (efficient concatenation)
   if (!relative_path.empty() && relative_path[0] != '/') {
-    info.full_path = absl::StrCat(mount_point, "/", relative_path);
+    info.full_path = absl::StrCat(mount.mount_point, "/", relative_path);
   } else {
-    info.full_path = absl::StrCat(mount_point, relative_path);
+    info.full_path = absl::StrCat(mount.mount_point, relative_path);
   }
 
   // Version determination from getCurrentCgroupPath
@@ -415,7 +431,7 @@ std::optional<double> CgroupCpuUtil::readActualLimits(const CpuFiles& cpu_files,
 // - If cgroup v2: save mount point, continue searching
 // - Result: single mount point with highest priority
 //
-std::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Instance& fs) {
+std::optional<CgroupMount> CgroupCpuUtil::discoverCgroupMount(Filesystem::Instance& fs) {
   const auto result = fs.fileReadToEnd(std::string(PROC_MOUNTINFO_PATH));
   if (!result.ok()) {
     // /proc/self/mountinfo doesn't exist - not in a cgroup
@@ -426,7 +442,7 @@ std::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Instan
   absl::string_view content = result.value();
   const std::vector<absl::string_view> lines = absl::StrSplit(content, '\n');
 
-  std::string v2_mount_point; // Save v2 mount in case no v1 found
+  std::optional<CgroupMount> v2_mount; // Save v2 mount in case no v1 found
 
   for (absl::string_view line : lines) {
     if (line.empty()) {
@@ -435,8 +451,8 @@ std::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Instan
 
     bool line_valid = true;
 
-    // Skip first four fields
-    for (int field = 0; field < 4; field++) {
+    // Skip the first three fields; retain field 4 (the cgroup root).
+    for (int field = 0; field < 3; field++) {
       size_t space_pos = line.find(' ');
       if (space_pos == absl::string_view::npos) {
         ENVOY_LOG_MISC(warn, "Malformed mountinfo line: not enough fields");
@@ -448,6 +464,15 @@ std::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Instan
     if (!line_valid) {
       continue;
     }
+
+    // (4) root: root of the cgroup mount within the filesystem
+    size_t root_end = line.find(' ');
+    if (root_end == absl::string_view::npos) {
+      ENVOY_LOG_MISC(warn, "Malformed mountinfo line: no root");
+      continue;
+    }
+    absl::string_view root_escaped = line.substr(0, root_end);
+    line = line.substr(root_end + 1);
 
     // (5) mount point: extract mount point
     size_t mount_end = line.find(' ');
@@ -501,12 +526,15 @@ std::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Instan
     }
 
     // Unescape mount point
-    std::string mount_point = unescapePath(std::string(mount_point_escaped));
+    CgroupMount mount;
+    mount.root = unescapePath(root_escaped);
+    mount.mount_point = unescapePath(mount_point_escaped);
+    mount.filesystem_type = std::string(fs_type);
 
     // As in Go: cgroup v1 with a CPU controller takes precedence over cgroup v2
     if (fs_type == "cgroup2") {
       // v2 hierarchy - save mount point but keep searching
-      v2_mount_point = mount_point;
+      v2_mount = mount;
       continue; // Keep searching, we might find a v1 hierarchy with CPU controller
     }
 
@@ -526,13 +554,14 @@ std::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Instan
     // v1 hierarchy - check for CPU controller
     if (containsToken(super_options, "cpu")) {
       // Found a v1 CPU controller. This must be the only one, so we're done
-      return mount_point; // Return immediately - v1 CPU wins
+      mount.has_cpu_controller = true;
+      return mount; // Return immediately - v1 CPU wins
     }
   }
 
   // Return v2 mount if no v1 with CPU found
-  if (!v2_mount_point.empty()) {
-    return v2_mount_point;
+  if (v2_mount.has_value()) {
+    return v2_mount;
   }
 
   // No cgroup filesystem found
