@@ -3,11 +3,6 @@
 Load-aware locality load balancing
 -----------------------------------
 
-.. attention::
-
-  This extension is **work-in-progress**. Functionality is incomplete and it
-  is not intended for production use.
-
 The load-aware locality LB policy
 (:ref:`envoy.load_balancing_policies.load_aware_locality
 <envoy_v3_api_msg_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality>`)
@@ -115,10 +110,13 @@ The policy is implemented as a ``ThreadAwareLoadBalancer``:
 ORCA data flow
 """"""""""""""
 
-Upstream endpoints must report ORCA utilization in-band: ORCA reports are
-returned on the response headers or trailers of upstream responses. Sample
-rate is tied to the request rate to each host, so probing
-(``remote_probe_fraction``) is required to keep remote-locality data fresh.
+Upstream endpoints report ORCA utilization in-band -- on the response headers
+or trailers of upstream responses -- and/or out-of-band (OOB): with
+``enable_oob_load_report`` the policy opens a gRPC stream per host and
+receives reports every ``oob_reporting_period``, independent of request
+traffic. In-band sample rate is tied to the request rate to each host, so
+without OOB reporting, probing (``remote_probe_fraction``) is required to
+keep remote-locality data fresh.
 
 Reports land in per-host ``HostLbPolicyData`` slots, which feed weight
 computation.
@@ -129,6 +127,26 @@ as ``endpoint_picking_policy`` yields two-level ORCA-aware balancing:
 locality selection by aggregate headroom, endpoint selection by
 per-endpoint capacity. Each consumer attaches independent
 ``HostLbPolicyData`` entries, so the two policies do not interfere.
+
+Report delivery is shared: every ORCA report received for a host -- in-band
+or OOB, whichever policy's stream it arrived on -- is delivered to every
+ORCA consumer attached to that host. Enabling OOB reporting at one level is
+therefore sufficient to feed both policies, and is the recommended
+configuration.
+
+Because delivery is shared, the reports must carry the fields every attached
+consumer needs. This policy only needs a utilization signal; CSWRR
+additionally requires ``rps_fractional`` greater than 0 and rejects any
+report that lacks it. A rejection does not fail the stream --
+``report_errors`` counts per-recipient rejection, not stream failure -- so
+pairing this policy's OOB reporting with a CSWRR child that only receives
+utilization data permanently increments ``report_errors`` and logs a
+periodic error for the host, even though the stream itself stays healthy.
+
+If both levels enable OOB, each opens its own independent stream per host
+honoring its own ``oob_reporting_period`` and ``oob_reporting_config``; this
+is harmless for correctness, but doubles the per-host connection and stream
+count, and the cluster-scoped ``lb_orca_oob.*`` stats sum across the two.
 
 Utilization is derived from each host's ORCA report using the same
 extraction as CSWRR, which takes the first source whose value is greater
@@ -359,8 +377,9 @@ Configuration parameters
      - 0.03
      - Minimum fraction of traffic sent to non-local localities to keep ORCA
        data fresh in all-local mode. The deficit is redistributed
-       proportionally to host count. Set to 0 to disable (safe only when
-       cross-zone traffic must be strictly avoided). Range: [0, 1). See
+       proportionally to host count. Set to 0 to disable (safe when ORCA
+       reports arrive out-of-band, or when cross-zone traffic must be
+       strictly avoided). Range: [0, 1). See
        :ref:`Caveats <load_aware_locality_caveats>` for scaling notes.
    * - ``weight_expiration_period``
      - 3 minutes
@@ -371,6 +390,21 @@ Configuration parameters
        falls back to host-count-proportional weighting. Tune higher to
        tolerate longer reporting gaps; tune lower to prune draining
        backends faster. Set to 0 s to disable expiration.
+   * - ``enable_oob_load_report``
+     - false
+     - Open a per-host out-of-band ORCA reporting stream and consume its
+       reports in addition to any in-band reports. See
+       :ref:`ORCA data flow <load_aware_locality_orca_data_flow>`.
+   * - ``oob_reporting_period``
+     - 10 s
+     - Reporting interval requested from the server on each OOB stream. The
+       server may report less frequently. Only used when
+       ``enable_oob_load_report`` is true.
+   * - ``oob_reporting_config``
+     - (unset)
+     - Optional overrides for the OOB reporting connection (alternative
+       port, ``:authority``, transport socket selection). Only honored when
+       ``enable_oob_load_report`` is true.
 
 Priority support
 ^^^^^^^^^^^^^^^^
@@ -401,13 +435,11 @@ weight, computed from the same per-host ORCA data in a single tick pass.
 Caveats and known limitations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- **Out-of-band ORCA reporting is not yet supported.** Only in-band
-  (per-response) ORCA reports are consumed. ``enable_oob_load_report`` and
-  ``oob_reporting_period`` are accepted but currently have no effect.
-- **Probing is required.** A locality only produces fresh ORCA samples
-  when it receives traffic, so ``remote_probe_fraction`` must stay above 0
-  to keep remote localities reporting. Set it to 0 only when cross-zone
-  traffic must be strictly avoided.
+- **Probing is required for in-band reporting.** Without OOB reporting, a
+  locality only produces fresh ORCA samples when it receives traffic, so
+  ``remote_probe_fraction`` must stay above 0 to keep remote localities
+  reporting. With ``enable_oob_load_report``, samples arrive independent of
+  traffic and the probe floor can safely be set to 0.
 - **Cold start snaps local.** Until the first ORCA reports arrive, every
   locality reads as utilization 0, so the stage-4 local-preference check
   routes ~100% of traffic to the local locality (minus
@@ -471,6 +503,12 @@ Caveats and known limitations
   every few ticks. To avoid this, either reduce locality count, raise
   ``remote_probe_fraction``, or raise ``weight_expiration_period`` to
   tolerate longer gaps.
+- **OOB resource cost.** Each policy that sets ``enable_oob_load_report``
+  opens one connection, one HTTP/2 stream, and one watchdog timer per host,
+  all serviced by the main-thread dispatcher. This scales with cluster size:
+  the 100-remote-localities-by-10-hosts scenario in the table above means up
+  to 1000 concurrent OOB streams for a single enabling policy. When both
+  this policy and its CSWRR child enable OOB, that per-host cost doubles.
 - **Variance-threshold oscillation.** Workloads sitting near the
   ``utilization_variance_threshold`` boundary can theoretically oscillate
   between snap-to-local and spillover modes across consecutive ticks.
@@ -526,6 +564,41 @@ The four condition counters increment at most once per tick, ORed across
 every priority and each of the three host subsets (healthy, degraded,
 all-hosts) the policy weighs independently; ``stale_locality_total`` is
 derived from the all-hosts subset.
+
+When ``enable_oob_load_report`` is set -- on this policy, its CSWRR child, or
+both -- the OOB manager additionally emits stats under
+``cluster.<cluster_name>.lb_orca_oob.*``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Stat
+     - Increments when / value
+   * - ``reports_received`` (Counter)
+     - An OOB report is decoded from a host's stream.
+   * - ``report_errors`` (Counter)
+     - A decoded report has no attached ORCA consumer, or any attached
+       consumer rejects it (for example CSWRR when ``rps_fractional`` is not
+       greater than 0). See :ref:`ORCA data flow
+       <load_aware_locality_orca_data_flow>`.
+   * - ``stream_failures`` (Counter)
+     - A per-host OOB connection or stream fails transiently; the session
+       reconnects with backoff.
+   * - ``stream_terminated`` (Counter)
+     - A per-host OOB session hits a terminal condition (for example the
+       server does not implement the ORCA OOB service) and stops retrying
+       that host until cluster membership changes.
+   * - ``active_sessions`` (Gauge)
+     - Number of hosts with an OOB session tracked, including sessions that
+       are disconnected and reconnecting after a transient failure. Use
+       ``stream_failures`` to detect sessions that are not currently
+       delivering reports.
+
+These stats are only emitted when OOB is enabled. When both this policy and
+its CSWRR child enable it, each opens its own OOB manager against the same
+cluster stats scope, so the values compose: the counters sum and the
+delta-updated ``active_sessions`` gauge reflects the combined session count.
 
 Migrating from zone-aware routing? The per-request zone routing counters
 (``lb_zone_routing_all_directly``, ``lb_zone_routing_sampled``,
