@@ -951,7 +951,7 @@ public:
 };
 
 // HttpFilterConfigHandle implementation
-class HttpFilterConfigHandleImpl : public HttpFilterConfigHandle {
+class HttpFilterConfigHandleImpl : public CommonHandleImpl<HttpFilterConfigHandle> {
 public:
   HttpFilterConfigHandleImpl(void* host_config_ptr) : host_config_ptr_(host_config_ptr) {}
 

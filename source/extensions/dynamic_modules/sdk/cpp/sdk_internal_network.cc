@@ -556,7 +556,7 @@ private:
   WriteBufferImpl write_buffer_;
 };
 
-class NetworkFilterConfigHandleImpl : public NetworkFilterConfigHandle {
+class NetworkFilterConfigHandleImpl : public CommonHandleImpl<NetworkFilterConfigHandle> {
 public:
   explicit NetworkFilterConfigHandleImpl(
       envoy_dynamic_module_type_network_filter_config_envoy_ptr host_config_ptr)

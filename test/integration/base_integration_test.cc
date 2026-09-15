@@ -482,10 +482,10 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
     Server::FieldValidationConfig validator_config, bool allow_lds_rejection,
     IntegrationTestServerPtr& test_server) {
   test_server = IntegrationTestServer::create(
-      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_,
-      deterministic_value_, timeSystem(), *api_, defer_listener_finalization_, process_object_,
-      validator_config, concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_,
-      use_real_stats_, use_bootstrap_node_metadata_);
+      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, random_config_,
+      timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
+      concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_, use_real_stats_,
+      use_bootstrap_node_metadata_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 

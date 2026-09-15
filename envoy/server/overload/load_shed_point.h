@@ -59,6 +59,9 @@ public:
   // Envoy will close the TCP proxy downstream connection upon receiving
   // data if under memory pressure.
   const std::string TcpProxyOnData = "envoy.load_shed_points.tcp_proxy_on_data";
+
+  // Envoy will stop establishing TCP proxy upstream connections when under resource pressure.
+  const std::string TcpProxyUpstreamConnect = "envoy.load_shed_points.tcp_proxy_upstream_connect";
 };
 
 using LoadShedPointName = ConstSingleton<LoadShedPointNameValues>;

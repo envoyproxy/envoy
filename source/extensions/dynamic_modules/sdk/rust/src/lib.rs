@@ -191,6 +191,61 @@ pub unsafe fn is_validation_mode() -> bool {
   unsafe { abi::envoy_dynamic_module_callback_is_validation_mode() }
 }
 
+/// Read a runtime value as a boolean.
+///
+/// The runtime is the layered key/value configuration described by the `layered_runtime` bootstrap
+/// option, including RTDS layers and values set through the admin `/runtime_modify` endpoint.
+/// [`get_runtime_int`] and [`get_runtime_number`] read the same configuration as other types.
+///
+/// `default_value` is returned whenever the key does not exist, the stored value cannot be read as
+/// a boolean, or the runtime is not reachable from the calling thread.
+///
+/// This may be called from any thread. Note that the runtime is reached through the server context,
+/// which is only installed on the main thread, so a call from a worker thread returns
+/// `default_value`. A module that needs a runtime value on the data path should read it while its
+/// configuration is created (for example in `on_http_filter_config_new`, which runs on the main
+/// thread) and cache the result in its own configuration.
+pub fn get_runtime_bool(key: &str, default_value: bool) -> bool {
+  unsafe {
+    abi::envoy_dynamic_module_callback_get_runtime_bool(str_to_module_buffer(key), default_value)
+  }
+}
+
+/// Read a runtime value as an unsigned integer. See [`get_runtime_bool`] for the description of the
+/// runtime and the threading behavior, which are identical here.
+///
+/// Envoy stores every numeric runtime value as a double, so this conversion is lossy at both ends.
+/// A value above 2^53 loses precision and is rounded to the nearest representable value, and a
+/// fractional value is truncated toward zero; in both cases the converted value is returned rather
+/// than `default_value`. Only a negative value, or one beyond the range of a `u64`, stores no
+/// integer at all and therefore yields `default_value`. Use [`get_runtime_number`] to read the
+/// value without either conversion.
+///
+/// Note that `key` must not name one of Envoy's own `envoy.reloadable_features.*` or
+/// `envoy.restart_features.*` guards: those are boolean guards and Envoy asserts against reading
+/// them as a number in debug builds, so read them with [`get_runtime_bool`] instead.
+pub fn get_runtime_int(key: &str, default_value: u64) -> u64 {
+  unsafe {
+    abi::envoy_dynamic_module_callback_get_runtime_int(str_to_module_buffer(key), default_value)
+  }
+}
+
+/// Read a runtime value as a double. See [`get_runtime_bool`] for the description of the runtime
+/// and the threading behavior, which are identical here.
+///
+/// This is the lossless counterpart to [`get_runtime_int`]: it returns the value exactly as Envoy
+/// stores it, so it neither rounds nor truncates, and it reads negative values, which
+/// [`get_runtime_int`] answers with its default.
+///
+/// Note that, as with [`get_runtime_int`], `key` must not name one of Envoy's own
+/// `envoy.reloadable_features.*` or `envoy.restart_features.*` guards; read those with
+/// [`get_runtime_bool`] instead.
+pub fn get_runtime_number(key: &str, default_value: f64) -> f64 {
+  unsafe {
+    abi::envoy_dynamic_module_callback_get_runtime_number(str_to_module_buffer(key), default_value)
+  }
+}
+
 /// Register a function pointer under a name in the process-wide function registry.
 ///
 /// This allows modules loaded in the same process to expose functions that other modules can
