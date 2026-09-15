@@ -50,6 +50,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/on_demand:config",
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
+        "//source/extensions/filters/http/set_filter_state:config",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",

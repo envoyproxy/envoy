@@ -2,8 +2,10 @@
 
 #include <memory>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/config_provider.h"
 #include "envoy/router/router.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Router {
@@ -85,11 +87,18 @@ public:
   virtual ~ScopeKeyBuilder() = default;
 
   /**
-   * Based on the incoming HTTP request headers, returns the hash value of its scope key.
+   * Based on the incoming HTTP request headers and stream info, returns the hash value of its
+   * scope key.
    * @param headers the request headers to match the scoped routing configuration against.
-   * @return unique_ptr of the scope key computed from header.
+   * @param stream_info the stream info, used by fragment builders that source their value from the
+   *        stream rather than the headers (e.g. filter state). Absent on code paths that have no
+   *        stream info, in which case such fragment builders produce no fragment and the computed
+   *        key will not match any scope.
+   * @return unique_ptr of the scope key, or nullptr if any fragment could not be computed.
    */
-  virtual ScopeKeyPtr computeScopeKey(const Http::HeaderMap&) const PURE;
+  virtual ScopeKeyPtr
+  computeScopeKey(const Http::HeaderMap&,
+                  OptRef<const StreamInfo::StreamInfo> stream_info = std::nullopt) const PURE;
 };
 
 /**
