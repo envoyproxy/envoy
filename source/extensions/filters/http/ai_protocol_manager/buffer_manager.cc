@@ -10,25 +10,84 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-BufferManager::BufferManager(ExternalBufferFactory& buffer_factory, FilterChainBridgePtr bridge)
-    : buffer_factory_(buffer_factory), bridge_(std::move(bridge)) {
-  // Reschedules replay work out of the current call stack: it starts a replay
-  // deferred from replay() (later in this same event-loop pass, once the caller's
-  // filter callback unwinds, so we avoid injecting reentrantly) and resumes
-  // replay on the next iteration after the per-iteration chunk budget is spent
-  // (see maybeReadNextChunk).
-  replay_cb_ =
-      bridge_->dispatcher().createSchedulableCallback([this]() { onReplayContinuation(); });
-  // Subscribe to the path's replay watermarks so replay can be paced against
-  // chain back-pressure. Note: subscribing may immediately deliver
-  // high-watermark callbacks if the chain is already backed up; those only bump
-  // the pause counter, which is safe here.
-  bridge_->registerReplayWatermarks(*this);
+void FilterChainBridge::addUnacked(uint64_t bytes) {
+  unacked_ += bytes;
+  updateIngestBackpressure();
+}
+
+void FilterChainBridge::releaseUnacked(uint64_t bytes) {
+  ASSERT(unacked_ >= bytes);
+  unacked_ -= bytes;
+  updateIngestBackpressure();
+}
+
+void FilterChainBridge::updateIngestBackpressure() {
+  if (high_watermark_ == 0) {
+    return; // Ingest flow control disabled.
+  }
+  if (!source_paused_ && unacked_ > high_watermark_) {
+    source_paused_ = true;
+    ENVOY_LOG(debug, "ai_protocol_manager: ingest high watermark ({} bytes not durable)", unacked_);
+    pauseSource();
+    return;
+  }
+  if (source_paused_ && unacked_ <= low_watermark_) {
+    source_paused_ = false;
+    ENVOY_LOG(debug, "ai_protocol_manager: ingest low watermark ({} bytes not durable)", unacked_);
+    resumeSource();
+  }
+}
+
+void FilterChainBridge::detachFromFilterChain() {
+  unsubscribeReplayWatermarks();
+  replay_handler_ = nullptr;
+}
+
+void FilterChainBridge::onAboveReplayWatermark() {
+  ++replay_high_watermark_count_;
+  ENVOY_LOG(debug, "ai_protocol_manager: replay high watermark (depth={})",
+            replay_high_watermark_count_);
+}
+
+void FilterChainBridge::onBelowReplayWatermark() {
+  ASSERT(replay_high_watermark_count_ > 0);
+  --replay_high_watermark_count_;
+  ENVOY_LOG(debug, "ai_protocol_manager: replay low watermark (depth={})",
+            replay_high_watermark_count_);
+  if (replay_high_watermark_count_ == 0 && replay_handler_ != nullptr) {
+    replay_handler_->onReplayResumed();
+  }
+}
+
+bool FilterChainBridge::tryConsumeInjectBudget() {
+  if (inject_budget_used_ >= InjectChunksPerIteration) {
+    return false;
+  }
+  ++inject_budget_used_;
+  return true;
+}
+
+void FilterChainBridge::resetInjectBudget() { inject_budget_used_ = 0; }
+
+BufferManager::BufferManager(Config config, ExternalBufferFactory& buffer_factory,
+                             FilterChainBridge& bridge)
+    : config_(config), buffer_factory_(buffer_factory), bridge_(bridge) {}
+
+Event::SchedulableCallback& BufferManager::replayCallback() {
+  // Created on first use: a manager that never replays -- every SSE frame small enough to stay in
+  // memory -- should not cost a dispatcher callback.
+  if (replay_cb_ == nullptr) {
+    replay_cb_ =
+        bridge_.dispatcher().createSchedulableCallback([this]() { onReplayContinuation(); });
+  }
+  return *replay_cb_;
 }
 
 void BufferManager::onDestroy() {
+  if (destroyed_) {
+    return;
+  }
   destroyed_ = true;
-  bridge_->unregisterReplayWatermarks();
   // Cancel any requested or in-flight replay operation and disarm callbacks.
   cancelReplay();
   // Dropping the buffer cancels any pending write/read completion callbacks.
@@ -36,23 +95,33 @@ void BufferManager::onDestroy() {
 }
 
 void BufferManager::onData(Buffer::Instance& data) {
+  const uint64_t accepted = data.length();
+  // Queue the bytes, taking ownership now so the filter chain's buffer reference does not dangle
+  // across the asynchronous offload. This ownership/serialization is storage-agnostic, so it lives
+  // here once rather than in every ExternalBuffer.
+  pending_.move(data);
+
   if (buffer_ == nullptr) {
-    buffer_ = buffer_factory_.createBuffer(bridge_->dispatcher());
-    // Bound the not-yet-durable payload to the configured buffer limit so the
-    // resident footprint stays bounded; resume the source once it has drained to
-    // half the limit.
-    high_watermark_ = bridge_->bufferLimit();
-    low_watermark_ = high_watermark_ / 2;
+    if (pending_.length() <= config_.max_in_memory_bytes) {
+      // Still within the in-memory tier. These bytes are readable where they are, so they are not
+      // pending durability and there is nothing to write.
+      ENVOY_LOG(trace, "ai_protocol_manager: holding {} bytes in memory ({} total)", accepted,
+                pending_.length());
+      return;
+    }
+    ENVOY_LOG(debug, "ai_protocol_manager: offloading, {} bytes exceeds the in-memory limit of {}",
+              pending_.length(), config_.max_in_memory_bytes);
+    buffer_ = buffer_factory_.createBuffer(bridge_.dispatcher());
+    // Everything held so far now needs a write to become readable, so all of it counts.
+    bridge_.addUnacked(pending_.length());
+    maybeIssueWrite();
+    return;
   }
 
-  ENVOY_LOG(trace, "ai_protocol_manager: offloading {} bytes", data.length());
-  // Queue the bytes, taking ownership now so the filter chain's buffer reference
-  // does not dangle across the asynchronous offload. maybeIssueWrite() flushes the
-  // queued backlog to the buffer as a single write once it is worth doing (batching
-  // small frames up to WriteFlushThreshold). This ownership/serialization is
-  // storage-agnostic, so it lives here once rather than in every ExternalBuffer.
-  pending_.move(data);
-  updateIngestBackpressure();
+  ENVOY_LOG(trace, "ai_protocol_manager: offloading {} bytes", accepted);
+  // maybeIssueWrite() flushes the queued backlog to the buffer as a single write once it is worth
+  // doing (batching small frames up to WriteFlushThreshold).
+  bridge_.addUnacked(accepted);
   maybeIssueWrite();
 }
 
@@ -71,6 +140,10 @@ void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback 
     done(absl::InternalError("replay is in progress, or has been cancelled"));
     return;
   }
+  // Every range this reads is behind endStream(): a caller reads a payload it has finished
+  // writing. Without that, ingest could move the range out of pending_ and into a write after the
+  // replay had started, and the read would have to stall mid-range and be resumed.
+  ASSERT(end_stream_seen_);
   replay_source_ = ReplaySource::ExternalBuffer;
   replay_offset_ = offset;
   replay_end_ = offset + length;
@@ -84,57 +157,67 @@ void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback 
   // the in-flight-write path -- whose completion is delivered via post() -- and
   // avoiding an extra iteration of latency. If a write is still in flight, that
   // completion starts replay via maybeStartReplay() instead.
-  if (!write_in_flight_ && pending_.length() == 0) {
-    replay_cb_->scheduleCallbackCurrentIteration();
+  if (allBytesReadable()) {
+    replayCallback().scheduleCallbackCurrentIteration();
   }
+  // Otherwise the backlog endStream() flushed is still going down; onWriteComplete() starts the
+  // replay through maybeStartReplay() once the last of it is readable.
 }
 
-void BufferManager::replay(Buffer::Instance& data, ReplayDoneCallback done) {
-  // One replay at a time: the caller chains sub-ranges from the done callback.
+void BufferManager::inject(Buffer::Instance& data, ReplayDoneCallback done) {
+  // One operation at a time: the caller chains further spans from the done callback.
   if (replay_cancelled_ || replaying_ || replay_requested_) {
     IS_ENVOY_BUG("replay is in progress, or has been cancelled. currently only one pending replay "
                  "is supported. and if cancelReplay is called, no more replay is allowed.");
     done(absl::InternalError("replay is in progress, or has been cancelled"));
     return;
   }
-  replay_source_ = ReplaySource::InMemory;
-  replay_in_memory_data_.move(data);
+  replay_source_ = ReplaySource::Injected;
+  inject_data_.move(data);
   replay_done_ = std::move(done);
   replay_requested_ = true;
-  ENVOY_LOG(debug, "ai_protocol_manager: in-memory replay requested for {} bytes",
-            replay_in_memory_data_.length());
-  if (!write_in_flight_ && pending_.length() == 0) {
-    replay_cb_->scheduleCallbackCurrentIteration();
-  }
+  ENVOY_LOG(debug, "ai_protocol_manager: inject requested for {} bytes", inject_data_.length());
+  replayCallback().scheduleCallbackCurrentIteration();
 }
 
 void BufferManager::cancelReplay() {
   replay_cancelled_ = true;
   replay_requested_ = false;
   replaying_ = false;
+  bridge_.clearReplayHandler(*this);
   replay_source_ = ReplaySource::None;
   replay_done_ = nullptr;
-  replay_in_memory_data_.drain(replay_in_memory_data_.length());
+  inject_data_.drain(inject_data_.length());
   if (replay_cb_) {
     replay_cb_->cancel();
   }
 }
 
+bool BufferManager::allBytesReadable() const {
+  // Within the in-memory tier every accepted byte is readable in place. Once a store exists, a
+  // read may not be issued until the queue has drained into it: the store counts only acknowledged
+  // writes, so a read past that point would be out of range.
+  return buffer_ == nullptr || (!write_in_flight_ && pending_.length() == 0);
+}
+
 void BufferManager::maybeIssueWrite() {
+  // Nothing to do while the payload is still within the in-memory tier: there is no store yet, and
+  // the bytes are already readable in pending_.
+  //
   // Honor the buffer's single-writer contract: only one write outstanding. The
   // rest of the backlog stays in pending_ until this one completes.
-  if (write_in_flight_ || pending_.length() == 0) {
+  if (buffer_ == nullptr || write_in_flight_ || pending_.length() == 0) {
     return;
   }
   // Batch small frames into a chunk-sized write instead of writing each one: with
   // a single write in flight at a time, per-frame writes would stream many tiny
-  // writes to the backing store. Durability is only needed before replay (which
-  // waits for end_stream), so holding a sub-threshold backlog costs nothing on the
-  // critical path. Flush early regardless of size once the stream has ended
-  // (nothing more is coming) or the source is paused for back-pressure (the
-  // backlog cannot grow, so waiting would stall -- this also guarantees progress
-  // when the buffer limit is below the threshold).
-  if (!end_stream_seen_ && !source_paused_ && pending_.length() < WriteFlushThreshold) {
+  // writes to the backing store. Holding a sub-threshold backlog costs nothing on
+  // the critical path as long as nothing needs those bytes durable yet. Flush early
+  // regardless of size once the stream has ended (nothing more is coming) or the
+  // source is paused for back-pressure (the backlog cannot grow, so waiting would
+  // stall -- this also guarantees progress when the buffer limit is below the
+  // threshold).
+  if (!end_stream_seen_ && !bridge_.ingestPaused() && pending_.length() < WriteFlushThreshold) {
     return;
   }
   auto owned = std::make_unique<Buffer::OwnedImpl>();
@@ -155,77 +238,65 @@ void BufferManager::onWriteComplete(ExternalBufferStatus status) {
   }
 
   // The just-written bytes are now durable.
+  const uint64_t acked = in_flight_write_size_;
   write_in_flight_ = false;
   in_flight_write_size_ = 0;
-  // Recompute back-pressure (the queue has shrunk) and let the source resume if
-  // it has drained below the low watermark.
-  updateIngestBackpressure();
+  // Let the source resume if the not-yet-durable total has fallen below the low
+  // watermark.
+  bridge_.releaseUnacked(acked);
   // Drain the next queued write, if any; replay waits until the queue empties.
   maybeIssueWrite();
-  // Begin a requested replay only after the last byte has been offloaded.
+  // Begin a requested replay only after the last byte has been offloaded. A replay that is already
+  // running cannot be waiting on this write: a range replay starts only once every accepted byte
+  // is readable, and endStream() has already ruled out any further ingest.
   maybeStartReplay();
 }
 
 void BufferManager::maybeStartReplay() {
-  // Start only once the caller has requested a replay and every accepted byte is
-  // durable. Consumes the request; the range was set by replay().
-  if (replay_cancelled_ || replaying_ || !replay_requested_ || write_in_flight_ ||
-      pending_.length() > 0) {
+  // Consumes the request; the range was set by replay().
+  if (replay_cancelled_ || replaying_ || !replay_requested_) {
+    return;
+  }
+  // A range replay reads the store, so it waits until every accepted byte is readable. An
+  // inject carries the caller's own bytes and has nothing to wait for.
+  if (replay_source_ == ReplaySource::ExternalBuffer && !allBytesReadable()) {
     return;
   }
   replay_requested_ = false;
   replaying_ = true;
-  if (replay_source_ == ReplaySource::InMemory) {
-    maybeDrainInMemoryReplay();
+  // Take the bridge's handler slot for the duration of the range: back-pressure only needs to
+  // reach whoever is injecting, and only one manager on a path injects at a time.
+  bridge_.setReplayHandler(*this);
+  if (replay_source_ == ReplaySource::Injected) {
+    maybeDrainInjected();
   } else if (replay_source_ == ReplaySource::ExternalBuffer) {
     ENVOY_LOG(debug, "ai_protocol_manager: replaying [{}, {})", replay_offset_, replay_end_);
     maybeReadNextChunk();
   }
 }
 
-void BufferManager::updateIngestBackpressure() {
-  if (high_watermark_ == 0) {
-    return; // Ingest flow control disabled.
-  }
-  // Not-yet-durable bytes: queued backlog plus the in-flight write.
-  const uint64_t unacked = pending_.length() + in_flight_write_size_;
-  if (!source_paused_ && unacked > high_watermark_) {
-    source_paused_ = true;
-    ENVOY_LOG(debug, "ai_protocol_manager: ingest high watermark ({} bytes not durable)", unacked);
-    bridge_->pauseSource();
-    return;
-  }
-  if (source_paused_ && unacked <= low_watermark_) {
-    source_paused_ = false;
-    ENVOY_LOG(debug, "ai_protocol_manager: ingest low watermark ({} bytes not durable)", unacked);
-    bridge_->resumeSource();
-  }
-}
-
-void BufferManager::maybeDrainInMemoryReplay() {
+void BufferManager::maybeDrainInjected() {
   ASSERT(!destroyed_);
   if (!replaying_) {
     return;
   }
 
-  replay_sync_chunks_ = 0;
-  while (replay_in_memory_data_.length() > 0) {
-    if (replay_high_watermark_count_ > 0) {
-      ENVOY_LOG(trace, "ai_protocol_manager: in-memory replay paused (chain back-pressure)");
+  while (inject_data_.length() > 0) {
+    if (bridge_.replayPaused()) {
+      ENVOY_LOG(trace, "ai_protocol_manager: inject paused (chain back-pressure)");
       return;
     }
-    if (replay_sync_chunks_ >= ReplayChunksPerIteration) {
-      ENVOY_LOG(trace, "ai_protocol_manager: in-memory replay yielding after {} chunks",
-                replay_sync_chunks_);
-      replay_cb_->scheduleCallbackNextIteration();
+    if (!bridge_.tryConsumeInjectBudget()) {
+      ENVOY_LOG(trace, "ai_protocol_manager: inject yielding (budget spent)");
+      budget_yielded_ = true;
+      replayCallback().scheduleCallbackNextIteration();
       return;
     }
-    ++replay_sync_chunks_;
     const uint64_t to_inject =
-        std::min(ReadChunkSize, static_cast<uint64_t>(replay_in_memory_data_.length()));
+        std::min(ReadChunkSize, static_cast<uint64_t>(inject_data_.length()));
     Buffer::OwnedImpl chunk;
-    chunk.move(replay_in_memory_data_, to_inject);
-    bridge_->injectData(chunk);
+    chunk.move(inject_data_, to_inject);
+    bridge_.injectData(chunk);
     if (destroyed_ || !replaying_) {
       return;
     }
@@ -244,10 +315,10 @@ void BufferManager::maybeReadNextChunk() {
   if (!replaying_ || read_in_flight_) {
     return;
   }
-  // Pause while the chain we feed is backed up; onReplayBelowLowWatermark()
-  // resumes once it drains. This bounds how much replayed data piles up in the
-  // chain when it is slow.
-  if (replay_high_watermark_count_ > 0) {
+  // Pause while the chain we feed is backed up; onReplayResumed() restarts us
+  // once it drains. This bounds how much replayed data piles up in the chain when
+  // it is slow.
+  if (bridge_.replayPaused()) {
     ENVOY_LOG(trace, "ai_protocol_manager: replay paused at offset {} (chain back-pressure)",
               replay_offset_);
     return;
@@ -260,33 +331,42 @@ void BufferManager::maybeReadNextChunk() {
     return;
   }
 
-  // Bound a synchronous burst. A store that completes the read on-stack re-enters
-  // here (via onReadComplete) from within the buffer_->read() call below, with
-  // in_read_ set; we chain such chunks only up to ReplayChunksPerIteration, then
-  // yield so a fast store cannot replay the whole payload back-to-back and starve
-  // other connections/timers on this worker. The budget also caps the recursion
-  // depth. A non-reentrant entry (offload done, resume, or an asynchronous read
-  // completion) restarts the burst -- an async store thus paces itself one chunk
-  // per iteration and never reaches the cap.
-  if (in_read_) {
-    if (replay_sync_chunks_ >= ReplayChunksPerIteration) {
-      ENVOY_LOG(trace, "ai_protocol_manager: replay yielding at offset {} after {} chunks",
-                replay_offset_, replay_sync_chunks_);
-      replay_cb_->scheduleCallbackNextIteration();
-      return;
-    }
-    ++replay_sync_chunks_;
-  } else {
-    replay_sync_chunks_ = 1;
+  // The range became readable before the replay started, and endStream() rules out the ingest
+  // that could have taken it away again.
+  ASSERT(allBytesReadable());
+
+  // Bound the work one event-loop pass can do. A store that completes the read
+  // on-stack re-enters here (via onReadComplete) from within the buffer_->read()
+  // call below and would otherwise replay the whole payload back-to-back; the
+  // budget stops that and caps the recursion depth with it. An async store paces
+  // itself one chunk per completion, each of which refills the budget, so it never
+  // reaches the cap.
+  if (!bridge_.tryConsumeInjectBudget()) {
+    ENVOY_LOG(trace, "ai_protocol_manager: replay yielding at offset {} (inject budget spent)",
+              replay_offset_);
+    budget_yielded_ = true;
+    replayCallback().scheduleCallbackNextIteration();
+    return;
   }
 
   const uint64_t chunk = std::min(ReadChunkSize, replay_end_ - replay_offset_);
   read_in_flight_ = true;
   in_read_ = true;
-  buffer_->read(replay_offset_, chunk,
-                [this](ExternalBufferStatus status, Buffer::InstancePtr data) {
-                  onReadComplete(status, std::move(data));
-                });
+  if (buffer_ == nullptr) {
+    // In-memory tier: pending_ holds the whole payload from offset 0, so serve the chunk directly.
+    // Completing on-stack keeps this on the synchronous-store path, which the inject budget
+    // already bounds.
+    auto data = std::make_unique<Buffer::OwnedImpl>();
+    auto bytes = std::make_unique<uint8_t[]>(chunk);
+    pending_.copyOut(replay_offset_, chunk, bytes.get());
+    data->add(bytes.get(), chunk);
+    onReadComplete(ExternalBufferStatus::Ok, std::move(data));
+  } else {
+    buffer_->read(replay_offset_, chunk,
+                  [this](ExternalBufferStatus status, Buffer::InstancePtr data) {
+                    onReadComplete(status, std::move(data));
+                  });
+  }
   // A synchronous store completes this read on-stack (onReadComplete, and on the
   // final chunk the replay-done callback) before read() returns, which may detach us
   // via onDestroy(). Per the destruction contract we are only detached, never freed,
@@ -302,16 +382,21 @@ void BufferManager::onReplayContinuation() {
   if (replay_cancelled_) {
     return;
   }
+  if (budget_yielded_) {
+    // This continuation was scheduled for the next event-loop pass, so the budget it yielded on
+    // has expired with the pass that spent it.
+    budget_yielded_ = false;
+    bridge_.resetInjectBudget();
+  }
   // Off the caller's stack: either start replay deferred from replay() (the
   // offload was already durable when the caller requested it), resume after the
-  // per-iteration burst budget was spent, or resume after chain back-pressure
-  // drained (deferred out of the watermark callback). maybeStartReplay() already
-  // drives the first read, so dispatch on whether replay is underway to avoid
-  // advancing a fresh burst twice.
+  // inject budget was spent, or resume after chain back-pressure drained (deferred
+  // out of the watermark callback). maybeStartReplay() already drives the first
+  // read, so dispatch on whether replay is underway to avoid advancing twice.
   if (!replaying_) {
     maybeStartReplay();
-  } else if (replay_source_ == ReplaySource::InMemory) {
-    maybeDrainInMemoryReplay();
+  } else if (replay_source_ == ReplaySource::Injected) {
+    maybeDrainInjected();
   } else if (replay_source_ == ReplaySource::ExternalBuffer) {
     maybeReadNextChunk();
   }
@@ -323,6 +408,11 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
   // below ends the stream -- handled by the runtime check after injectData().)
   ASSERT(!destroyed_);
   read_in_flight_ = false;
+  if (!in_read_) {
+    // An asynchronous store returns its completion through the dispatcher, so this is a later pass
+    // than the one that issued the read.
+    bridge_.resetInjectBudget();
+  }
   if (replay_cancelled_ || !replaying_) {
     return;
   }
@@ -344,7 +434,7 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
   // before finishing the range (finishReplay() would run the caller's replay-done
   // callback into a torn-down stream) or reading another chunk from the released
   // buffer -- and it is what keeps maybeReadNextChunk()'s ASSERT(!destroyed_) valid.
-  bridge_->injectData(*data);
+  bridge_.injectData(*data);
   if (destroyed_ || !replaying_) {
     return;
   }
@@ -362,6 +452,7 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
 void BufferManager::finishReplay() {
   replaying_ = false;
   replay_source_ = ReplaySource::None;
+  bridge_.clearReplayHandler(*this);
   ENVOY_LOG(trace, "ai_protocol_manager: replay complete");
   // Hand control back to the caller. Its callback may start the next sub-range or
   // terminate the stream; move the callback out first so it can re-arm replay().
@@ -374,30 +465,16 @@ void BufferManager::finishReplay() {
 
 void BufferManager::onExternalBufferError() {
   ENVOY_LOG(warn, "ai_protocol_manager: external buffer I/O error, failing stream");
-  bridge_->onUnrecoverableError();
+  bridge_.onUnrecoverableError();
 }
 
-void BufferManager::onReplayAboveHighWatermark() {
-  // May be called multiple times (stream and connection); count so we resume
-  // only after a matching number of low-watermark callbacks.
-  ++replay_high_watermark_count_;
-  ENVOY_LOG(debug, "ai_protocol_manager: replay high watermark (depth={})",
-            replay_high_watermark_count_);
-}
-
-void BufferManager::onReplayBelowLowWatermark() {
-  ASSERT(replay_high_watermark_count_ > 0);
-  --replay_high_watermark_count_;
-  ENVOY_LOG(debug, "ai_protocol_manager: replay low watermark (depth={})",
-            replay_high_watermark_count_);
-  if (replay_high_watermark_count_ == 0) {
-    // resume replay where we paused. Defer via replay_cb_ rather than reading which may potentially
-    // error out or inject data synchronously. this is an Envoy watermark callback, and injecting a
-    // chunk (or failing the stream on a buffer error) can re-enter the watermark callbacks during
-    // router cleanup, which is unsafe. The continuation runs once this callback unwinds. If a
-    // replay_cb_ was already scheduled (e.g. a per-iteration yield), this is idempotent.
-    replay_cb_->scheduleCallbackCurrentIteration();
-  }
+void BufferManager::onReplayResumed() {
+  // Resume replay where we paused, deferred via replay_cb_ rather than reading here: this runs
+  // inside an Envoy watermark callback, and injecting a chunk (or failing the stream on a buffer
+  // error) can re-enter the watermark callbacks during router cleanup, which is unsafe. The
+  // continuation runs once this callback unwinds. If a replay_cb_ was already scheduled (e.g. a
+  // per-iteration yield), this is idempotent.
+  replayCallback().scheduleCallbackCurrentIteration();
 }
 
 } // namespace AiProtocolManager

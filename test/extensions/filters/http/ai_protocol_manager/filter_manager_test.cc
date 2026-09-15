@@ -34,11 +34,8 @@ class FilterManagerTest : public testing::Test {
 public:
   FilterManagerTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")), factory_(),
-        bridge_raw_(new FakeBridge(*dispatcher_)),
-        buffer_manager_(factory_, std::unique_ptr<FakeBridge>(bridge_raw_)),
+        bridge_(*dispatcher_), buffer_manager_(BufferManager::Config{}, factory_, bridge_),
         stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain) {}
-
-  ~FilterManagerTest() override { buffer_manager_.onDestroy(); }
 
   void drain() {
     for (int i = 0; i < 20; ++i) {
@@ -49,7 +46,8 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   InMemoryExternalBufferFactory factory_;
-  FakeBridge* bridge_raw_{nullptr};
+  // Declared before buffer_manager_ so it outlives the manager that references it.
+  FakeBridge bridge_;
   BufferManager buffer_manager_;
   StreamInfo::StreamInfoImpl stream_info_;
 };
@@ -75,7 +73,7 @@ TEST_F(FilterManagerTest, ZeroFilterPassThrough) {
   EXPECT_TRUE(completed);
   ASSERT_OK(status);
 
-  auto parsed = nlohmann::json::parse(bridge_raw_->injected_.toString());
+  auto parsed = nlohmann::json::parse(bridge_.injected_.toString());
   EXPECT_EQ(parsed["model"], "gpt-4");
 
   auto* fs = stream_info_.filterState()->getDataReadOnly<APMRequestPayloadIndex>(
@@ -121,7 +119,7 @@ TEST_F(FilterManagerTest, SingleFilterMutation) {
   EXPECT_TRUE(completed);
   ASSERT_OK(status);
 
-  auto parsed = nlohmann::json::parse(bridge_raw_->injected_.toString());
+  auto parsed = nlohmann::json::parse(bridge_.injected_.toString());
   EXPECT_EQ(parsed["model"], "gpt-4-turbo");
 }
 
@@ -170,7 +168,7 @@ TEST_F(FilterManagerTest, MultiFilterPipeline) {
   EXPECT_TRUE(completed);
   ASSERT_OK(status);
 
-  auto parsed = nlohmann::json::parse(bridge_raw_->injected_.toString());
+  auto parsed = nlohmann::json::parse(bridge_.injected_.toString());
   EXPECT_EQ(parsed["model"], "gpt-4");
   EXPECT_DOUBLE_EQ(parsed["temperature"].get<double>(), 0.9);
 }
@@ -239,7 +237,7 @@ TEST_F(FilterManagerTest, FilterBypassEarlyReturnPassesThrough) {
   EXPECT_TRUE(completed);
   ASSERT_OK(status);
 
-  auto parsed = nlohmann::json::parse(bridge_raw_->injected_.toString());
+  auto parsed = nlohmann::json::parse(bridge_.injected_.toString());
   EXPECT_EQ(parsed["model"], "gpt-4-turbo");
 }
 
@@ -657,7 +655,7 @@ TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeaders) {
   EXPECT_TRUE(completed);
   ASSERT_OK(status);
 
-  std::string output = bridge_raw_->injected_.toString();
+  std::string output = bridge_.injected_.toString();
   EXPECT_EQ(headers.getContentLengthValue(), absl::StrCat(output.size()));
 }
 
@@ -685,7 +683,7 @@ TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeadersAfterMutation) {
   EXPECT_TRUE(completed);
   ASSERT_OK(status);
 
-  std::string output = bridge_raw_->injected_.toString();
+  std::string output = bridge_.injected_.toString();
   EXPECT_EQ(headers.getContentLengthValue(), absl::StrCat(output.size()));
 }
 
