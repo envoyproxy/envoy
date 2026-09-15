@@ -512,19 +512,15 @@ newDynamicModuleBootstrapExtensionConfig(
     return on_listener_removal.status();
   }
 
+  // Secret lifecycle hooks are optional per the ABI compatibility policy (abi/abi.h): an absent
+  // symbol means the module does not implement the hook, not a load failure. A module that never
+  // enables secret lifecycle need not export them.
   auto on_secret_add_or_update =
       dynamic_module->getFunctionPointer<OnBootstrapExtensionSecretAddOrUpdateType>(
           "envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update");
-  if (!on_secret_add_or_update.ok()) {
-    return on_secret_add_or_update.status();
-  }
-
   auto on_secret_removal =
       dynamic_module->getFunctionPointer<OnBootstrapExtensionSecretRemovalType>(
           "envoy_dynamic_module_on_bootstrap_extension_secret_removal");
-  if (!on_secret_removal.ok()) {
-    return on_secret_removal.status();
-  }
 
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
       extension_name, extension_config, metrics_namespace, std::move(dynamic_module),
@@ -560,8 +556,10 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_cluster_removal_ = on_cluster_removal.value();
   config->on_bootstrap_extension_listener_add_or_update_ = on_listener_add_or_update.value();
   config->on_bootstrap_extension_listener_removal_ = on_listener_removal.value();
-  config->on_bootstrap_extension_secret_add_or_update_ = on_secret_add_or_update.value();
-  config->on_bootstrap_extension_secret_removal_ = on_secret_removal.value();
+  config->on_bootstrap_extension_secret_add_or_update_ =
+      on_secret_add_or_update.ok() ? on_secret_add_or_update.value() : nullptr;
+  config->on_bootstrap_extension_secret_removal_ =
+      on_secret_removal.ok() ? on_secret_removal.value() : nullptr;
 
   config->stat_creation_frozen_ = true;
 

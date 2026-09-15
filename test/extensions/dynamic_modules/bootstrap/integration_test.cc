@@ -581,6 +581,66 @@ resources:
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_secret_lifecycle_test"));
 }
 
+// Verifies the module observes a secret rotation. After the initial add, rewriting the SDS file
+// with a different certificate delivers a provider update, and on_secret_add_or_update fires again
+// for secret_0.
+TEST_P(DynamicModulesBootstrapIntegrationTest, SecretRotationRust) {
+  auto sds_yaml = [](absl::string_view version, absl::string_view cert, absl::string_view key) {
+    return fmt::format(R"EOF(
+---
+version_info: "{}"
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: "secret_0"
+  tls_certificate:
+    certificate_chain:
+      filename: "{}"
+    private_key:
+      filename: "{}"
+)EOF",
+                       version, cert, key);
+  };
+  const std::string cert0 =
+      TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem");
+  const std::string key0 =
+      TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem");
+  const std::string cert1 =
+      TestEnvironment::runfilesPath("test/config/integration/certs/server2cert.pem");
+  const std::string key1 =
+      TestEnvironment::runfilesPath("test/config/integration/certs/server2key.pem");
+  const std::string sds_path =
+      TestEnvironment::writeStringToFileForTest("secret_0.sds.yaml", sds_yaml("0", cert0, key0));
+
+  config_helper_.addConfigModifier([sds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* transport_socket = bootstrap.mutable_static_resources()
+                                 ->mutable_listeners(0)
+                                 ->mutable_filter_chains(0)
+                                 ->mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    auto* secret_config =
+        tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+    secret_config->set_name("secret_0");
+    auto* config_source = secret_config->mutable_sds_config();
+    config_source->mutable_path_config_source()->set_path(sds_path);
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(tls_context));
+  });
+
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_secret_lifecycle_test");
+  test_server_->waitForCounter("sds.secret_0.update_success", testing::Ge(1));
+
+  // Rotate the certificate by rewriting the SDS file; the provider update fires and the module
+  // observes on_secret_add_or_update again for secret_0 (first delivery already logged during
+  // init).
+  EXPECT_LOG_CONTAINS("info", "Secret added or updated: secret_0", {
+    const std::string rotated_path = TestEnvironment::writeStringToFileForTest(
+        "secret_0_rotated.sds.yaml", sds_yaml("1", cert1, key1));
+    TestEnvironment::renameFile(rotated_path, sds_path);
+    test_server_->waitForCounter("sds.secret_0.update_success", testing::Ge(2));
+  });
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions
