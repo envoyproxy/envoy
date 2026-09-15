@@ -95,12 +95,10 @@ ExternalProcessingFilterConfig::createHttpFilterFactoryFromProtoTyped(
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
   const uint32_t max_message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
-  // The scope outlives the filter chain, so the callback below can hold on to it. The extra
-  // context itself must not be captured: it is a stack temporary at the call site.
-  OptRef<Stats::Scope> scope = extra_context.scopeOr(context);
+  Stats::Scope& scope = extra_context.scopeOr(context);
   absl::Status config_creation_status = absl::OkStatus();
   auto filter_config = std::make_shared<FilterConfig>(
-      proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms, *scope,
+      proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms, scope,
       extra_context.stats_prefix, extra_context.is_upstream,
       Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context,
       config_creation_status);
