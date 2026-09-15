@@ -169,6 +169,11 @@ void AiProtocolManagerFilter::onDestroy() {
     // BufferManager's onDestroy()-before-destruction contract (see buffer_manager.h).
     decode_manager_->onDestroy();
   }
+  if (decode_bridge_ != nullptr) {
+    // The bridge outlives the manager, so it is detached here rather than by the manager: this is
+    // the last point at which the filter manager's watermark callback list is still alive.
+    decode_bridge_->detachFromFilterChain();
+  }
 }
 
 Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHeaderMap& headers,
@@ -215,9 +220,14 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // Built here, not at setDecoderFilterCallbacks(), so a pass-through stream pays
   // for none of it: constructing it subscribes to upstream watermarks and claims
   // a schedulable callback.
+  decode_bridge_ =
+      std::make_unique<DecoderFilterChainBridge>(*decoder_callbacks_, config_->stats());
+  // A request small enough that the chain would have buffered it anyway is held in memory and
+  // replayed from there, so it costs no storage IO at all. Past that the chain would have pushed
+  // back, which is exactly the point at which offloading starts to pay for itself.
   decode_manager_ = std::make_unique<BufferManager>(
-      buffer_factory_,
-      std::make_unique<DecoderFilterChainBridge>(*decoder_callbacks_, config_->stats()));
+      BufferManager::Config{decoder_callbacks_->decoderBufferLimit()}, buffer_factory_,
+      *decode_bridge_);
 
   // Pin the headers so routing and admission filters do not act on them before
   // the payload is offloaded. decodeData() still fires while iteration is stopped
