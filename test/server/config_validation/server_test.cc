@@ -216,7 +216,7 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
 
   Network::MockTcpListenerCallbacks listener_callbacks;
   Network::MockListenerConfig listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
 
   server.dnsResolver()->resolve("", Network::DnsLookupFamily::All, nullptr);
 

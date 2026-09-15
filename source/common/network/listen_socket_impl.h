@@ -199,7 +199,7 @@ class AcceptedSocketImpl : public ConnectionSocketImpl {
 public:
   AcceptedSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,
                      const Address::InstanceConstSharedPtr& remote_address,
-                     Server::ThreadLocalOverloadStateOptRef overload_state,
+                     Server::ThreadLocalOverloadStateSharedPtr overload_state,
                      bool track_global_cx_limit_in_overload_manager)
       : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address),
         overload_state_(overload_state),
@@ -230,7 +230,7 @@ public:
 
 private:
   static std::atomic<uint64_t> global_accepted_socket_count_;
-  Server::ThreadLocalOverloadStateOptRef overload_state_;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state_;
   const bool track_global_cx_limit_in_overload_manager_;
 };
 

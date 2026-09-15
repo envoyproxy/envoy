@@ -282,7 +282,7 @@ public:
   createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
                  Runtime::Loader& runtime, Random::RandomGenerator& random,
                  const Network::ListenerConfig& listener_config,
-                 Server::ThreadLocalOverloadStateOptRef overload_state) PURE;
+                 Server::ThreadLocalOverloadStateSharedPtr overload_state) PURE;
 };
 
 /**

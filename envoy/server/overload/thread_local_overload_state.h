@@ -125,5 +125,10 @@ public:
 
 using ThreadLocalOverloadStateOptRef = OptRef<ThreadLocalOverloadState>;
 
+// Owning handle to a thread's ThreadLocalOverloadState. Prefer this over
+// ThreadLocalOverloadStateOptRef whenever the handle may outlive and be used by a different
+// thread than the one that obtained it (e.g. a connection handed off via connection balancing).
+using ThreadLocalOverloadStateSharedPtr = std::shared_ptr<ThreadLocalOverloadState>;
+
 } // namespace Server
 } // namespace Envoy

@@ -81,13 +81,14 @@ void ConnectionHandlerImpl::addListener(std::optional<uint64_t> overridden_liste
         disable_listeners_, std::move(internal_listener),
         config.shouldBypassOverloadManager() ? null_overload_manager_ : overload_manager_);
   } else if (config.listenSocketFactories()[0]->socketType() == Network::Socket::Type::Stream) {
-    auto overload_state =
+    // Owning accessor: the listener/socket can be handed off to another worker via
+    // exact_balance, which can outlive this thread's own shutdown.
+    Server::ThreadLocalOverloadStateSharedPtr overload_state =
         config.shouldBypassOverloadManager()
-            ? (null_overload_manager_
-                   ? makeOptRef(null_overload_manager_->getThreadLocalOverloadState())
-                   : std::nullopt)
-            : (overload_manager_ ? makeOptRef(overload_manager_->getThreadLocalOverloadState())
-                                 : std::nullopt);
+            ? (null_overload_manager_ ? null_overload_manager_->getThreadLocalOverloadStateShared()
+                                      : nullptr)
+            : (overload_manager_ ? overload_manager_->getThreadLocalOverloadStateShared()
+                                 : nullptr);
     for (auto& socket_factory : config.listenSocketFactories()) {
       auto address = socket_factory->localAddress();
       // worker_index_ doesn't have a value on the main thread for the admin server.
@@ -397,7 +398,7 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
 Network::ListenerPtr ConnectionHandlerImpl::createListener(
     Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
     Random::RandomGenerator& random, const Network::ListenerConfig& config,
-    Server::ThreadLocalOverloadStateOptRef overload_state) {
+    Server::ThreadLocalOverloadStateSharedPtr overload_state) {
   return std::make_unique<Network::TcpListenerImpl>(
       dispatcher(), random, runtime, std::move(socket), cb, config.bindToPort(),
       config.ignoreGlobalConnLimit(), config.shouldBypassOverloadManager(),

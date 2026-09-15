@@ -48,6 +48,10 @@ public:
     return tls_->getTyped<OverloadState>();
   }
 
+  ThreadLocalOverloadStateSharedPtr getThreadLocalOverloadStateShared() override {
+    return std::static_pointer_cast<ThreadLocalOverloadState>(tls_->get());
+  }
+
   LoadShedPoint* getLoadShedPoint(absl::string_view) override { return nullptr; }
 
   Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override {

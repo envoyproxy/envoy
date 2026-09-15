@@ -557,7 +557,7 @@ private:
 Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                     Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
                                     const Network::ListenerConfig& listener_config,
-                                    Server::ThreadLocalOverloadStateOptRef overload_state,
+                                    Server::ThreadLocalOverloadStateSharedPtr overload_state,
                                     Random::RandomGenerator& rng, Event::Dispatcher& dispatcher) {
   return std::make_unique<Network::TcpListenerImpl>(
       dispatcher, rng, runtime, socket, cb, listener_config.bindToPort(),
@@ -610,7 +610,7 @@ void testUtil(const TestUtilOptions& options) {
       Network::Test::getCanonicalLoopbackAddress(options.version()));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener =
       createListener(socket, callbacks, runtime, listener_config, overload_state,
                      server_api->randomGenerator(), *dispatcher);
@@ -1142,7 +1142,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
       Network::Test::getCanonicalLoopbackAddress(options.version()));
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener =
       createListener(socket, callbacks, runtime, listener_config, overload_state,
                      server_api->randomGenerator(), *dispatcher);
@@ -1414,7 +1414,7 @@ protected:
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                       Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
                                       const Network::ListenerConfig& listener_config,
-                                      Server::ThreadLocalOverloadStateOptRef overload_state,
+                                      Server::ThreadLocalOverloadStateSharedPtr overload_state,
                                       Event::Dispatcher& dispatcher) {
     return std::make_unique<Network::TcpListenerImpl>(
         dispatcher, api_->randomGenerator(), runtime, std::move(socket), cb,
@@ -4679,7 +4679,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener =
       createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
 
@@ -4740,7 +4740,7 @@ TEST_P(SslSocketTest, HalfClose) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener = createListener(socket, listener_callbacks, runtime_,
                                                  listener_config, overload_state, *dispatcher_);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
@@ -4827,7 +4827,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener = createListener(socket, listener_callbacks, runtime_,
                                                  listener_config, overload_state, *dispatcher_);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
@@ -4920,7 +4920,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener = createListener(socket, listener_callbacks, runtime_,
                                                  listener_config, overload_state, *dispatcher_);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
@@ -5029,7 +5029,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener =
       createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
 
@@ -5106,7 +5106,7 @@ void testSuppressClientCaListOnTheWire(
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     const std::function<Network::ListenerPtr(
         Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&, Runtime::Loader&,
-        const Network::ListenerConfig&, Server::ThreadLocalOverloadStateOptRef,
+        const Network::ListenerConfig&, Server::ThreadLocalOverloadStateSharedPtr,
         Event::Dispatcher&)>& listener_factory) {
   const std::string server_ctx_yaml = fmt::format(R"EOF(
   require_client_certificate: true
@@ -5137,7 +5137,7 @@ void testSuppressClientCaListOnTheWire(
       Network::Test::getCanonicalLoopbackAddress(version));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener =
       listener_factory(socket, callbacks, runtime, listener_config, overload_state, dispatcher);
 
@@ -5223,7 +5223,7 @@ TEST_P(SslSocketTest, SuppressClientCaListOnTheWireEnabled) {
       /*suppress=*/true, version_, *dispatcher_, runtime_, stream_info_, factory_context_,
       [this](Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
              Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
-             Server::ThreadLocalOverloadStateOptRef overload_state, Event::Dispatcher& dispatcher) {
+             Server::ThreadLocalOverloadStateSharedPtr overload_state, Event::Dispatcher& dispatcher) {
         return createListener(std::move(socket), cb, runtime, listener_config, overload_state,
                               dispatcher);
       });
@@ -5234,7 +5234,7 @@ TEST_P(SslSocketTest, SuppressClientCaListOnTheWireDisabled) {
       /*suppress=*/false, version_, *dispatcher_, runtime_, stream_info_, factory_context_,
       [this](Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
              Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
-             Server::ThreadLocalOverloadStateOptRef overload_state, Event::Dispatcher& dispatcher) {
+             Server::ThreadLocalOverloadStateSharedPtr overload_state, Event::Dispatcher& dispatcher) {
         return createListener(std::move(socket), cb, runtime, listener_config, overload_state,
                               dispatcher);
       });
@@ -5284,7 +5284,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener1 =
       createListener(socket1, callbacks, runtime, listener_config, overload_state,
                      server_api->randomGenerator(), *dispatcher);
@@ -5441,7 +5441,7 @@ void testSupportForSessionResumption(const std::string& server_ctx_yaml,
       Network::Test::getCanonicalLoopbackAddress(ip_version));
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   Network::ListenerPtr listener =
       createListener(tcp_socket, callbacks, runtime, listener_config, overload_state,
@@ -6121,7 +6121,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener =
       createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
   Network::ListenerPtr listener2 =
@@ -6248,7 +6248,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   NiceMock<Network::MockListenerConfig> listener_config;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system_);
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener =
       createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher);
 
@@ -6397,7 +6397,7 @@ void SslSocketTest::testClientSessionResumptionSniSequence(
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener =
       createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher);
 
@@ -6854,7 +6854,7 @@ TEST_P(SslSocketTest, SslError) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener =
       createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
 
@@ -7502,7 +7502,7 @@ TEST_P(SslSocketTest, SetSignatureAlgorithms) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener =
       createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
 
@@ -8237,7 +8237,7 @@ protected:
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(version_));
     NiceMock<Network::MockListenerConfig> listener_config;
-    Server::ThreadLocalOverloadStateOptRef overload_state;
+    Server::ThreadLocalOverloadStateSharedPtr overload_state;
     listener_ = createListener(socket_, listener_callbacks_, runtime_, listener_config,
                                overload_state, *dispatcher_);
 
@@ -9696,7 +9696,7 @@ TEST_P(SslSocketTest, TlsConnectionResetDetection) {
   const auto local_address = socket->connectionInfoProvider().localAddress();
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener = createListener(std::move(socket), listener_callbacks, runtime_,
                                                  listener_config, overload_state, *dispatcher_);
 
@@ -9808,7 +9808,7 @@ TEST_P(SslSocketTest, TlsConnectionResetDetectionDisabledByRuntime) {
   const auto local_address = socket->connectionInfoProvider().localAddress();
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Server::ThreadLocalOverloadStateSharedPtr overload_state;
   Network::ListenerPtr listener = createListener(std::move(socket), listener_callbacks, runtime_,
                                                  listener_config, overload_state, *dispatcher_);
 
