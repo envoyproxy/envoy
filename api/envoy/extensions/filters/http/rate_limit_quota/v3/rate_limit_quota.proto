@@ -31,7 +31,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // Can be overridden in the per-route and per-host configurations.
 // The more specific definition completely overrides the less specific definition.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RateLimitQuotaFilterConfig {
   // Configures the gRPC Rate Limit Quota Service (RLQS) RateLimitQuotaService.
   config.core.v3.GrpcService rlqs_server = 1 [(validate.rules).message = {required: true}];
@@ -134,6 +134,18 @@ message RateLimitQuotaFilterConfig {
   // filter is enabled but not enforced.
   repeated config.core.v3.HeaderValueOption request_headers_to_add_when_not_enforced = 6
       [(validate.rules).repeated = {max_items: 10}];
+
+  // The interval at which the data plane reports quota usage to the RLQS server for the buckets
+  // managed by this filter.
+  //
+  // The data plane keeps a single RLQS client (and therefore a single reporting timer) per unique
+  // combination of RLQS server target and :ref:`domain
+  // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.domain>`.
+  // When several filter configurations share the same target and domain, the value from the first
+  // initialized configuration is used.
+  //
+  // If not set, defaults to 5 seconds.
+  google.protobuf.Duration reporting_interval = 7 [(validate.rules).duration = {gt {}}];
 }
 
 // Per-route and per-host configuration overrides. The more specific definition completely
