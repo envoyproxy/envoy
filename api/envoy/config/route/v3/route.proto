@@ -4,6 +4,7 @@ package envoy.config.route.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 
 import "google/protobuf/any.proto";
@@ -23,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.RouteConfiguration";
 
@@ -162,6 +163,33 @@ message RouteConfiguration {
   // For instance, if the metadata is intended for the Router filter,
   // the filter name should be specified as ``envoy.filters.http.router``.
   core.v3.Metadata metadata = 17;
+
+  // After the route matching has resolved a route for incoming request, the route extensions
+  // are applied to the route to customize or monitor it and the output of the extensions will be
+  // used as the final route by Envoy for the request. The extensions here will not modify/affect
+  // the request attributes (e.g., headers, path) directly.
+  //
+  // Extensions are executed in order, and the output of each is the input of the next. The route
+  // that comes out of the last one is the route Envoy uses for the request.
+  //
+  // Extensions are configured at three levels. Extensions in three levels will run in this order:
+  //
+  // 1. The ``route_extensions`` of
+  //    :ref:`route configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`
+  // 2. The ``route_extensions`` of resolved
+  //    :ref:`virtual host <envoy_v3_api_msg_config.route.v3.VirtualHost>`
+  // 3. The ``route_extensions`` of resolved
+  //    :ref:`route <envoy_v3_api_msg_config.route.v3.Route>`.
+  //
+  // .. note::
+  //   If the route matching resolves no route, the route extensions at the route configuration
+  //   and the virtual host levels will still be applied to null. This allows route extensions to
+  //   optionally generate a valid route even when no route is resolved for the request.
+  //   Similarly, if the route matching resolves a valid route, the route extensions may drop it
+  //   and return no route. Then Envoy will treat it as route not found and result in 404 response.
+  //
+  // See :ref:`route extensions <config_http_conn_man_route_extensions>` for more details.
+  repeated core.v3.TypedExtensionConfig route_extensions = 19;
 }
 
 message Vhds {

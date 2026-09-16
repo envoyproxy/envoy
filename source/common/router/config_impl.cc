@@ -802,6 +802,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   } else {
     early_data_policy_ = std::make_unique<DefaultEarlyDataPolicy>(/*allow_safe_request*/ true);
   }
+
+  auto route_extensions_or_error = createRouteExtensions(route.route_extensions(), factory_context);
+  SET_AND_RETURN_IF_NOT_OK(route_extensions_or_error.status(), creation_status);
+  route_extensions_ = std::move(route_extensions_or_error.value());
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
@@ -1701,6 +1705,11 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   if (virtual_host.has_metadata()) {
     metadata_ = std::make_unique<RouteMetadataPack>(virtual_host.metadata());
   }
+
+  auto route_extensions_or_error =
+      createRouteExtensions(virtual_host.route_extensions(), factory_context);
+  SET_AND_RETURN_IF_NOT_OK(route_extensions_or_error.status(), creation_status);
+  route_extensions_ = std::move(route_extensions_or_error.value());
 }
 
 CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
@@ -1824,7 +1833,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
   }
 }
 
-RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
+VirtualHostMatchResult VirtualHostImpl::getRouteFromRoutes(
     const RouteCallback& cb, const RouteMatchContext& route_match_context,
     const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
     absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const {
@@ -1840,7 +1849,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
     }
 
     if (cb == nullptr) {
-      return route_entry;
+      return {std::move(route_entry), (*route)->routeExtensions()};
     }
 
     RouteEvalStatus eval_status = (std::next(route) == routes.end())
@@ -1848,24 +1857,24 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
                                       : RouteEvalStatus::HasMoreRoutes;
     RouteMatchStatus match_status = cb(route_entry, eval_status);
     if (match_status == RouteMatchStatus::Accept) {
-      return route_entry;
+      return {std::move(route_entry), (*route)->routeExtensions()};
     }
     if (match_status == RouteMatchStatus::Continue &&
         eval_status == RouteEvalStatus::NoMoreRoutes) {
       ENVOY_LOG(debug,
                 "return null when route match status is Continue but there is no more routes");
-      return nullptr;
+      return {};
     }
   }
 
   ENVOY_LOG(debug, "route was resolved but final route list did not match incoming request");
-  return nullptr;
+  return {};
 }
 
-RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb,
-                                                         const Http::RequestHeaderMap& headers,
-                                                         const StreamInfo::StreamInfo& stream_info,
-                                                         uint64_t random_value) const {
+VirtualHostMatchResult
+VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                     const StreamInfo::StreamInfo& stream_info,
+                                     uint64_t random_value) const {
   // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
   // connection), force a redirect based on underlying protocol, rather than URL
   // scheme, so don't force a redirect for a http:// url served over a TLS
@@ -1874,15 +1883,15 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
   if (scheme.empty()) {
     // No scheme header. This normally only happens when ActiveStream::decodeHeaders
     // bails early (as it rejects a request), or a buggy filter removes the :scheme header.
-    return nullptr;
+    return {};
   }
 
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::All && scheme != "https") {
-    return ssl_redirect_route_;
+    return {ssl_redirect_route_, {}};
   } else if (ssl_requirements_ == SslRequirements::ExternalOnly && scheme != "https" &&
              !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
-    return ssl_redirect_route_;
+    return {ssl_redirect_route_, {}};
   }
 
   // Constructed once per request; derived values (query params, cookies, etc.) are computed
@@ -1914,7 +1923,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     ENVOY_LOG(debug, "failed to match incoming request: {}",
               match_result.isNoMatch() ? "no match" : "insufficient data");
 
-    return nullptr;
+    return {};
   }
 
   // Check for a route that matches the request.
@@ -1961,7 +1970,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
                            ProtobufMessage::ValidationVisitor& validator,
                            Init::Manager& init_manager, bool validate_clusters,
                            absl::Status& creation_status)
-    : vhost_scope_(factory_context.scope().scopeFromStatName(
+    : global_route_config_(global_route_config),
+      vhost_scope_(factory_context.scope().scopeFromStatName(
           factory_context.routerContext().virtualClusterStatNames().vhost_)),
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()),
       vhost_header_(route_config.vhost_header()) {
@@ -2074,11 +2084,23 @@ VirtualHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::Reques
                                      const StreamInfo::StreamInfo& stream_info,
                                      uint64_t random_value) const {
   VirtualHostRoute route_result;
+
+  VirtualHostMatchResult match_result;
+  RouteExtensionSpan vhost_extensions;
+
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
     route_result.vhost = virtual_host->virtualHost();
-    route_result.route = virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
+    vhost_extensions = virtual_host->routeExtensions();
+    match_result = virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
   }
+
+  // The route configuration and virtual host chains run whether or not a route matched, so that an
+  // extension can supply a fallback route for a request that would otherwise get no route at all.
+  // The route level chain is empty unless a route matched.
+  route_result.route = applyRouteExtensions(
+      std::move(match_result.route), global_route_config_->routeExtensions(), vhost_extensions,
+      match_result.route_extensions, headers, stream_info, random_value);
 
   return route_result;
 }
@@ -2168,6 +2190,11 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
   if (config.has_metadata()) {
     metadata_ = std::make_unique<RouteMetadataPack>(config.metadata());
   }
+
+  auto route_extensions_or_error =
+      createRouteExtensions(config.route_extensions(), factory_context);
+  SET_AND_RETURN_IF_NOT_OK(route_extensions_or_error.status(), creation_status);
+  route_extensions_ = std::move(route_extensions_or_error.value());
 }
 
 absl::StatusOr<ClusterSpecifierPluginSharedPtr>

@@ -45,6 +45,7 @@ envoy_cc_library(
         ":per_filter_config_lib",
         ":retry_policy_lib",
         ":retry_state_lib",
+        ":route_extension_lib",
         ":router_ratelimit_lib",
         ":tls_context_match_criteria_lib",
         ":weighted_cluster_specifier_lib",
@@ -107,6 +108,23 @@ envoy_cc_library(
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,
+)
+
+envoy_cc_library(
+    name = "route_extension_lib",
+    srcs = ["route_extension_impl.cc"],
+    hdrs = ["route_extension_impl.h"],
+    deps = [
+        "//envoy/common:exception_lib",
+        "//envoy/router:route_extension_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:utility_lib",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:span",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
