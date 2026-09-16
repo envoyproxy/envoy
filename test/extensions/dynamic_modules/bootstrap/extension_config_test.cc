@@ -1,6 +1,6 @@
-#include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
-
 #include "envoy/config/core/v3/config_source.pb.h"
+
+#include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
