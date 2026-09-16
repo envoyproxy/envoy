@@ -354,7 +354,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndIncrementCounter) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify counter value.
-  auto counter = filter_config_->getCounterById(counter_id);
+  auto counter = filter_config_->metrics().getCounterById(counter_id);
   EXPECT_TRUE(counter.has_value());
 }
 
@@ -382,7 +382,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndManipulateGauge) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify gauge exists.
-  auto gauge = filter_config_->getGaugeById(gauge_id);
+  auto gauge = filter_config_->metrics().getGaugeById(gauge_id);
   EXPECT_TRUE(gauge.has_value());
 }
 
@@ -405,7 +405,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndRecordHistogram) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify histogram exists.
-  auto histogram = filter_config_->getHistogramById(histogram_id);
+  auto histogram = filter_config_->metrics().getHistogramById(histogram_id);
   EXPECT_TRUE(histogram.has_value());
 }
 
