@@ -62,7 +62,7 @@ aws-c-auth-testdata:
   license: "Apache-2.0"
   license_url: "https://github.com/awslabs/aws-c-auth/blob/v{version}/LICENSE"
 
-bazel_compdb:
+bazel-compdb:
   project_name: "bazel-compilation-database"
   project_desc: "Clang JSON compilation database support for Bazel"
   project_url: "https://github.com/grailbio/bazel-compilation-database"
@@ -86,6 +86,7 @@ benchmark:
   project_name: "Benchmark"
   project_desc: "Library to benchmark code snippets"
   project_url: "https://github.com/google/benchmark"
+  apparent_name: google_benchmark
   release_date: "2026-01-21"
   use_category:
   - test_only
@@ -96,6 +97,7 @@ boost:
   project_name: "Boost"
   project_desc: "Boost C++ source libraries"
   project_url: "https://www.boost.org/"
+  apparent_name: boost.headers
   release_date: "2025-08-14"
   use_category:
   - dataplane_ext
@@ -294,7 +296,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-09-02"
+  release_date: "2026-09-03"
   use_category:
   - build
   - controlplane
@@ -304,6 +306,10 @@ envoy_toolshed:
   - sysroot_linux_arm64
   - tsan_libs
   - msan_libs
+  # Prebuilt wee8 repos; must mirror api/bazel/deps.yaml.
+  - wee8_prebuilt_x86_64
+  - wee8_prebuilt_x86_64_libstdcxx
+  - wee8_prebuilt_aarch64
   license: "Apache-2.0"
   license_url: "https://github.com/envoyproxy/toolshed/blob/bazel-v{version}/LICENSE"
 
@@ -1206,6 +1212,7 @@ shellcheck:
   project_name: "Shellcheck rules for bazel"
   project_desc: "Now you do not need to depend on the system shellcheck version in your bazel-managed (mono)repos."
   project_url: "https://github.com/aignas/rules_shellcheck"
+  apparent_name: rules_shellcheck
   release_date: "2025-08-13"
   use_category:
   - build

@@ -129,6 +129,28 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "envoy_quic_downstream_cert_verifier_test",
+    srcs = envoy_select_enable_http3(["envoy_quic_downstream_cert_verifier_test.cc"]),
+    data = [
+        "//test/common/tls/test_data:certs",
+    ],
+    rbe_pool = "linux_x64_small",
+    deps = envoy_select_enable_http3([
+        "//source/common/quic:envoy_quic_proof_verifier_lib",
+        "//source/common/quic:envoy_quic_downstream_cert_verifier_lib",
+        "//source/common/tls:context_config_lib",
+        "//source/common/tls:context_lib",
+        "//source/common/tls:server_context_config_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+        "@quiche//:quic_core_crypto_certificate_view_lib",
+        "@quiche//:quic_test_tools_test_certificates_lib",
+    ]),
+)
+
+envoy_cc_test(
     name = "envoy_quic_server_stream_test",
     srcs = envoy_select_enable_http3(["envoy_quic_server_stream_test.cc"]),
     rbe_pool = "linux_x64_small",
@@ -178,6 +200,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_server_session_test",
     srcs = envoy_select_enable_http3(["envoy_quic_server_session_test.cc"]),
+    data = [
+        "//test/common/tls/test_data:certs",
+    ],
     rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         ":test_proof_source_lib",
@@ -187,18 +212,23 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:envoy_quic_server_session_lib",
+        "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/quic:server_codec_lib",
+        "//source/common/tls/cert_validator:cert_validator_lib",
         "//source/server:configuration_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:overload_manager_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:global_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
         "@quiche//:quic_test_tools_config_peer_lib",
         "@quiche//:quic_test_tools_stream_peer_lib",
         "@quiche//:quic_test_tools_server_session_base_peer",

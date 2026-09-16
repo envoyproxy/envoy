@@ -41,7 +41,7 @@
   display: flex;
   flex-wrap: wrap;
   font-family: var(--envoy-font-mono);
-  font-size: 11.5px;
+  font-size: 0.7rem;
   gap: 0 4px;
   margin-bottom: 30px;
 }
@@ -69,7 +69,7 @@
 
 .envoy-content-main .wy-breadcrumbs-aside a {
   font-family: var(--envoy-font-sans);
-  font-size: 12.5px;
+  font-size: 0.8rem;
 }
 
 .envoy-content-main .rst-content .wy-breadcrumbs + hr {
@@ -94,20 +94,20 @@
 }
 
 .envoy-content-main .rst-content h1 {
-  font-size: 32px;
+  font-size: 2rem;
   letter-spacing: -0.025em;
   line-height: 1.15;
   margin: 0 0 20px;
 }
 
 .envoy-content-main .rst-content h2 {
-  font-size: 23px;
+  font-size: 1.45rem;
   line-height: 1.25;
   margin: 52px 0 14px;
 }
 
 .envoy-content-main .rst-content h3 {
-  font-size: 18px;
+  font-size: 1.125rem;
   line-height: 1.35;
   margin: 36px 0 10px;
 }
@@ -116,34 +116,85 @@
 .envoy-content-main .rst-content h5,
 .envoy-content-main .rst-content h6,
 .envoy-content-main .rst-content .rubric {
-  font-size: 16px;
+  font-size: 1rem;
   margin: 28px 0 8px;
 }
 
-/* the anchor hangs in the margin, so linking a heading never reflows the line */
+/* --- permalinks ----------------------------------------------------------
+
+   A link icon sized to its line and never below 13px, so it reads as a link
+   at a glance; conf.py blanks the theme's Font Awesome glyph so this is the
+   only mark. The anchor spans its line, which makes the hit target the line
+   rather than the icon, and is a positioned box so the copied bubble has
+   something to sit on. */
+
 .envoy-content-main .rst-content a.headerlink {
-  color: var(--envoy-rule-strong);
-  font-size: 0.7em;
-  font-weight: 400;
-  left: -1.35em;
+  color: var(--envoy-ink-muted);
+  display: inline-block;
+  font-size: inherit;
+  line-height: inherit;
+  margin-left: 0.2em;
   opacity: 0;
-  position: absolute;
+  padding: 0 0.3em;
+  position: relative;
   text-decoration: none;
-  top: 0.28em;
   visibility: visible;
 }
 
 .envoy-content-main .rst-content a.headerlink::after {
-  content: "#";
+  background: currentColor;
+  content: "";
+  display: inline-block;
+  height: clamp(13px, 0.75em, 18px);
+  mask: url("../../img/link.svg") center / contain no-repeat;
+  vertical-align: middle;
+  width: clamp(13px, 0.75em, 18px);
 }
 
-.envoy-content-main .rst-content :hover > a.headerlink,
-.envoy-content-main .rst-content a.headerlink:focus-visible {
+/* in a heading it hangs in the margin, so linking one never reflows the line */
+.envoy-content-main .rst-content h1 > a.headerlink,
+.envoy-content-main .rst-content h2 > a.headerlink,
+.envoy-content-main .rst-content h3 > a.headerlink,
+.envoy-content-main .rst-content h4 > a.headerlink,
+.envoy-content-main .rst-content h5 > a.headerlink,
+.envoy-content-main .rst-content h6 > a.headerlink {
+  margin: 0 0.2em 0 0;
+  position: absolute;
+  right: 100%;
+  top: 0;
+}
+
+/* a definition's anchor stays faintly in view: fields are what gets shared,
+   and a page holds dozens to discover it from */
+.envoy-content-main .rst-content dl > dt > a.headerlink {
+  color: var(--envoy-rule-strong);
   opacity: 1;
 }
 
+.envoy-content-main .rst-content :hover > a.headerlink,
+.envoy-content-main .rst-content a.headerlink:focus-visible,
+.envoy-content-main .rst-content a.headerlink.envoy-copied {
+  color: var(--envoy-ink-muted);
+  opacity: 1;
+}
+
+/* the accent marks interaction everywhere else, and this is a link */
 .envoy-content-main .rst-content a.headerlink:hover {
-  color: var(--envoy-ink);
+  color: var(--envoy-accent);
+}
+
+/* permalinks.js holds the class for a moment after the link is copied */
+.envoy-content-main .rst-content a.headerlink.envoy-copied::before {
+  background: var(--envoy-ink);
+  border-radius: 4px;
+  bottom: calc(50% + 11px);
+  color: var(--envoy-ground);
+  content: "Copied";
+  font: 500 11px/1 var(--envoy-font-sans);
+  left: 0;
+  padding: 4px 7px;
+  pointer-events: none;
+  position: absolute;
 }
 
 /* --- text ---------------------------------------------------------------- */
@@ -234,7 +285,7 @@
   border-left: 2px solid var(--envoy-rule);
   color: var(--envoy-ink);
   font-family: var(--envoy-font-mono);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   margin: 22px 0 0;
   padding: 0 0 0 14px;
@@ -297,7 +348,7 @@
 .envoy-content-main .rst-content .sidebar .sidebar-title {
   background: transparent;
   color: var(--envoy-ink);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   margin: 0 0 8px;
   padding: 0;
@@ -321,7 +372,7 @@
 }
 
 .envoy-content-main .rst-content .toctree-wrapper > ul > li > a {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
   text-decoration: none;
 }
@@ -338,7 +389,7 @@
 
 .envoy-content-main .rst-content .toctree-wrapper ul ul a {
   color: var(--envoy-ink-body);
-  font-size: 14px;
+  font-size: 0.875rem;
   text-decoration: none;
 }
 
@@ -351,7 +402,7 @@
 .envoy-content-main .rst-content .toctree-wrapper .caption {
   color: var(--envoy-ink-muted);
   font-family: var(--envoy-font-mono);
-  font-size: 10px;
+  font-size: 0.625rem;
   letter-spacing: 0.14em;
   margin: 36px 0 6px;
   text-transform: uppercase;
@@ -365,7 +416,7 @@
   border-bottom: 2px solid transparent;
   color: var(--envoy-ink-muted);
   font-family: var(--envoy-font-sans);
-  font-size: 13.5px;
+  font-size: 0.85rem;
   padding: 8px 14px;
 }
 
@@ -405,7 +456,7 @@
   border-radius: 6px;
   box-shadow: none;
   color: var(--envoy-ink);
-  font-size: 13.5px;
+  font-size: 0.85rem;
   font-weight: 500;
   padding: 10px 14px;
   text-decoration: none;
@@ -426,7 +477,7 @@
 .envoy-content-main .rst-content footer,
 .envoy-content-main .rst-content footer p {
   color: var(--envoy-ink-muted);
-  font-size: 12.5px;
+  font-size: 0.8rem;
 }
 
 .envoy-content-main footer hr {

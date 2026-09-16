@@ -168,20 +168,6 @@ getCertificateValidationContextConfigProvider(
   }
 }
 
-std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
-compliancePolicyFromProto(
-    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params) {
-  switch (params.compliance_policies_size()) {
-  case 0:
-    return std::nullopt;
-  case 1:
-    return params.compliance_policies(0);
-  default:
-    IS_ENVOY_BUG("more than one policies are not supported");
-    return std::nullopt;
-  }
-}
-
 std::shared_ptr<SharedPool::ObjectSharedPool<std::string>>
 getCipherSuitesPool(Singleton::Manager& singleton_manager, Event::Dispatcher& dispatcher) {
   return singleton_manager.getTyped<SharedPool::ObjectSharedPool<std::string>>(
@@ -223,7 +209,7 @@ ContextConfigImpl::ContextConfigImpl(
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)),
       factory_context_(factory_context), tls_keylog_path_(config.key_log().path()),
-      compliance_policy_(compliancePolicyFromProto(config.tls_params())) {
+      compliance_policy_(Utility::compliancePolicyFromProto(config.tls_params())) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
   auto list_or_error = Network::Address::IpList::create(config.key_log().local_address_range());
   SET_AND_RETURN_IF_NOT_OK(list_or_error.status(), creation_status);
@@ -372,21 +358,7 @@ Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
 unsigned ContextConfigImpl::tlsVersionFromProto(
     const envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol& version,
     unsigned default_version) {
-  switch (version) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO:
-    return default_version;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0:
-    return TLS1_VERSION;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_1:
-    return TLS1_1_VERSION;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2:
-    return TLS1_2_VERSION;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3:
-    return TLS1_3_VERSION;
-  }
-  IS_ENVOY_BUG("unexpected tls version provided");
-  return default_version;
+  return Utility::tlsVersionFromProto(version, default_version);
 }
 
 const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;

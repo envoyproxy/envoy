@@ -1753,6 +1753,48 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) GetLogLevel() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogLevel", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).GetLogLevel))
 }
 
+// GetRuntimeBool mocks base method.
+func (m *MockHttpFilterConfigHandle) GetRuntimeBool(key string, defaultValue bool) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRuntimeBool", key, defaultValue)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// GetRuntimeBool indicates an expected call of GetRuntimeBool.
+func (mr *MockHttpFilterConfigHandleMockRecorder) GetRuntimeBool(key, defaultValue any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRuntimeBool", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).GetRuntimeBool), key, defaultValue)
+}
+
+// GetRuntimeInt mocks base method.
+func (m *MockHttpFilterConfigHandle) GetRuntimeInt(key string, defaultValue uint64) uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRuntimeInt", key, defaultValue)
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetRuntimeInt indicates an expected call of GetRuntimeInt.
+func (mr *MockHttpFilterConfigHandleMockRecorder) GetRuntimeInt(key, defaultValue any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRuntimeInt", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).GetRuntimeInt), key, defaultValue)
+}
+
+// GetRuntimeNumber mocks base method.
+func (m *MockHttpFilterConfigHandle) GetRuntimeNumber(key string, defaultValue float64) float64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRuntimeNumber", key, defaultValue)
+	ret0, _ := ret[0].(float64)
+	return ret0
+}
+
+// GetRuntimeNumber indicates an expected call of GetRuntimeNumber.
+func (mr *MockHttpFilterConfigHandleMockRecorder) GetRuntimeNumber(key, defaultValue any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRuntimeNumber", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).GetRuntimeNumber), key, defaultValue)
+}
+
 // GetScheduler mocks base method.
 func (m *MockHttpFilterConfigHandle) GetScheduler() shared.Scheduler {
 	m.ctrl.T.Helper()

@@ -28,8 +28,10 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:statusor_lib",
+        "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "//source/common/http:hash_policy_lib",
+        "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/router:delegating_route_lib",
@@ -40,6 +42,7 @@ envoy_cc_library(
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/router/cluster_specifiers/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

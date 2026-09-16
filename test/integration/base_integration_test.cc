@@ -167,9 +167,8 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
   if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
-    static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
+        std::move(cfg), context_manager_, server_factory_context_.serverScope());
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
@@ -483,10 +482,10 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
     Server::FieldValidationConfig validator_config, bool allow_lds_rejection,
     IntegrationTestServerPtr& test_server) {
   test_server = IntegrationTestServer::create(
-      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_,
-      deterministic_value_, timeSystem(), *api_, defer_listener_finalization_, process_object_,
-      validator_config, concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_,
-      use_real_stats_, use_bootstrap_node_metadata_);
+      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, random_config_,
+      timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
+      concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_, use_real_stats_,
+      use_bootstrap_node_metadata_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -628,7 +627,8 @@ void BaseIntegrationTest::createXdsUpstream() {
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
 
-    upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
+    upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>(
+        server_factory_context_.serverScope().symbolTable());
     auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
         std::move(cfg), context_manager_, *upstream_stats_store_->rootScope());
     addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
@@ -646,6 +646,10 @@ void BaseIntegrationTest::cleanUpXdsConnection() {
     AssertionResult result = xds_connection_->close();
     RELEASE_ASSERT(result, result.message());
     result = xds_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    // The disconnect notification can run inside another fake-upstream event callback. Wait for
+    // that callback to unwind before destroying the connection wrapper it may still reference.
+    result = xds_connection_->waitForDispatcherBarrier();
     RELEASE_ASSERT(result, result.message());
     xds_connection_.reset();
   }

@@ -1,7 +1,10 @@
 #include "source/common/quic/envoy_tls_server_handshaker.h"
 
 #include "source/common/common/macros.h"
+#include "source/common/quic/envoy_quic_downstream_cert_verifier.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_server_session.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -52,6 +55,25 @@ void EnvoyTlsServerHandshaker::keylogCallback(const SSL* ssl, const char* line) 
       static_cast<EnvoyQuicServerSession*>(handshaker->session())->connectionInfoProvider();
   handshaker->pinnedServerContext()->maybeWriteKeyLog(line, info.localAddress().get(),
                                                       info.remoteAddress().get());
+}
+
+quic::QuicAsyncStatus EnvoyTlsServerHandshaker::VerifyCertChain(
+    const std::vector<absl::string_view>& certs, std::string* error_details,
+    std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert,
+    std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_mtls_server_enabled")) {
+    *error_details = "QUIC mTLS server validation is disabled by runtime guard "
+                     "envoy.reloadable_features.quic_mtls_server_enabled";
+    *details = std::make_unique<CertVerifyResult>(false);
+    return quic::QUIC_FAILURE;
+  }
+  auto* context = pinnedServerContext();
+  if (context == nullptr) {
+    *error_details = "server SSL context not available because secrets are not loaded";
+    *details = std::make_unique<CertVerifyResult>(false);
+    return quic::QUIC_FAILURE;
+  }
+  return verifyQuicClientCertChain(certs, *context, error_details, details, out_alert);
 }
 
 } // namespace Quic

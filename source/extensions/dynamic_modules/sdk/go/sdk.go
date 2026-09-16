@@ -12,6 +12,7 @@ var httpFilterConfigFactoryRegistry = make(map[string]shared.HttpFilterConfigFac
 var listenerFilterConfigFactoryRegistry = make(map[string]shared.ListenerFilterConfigFactory)
 var networkFilterConfigFactoryRegistry = make(map[string]shared.NetworkFilterConfigFactory)
 var statSinkConfigFactoryRegistry = make(map[string]shared.StatSinkConfigFactory)
+var earlyHeaderMutationConfigFactoryRegistry = make(map[string]shared.EarlyHeaderMutationConfigFactory)
 
 // NewHttpFilterFactory creates a new plugin factory for the given plugin name and unparsed config.
 func NewHttpFilterFactory(handle shared.HttpFilterConfigHandle, name string,
@@ -117,5 +118,34 @@ func RegisterStatSinkConfigFactories(factories map[string]shared.StatSinkConfigF
 			panic("stat sink config factory already registered: " + name)
 		}
 		statSinkConfigFactoryRegistry[name] = factory
+	}
+}
+
+// NewEarlyHeaderMutation creates a new EarlyHeaderMutation for the given mutation name and
+// unparsed config bytes.
+func NewEarlyHeaderMutation(handle shared.EarlyHeaderMutationConfigHandle, name string,
+	unparsedConfig []byte) (shared.EarlyHeaderMutation, error) {
+	configFactory := earlyHeaderMutationConfigFactoryRegistry[name]
+	if configFactory == nil {
+		return nil, fmt.Errorf("failed to get early header mutation config factory for %s", name)
+	}
+	return configFactory.Create(handle, unparsedConfig)
+}
+
+// GetEarlyHeaderMutationConfigFactory gets the early header mutation config factory for the given
+// mutation name.
+func GetEarlyHeaderMutationConfigFactory(name string) shared.EarlyHeaderMutationConfigFactory {
+	return earlyHeaderMutationConfigFactoryRegistry[name]
+}
+
+// RegisterEarlyHeaderMutationConfigFactories registers early header mutation config factories for
+// plugins in the composer binary itself. This function MUST only be called from init() functions.
+func RegisterEarlyHeaderMutationConfigFactories(
+	factories map[string]shared.EarlyHeaderMutationConfigFactory) {
+	for name, factory := range factories {
+		if _, ok := earlyHeaderMutationConfigFactoryRegistry[name]; ok {
+			panic("early header mutation config factory already registered: " + name)
+		}
+		earlyHeaderMutationConfigFactoryRegistry[name] = factory
 	}
 }

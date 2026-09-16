@@ -32,6 +32,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Server {
@@ -306,11 +307,17 @@ private:
 };
 
 /**
- * This is a variant of the isolated store that has locking across all operations so that it can
- * be used during the integration tests.
+ * This is a thread-safe wrapper around a stats store. By default it owns an isolated store, but it
+ * can also wrap an externally owned store so its test-facing state remains authoritative.
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
+  TestIsolatedStoreImpl()
+      : owned_store_(std::make_unique<IsolatedStoreImpl>()), store_(*owned_store_) {}
+  explicit TestIsolatedStoreImpl(SymbolTable& symbol_table)
+      : owned_store_(std::make_unique<IsolatedStoreImpl>(symbol_table)), store_(*owned_store_) {}
+  explicit TestIsolatedStoreImpl(Store& store) : store_(store) {}
+
   // Stats::Store
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
@@ -357,8 +364,8 @@ public:
     Thread::LockGuard lock(lock_);
     store_.deliverHistogramToSinks(histogram, value);
   }
-  NullGaugeImpl& nullGauge() override { return store_.nullGauge(); }
-  NullCounterImpl& nullCounter() override { return store_.nullCounter(); }
+  Gauge& nullGauge() override { return store_.nullGauge(); }
+  Counter& nullCounter() override { return store_.nullCounter(); }
   ScopeSharedPtr rootScope() override {
     Thread::LockGuard lock(lock_);
     if (lazy_default_scope_ == nullptr) {
@@ -423,7 +430,8 @@ public:
 
 private:
   mutable Thread::MutexBasicLockable lock_;
-  IsolatedStoreImpl store_;
+  std::unique_ptr<IsolatedStoreImpl> owned_store_;
+  Store& store_;
   PostMergeCb merge_cb_;
   ScopeSharedPtr lazy_default_scope_;
   uint32_t eviction_count_{0};
@@ -433,6 +441,14 @@ private:
 
 class IntegrationTestServer;
 using IntegrationTestServerPtr = std::unique_ptr<IntegrationTestServer>;
+
+struct TestRandomValue {
+  uint64_t value;
+};
+struct TestRandomSeed {
+  uint64_t value;
+};
+using TestRandomGeneratorConfig = absl::variant<absl::monostate, TestRandomValue, TestRandomSeed>;
 
 /**
  * Wrapper for running the real server for the purpose of integration tests.
@@ -448,7 +464,7 @@ public:
   static IntegrationTestServerPtr
   create(const std::string& config_path, const Network::Address::IpVersion version,
          std::function<void(IntegrationTestServer&)> on_server_ready_function,
-         std::function<void()> on_server_init_function, std::optional<uint64_t> deterministic_value,
+         std::function<void()> on_server_init_function, TestRandomGeneratorConfig random_config,
          Event::TestTimeSystem& time_system, Api::Api& api,
          bool defer_listener_finalization = false,
          ProcessObjectOptRef process_object = std::nullopt,
@@ -464,6 +480,9 @@ public:
   ~IntegrationTestServer() override;
 
   void waitUntilListenersReady();
+
+  // Wait until callbacks already running or queued on every server worker have completed.
+  void waitForWorkerThreads();
 
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value);
@@ -483,11 +502,10 @@ public:
   void onWorkersStarted() override {}
 
   void start(const Network::Address::IpVersion version,
-             std::function<void()> on_server_init_function,
-             std::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
-             ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
-             uint32_t concurrency, std::chrono::seconds drain_time,
-             Server::DrainStrategy drain_strategy,
+             std::function<void()> on_server_init_function, TestRandomGeneratorConfig random_config,
+             bool defer_listener_finalization, ProcessObjectOptRef process_object,
+             Server::FieldValidationConfig validation_config, uint32_t concurrency,
+             std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
              Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata,
              bool use_admin_server);
 
@@ -645,8 +663,7 @@ private:
    * Runs the real server on a thread.
    */
   void threadRoutine(const Network::Address::IpVersion version,
-                     std::optional<uint64_t> deterministic_value,
-                     ProcessObjectOptRef process_object,
+                     TestRandomGeneratorConfig random_config, ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
                      Buffer::WatermarkFactorySharedPtr watermark_factory,

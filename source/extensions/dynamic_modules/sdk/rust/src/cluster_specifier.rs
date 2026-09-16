@@ -7,12 +7,11 @@
 //! `specifier_name`.
 
 use crate::{
-  abi, ClusterHostCount, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
+  abi, ffi_export, ClusterHostCount, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
   EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
 };
 use mockall::*;
 use std::ffi::c_void;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -73,28 +72,21 @@ impl ClusterSpecifierContext {
     if count == 0 {
       return Vec::new();
     }
-    let mut raw: Vec<abi::envoy_dynamic_module_type_envoy_http_header> = Vec::with_capacity(count);
+    // Fill the pairs in place as ABI headers to avoid a second allocation.
+    let mut headers: Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> = Vec::with_capacity(count);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
         self.envoy_ptr,
-        raw.as_mut_ptr(),
+        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
       )
     };
     if !success {
       return Vec::new();
     }
     unsafe {
-      raw.set_len(count);
+      headers.set_len(count);
     }
-    raw
-      .iter()
-      .map(|h| {
-        (
-          unsafe { EnvoyBuffer::new_from_raw(h.key_ptr as *const _, h.key_length) },
-          unsafe { EnvoyBuffer::new_from_raw(h.value_ptr as *const _, h.value_length) },
-        )
-      })
-      .collect()
+    headers
   }
 
   /// Get the first value of the request header with the given key.
@@ -430,6 +422,78 @@ impl ClusterSpecifierContext {
       abi::envoy_dynamic_module_callback_cluster_specifier_set_route_action_override(
         self.envoy_ptr,
         name_buf,
+      )
+    }
+  }
+
+  /// Set a number-typed route metadata value under the given namespace and key.
+  ///
+  /// The entry is layered onto the metadata of the matched route, so consumers that read route
+  /// metadata, such as the rate limit `ROUTE_ENTRY` action or the `METADATA(ROUTE)` formatter,
+  /// observe it. An existing entry with the same namespace and key is overwritten. Route metadata
+  /// takes effect only when [`ClusterSpecifierConfig::on_select`] returns `true`.
+  pub fn set_route_metadata_number(&mut self, namespace: &str, key: &str, value: f64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(namespace),
+        crate::str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  /// Set a string-typed route metadata value under the given namespace and key.
+  ///
+  /// It behaves like [`Self::set_route_metadata_number`] but stores a string.
+  pub fn set_route_metadata_string(&mut self, namespace: &str, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(namespace),
+        crate::str_to_module_buffer(key),
+        crate::str_to_module_buffer(value),
+      )
+    }
+  }
+
+  /// Set a bool-typed route metadata value under the given namespace and key.
+  ///
+  /// It behaves like [`Self::set_route_metadata_number`] but stores a bool.
+  pub fn set_route_metadata_bool(&mut self, namespace: &str, key: &str, value: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(namespace),
+        crate::str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  /// Merge a serialized `google.protobuf.Struct` into the route metadata under the given namespace.
+  ///
+  /// Existing entries with the same key are overwritten, while the others stay in effect. A buffer
+  /// that does not parse as a `google.protobuf.Struct` is a no-op.
+  pub fn set_route_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(namespace),
+        crate::bytes_to_module_buffer(serialized_struct),
+      )
+    }
+  }
+
+  /// Set the typed route metadata under the given namespace from a `google.protobuf.Any`, replacing
+  /// an existing entry. A typed metadata factory registered for the namespace parses it out of
+  /// `typedMetadata`. A buffer that does not parse as a `google.protobuf.Any` is a no-op.
+  pub fn set_route_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(namespace),
+        crate::bytes_to_module_buffer(serialized_any),
       )
     }
   }
@@ -899,17 +963,16 @@ impl EnvoyClusterSpecifierMetrics for EnvoyClusterSpecifierMetricsImpl {
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_specifier_config_new(
-  config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> *const c_void {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_specifier_config_new(
+    config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> *const c_void {
     // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes.
     // The helpers tolerate `(nullptr, 0)` empty inputs and substitute `U+FFFD` for malformed
     // UTF-8 rather than triggering UB.
@@ -927,14 +990,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_specifier_config_new(
         .get()
         .expect("NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION must be set"),
     )
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_cluster_specifier_config_new",
-      panic,
-    );
-    ptr::null()
-  })
+  }
+  on_panic = ptr::null()
 }
 
 /// Testable wrapper for [`envoy_dynamic_module_on_cluster_specifier_config_new`].
@@ -956,42 +1013,31 @@ pub fn envoy_dynamic_module_on_cluster_specifier_config_new_impl(
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_specifier_config_destroy(
-  config_ptr: *const c_void,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_specifier_config_destroy(
+    config_ptr: *const c_void,
+  ) {
     crate::drop_wrapped_c_void_ptr!(config_ptr, ClusterSpecifierConfig);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_cluster_specifier_config_destroy",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_specifier_select(
-  config_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_module_ptr,
-  context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
-) -> bool {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_cluster_specifier_select(
+    config_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_module_ptr,
+    context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  ) -> bool {
     let config = &*(config_ptr as *const Box<dyn ClusterSpecifierConfig>);
     let mut ctx = unsafe { ClusterSpecifierContext::new(context_envoy_ptr) };
     config.on_select(&mut ctx)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_specifier_select", panic);
-    // A panic during selection must not look like a decision, so fail closed.
-    false
-  })
+  }
+  // A panic during selection must not look like a decision, so fail closed.
+  on_panic = false
 }

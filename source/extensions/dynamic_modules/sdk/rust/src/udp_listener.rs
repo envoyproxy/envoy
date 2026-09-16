@@ -1,11 +1,10 @@
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr,
-  EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId, NewUdpListenerFilterConfigFunction,
-  NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION,
+  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
+  wrap_into_c_void_ptr, EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId,
+  NewUdpListenerFilterConfigFunction, NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION,
 };
 use mockall::*;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// The trait that represents the Envoy UDP listener filter configuration.
 /// This is used in [`NewUdpListenerFilterConfigFunction`] to pass the Envoy filter configuration
@@ -505,13 +504,12 @@ impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
 
 // UDP Listener Filter Event Hook Implementations
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_config_new(
-  envoy_filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_udp_listener_filter_config_new(
+    envoy_filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr {
     let mut envoy_filter_config = EnvoyUdpListenerFilterConfigImpl::new(envoy_filter_config_ptr);
     let name_str =
       unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
@@ -526,14 +524,8 @@ pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_config_new(
         .get()
         .expect("NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION must be set"),
     )
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_udp_listener_filter_config_new",
-      panic,
-    );
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
 pub(crate) fn init_udp_listener_filter_config<
@@ -552,38 +544,30 @@ pub(crate) fn init_udp_listener_filter_config<
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_udp_listener_filter_config_destroy(
-  filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_udp_listener_filter_config_destroy(
+    filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr,
+  ) {
     drop_wrapped_c_void_ptr!(
       filter_config_ptr,
       UdpListenerFilterConfig<EnvoyUdpListenerFilterImpl>
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_udp_listener_filter_config_destroy",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_udp_listener_filter_new(
-  filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr,
-  envoy_filter_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_envoy_ptr,
-) -> abi::envoy_dynamic_module_type_udp_listener_filter_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_udp_listener_filter_new(
+    filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr,
+    envoy_filter_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_envoy_ptr,
+  ) -> abi::envoy_dynamic_module_type_udp_listener_filter_module_ptr {
     let mut envoy_filter = EnvoyUdpListenerFilterImpl::new(envoy_filter_ptr);
     let filter_config = {
       let raw =
@@ -591,11 +575,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_udp_listener_filter_new(
       &**raw
     };
     envoy_dynamic_module_on_udp_listener_filter_new_impl(&mut envoy_filter, filter_config)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_udp_listener_filter_new", panic);
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
 pub(crate) fn envoy_dynamic_module_on_udp_listener_filter_new_impl(
@@ -606,32 +587,24 @@ pub(crate) fn envoy_dynamic_module_on_udp_listener_filter_new_impl(
   wrap_into_c_void_ptr!(filter)
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_on_data(
-  envoy_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_module_ptr,
-) -> abi::envoy_dynamic_module_type_on_udp_listener_filter_status {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_udp_listener_filter_on_data(
+    envoy_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_envoy_ptr,
+    filter_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_module_ptr,
+  ) -> abi::envoy_dynamic_module_type_on_udp_listener_filter_status {
     let filter = filter_ptr as *mut Box<dyn UdpListenerFilter<EnvoyUdpListenerFilterImpl>>;
     let filter = unsafe { &mut *filter };
     filter.on_data(&mut EnvoyUdpListenerFilterImpl::new(envoy_ptr))
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_udp_listener_filter_on_data", panic);
-    abi::envoy_dynamic_module_type_on_udp_listener_filter_status::StopIteration
-  })
+  }
+  on_panic = abi::envoy_dynamic_module_type_on_udp_listener_filter_status::StopIteration
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_destroy(
-  filter_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_udp_listener_filter_destroy(
+    filter_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_module_ptr,
+  ) {
     let _ = unsafe {
       Box::from_raw(filter_ptr as *mut Box<dyn UdpListenerFilter<EnvoyUdpListenerFilterImpl>>)
     };
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_udp_listener_filter_destroy", panic);
-  });
+  }
 }

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/common/optref.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/hash_policy.h"
@@ -19,6 +20,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/statusor.h"
+#include "source/common/config/metadata.h"
 #include "source/common/router/delegating_route_impl.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -327,6 +329,9 @@ struct ClusterSpecifierSelection {
   // Points into the override map of the cluster specifier configuration, which is immutable after
   // construction.
   const RouteActionOverride* route_action_override{nullptr};
+  // Metadata the module layered onto the matched route, keyed by namespace. Empty when the module
+  // set none, so metadata() and typedMetadata() fall back to the matched route.
+  envoy::config::core::v3::Metadata route_metadata;
 };
 
 /**
@@ -392,6 +397,14 @@ public:
     return entry != nullptr && entry->hash_policy != nullptr ? entry->hash_policy.get()
                                                              : DelegatingRouteEntry::hashPolicy();
   }
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return active_metadata_pack_ != nullptr ? active_metadata_pack_->proto_metadata_
+                                            : DelegatingRouteEntry::metadata();
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return active_metadata_pack_ != nullptr ? active_metadata_pack_->typed_metadata_
+                                            : DelegatingRouteEntry::typedMetadata();
+  }
   void refreshRouteCluster(const Http::RequestHeaderMap& headers,
                            const StreamInfo::StreamInfo& stream_info) const override;
 
@@ -400,6 +413,15 @@ private:
   const uint64_t random_value_;
   // Only accessed from the worker thread that owns the request, so no synchronization is needed.
   mutable ClusterSpecifierSelection selection_;
+  // Metadata packs built across refreshes. A pack is kept until the entry is destroyed so the
+  // reference that metadata() and typedMetadata() return stays valid past a refresh, the way
+  // cluster_name does. active_metadata_pack_ points at the pack of the current decision, or is null
+  // so both accessors fall back to the matched route. Only the worker thread that owns the request
+  // touches these.
+  mutable std::vector<Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory>>
+      metadata_packs_;
+  mutable const Envoy::Config::MetadataPack<Envoy::Router::HttpRouteTypedMetadataFactory>*
+      active_metadata_pack_{nullptr};
 };
 
 /**

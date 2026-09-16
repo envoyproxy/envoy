@@ -45,6 +45,8 @@ type MetricSnapshot interface {
 // to host services. It provides logging, gauge definition and updates, and
 // scheduling work back onto the main thread.
 type StatSinkHandle interface {
+	CommonHandle
+
 	// Log writes a message to Envoy's logger at the given level.
 	Log(level LogLevel, format string, args ...any)
 

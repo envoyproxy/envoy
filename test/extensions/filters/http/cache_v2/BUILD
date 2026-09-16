@@ -87,6 +87,8 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         ":mocks",
+        "//envoy/http:codes_interface",
+        "//source/common/http:headers_lib",
         "//source/extensions/filters/http/cache_v2:upstream_request_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
@@ -162,7 +164,6 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.cache_v2"],
     rbe_pool = "linux_x64_small",
-    shard_count = 4,
     deps = [
         "//source/extensions/filters/http/cache_v2:config",
         "//source/extensions/filters/http/cache_v2:http_cache_lib",
