@@ -453,9 +453,9 @@ TEST_F(GeoipFilterTest, NoContinueDecodingWhenStreamDestroyedBeforeLookupComplet
       .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_)));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
-  // Tear the stream down while the lookup is still in flight. The posted callback holds a
-  // shared_ptr to the filter, so it stays alive, but the decoder callbacks and the request headers
-  // they refer to do not.
+  // Keep the filter alive through the posted callback so the destroyed_ guard is exercised.
+  // In production, the callback captures a weak_ptr and does nothing if the filter is already gone;
+  // the decoder callbacks and request headers it refers to are invalid after stream destruction.
   filter_->onDestroy();
   captured_cb_(Geolocation::LookupResult{{"x-geo-city", "dummy-city"}});
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);

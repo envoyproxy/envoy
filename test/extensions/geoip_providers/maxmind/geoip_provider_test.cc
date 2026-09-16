@@ -148,7 +148,6 @@ public:
   void initializeProvider(const std::string& yaml,
                           std::optional<ConditionalInitializer>& conditional) {
     EXPECT_CALL(server_factory_context_, scope()).WillRepeatedly(ReturnRef(*scope_));
-    EXPECT_CALL(server_factory_context_, api()).WillRepeatedly(ReturnRef(*api_));
     EXPECT_CALL(dispatcher_, createFilesystemWatcher_())
         .WillRepeatedly(Invoke([this, &conditional] {
           Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
