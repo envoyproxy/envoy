@@ -11,11 +11,14 @@ sphinx-rtd-theme>=3.0.2
 
 # Shared dependencies (also in main workspace)
 aio.run.runner
-envoy.base.utils>=0.6.9
-envoy.code.check>=0.6.7
+# envoy.base.utils>=0.6.10
+# envoy.code.check>=0.6.8
 frozendict>=2.3.7
 jinja2
 packaging
 pyjwt[crypto]==2.13.0
 cryptography==50.0.0
 pyyaml
+
+envoy.base.utils @ git+https://github.com/envoyproxy/toolshed@5450f31b19cb87fe511723c3ec44bff54e11b9dd#subdirectory=py/envoy.base.utils
+envoy.code.check @ git+https://github.com/envoyproxy/toolshed@5450f31b19cb87fe511723c3ec44bff54e11b9dd#subdirectory=py/envoy.code.check
