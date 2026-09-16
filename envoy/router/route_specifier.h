@@ -57,11 +57,6 @@ struct OnRouteResult {
  * it was given. Only if the last specifier returns nullptr is the request treated as having no
  * route.
  *
- * The virtual host Envoy reports alongside the route always belongs to the route that comes out of
- * the chains: a specifier that returns a route from elsewhere brings that route's virtual host
- * along, and a specifier that answers for a request no virtual host matched supplies the virtual
- * host too.
- *
  * Which specifiers apply, and in which order, is entirely owned by the route configuration
  * implementation; nothing about the chains is visible on the Route, VirtualHost or Config
  * interfaces.
