@@ -46,6 +46,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/router/header_cluster_specifier.h"
 #include "source/common/router/matcher_visitor.h"
+#include "source/common/router/route_specifier_impl.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/custom_tag_impl.h"
@@ -803,9 +804,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     early_data_policy_ = std::make_unique<DefaultEarlyDataPolicy>(/*allow_safe_request*/ true);
   }
 
-  auto route_extensions_or_error = createRouteExtensions(route.route_extensions(), factory_context);
-  SET_AND_RETURN_IF_NOT_OK(route_extensions_or_error.status(), creation_status);
-  route_extensions_ = std::move(route_extensions_or_error.value());
+  auto route_specifiers_or_error = createRouteSpecifiers(route.route_specifiers(), factory_context);
+  SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
+  route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
@@ -1706,10 +1707,10 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
     metadata_ = std::make_unique<RouteMetadataPack>(virtual_host.metadata());
   }
 
-  auto route_extensions_or_error =
-      createRouteExtensions(virtual_host.route_extensions(), factory_context);
-  SET_AND_RETURN_IF_NOT_OK(route_extensions_or_error.status(), creation_status);
-  route_extensions_ = std::move(route_extensions_or_error.value());
+  auto route_specifiers_or_error =
+      createRouteSpecifiers(virtual_host.route_specifiers(), factory_context);
+  SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
+  route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
 
 CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
@@ -1849,7 +1850,7 @@ VirtualHostMatchResult VirtualHostImpl::getRouteFromRoutes(
     }
 
     if (cb == nullptr) {
-      return {std::move(route_entry), (*route)->routeExtensions()};
+      return {std::move(route_entry), (*route)->routeSpecifiers()};
     }
 
     RouteEvalStatus eval_status = (std::next(route) == routes.end())
@@ -1857,7 +1858,7 @@ VirtualHostMatchResult VirtualHostImpl::getRouteFromRoutes(
                                       : RouteEvalStatus::HasMoreRoutes;
     RouteMatchStatus match_status = cb(route_entry, eval_status);
     if (match_status == RouteMatchStatus::Accept) {
-      return {std::move(route_entry), (*route)->routeExtensions()};
+      return {std::move(route_entry), (*route)->routeSpecifiers()};
     }
     if (match_status == RouteMatchStatus::Continue &&
         eval_status == RouteEvalStatus::NoMoreRoutes) {
@@ -2085,22 +2086,36 @@ VirtualHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::Reques
                                      uint64_t random_value) const {
   VirtualHostRoute route_result;
 
+  RouteSpecifierSpan config_specifiers = global_route_config_->routeSpecifiers();
+  RouteSpecifierSpan vhost_specifiers;
   VirtualHostMatchResult match_result;
-  RouteExtensionSpan vhost_extensions;
 
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
     route_result.vhost = virtual_host->virtualHost();
-    vhost_extensions = virtual_host->routeExtensions();
+    vhost_specifiers = virtual_host->routeSpecifiers();
     match_result = virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
   }
 
-  // The route configuration and virtual host chains run whether or not a route matched, so that an
-  // extension can supply a fallback route for a request that would otherwise get no route at all.
+  const bool has_route_specifiers = !config_specifiers.empty() || !vhost_specifiers.empty() ||
+                                    !match_result.route_specifiers.empty();
+  if (!has_route_specifiers) {
+    // Quick return if there are no route specifiers at any level.
+    route_result.route = std::move(match_result.route);
+    return route_result;
+  }
+
+  // The route configuration and virtual host chains run whether or not a route matched, so that a
+  // specifier can supply a fallback route for a request that would otherwise get no route at all.
   // The route level chain is empty unless a route matched.
-  route_result.route = applyRouteExtensions(
-      std::move(match_result.route), global_route_config_->routeExtensions(), vhost_extensions,
-      match_result.route_extensions, headers, stream_info, random_value);
+  route_result.route =
+      applyRouteSpecifiers(std::move(match_result.route), config_specifiers, vhost_specifiers,
+                           match_result.route_specifiers, headers, stream_info, random_value);
+  if (route_result.route != nullptr) {
+    if (std::addressof(route_result.route->virtualHost()) != route_result.vhost.get()) {
+      route_result.vhost = route_result.route->virtualHostSharedPtr();
+    }
+  }
 
   return route_result;
 }
@@ -2191,10 +2206,10 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
     metadata_ = std::make_unique<RouteMetadataPack>(config.metadata());
   }
 
-  auto route_extensions_or_error =
-      createRouteExtensions(config.route_extensions(), factory_context);
-  SET_AND_RETURN_IF_NOT_OK(route_extensions_or_error.status(), creation_status);
-  route_extensions_ = std::move(route_extensions_or_error.value());
+  auto route_specifiers_or_error =
+      createRouteSpecifiers(config.route_specifiers(), factory_context);
+  SET_AND_RETURN_IF_NOT_OK(route_specifiers_or_error.status(), creation_status);
+  route_specifiers_ = std::move(route_specifiers_or_error.value());
 }
 
 absl::StatusOr<ClusterSpecifierPluginSharedPtr>

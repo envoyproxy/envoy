@@ -45,7 +45,7 @@ envoy_cc_library(
         ":per_filter_config_lib",
         ":retry_policy_lib",
         ":retry_state_lib",
-        ":route_extension_lib",
+        ":route_specifier_lib",
         ":router_ratelimit_lib",
         ":tls_context_match_criteria_lib",
         ":weighted_cluster_specifier_lib",
@@ -111,12 +111,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "route_extension_lib",
-    srcs = ["route_extension_impl.cc"],
-    hdrs = ["route_extension_impl.h"],
+    name = "route_specifier_lib",
+    srcs = ["route_specifier_impl.cc"],
+    hdrs = ["route_specifier_impl.h"],
     deps = [
         "//envoy/common:exception_lib",
-        "//envoy/router:route_extension_interface",
+        "//envoy/router:route_specifier_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",

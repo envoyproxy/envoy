@@ -136,12 +136,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "route_extension_integration_test",
+    name = "route_specifier_integration_test",
     size = "large",
-    srcs = ["route_extension_integration_test.cc"],
+    srcs = ["route_specifier_integration_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
-        "//envoy/router:route_extension_interface",
+        "//envoy/router:route_specifier_interface",
         "//source/common/common:macros",
         "//source/common/protobuf",
         "//source/common/router:delegating_route_lib",
@@ -604,13 +604,13 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "route_extension_impl_test",
-    srcs = ["route_extension_impl_test.cc"],
+    name = "route_specifier_impl_test",
+    srcs = ["route_specifier_impl_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:config_lib",
         "//source/common/router:delegating_route_lib",
-        "//source/common/router:route_extension_lib",
+        "//source/common/router:route_specifier_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

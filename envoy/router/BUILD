@@ -162,8 +162,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "route_extension_interface",
-    hdrs = ["route_extension.h"],
+    name = "route_specifier_interface",
+    hdrs = ["route_specifier.h"],
     deps = [
         ":router_interface",
         "//envoy/config:typed_config_interface",

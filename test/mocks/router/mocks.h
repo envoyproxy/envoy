@@ -22,7 +22,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/route_config_update_receiver.h"
-#include "envoy/router/route_extension.h"
+#include "envoy/router/route_specifier.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/scopes.h"
@@ -653,12 +653,12 @@ public:
   MockRouteMetadata typed_metadata_;
 };
 
-class MockRouteExtension : public RouteExtension {
+class MockRouteSpecifier : public RouteSpecifier {
 public:
-  MockRouteExtension();
-  ~MockRouteExtension() override;
+  MockRouteSpecifier();
+  ~MockRouteSpecifier() override;
 
-  // Router::RouteExtension
+  // Router::RouteSpecifier
   MOCK_METHOD(OnRouteResult, onRoute,
               (RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& stream_info, uint64_t random_value),

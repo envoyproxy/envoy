@@ -164,32 +164,32 @@ message RouteConfiguration {
   // the filter name should be specified as ``envoy.filters.http.router``.
   core.v3.Metadata metadata = 17;
 
-  // After the route matching has resolved a route for incoming request, the route extensions
-  // are applied to the route to customize or monitor it and the output of the extensions will be
-  // used as the final route by Envoy for the request. The extensions here will not modify/affect
+  // After the route matching has resolved a route for incoming request, the route specifiers
+  // are applied to the route to customize or monitor it and the output of the specifiers will be
+  // used as the final route by Envoy for the request. The specifiers here will not modify/affect
   // the request attributes (e.g., headers, path) directly.
   //
-  // Extensions are executed in order, and the output of each is the input of the next. The route
+  // Specifiers are executed in order, and the output of each is the input of the next. The route
   // that comes out of the last one is the route Envoy uses for the request.
   //
-  // Extensions are configured at three levels. Extensions in three levels will run in this order:
+  // Specifiers are configured at three levels. Specifiers in three levels will run in this order:
   //
-  // 1. The ``route_extensions`` of
+  // 1. The ``route_specifiers`` of
   //    :ref:`route configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`
-  // 2. The ``route_extensions`` of resolved
+  // 2. The ``route_specifiers`` of resolved
   //    :ref:`virtual host <envoy_v3_api_msg_config.route.v3.VirtualHost>`
-  // 3. The ``route_extensions`` of resolved
+  // 3. The ``route_specifiers`` of resolved
   //    :ref:`route <envoy_v3_api_msg_config.route.v3.Route>`.
   //
   // .. note::
-  //   If the route matching resolves no route, the route extensions at the route configuration
-  //   and the virtual host levels will still be applied to null. This allows route extensions to
+  //   If the route matching resolves no route, the route specifiers at the route configuration
+  //   and the virtual host levels will still be applied to null. This allows route specifiers to
   //   optionally generate a valid route even when no route is resolved for the request.
-  //   Similarly, if the route matching resolves a valid route, the route extensions may drop it
+  //   Similarly, if the route matching resolves a valid route, the route specifiers may drop it
   //   and return no route. Then Envoy will treat it as route not found and result in 404 response.
   //
-  // See :ref:`route extensions <config_http_conn_man_route_extensions>` for more details.
-  repeated core.v3.TypedExtensionConfig route_extensions = 19;
+  // See :ref:`route specifiers <config_http_conn_man_route_specifiers>` for more details.
+  repeated core.v3.TypedExtensionConfig route_specifiers = 19;
 }
 
 message Vhds {
