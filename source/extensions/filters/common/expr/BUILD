@@ -52,6 +52,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "flatbuffers_backed_cel_map_lib",
+    srcs = [
+        "flatbuffers_backed_cel_map.cc",
+    ],
+    hdrs = [
+        "flatbuffers_backed_cel_map.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/protobuf",
+        "@cel-cpp//eval/public:cel_value",
+        "@flatbuffers",
+    ],
+)
+
+envoy_cc_library(
     name = "cel_state_lib",
     srcs = [
         "cel_state.cc",
@@ -61,12 +77,12 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        ":flatbuffers_backed_cel_map_lib",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
         "@cel-cpp//eval/public:cel_value",
         "@cel-cpp//eval/public/structs:cel_proto_wrapper",
-        "@cel-cpp//tools:flatbuffers_backed_impl",
         "@flatbuffers",
     ],
 )

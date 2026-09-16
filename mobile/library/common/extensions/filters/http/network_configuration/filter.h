@@ -27,12 +27,9 @@ class NetworkConfigurationFilter final
       public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks,
       public std::enable_shared_from_this<NetworkConfigurationFilter> {
 public:
-  NetworkConfigurationFilter(Network::ConnectivityManagerSharedPtr connectivity_manager,
-                             bool enable_drain_post_dns_refresh, bool enable_interface_binding)
-      : connectivity_manager_(connectivity_manager),
-        extra_stream_info_(nullptr), // always set in setDecoderFilterCallbacks
-        enable_drain_post_dns_refresh_(enable_drain_post_dns_refresh),
-        enable_interface_binding_(enable_interface_binding) {}
+  explicit NetworkConfigurationFilter(Network::ConnectivityManagerSharedPtr connectivity_manager)
+      : connectivity_manager_(connectivity_manager), extra_stream_info_(nullptr) {
+  } // always set in setDecoderFilterCallbacks
 
   // Http::StreamDecoderFilter
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
@@ -63,8 +60,6 @@ private:
       dns_cache_handle_;
   Network::ConnectivityManagerSharedPtr connectivity_manager_;
   StreamInfo::ExtraStreamInfo* extra_stream_info_;
-  bool enable_drain_post_dns_refresh_;
-  bool enable_interface_binding_;
   Event::SchedulableCallbackPtr continue_decoding_callback_;
   // The lifetime of proxy settings must be attached to the lifetime of the filter.
   std::vector<Network::ProxySettings> proxy_settings_;

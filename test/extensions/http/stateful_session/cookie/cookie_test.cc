@@ -5,7 +5,10 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::HasSubstr;
 
 namespace Envoy {
 namespace Extensions {
@@ -244,7 +247,7 @@ TEST(CookieBasedSessionStateFactoryTest, CookieAttributesTest) {
 
     std::string actual_cookie = response_headers.get_("set-cookie");
     // Should only have HttpOnly (added by makeSetCookieValue by default)
-    EXPECT_NE(actual_cookie.find("HttpOnly"), std::string::npos);
+    EXPECT_THAT(actual_cookie, HasSubstr("HttpOnly"));
     // Should not have any custom attributes
     EXPECT_EQ(actual_cookie.find("SameSite"), std::string::npos);
     EXPECT_EQ(actual_cookie.find("Domain"), std::string::npos);
@@ -273,11 +276,11 @@ TEST(CookieBasedSessionStateFactoryTest, CookieAttributesTest) {
 
     std::string actual_cookie = response_headers.get_("set-cookie");
     // Should have HttpOnly (added by makeSetCookieValue by default)
-    EXPECT_NE(actual_cookie.find("HttpOnly"), std::string::npos);
+    EXPECT_THAT(actual_cookie, HasSubstr("HttpOnly"));
     // Should also have custom attributes
-    EXPECT_NE(actual_cookie.find("SameSite=Lax"), std::string::npos);
-    EXPECT_NE(actual_cookie.find("Secure"), std::string::npos);
-    EXPECT_NE(actual_cookie.find("Domain=example.com"), std::string::npos);
+    EXPECT_THAT(actual_cookie, HasSubstr("SameSite=Lax"));
+    EXPECT_THAT(actual_cookie, HasSubstr("Secure"));
+    EXPECT_THAT(actual_cookie, HasSubstr("Domain=example.com"));
   }
 }
 

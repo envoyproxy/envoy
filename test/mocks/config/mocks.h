@@ -100,7 +100,8 @@ public:
   MockOpaqueResourceDecoder();
   ~MockOpaqueResourceDecoder() override;
 
-  MOCK_METHOD(ProtobufTypes::MessagePtr, decodeResource, (const Protobuf::Any& resource));
+  MOCK_METHOD(ArenaWrappedProto<Protobuf::Message>, decodeResource,
+              (const Protobuf::Any& resource));
   MOCK_METHOD(std::string, resourceName, (const Protobuf::Message& resource));
 };
 

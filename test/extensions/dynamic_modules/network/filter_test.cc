@@ -314,6 +314,24 @@ TEST(DynamicModuleNetworkFilterConfigTest, StopIterationStatus) {
 }
 
 // -----------------------------------------------------------------------------
+// Worker index tests
+// -----------------------------------------------------------------------------
+
+// The filter publishes the worker index parsed from its dispatcher name. Malformed names are
+// covered by the shared helper unit test.
+TEST_F(DynamicModuleNetworkFilterTest, WorkerIndexParsedFromDispatcherName) {
+  NiceMock<Event::MockDispatcher> worker_dispatcher{"worker_7"};
+  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
+  NiceMock<Network::MockConnection> connection;
+  ON_CALL(connection, dispatcher()).WillByDefault(testing::ReturnRef(worker_dispatcher));
+  ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
+
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks);
+  EXPECT_EQ(7U, filter->workerIndex());
+}
+
+// -----------------------------------------------------------------------------
 // Metrics Tests
 // -----------------------------------------------------------------------------
 
@@ -336,7 +354,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndIncrementCounter) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify counter value.
-  auto counter = filter_config_->getCounterById(counter_id);
+  auto counter = filter_config_->metrics().getCounterById(counter_id);
   EXPECT_TRUE(counter.has_value());
 }
 
@@ -364,7 +382,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndManipulateGauge) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify gauge exists.
-  auto gauge = filter_config_->getGaugeById(gauge_id);
+  auto gauge = filter_config_->metrics().getGaugeById(gauge_id);
   EXPECT_TRUE(gauge.has_value());
 }
 
@@ -387,7 +405,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndRecordHistogram) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify histogram exists.
-  auto histogram = filter_config_->getHistogramById(histogram_id);
+  auto histogram = filter_config_->metrics().getHistogramById(histogram_id);
   EXPECT_TRUE(histogram.has_value());
 }
 

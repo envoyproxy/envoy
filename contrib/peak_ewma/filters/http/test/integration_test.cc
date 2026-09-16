@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <format>
 
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
@@ -59,7 +60,7 @@ typed_config:
 
       const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
       TestUtility::loadFromYaml(
-          fmt::format(endpoints_yaml, local_address, local_address, local_address), *endpoint);
+          std::format(endpoints_yaml, local_address, local_address, local_address), *endpoint);
 
       // Configure Peak EWMA load balancing policy.
       auto* policy = cluster_0->mutable_load_balancing_policy();

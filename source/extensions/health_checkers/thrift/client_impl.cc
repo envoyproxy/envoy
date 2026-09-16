@@ -60,10 +60,16 @@ Network::FilterStatus ThriftSessionCallbacks::onData(Buffer::Instance& data, boo
   return Network::FilterStatus::StopIteration;
 }
 
-void ClientImpl::start() {
+bool ClientImpl::start() {
   Upstream::Host::CreateConnectionData conn_data = parent_.createConnection();
   connection_ = std::move(conn_data.connection_);
   host_description_ = std::move(conn_data.host_description_);
+  // Connection creation can fail, e.g. when binding to a configured network namespace that is no
+  // longer available. Report this so the health check fails gracefully instead of crashing on a
+  // null dereference below.
+  if (connection_ == nullptr) {
+    return false;
+  }
   session_callbacks_ = std::make_unique<ThriftSessionCallbacks>(*this);
   connection_->addConnectionCallbacks(*session_callbacks_);
   connection_->addReadFilter(session_callbacks_);
@@ -72,6 +78,7 @@ void ClientImpl::start() {
   connection_->noDelay(true);
 
   ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl start", *connection_);
+  return true;
 }
 
 bool ClientImpl::sendRequest() {

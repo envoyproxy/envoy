@@ -23,6 +23,9 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 constexpr absl::string_view kDefaultVersion = "00";
+// The sampled bit of the W3C trace flags carried in the low 8 bits of the OTLP span flags.
+// See https://www.w3.org/TR/trace-context/#sampled-flag.
+constexpr uint32_t TraceFlagsSampledMask = 0x1;
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 
@@ -77,7 +80,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
                                   SystemTime start_time) {
   // Build span_context from the current span, then generate the child span from that context.
   SpanContext span_context(kDefaultVersion, getTraceId(), spanId(), sampled(),
-                           std::string(tracestate()));
+                           std::string(tracestate()), /*is_remote=*/false);
   return parent_tracer_.startSpan(name, stream_info_, start_time, span_context, {},
                                   ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
 }
@@ -86,6 +89,19 @@ void Span::finishSpan() {
   // Call into the parent tracer so we can access the shared exporter.
   span_.set_end_time_unix_nano(
       std::chrono::nanoseconds(time_source_.systemTime().time_since_epoch()).count());
+  // Bits 0-7 of the span flags carry the W3C trace flags; bits 8 and 9 encode the tri-state
+  // "is the parent context remote" (unknown/local/remote). The parent's remoteness is always
+  // known here, so the HAS_IS_REMOTE bit is set unconditionally.
+  uint32_t flags = static_cast<uint32_t>(
+      ::opentelemetry::proto::trace::v1::SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK);
+  if (parent_context_is_remote_) {
+    flags |=
+        static_cast<uint32_t>(::opentelemetry::proto::trace::v1::SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK);
+  }
+  if (sampled()) {
+    flags |= TraceFlagsSampledMask;
+  }
+  span_.set_flags(flags);
   if (sampled()) {
     parent_tracer_.sendSpan(span_);
   }
@@ -232,6 +248,16 @@ void Tracer::flushSpans() {
     return;
   }
 
+  if (!exporter_) {
+    ENVOY_LOG_EVERY_POW_2(warn,
+                          "Skipping log request to OpenTelemetry: no exporter "
+                          "configured; dropping {} spans",
+                          span_buffer_.size());
+    tracing_stats_.spans_dropped_.add(span_buffer_.size());
+    span_buffer_.clear();
+    return;
+  }
+
   ExportTraceServiceRequest request;
   // A request consists of ResourceSpans.
   ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
@@ -260,14 +286,10 @@ void Tracer::flushSpans() {
   for (const auto& pending_span : span_buffer_) {
     (*scope_span->add_spans()) = pending_span;
   }
-  if (exporter_) {
-    tracing_stats_.spans_sent_.add(span_buffer_.size());
-    if (!exporter_->log(request)) {
-      // TODO: should there be any sort of retry or reporting here?
-      ENVOY_LOG(trace, "Unsuccessful log request to OpenTelemetry trace collector.");
-    }
-  } else {
-    ENVOY_LOG(info, "Skipping log request to OpenTelemetry: no exporter configured");
+  tracing_stats_.spans_sent_.add(span_buffer_.size());
+  if (!exporter_->log(request)) {
+    // TODO: should there be any sort of retry or reporting here?
+    ENVOY_LOG(trace, "Unsuccessful log request to OpenTelemetry trace collector.");
   }
   span_buffer_.clear();
 }
@@ -327,6 +349,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   // Create a new span and populate details from the span context.
   auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
                                          *this, span_kind, false);
+  new_span->setParentContextIsRemote(parent_context.isRemote());
   new_span->setTraceId(parent_context.traceId());
   if (!parent_context.spanId().empty()) {
     new_span->setParentId(parent_context.spanId());

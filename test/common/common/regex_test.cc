@@ -104,8 +104,8 @@ TEST(Utility, ParseRegex) {
   {
     TestScopedRuntime scoped_runtime;
     envoy::type::matcher::v3::RegexMatcher matcher;
-    matcher.set_regex(
-        "/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*");
+    matcher.set_regex("/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/"
+                      "asdf/.*/asdf/.*/asdf/.*/asdf/.*");
     matcher.mutable_google_re2();
 #ifndef GTEST_USES_SIMPLE_RE
     EXPECT_THAT(Utility::parseRegex(matcher, engine).status().message(),

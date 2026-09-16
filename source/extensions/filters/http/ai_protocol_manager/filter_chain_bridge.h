@@ -3,6 +3,7 @@
 #include "envoy/http/filter.h"
 
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,8 +16,9 @@ namespace AiProtocolManager {
 // against upstream back-pressure.
 class DecoderFilterChainBridge : public FilterChainBridge, public Http::UpstreamWatermarkCallbacks {
 public:
-  explicit DecoderFilterChainBridge(Http::StreamDecoderFilterCallbacks& callbacks)
-      : callbacks_(callbacks) {}
+  DecoderFilterChainBridge(Http::StreamDecoderFilterCallbacks& callbacks,
+                           AiProtocolManagerStats& stats)
+      : callbacks_(callbacks), stats_(stats) {}
 
   // FilterChainBridge
   Event::Dispatcher& dispatcher() override { return callbacks_.dispatcher(); }
@@ -44,6 +46,7 @@ public:
 
 private:
   Http::StreamDecoderFilterCallbacks& callbacks_;
+  AiProtocolManagerStats& stats_;
   ReplayWatermarkHandler* handler_{nullptr};
   // Whether *this is currently registered as an UpstreamWatermarkCallbacks.
   bool registered_{false};
@@ -61,8 +64,10 @@ class EncoderFilterChainBridge : public FilterChainBridge,
                                  public Http::DownstreamWatermarkCallbacks {
 public:
   EncoderFilterChainBridge(Http::StreamEncoderFilterCallbacks& encoder_callbacks,
-                           Http::StreamDecoderFilterCallbacks& decoder_callbacks)
-      : encoder_callbacks_(encoder_callbacks), decoder_callbacks_(decoder_callbacks) {}
+                           Http::StreamDecoderFilterCallbacks& decoder_callbacks,
+                           AiProtocolManagerStats& stats)
+      : encoder_callbacks_(encoder_callbacks), decoder_callbacks_(decoder_callbacks),
+        stats_(stats) {}
 
   // FilterChainBridge
   Event::Dispatcher& dispatcher() override { return encoder_callbacks_.dispatcher(); }
@@ -91,6 +96,7 @@ public:
 private:
   Http::StreamEncoderFilterCallbacks& encoder_callbacks_;
   Http::StreamDecoderFilterCallbacks& decoder_callbacks_;
+  AiProtocolManagerStats& stats_;
   ReplayWatermarkHandler* handler_{nullptr};
   // Whether *this is currently registered as a DownstreamWatermarkCallbacks.
   bool registered_{false};

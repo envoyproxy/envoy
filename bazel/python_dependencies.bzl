@@ -1,5 +1,5 @@
-load("@com_google_protobuf//python/dist:system_python.bzl", "system_python")
 load("@envoy_toolshed//:packages.bzl", "load_packages")
+load("@protobuf//python/dist:system_python.bzl", "system_python")
 load("@rules_python//python:pip.bzl", "pip_parse")
 
 def envoy_python_dependencies():

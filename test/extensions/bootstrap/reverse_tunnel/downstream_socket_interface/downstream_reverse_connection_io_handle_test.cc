@@ -214,10 +214,12 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, CloseMethod) {
     // First close - should notify parent and reset owned_socket.
     auto result1 = handle->close();
     EXPECT_EQ(result1.err_, nullptr);
+    EXPECT_ENVOY_BUG(handle->activateFileEvents(0), "Null file_event_");
 
     // Second close - should return immediately without notifying parent (fd < 0).
     auto result2 = handle->close();
     EXPECT_EQ(result2.err_, nullptr);
+    EXPECT_ENVOY_BUG(handle->activateFileEvents(0), "Null file_event_");
   }
 }
 

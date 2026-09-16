@@ -119,9 +119,7 @@ void EvwatchObserverManagerImpl::cleanupNulledObservers() {
   if (!has_nulled_observers_ || iteration_depth_ > 0) {
     return;
   }
-  observers_.erase(std::remove_if(observers_.begin(), observers_.end(),
-                                  [](const auto& entry) { return !entry.has_value(); }),
-                   observers_.end());
+  std::erase_if(observers_, [](const auto& entry) { return !entry.has_value(); });
   has_nulled_observers_ = false;
 }
 

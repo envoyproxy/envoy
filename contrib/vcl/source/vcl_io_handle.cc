@@ -1,5 +1,6 @@
 #include "contrib/vcl/source/vcl_io_handle.h"
 
+#include <format>
 #include <optional>
 
 #include "source/common/buffer/buffer_impl.h"
@@ -92,7 +93,7 @@ Envoy::Network::Address::InstanceConstSharedPtr vclEndptToAddress(const vppcom_e
     // used to create socket. Wrong knowledge of dual stack support won't hurt.
     return *Envoy::Network::Address::addressFromSockAddr(addr, len, /*v6only=*/false);
   } catch (const EnvoyException& e) {
-    PANIC(fmt::format("Invalid remote address for fd: {}, error: {}", sh, e.what()));
+    PANIC(std::format("Invalid remote address for fd: {}, error: {}", sh, e.what()));
   }
 }
 
@@ -277,6 +278,11 @@ Api::IoCallUint64Result VclIoHandle::write(Buffer::Instance& buffer) {
   return result;
 }
 
+Api::IoCallUint64Result VclIoHandle::send(const void* buffer, size_t length) {
+  Buffer::RawSlice slice{const_cast<void*>(buffer), length};
+  return writev(&slice, 1);
+}
+
 Api::IoCallUint64Result VclIoHandle::recv(void* buffer, size_t length, int flags) {
   VCL_LOG("recv on sh {:x}", sh_);
   int rv = vppcom_session_recvfrom(sh_, buffer, length, flags, nullptr);
@@ -303,7 +309,8 @@ Api::IoCallUint64Result VclIoHandle::sendmsg(const Buffer::RawSlice* slices, uin
     }
   }
   if (num_slices_to_write == 0) {
-    return Api::ioCallUint64ResultNoError();
+    uint8_t empty_payload = 0;
+    return vclCallResultToIoCallResult(vppcom_session_write_msg(sh_, &empty_payload, /*n=*/0));
   }
 
   // VCL has no sendmsg semantics- Treat as a session write followed by a flush

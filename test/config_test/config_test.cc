@@ -11,6 +11,7 @@
 #include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/server/config_validation/server.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/options_impl.h"
@@ -68,6 +69,7 @@ public:
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
     ON_CALL(server_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
+    ON_CALL(server_.api_, customStatNamespaces()).WillByDefault(ReturnRef(custom_stat_namespaces_));
     ON_CALL(server_.api_, threadFactory()).WillByDefault(Invoke([&]() -> Thread::ThreadFactory& {
       return api_->threadFactory();
     }));
@@ -181,6 +183,7 @@ public:
   Server::ListenerManagerImpl listener_manager_{server_, std::move(component_factory_ptr_),
                                                 worker_factory_, false, server_.quic_stat_names_};
   Random::RandomGeneratorImpl random_;
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces_;
   std::shared_ptr<Runtime::MockSnapshot> snapshot_{
       std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;

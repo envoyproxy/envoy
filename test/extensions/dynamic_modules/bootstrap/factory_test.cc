@@ -6,6 +6,7 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -47,8 +48,10 @@ TEST_F(FactoryTestBase, DynamicModuleLoadFail) {
   proto_config.mutable_dynamic_module_config()->set_name("nonexistent_module");
   proto_config.set_extension_name("test");
 
-  EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_), EnvoyException,
-                          "Failed to load dynamic module:.*");
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module libnonexistent_module", {
+    EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_),
+                            EnvoyException, "Failed to load dynamic module:.*");
+  });
 
   EXPECT_EQ(1U, failureCounter(context_.serverScope(), "module_load_error", "test"));
 

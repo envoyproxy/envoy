@@ -1,3 +1,5 @@
+#include <format>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
@@ -87,7 +89,7 @@ INSTANTIATE_TEST_SUITE_P(QatzipConfigTestInstantiation, QatzipConfigTest,
 TEST_P(QatzipConfigTest, LoadConfigAndVerifyWithDecompressor) {
   std::tuple<int, std::string, int, int, int> config_value_tuple = GetParam();
   int chunk_size = std::get<4>(config_value_tuple);
-  std::string json{fmt::format(R"EOF({{
+  std::string json{std::format(R"EOF({{
   "compression_level": {},
   "hardware_buffer_size": "{}",
   "input_size_threshold": {},
@@ -127,7 +129,7 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(InvalidQatzipConfigTest, LoadConfigWithInvalidValues) {
   std::tuple<int, std::string, int, int, int> config_value_tuple = GetParam();
   int chunk_size = std::get<4>(config_value_tuple);
-  std::string json{fmt::format(R"EOF({{
+  std::string json{std::format(R"EOF({{
   "compression_level": {},
   "hardware_buffer_size": "{}",
   "input_size_threshold": {},

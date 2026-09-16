@@ -28,10 +28,12 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -146,7 +148,7 @@ public:
   filterMatchCriteria(const std::set<std::string>& names) const override {
     auto new_criteria = std::make_unique<TestMetadataMatchCriteria>(*this);
     for (auto it = new_criteria->matches_.begin(); it != new_criteria->matches_.end();) {
-      if (names.count(it->get()->name()) == 0) {
+      if (!names.contains(it->get()->name())) {
         it = new_criteria->matches_.erase(it);
       } else {
         it++;
@@ -283,8 +285,8 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   EXPECT_TRUE(subset_info.fallbackPolicy() ==
               envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
   EXPECT_EQ(subset_info.defaultSubset().fields_size(), 1);
-  EXPECT_EQ(subset_info.defaultSubset().fields().at("key").string_value(),
-            std::string("the value"));
+  EXPECT_THAT(subset_info.defaultSubset().fields(),
+              Contains(IsStructString("key", std::string("the value"))));
   EXPECT_EQ(subset_info.subsetSelectors().size(), 2);
   EXPECT_EQ(subset_info.subsetSelectors()[0]->selectorKeys(),
             std::set<std::string>({"selector_key1"}));

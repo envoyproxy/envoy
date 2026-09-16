@@ -4,6 +4,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/worker_index.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
@@ -15,9 +16,11 @@ namespace {
 
 // Builds a FilterFactoryCb from an already-loaded DynamicModule.
 // Extracted because both the synchronous path and the remote fetch callback need it.
-absl::StatusOr<Http::FilterFactoryCb> buildFilterFactoryCallback(
-    Extensions::DynamicModules::DynamicModulePtr dynamic_module, const FilterConfig& proto_config,
-    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
+absl::StatusOr<Http::FilterFactoryCb>
+buildFilterFactoryCallback(Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+                           const FilterConfig& proto_config,
+                           Server::Configuration::ServerFactoryContext& context,
+                           Stats::Scope& scope, OptRef<Init::Manager> init_manager) {
 
   std::string config;
   if (proto_config.has_filter_config()) {
@@ -41,7 +44,7 @@ absl::StatusOr<Http::FilterFactoryCb> buildFilterFactoryCallback(
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
               proto_config.filter_name(), config, metrics_namespace, proto_config.terminal_filter(),
-              std::move(dynamic_module), scope, context);
+              std::move(dynamic_module), scope, context, init_manager);
 
   if (!filter_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
@@ -59,13 +62,8 @@ absl::StatusOr<Http::FilterFactoryCb> buildFilterFactoryCallback(
   }
 
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    const std::string& worker_name = callbacks.dispatcher().name();
-    auto pos = worker_name.find_first_of('_');
-    ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
-    uint32_t worker_index;
-    if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
-      IS_ENVOY_BUG("failed to parse worker index from name");
-    }
+    const uint32_t worker_index = Extensions::DynamicModules::parseWorkerIndexFromDispatcherName(
+        callbacks.dispatcher().name());
     auto filter =
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
             config, config->stats_scope_->symbolTable(), worker_index);
@@ -109,8 +107,12 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
     if (!state) {
       return;
     }
-    auto cb_or_error =
-        buildFilterFactoryCallback(std::move(dynamic_module), proto_config, context, scope);
+    // No init manager here: this runs after the factory has already returned, so the filter chain
+    // factory context's init manager is long gone. Any secret subscription the module creates
+    // therefore starts immediately instead of gating initialization, which matches the fail-open
+    // nature of the remote fetch path.
+    auto cb_or_error = buildFilterFactoryCallback(std::move(dynamic_module), proto_config, context,
+                                                  scope, std::nullopt);
     if (!cb_or_error.ok()) {
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules),
                           error, "Failed to create filter config from remote module: {}",
@@ -129,7 +131,8 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
 
   // Synchronous load (local file, by name, or remote cache hit): build the factory now.
   if (load_result->loaded != nullptr) {
-    return buildFilterFactoryCallback(std::move(load_result->loaded), proto_config, context, scope);
+    return buildFilterFactoryCallback(std::move(load_result->loaded), proto_config, context, scope,
+                                      init_manager);
   }
 
   ASSERT(load_result->async != nullptr, "Async loading state must be populated for async loads");
@@ -148,15 +151,16 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
 
 absl::StatusOr<Envoy::Http::FilterFactoryCb>
 DynamicModuleConfigFactory::createHttpFilterFactoryFromProtoTyped(
-    const FilterConfig& proto_config, const std::string& stat_prefix,
-    Server::Configuration::ServerFactoryContext& context) {
-  return createFilterFactory(proto_config, stat_prefix, context, context.scope());
+    const FilterConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  return createFilterFactory(proto_config, extra_context.stats_prefix, context,
+                             extra_context.scopeOr(context), extra_context.init_manager);
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
+DynamicModuleConfigFactory::createHttpFilterRouteConfigTyped(
     const RouteConfigProto& proto_config, Server::Configuration::ServerFactoryContext& context,
-    ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::ExtraFactoryContext&) {
 
   const auto& module_config = proto_config.dynamic_module_config();
 

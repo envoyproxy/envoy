@@ -57,9 +57,12 @@ TEST_F(McpFilterConfigTest, CreateRouteSpecificConfig) {
 TEST_F(McpFilterConfigTest, CreateFilterWithServerContext) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  Server::Configuration::ExtraFactoryContext extra_context{
+      server_context.messageValidationVisitor(), "stats"};
 
   Http::FilterFactoryCb cb =
-      factory_->createHttpFilterFactoryFromProto(proto_config, "stats", server_context).value();
+      factory_->createHttpFilterFactoryFromProto(proto_config, server_context, extra_context)
+          .value();
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));

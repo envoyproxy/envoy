@@ -200,7 +200,7 @@ public:
     }
   }
 
-  bool contains(const K& key) { return cache_.find(key) != cache_.end(); }
+  bool contains(const K& key) { return cache_.contains(key); }
 
   OptRef<V> at(const K& key) {
     auto it = cache_.find(key);

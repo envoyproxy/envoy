@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "test/extensions/filters/http/ext_proc/test_processor.h"
 
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"

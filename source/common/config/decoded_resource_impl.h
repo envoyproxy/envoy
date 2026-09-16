@@ -4,6 +4,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/protobuf/utility.h"
 
 #include "xds/core/v3/collection_entry.pb.h"
@@ -62,7 +63,7 @@ public:
       : DecodedResourceImpl(resource_decoder, inline_entry.name(),
                             Protobuf::RepeatedPtrField<std::string>(), inline_entry.resource(),
                             true, inline_entry.version(), std::nullopt, std::nullopt) {}
-  DecodedResourceImpl(ProtobufTypes::MessagePtr resource, const std::string& name,
+  DecodedResourceImpl(ArenaWrappedProto<Protobuf::Message> resource, const std::string& name,
                       const std::vector<std::string>& aliases, const std::string& version)
       : resource_(std::move(resource)), has_resource_(true), name_(name), aliases_(aliases),
         version_(version), ttl_(std::nullopt), metadata_(std::nullopt) {}
@@ -89,7 +90,7 @@ private:
         aliases_(repeatedPtrFieldToVector(aliases)), version_(version), ttl_(ttl),
         metadata_(metadata) {}
 
-  const ProtobufTypes::MessagePtr resource_;
+  const ArenaWrappedProto<Protobuf::Message> resource_;
   const bool has_resource_;
   const std::string name_;
   const std::vector<std::string> aliases_;

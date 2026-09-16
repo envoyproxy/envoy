@@ -13,11 +13,13 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Contains;
 
 namespace Envoy {
 namespace Extensions {
@@ -232,7 +234,7 @@ thrift_filters:
   testConfig(config);
 
   EXPECT_EQ(1, factory.config_struct_.fields_size());
-  EXPECT_EQ("value", factory.config_struct_.fields().at("key").string_value());
+  EXPECT_THAT(factory.config_struct_.fields(), Contains(IsStructString("key", "value")));
   EXPECT_EQ("thrift.ingress.", factory.config_stat_prefix_);
 }
 

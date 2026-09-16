@@ -43,6 +43,8 @@ struct HeadersToAddEntry {
   }
 
   std::string original_value_;
+  // Null when the configured value contains no substitution command. Such a value formats to
+  // original_value_ for every request, so no formatter is built and callers use that directly.
   Formatter::FormatterPtr formatter_;
   HeaderAppendAction append_action_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.

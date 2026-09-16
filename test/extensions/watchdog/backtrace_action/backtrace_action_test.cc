@@ -123,7 +123,7 @@ TEST_F(BacktraceActionTest, SingleBacktraceLogged) {
 
   absl::Notification logged;
   LogLevelSetter save_levels(spdlog::level::trace);
-  LogExpectation expectation(GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
+  LogExpectation expectation(GetLogSink(), [&](Logger::Levels, const std::string& msg) {
     if (msg.find("Envoy version:") != std::string::npos) {
       logged.Notify();
     }
@@ -180,7 +180,7 @@ TEST_F(BacktraceActionTest, MultipleBacktracesLogged) {
   std::atomic<int> count{0};
   absl::Notification all_logged;
   LogLevelSetter save_levels(spdlog::level::trace);
-  LogExpectation expectation(GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
+  LogExpectation expectation(GetLogSink(), [&](Logger::Levels, const std::string& msg) {
     if (msg.find("Envoy version:") != std::string::npos) {
       if (++count == 2) {
         all_logged.Notify();
@@ -229,7 +229,7 @@ TEST_F(BacktraceActionTest, CooldownPreventsDuplicateBacktrace) {
   std::atomic<int> count{0};
   absl::Notification first_logged;
   LogLevelSetter save_levels(spdlog::level::trace);
-  LogExpectation expectation(GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
+  LogExpectation expectation(GetLogSink(), [&](Logger::Levels, const std::string& msg) {
     if (msg.find("Envoy version:") != std::string::npos) {
       if (count.fetch_add(1, std::memory_order_relaxed) == 0) {
         first_logged.Notify();

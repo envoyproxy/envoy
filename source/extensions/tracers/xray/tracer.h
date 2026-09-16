@@ -130,7 +130,7 @@ public:
    * Check if key is set in http request annotation field of a Span.
    */
   bool hasKeyInHttpRequestAnnotations(absl::string_view key) {
-    return http_request_annotations_.find(key) != http_request_annotations_.end();
+    return http_request_annotations_.contains(key);
   }
 
   /*

@@ -16,6 +16,7 @@
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/extensions/request_id/uuid/config.h"
 
+#include "test/common/http/header_formatter_test_utils.h"
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
 #include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
 #include "test/extensions/filters/network/http_connection_manager/config_test_base.h"
@@ -36,6 +37,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatus;
 using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::An;
@@ -50,6 +52,10 @@ using testing::Ref;
 using testing::Return;
 using testing::StrictMock;
 using testing::WhenDynamicCastTo;
+
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -281,6 +287,47 @@ http_filters:
 
   EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
                             "Non-HTTP/3 codec configured on QUIC listener.");
+}
+
+// A stateful header formatter that rejects its configuration must fail listener config creation
+// rather than leaving the connection manager with silently defaulted HTTP/1 settings.
+TEST_F(HttpConnectionManagerConfigTest, StatefulFormatterCreationFailureIsPropagated) {
+  Http::RejectingStatefulFormatterFactoryConfig factory;
+  Registry::InjectFactory<Http::StatefulHeaderKeyFormatterFactoryConfig> registered(factory);
+
+  const std::string yaml_string = fmt::format(R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_protocol_options:
+  header_key_format:
+    stateful_formatter:
+      name: {}
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+http_filters:
+- name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF",
+                                              Http::RejectingStatefulFormatterFactoryConfig::kName);
+
+  [[maybe_unused]] HttpConnectionManagerConfig config(
+      parseHttpConnectionManagerFromYaml(yaml_string), context_, date_provider_,
+      route_config_provider_manager_, &scoped_routes_config_provider_manager_, tracer_manager_,
+      filter_config_provider_manager_, creation_status_);
+  EXPECT_THAT(creation_status_,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        Eq(Http::RejectingStatefulFormatterFactoryConfig::kError)));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, TracingNotEnabledAndNoTracingConfigInBootstrap) {
@@ -537,7 +584,7 @@ tracing:
   std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
   const Tracing::CustomTagMap& custom_tag_map = config.tracingConfig()->custom_tags_;
   for (const std::string& custom_tag : custom_tags) {
-    EXPECT_NE(custom_tag_map.find(custom_tag), custom_tag_map.end());
+    EXPECT_THAT(custom_tag_map, Contains(Key(custom_tag)));
   }
 }
 
@@ -4093,14 +4140,10 @@ http_filters:
   EXPECT_OK(creation_status_);
 
   const auto& https_ports = config.httpsDestinationPorts();
-  EXPECT_EQ(2, https_ports.size());
-  EXPECT_TRUE(https_ports.contains(443));
-  EXPECT_TRUE(https_ports.contains(8443));
+  EXPECT_THAT(https_ports, UnorderedElementsAre(443, 8443));
 
   const auto& http_ports = config.httpDestinationPorts();
-  EXPECT_EQ(2, http_ports.size());
-  EXPECT_TRUE(http_ports.contains(80));
-  EXPECT_TRUE(http_ports.contains(8080));
+  EXPECT_THAT(http_ports, UnorderedElementsAre(80, 8080));
 }
 
 // Test empty forward_proto_config is valid (feature disabled).

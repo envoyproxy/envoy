@@ -32,6 +32,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -162,6 +163,92 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
 
   EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
             total_bytes_sent);
+}
+
+TEST_P(UdpListenerImplBatchWriterTest, SendEmptyDatagramsInOrder) {
+  quic::test::MockQuicSyscallWrapper os_sys_calls;
+  quic::ScopedGlobalSyscallWrapperOverride os_calls(&os_sys_calls);
+  testing::InSequence sequence;
+
+  const std::string payload("payload");
+  EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _)).WillOnce(Invoke([&](int, const msghdr* message, int) {
+    EXPECT_EQ(payload.length(), getPacketLength(message));
+    return payload.length();
+  }));
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
+        .WillOnce(Invoke([](int, const msghdr* message, int) {
+          EXPECT_EQ(1, message->msg_iovlen);
+          EXPECT_NE(nullptr, message->msg_iov);
+          if (message->msg_iov != nullptr && message->msg_iovlen == 1) {
+            EXPECT_NE(nullptr, message->msg_iov[0].iov_base);
+            EXPECT_EQ(0, message->msg_iov[0].iov_len);
+          }
+          return 0;
+        }));
+  }
+
+  Address::InstanceConstSharedPtr send_from_addr = getNonDefaultSourceAddress();
+  Buffer::OwnedImpl payload_buffer(payload);
+  UdpSendData payload_data{send_from_addr->ip(), *client_.localAddress(), payload_buffer};
+  Api::IoCallUint64Result send_result = listener_->send(payload_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(payload.length(), send_result.return_value_);
+
+  Buffer::OwnedImpl first_empty_buffer;
+  UdpSendData first_empty_data{send_from_addr->ip(), *client_.localAddress(), first_empty_buffer};
+  send_result = listener_->send(first_empty_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(0, send_result.return_value_);
+
+  Buffer::OwnedImpl second_empty_buffer;
+  UdpSendData second_empty_data{send_from_addr->ip(), *client_.localAddress(), second_empty_buffer};
+  send_result = listener_->send(second_empty_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(0, send_result.return_value_);
+
+  const Api::IoCallUint64Result flush_result = udp_packet_writer_->flush();
+  ASSERT_TRUE(flush_result.ok()) << flush_result.err_->getErrorDetails();
+  EXPECT_EQ(0, flush_result.return_value_);
+  EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
+}
+
+TEST_P(UdpListenerImplBatchWriterTest, DropEmptyDatagramWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.udp_send_zero_length_datagrams", "false"}});
+
+  quic::test::MockQuicSyscallWrapper os_sys_calls;
+  quic::ScopedGlobalSyscallWrapperOverride os_calls(&os_sys_calls);
+
+  const std::string payload("payload");
+  EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _)).WillOnce(Invoke([&](int, const msghdr* message, int) {
+    EXPECT_EQ(payload.length(), getPacketLength(message));
+    return payload.length();
+  }));
+
+  Address::InstanceConstSharedPtr send_from_addr = getNonDefaultSourceAddress();
+  Buffer::OwnedImpl payload_buffer(payload);
+  UdpSendData payload_data{send_from_addr->ip(), *client_.localAddress(), payload_buffer};
+  Api::IoCallUint64Result send_result = listener_->send(payload_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(payload.length(), send_result.return_value_);
+
+  Buffer::OwnedImpl empty_buffer;
+  UdpSendData empty_data{send_from_addr->ip(), *client_.localAddress(), empty_buffer};
+  send_result = listener_->send(empty_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(0, send_result.return_value_);
+  EXPECT_EQ(payload.length(),
+            listener_config_.listenerScope()
+                .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
+                .value());
+
+  const Api::IoCallUint64Result flush_result = udp_packet_writer_->flush();
+  ASSERT_TRUE(flush_result.ok()) << flush_result.err_->getErrorDetails();
+  EXPECT_EQ(0, listener_config_.listenerScope()
+                   .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
 }
 
 /**

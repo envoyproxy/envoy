@@ -249,6 +249,33 @@ TEST_F(ThriftHealthCheckerTest, PingAndVariousFailures) {
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
+// Tests that a client whose underlying connection cannot be created (e.g. a network namespace
+// binding failure) results in a network health check failure instead of a crash.
+TEST_F(ThriftHealthCheckerTest, ConnectionCreateFailure) {
+  setup();
+
+  expectSessionCreate();
+  EXPECT_CALL(*this, create_(_)).WillOnce(testing::Invoke([&](ClientCallback& callback) {
+    client_ = new NiceMock<MockClient>(callback);
+    EXPECT_CALL(*client_, start()).WillOnce(Return(false));
+    return client_;
+  }));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(testing::AnyNumber());
+  EXPECT_CALL(*timeout_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*interval_timer_, disableTimer()).Times(testing::AnyNumber());
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  // The first check fails gracefully instead of crashing.
+  health_checker_->start();
+
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
+}
+
 TEST_F(ThriftHealthCheckerTest, AlwaysLogHealthCheckFailures) {
   InSequence s;
   setupAlwaysLogHealthCheckFailures();

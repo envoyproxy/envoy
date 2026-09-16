@@ -3,6 +3,7 @@
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 
 namespace Envoy {
 namespace {
@@ -120,6 +121,35 @@ TEST_P(DynamicModuleBridgeIntegrationTest, LocalReplyMode) {
 
   EXPECT_EQ("403", response->headers().getStatusValue());
   EXPECT_EQ("access denied", response->body());
+}
+
+// The upstream HTTP bridge loads its module lazily on the data path and has no factory context, so
+// a missing module is visible only through the loader error log.
+TEST_P(DynamicModuleBridgeIntegrationTest, ModuleLoadFailureLogsAtRuntime) {
+  TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", "/should/not/find/this/path", 1);
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->mutable_upstream_config()->set_name("envoy.upstreams.http.dynamic_modules");
+    cluster->mutable_upstream_config()->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/"
+        "envoy.extensions.upstreams.http.dynamic_modules.v3.Config");
+
+    envoy::extensions::upstreams::http::dynamic_modules::v3::Config proto_config;
+    proto_config.mutable_dynamic_module_config()->set_name("nonexistent_module");
+    proto_config.set_bridge_name("test_bridge");
+    std::ignore =
+        cluster->mutable_upstream_config()->mutable_typed_config()->PackFrom(proto_config);
+  });
+
+  initialize();
+
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module libnonexistent_module", {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("503", response->headers().getStatusValue());
+  });
 }
 
 } // namespace

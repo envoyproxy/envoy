@@ -9,14 +9,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AwsEventstreamParser {
 
-absl::StatusOr<Http::FilterFactoryCb> AwsEventstreamParserConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+AwsEventstreamParserConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_eventstream_parser::v3::AwsEventstreamParser&
         proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
 
   // Create shared config (which instantiates the parser from TypedExtensionConfig)
   // Note: content_parser is validated as required by proto validation rules
-  auto config = std::make_shared<FilterConfig>(proto_config, context.serverFactoryContext());
+  auto config = std::make_shared<FilterConfig>(proto_config, context);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamEncoderFilter(std::make_shared<Filter>(config));

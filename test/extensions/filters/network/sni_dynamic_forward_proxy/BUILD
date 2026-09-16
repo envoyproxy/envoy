@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "proxy_filter_test",
     srcs = ["proxy_filter_test.cc"],
     extension_names = ["envoy.filters.network.sni_dynamic_forward_proxy"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:uint32_accessor_lib",
@@ -23,8 +23,11 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:basic_resource_limit_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
@@ -38,7 +41,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.network.sni_dynamic_forward_proxy"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     # TODO(envoyproxy/windows-dev): Diagnose failure shown only on clang-cl build, see:
     #   https://gist.github.com/wrowe/12b0b7579791c541c789c98563999a2e
     tags = ["fails_on_clang_cl"],

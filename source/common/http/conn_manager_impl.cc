@@ -35,6 +35,7 @@
 #include "source/common/common/perf_tracing.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/exception.h"
@@ -46,6 +47,7 @@
 #include "source/common/http/path_utility.h"
 #include "source/common/http/status.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/drain_close_util.h"
 #include "source/common/network/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -97,22 +99,95 @@ upstreamOperationNameFormatter(const Http::TracingConnectionManagerConfig& hcm_c
   return formatter != nullptr ? formatter : hcm_config.upstream_operation_.get();
 }
 
-ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
-                                                            Stats::Scope& scope) {
-  return ConnectionManagerStats(
-      {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix),
-                               POOL_HISTOGRAM_PREFIX(scope, prefix))},
-      prefix, scope);
+namespace {
+// The stats of an HTTP connection manager are namespaced 'http.(<stat_prefix>.)*': the flat prefix
+// is 'http.<stat_prefix>.' and 'http' alone is the tag-extracted prefix, with the stat prefix
+// carried by an 'envoy.http_conn_manager_prefix' tag.
+constexpr absl::string_view HttpBaseStatPrefix = "http";
+
+std::string httpFlatStatPrefix(absl::string_view stat_prefix) {
+  return absl::StrCat(HttpBaseStatPrefix, ".", stat_prefix, ".");
 }
 
-ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const std::string& prefix,
-                                                                          Stats::Scope& scope) {
-  return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(scope, prefix + "tracing."))};
+Stats::TagStringView httpStatPrefixTag(absl::string_view stat_prefix) {
+  return {Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX, stat_prefix};
+}
+
+// Creates a 'downstream_rq_<class>xx' counter carrying the response code class as an explicit
+// 'envoy.response_code_class' tag, so it does not depend on the class being recovered from the
+// stat name by a tag extractor.
+//
+// `name` is the complete stat name, 'downstream_rq_<class>xx'. The class is the digit before the
+// trailing 'xx', which is exactly what the '_rq_((\d))xx$' extraction rule pulls out, and the
+// tag-extracted name is the same name with that digit removed.
+//
+// `base_prefix`, `prefix_tags` and `prefix` describe an enclosing prefix that is part of the stat
+// name rather than of the scope, as is the case for the listener stats. They are all empty when
+// the scope itself carries the prefix.
+Stats::Counter& responseCodeClassCounter(Stats::Scope& scope, Stats::StatName base_prefix,
+                                         Stats::StatNameTagSpan prefix_tags, Stats::StatName prefix,
+                                         absl::string_view name) {
+  ASSERT(absl::StartsWith(name, "downstream_rq_"));
+  ASSERT(absl::EndsWith(name, "xx"));
+  ASSERT(absl::ascii_isdigit(name[name.size() - 3]));
+  const absl::string_view response_code_class = name.substr(name.size() - 3, 1);
+
+  Stats::SymbolTable& symbol_table = scope.symbolTable();
+  Stats::StatNamePool pool(symbol_table);
+  const Stats::StatName base_leaf = pool.add(absl::StrCat(name.substr(0, name.size() - 3), "xx"));
+  const Stats::StatName leaf = pool.add(name);
+
+  Stats::StatNameTagVec tags(prefix_tags.begin(), prefix_tags.end());
+  tags.emplace_back(pool.add(Config::TagNames::get().RESPONSE_CODE_CLASS),
+                    pool.add(response_code_class));
+
+  const Stats::SymbolTable::StoragePtr base_name = symbol_table.join({base_prefix, base_leaf});
+  const Stats::SymbolTable::StoragePtr tagged_name = symbol_table.join({prefix, leaf});
+  return scope.counterFromTaggedName(Stats::StatName(base_name.get()), tags,
+                                     Stats::StatName(tagged_name.get()));
+}
+
+// Completes a POOL_COUNTER_RESPONSE_CODE_CLASS() invocation, in the style of the POOL_* macros in
+// stats_macros.h.
+#define FINISH_RESPONSE_CODE_CLASS_DECL_(X) #X),
+
+// Creates the response code class counters of a stats list. BASE_PREFIX, TAGS and PREFIX describe
+// an enclosing prefix that is part of the stat name rather than of the scope, and are all empty
+// when the scope itself carries the prefix.
+#define POOL_COUNTER_RESPONSE_CODE_CLASS(SCOPE, BASE_PREFIX, TAGS, PREFIX)                         \
+  responseCodeClassCounter(SCOPE, BASE_PREFIX, TAGS, PREFIX, FINISH_RESPONSE_CODE_CLASS_DECL_
+
+} // namespace
+
+ConnectionManagerStats ConnectionManagerImpl::generateStats(Stats::Scope& scope) {
+  // The scope already carries the 'http.<stat_prefix>.' prefix, so the response code class
+  // counters need no prefix of their own.
+  return ConnectionManagerStats(
+      {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope),
+                               POOL_COUNTER_RESPONSE_CODE_CLASS(scope, {}, {}, {}))},
+      scope);
+}
+
+ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(Stats::Scope& scope) {
+  return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(scope, "tracing."))};
+}
+
+Stats::ScopeSharedPtr ConnectionManagerImpl::createStatsScope(Stats::Scope& scope,
+                                                              absl::string_view stat_prefix) {
+  return scope.createScopeWithTaggedName(HttpBaseStatPrefix, {httpStatPrefixTag(stat_prefix)},
+                                         httpFlatStatPrefix(stat_prefix));
 }
 
 ConnectionManagerListenerStats
-ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::Scope& scope) {
-  return {CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+ConnectionManagerImpl::generateListenerStats(absl::string_view stat_prefix, Stats::Scope& scope) {
+  // These live in the listener's scope, so the 'http.<stat_prefix>.' prefix is part of the stat
+  // name rather than of the scope and has to be supplied to every stat.
+  const Stats::TaggedStatName prefix(scope.symbolTable(), HttpBaseStatPrefix,
+                                     {httpStatPrefixTag(stat_prefix)},
+                                     httpFlatStatPrefix(stat_prefix));
+  return {CONN_MAN_LISTENER_STATS(
+      POOL_COUNTER_TAGGED(scope, prefix),
+      POOL_COUNTER_RESPONSE_CODE_CLASS(scope, prefix.baseName(), prefix.tags(), prefix.name()))};
 }
 
 ConnectionManagerImpl::ConnectionManagerImpl(
@@ -120,7 +195,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(
     Random::RandomGenerator& random_generator, Http::Context& http_context,
     Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
     Upstream::ClusterManager& cluster_manager, Server::OverloadManager& overload_manager,
-    TimeSource& time_source, envoy::config::core::v3::TrafficDirection direction)
+    TimeSource& time_source, envoy::config::core::v3::TrafficDirection direction,
+    Server::Configuration::ServerFactoryContext& server_context)
     : config_(std::move(config)), stats_(config_->stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
@@ -147,7 +223,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(
                                      /*proxy_status_config=*/config_->proxyStatusConfig())),
       max_requests_during_dispatch_(
           runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
-      direction_(direction),
+      direction_(direction), server_context_(server_context),
+      use_connection_event_drain_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")),
       allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
       close_connection_on_zombie_stream_complete_(Runtime::runtimeFeatureEnabled(
@@ -189,6 +267,9 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     stats_.named_.downstream_cx_ssl_active_.inc();
   }
 
+  // Captured once here rather than plumbed through the filter factory: the drain type belongs to
+  // the listener that accepted this connection, and is reachable from the connection itself.
+  drain_type_ = Network::listenerDrainType(read_callbacks_->connection());
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
   if (config_->addProxyProtocolConnectionState() &&
@@ -368,9 +449,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
       // There was a downstream reset, log immediately.
       !stream.filter_manager_.sawDownstreamReset() &&
       // On recreate stream, log immediately.
-      stream.response_encoder_ != nullptr &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_defer_logging_to_ack_listener")) {
+      stream.response_encoder_ != nullptr) {
     stream.deferHeadersAndTrailers();
   } else {
     // For HTTP/1 and HTTP/2, log here as usual.
@@ -647,6 +726,20 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
     doConnectionClose(std::nullopt, StreamInfo::CoreResponseFlag::DownstreamConnectionTermination,
                       details);
   }
+}
+
+void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
+  if (!connection_drain_event_.has_value()) {
+    connection_drain_event_ = drain_event;
+  }
+}
+
+bool ConnectionManagerImpl::shouldDrainClose(Network::DrainDirection scope) {
+  if (!use_connection_event_drain_) {
+    return drain_close_.drainClose(scope);
+  }
+
+  return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_);
 }
 
 void ConnectionManagerImpl::doConnectionClose(
@@ -1446,7 +1539,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   }
 
   connection_manager_.user_agent_.initializeFromHeaders(*request_headers_,
-                                                        connection_manager_.stats_.prefixStatName(),
                                                         connection_manager_.stats_.scope_);
 
   if (!request_headers_->Host()) {
@@ -1491,6 +1583,18 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Code::NotFound, "", nullptr, std::nullopt,
                    StreamInfo::ResponseCodeDetails::get().AbsolutePath);
+    return;
+  }
+
+  // RFC 10008 Section 2: "Servers MUST fail the request if the Content-Type request field is
+  // missing or is inconsistent with the request content." Only the missing case is enforced here;
+  // whether the media type is consistent with, supported by, or processable for the request
+  // content is a decision only the origin server can make. An empty field value is as absent as a
+  // missing one. Section 2.1 calls for "a 4xx status code such as 400".
+  if (HeaderUtility::isQuery(*request_headers_) &&
+      request_headers_->getContentTypeValue().empty()) {
+    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().QueryMissingContentType);
     return;
   }
 
@@ -1952,8 +2056,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // header block. Only drain if the drain direction is not inbound only or the connection is
   // inbound.
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      (connection_manager_.drain_close_.drainClose(drain_scope) ||
-       drain_connection_due_to_overload)) {
+      (drain_connection_due_to_overload || connection_manager_.shouldDrainClose(drain_scope))) {
 
     // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
     // of time to race with incoming requests. For HTTP/2 connections, send a GOAWAY frame to

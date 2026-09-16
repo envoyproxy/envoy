@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "source/common/common/assert.h"
 #include "source/common/coroutine/executor.h"
 
 #include "absl/functional/any_invocable.h"
@@ -47,10 +48,12 @@ public:
   }
 
   // Registers a cancellation callback. This is called by a leaf awaitable while it
-  // is suspended. If the scope is already cancelled, the callback fires synchronously.
+  // is suspended. This must never execute the callback inline on the stack; the callback
+  // is only invoked when cancel() is explicitly called.
   void setCancelCallback(absl::AnyInvocable<void()> cb) {
     if (cancelled_) {
-      cb();
+      IS_ENVOY_BUG(
+          "setCancelCallback called on an already-cancelled CancellationState. Ignoring callback.");
       return;
     }
     on_cancel_ = std::move(cb);
@@ -84,6 +87,7 @@ public:
       : executor_(std::move(executor)), cancel_(std::move(cancel)) {}
 
   Executor& executor() const { return *executor_; }
+  const std::shared_ptr<Executor>& executorShared() const { return executor_; }
   const CancellationStatePtr& cancellation() const { return cancel_; }
 
 private:

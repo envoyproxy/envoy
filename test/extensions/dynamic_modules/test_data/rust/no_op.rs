@@ -1,4 +1,5 @@
 use envoy_proxy_dynamic_modules_rust_sdk::*;
+use std::cell::Cell;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 declare_init_functions!(init, new_nop_http_filter_config_fn);
@@ -61,13 +62,13 @@ struct NopHttpFilterConfig {
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for NopHttpFilterConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(NopHttpFilter {
-      on_request_headers_called: false,
-      on_request_body_called: false,
-      on_request_trailers_called: false,
-      on_response_headers_called: false,
-      on_response_body_called: false,
-      on_response_trailers_called: false,
-      on_stream_complete_called: false,
+      on_request_headers_called: Cell::new(false),
+      on_request_body_called: Cell::new(false),
+      on_request_trailers_called: Cell::new(false),
+      on_response_headers_called: Cell::new(false),
+      on_response_body_called: Cell::new(false),
+      on_response_trailers_called: Cell::new(false),
+      on_stream_complete_called: Cell::new(false),
     })
   }
 }
@@ -82,77 +83,77 @@ impl Drop for NopHttpFilterConfig {
 /// A no-op HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`]
 /// as well as the [`Drop`] to test the cleanup of the filter.
 struct NopHttpFilter {
-  on_request_headers_called: bool,
-  on_request_body_called: bool,
-  on_request_trailers_called: bool,
-  on_response_headers_called: bool,
-  on_response_body_called: bool,
-  on_response_trailers_called: bool,
-  on_stream_complete_called: bool,
+  on_request_headers_called: Cell<bool>,
+  on_request_body_called: Cell<bool>,
+  on_request_trailers_called: Cell<bool>,
+  on_response_headers_called: Cell<bool>,
+  on_response_body_called: Cell<bool>,
+  on_response_trailers_called: Cell<bool>,
+  on_stream_complete_called: Cell<bool>,
 }
 
 impl Drop for NopHttpFilter {
   fn drop(&mut self) {
-    assert!(self.on_request_headers_called);
-    assert!(self.on_response_headers_called);
-    assert!(self.on_stream_complete_called);
+    assert!(self.on_request_headers_called.get());
+    assert!(self.on_response_headers_called.get());
+    assert!(self.on_stream_complete_called.get());
   }
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NopHttpFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    self.on_request_headers_called = true;
+    self.on_request_headers_called.set(true);
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
   fn on_request_body(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
-    self.on_request_body_called = true;
+    self.on_request_body_called.set(true);
     abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
   }
 
   fn on_request_trailers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
-    self.on_request_trailers_called = true;
+    self.on_request_trailers_called.set(true);
     abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
   }
 
   fn on_response_headers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    self.on_response_headers_called = true;
+    self.on_response_headers_called.set(true);
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 
   fn on_response_body(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
-    self.on_response_body_called = true;
+    self.on_response_body_called.set(true);
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   }
 
   fn on_response_trailers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
-    self.on_response_trailers_called = true;
+    self.on_response_trailers_called.set(true);
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }
 
-  fn on_stream_complete(&mut self, _envoy_filter: &mut EHF) {
-    self.on_stream_complete_called = true;
+  fn on_stream_complete(&self, _envoy_filter: &mut EHF) {
+    self.on_stream_complete_called.set(true);
   }
 }

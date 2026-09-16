@@ -105,6 +105,7 @@ using Headers = ConstSingleton<HeaderValues>;
 struct FilterNameValues {
   const std::string Name = "istio.peer_metadata";
   const std::string DisableDiscoveryField = "disable_baggage_discovery";
+  const std::string EnableTLSFilterExchange = "istio.peer_metadata.enable_tls_filter_exchange";
 };
 
 using FilterNames = ConstSingleton<FilterNameValues>;
@@ -129,8 +130,9 @@ PACKED_STRUCT(struct PeerMetadataHeader {
  * baggage header information from filter state (we expect TCP Proxy to
  * populate it), collect other details that are missing from the baggage, i.e.
  * the upstream peer identity, and store the discovered peer metadata in a
- * thread-local registry keyed by the upstream connection ID, allowing the
- * upstream peer_metadata filter on the cluster side to retrieve it directly.
+ * thread-local registry keyed by the shared PassthroughState pointer of the
+ * internal user-space socket, allowing the upstream peer_metadata filter on the
+ * cluster side to retrieve it directly.
  */
 class Filter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
 public:
@@ -151,9 +153,9 @@ private:
   bool disableDiscovery() const;
   std::optional<Envoy::Protobuf::Any> discoverPeerMetadata();
   // Store discovered peer metadata in the thread-local registry, keyed by the
-  // downstream connection ID from filter state. Returns false when there is no
-  // connection ID in filter state (registry hand-off unavailable), so the caller
-  // can fall back to the data-stream approach.
+  // shared PassthroughState pointer of the internal user-space socket. Returns
+  // false when no registry is allocated or the pointer key is unavailable, so
+  // the caller can fall back to the legacy in-byte-stream preamble exchange.
   bool storeInRegistry(const std::optional<Envoy::Protobuf::Any>& peer_metadata);
   // Legacy fallback: inject the peer metadata (or an empty marker) as a preamble
   // into the downstream data stream.
@@ -172,8 +174,9 @@ private:
  * This is an upstream network filter complementing the filter above. It will
  * be installed in all the service clusters that communicate with upstream peers
  * via internal listeners. It reads peer metadata from the thread-local registry
- * (stored by the listener-side Filter keyed by this connection's ID) and
- * populates filter state for use by telemetry filters.
+ * (stored by the listener-side Filter keyed by the shared PassthroughState
+ * pointer of the internal user-space socket) and populates filter state for use
+ * by telemetry filters.
  */
 class UpstreamFilter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
@@ -186,9 +189,10 @@ public:
 
 private:
   bool disableDiscovery() const;
-  // Look up peer metadata stored by the paired downstream filter, keyed by this
-  // connection's ID from filter state. Returns false when there is no connection
-  // ID in filter state or the TLS registry is not allocated.
+  // Look up peer metadata stored by the paired downstream filter, keyed by the
+  // shared PassthroughState pointer of the internal user-space socket. Returns
+  // false when no registry is allocated or the pointer key is unavailable, so
+  // the caller can fall back to the legacy in-byte-stream preamble exchange.
   bool tryRegistryLookup();
   // Legacy fallback: parse and strip the peer metadata preamble from the
   // upstream data stream.

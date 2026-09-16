@@ -25,6 +25,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace StreamInfo {
 namespace {
@@ -579,8 +581,8 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   const auto status = Protobuf::util::MessageToJsonString(test_struct, &json);
   EXPECT_OK(status);
   // check json contains the key and values we set
-  EXPECT_TRUE(json.find("\"test_key\":\"test_value\"") != std::string::npos);
-  EXPECT_TRUE(json.find("\"another_key\":\"another_value\"") != std::string::npos);
+  EXPECT_THAT(json, HasSubstr("\"test_key\":\"test_value\""));
+  EXPECT_THAT(json, HasSubstr("\"another_key\":\"another_value\""));
 }
 
 TEST_F(StreamInfoImplTest, DumpStateTest) {

@@ -36,6 +36,7 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
         predicate:
           single_predicate:
             input:
+              name: envoy.matching.inputs.request_headers
               typed_config:
                 "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
                 header_name: environment
@@ -65,8 +66,8 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
 
   RateLimitQuotaFilterFactory factory;
   std::string stats_prefix = "test";
-  auto cb_or = factory.createFilterFactoryFromProtoTyped(filter_config, stats_prefix,
-                                                         mock_stream_client->context_);
+  auto cb_or = factory.createFilterFactoryFromProto(filter_config, stats_prefix,
+                                                    mock_stream_client->context_);
   ASSERT_TRUE(cb_or.ok()) << cb_or.status();
   Http::FilterFactoryCb cb = std::move(cb_or).value();
   cb(filter_callback);
@@ -112,12 +113,11 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidMatcher) {
 
   RateLimitQuotaFilterFactory factory;
   std::string stats_prefix = "test";
-  EXPECT_THROW_WITH_REGEX(factory
-                              .createFilterFactoryFromProtoTyped(filter_config, stats_prefix,
-                                                                 mock_stream_client->context_)
-                              .value(),
-                          EnvoyException,
-                          "Didn't find a registered implementation.*'input_not_found'");
+  EXPECT_THROW_WITH_REGEX(
+      factory
+          .createFilterFactoryFromProto(filter_config, stats_prefix, mock_stream_client->context_)
+          .value(),
+      EnvoyException, "Didn't find a registered implementation.*'input_not_found'");
 }
 
 TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidGrpcClient) {
@@ -133,6 +133,7 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidGrpcClient) 
         predicate:
           single_predicate:
             input:
+              name: envoy.matching.inputs.request_headers
               typed_config:
                 "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
                 header_name: environment
@@ -157,8 +158,8 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidGrpcClient) 
 
   RateLimitQuotaFilterFactory factory;
   std::string stats_prefix = "test";
-  auto cb_or = factory.createFilterFactoryFromProtoTyped(filter_config, stats_prefix,
-                                                         mock_stream_client->context_);
+  auto cb_or = factory.createFilterFactoryFromProto(filter_config, stats_prefix,
+                                                    mock_stream_client->context_);
   EXPECT_THAT(cb_or, HasStatus(absl::StatusCode::kInternal, "Mock client creation failure"));
 }
 

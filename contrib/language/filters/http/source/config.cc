@@ -1,6 +1,7 @@
 #include "contrib/language/filters/http/source/config.h"
 
-#include "envoy/common/exception.h"
+#include <format>
+
 #include "envoy/registry/registry.h"
 
 #include "contrib/language/filters/http/source/language_filter.h"
@@ -18,14 +19,16 @@ struct LocaleHash {
   }
 };
 
-Http::FilterFactoryCb LanguageFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> LanguageFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::language::v3alpha::Language& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   const auto default_locale = icu::Locale(proto_config.default_language().data());
 
   if (default_locale.isBogus()) {
-    throw EnvoyException(fmt::format("Failed to create icu::Locale from default_language: {}",
-                                     proto_config.default_language().data()));
+    return absl::InvalidArgumentError(
+        std::format("Failed to create icu::Locale from default_language: {}",
+                    proto_config.default_language().data()));
   }
 
   absl::flat_hash_set<icu::Locale, LocaleHash> supported_languages({default_locale});
@@ -34,8 +37,8 @@ Http::FilterFactoryCb LanguageFilterFactory::createFilterFactoryFromProtoTyped(
     const auto locale = icu::Locale(supported_language.data());
 
     if (locale.isBogus()) {
-      throw EnvoyException(fmt::format("Failed to create icu::Locale from supported_languages: {}",
-                                       supported_language.data()));
+      return absl::InvalidArgumentError(std::format(
+          "Failed to create icu::Locale from supported_languages: {}", supported_language.data()));
     }
 
     supported_languages.insert(locale);
@@ -49,14 +52,15 @@ Http::FilterFactoryCb LanguageFilterFactory::createFilterFactoryFromProtoTyped(
           .build(errorCode));
 
   if (U_FAILURE(errorCode)) {
-    throw EnvoyException(fmt::format("Failed to initialize icu::LocaleMatcher::Builder: ICU error "
-                                     "code icu::LocaleMatcher::Builder build: {}",
-                                     static_cast<int>(errorCode)));
+    return absl::InvalidArgumentError(
+        std::format("Failed to initialize icu::LocaleMatcher::Builder: ICU error "
+                    "code icu::LocaleMatcher::Builder build: {}",
+                    static_cast<int>(errorCode)));
   }
 
   auto config = std::make_shared<LanguageFilterConfigImpl>(
       std::make_shared<icu::Locale>(default_locale), locale_matcher,
-      proto_config.clear_route_cache(), stats_prefix, context.scope());
+      proto_config.clear_route_cache(), extra_context.stats_prefix, extra_context.scopeOr(context));
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<LanguageFilter>(config);

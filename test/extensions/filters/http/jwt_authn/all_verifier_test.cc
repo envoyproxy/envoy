@@ -76,8 +76,9 @@ public:
 
   void createVerifier() {
     absl::Status creation_status = absl::OkStatus();
-    filter_config_ =
-        std::make_shared<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_, creation_status);
+    filter_config_ = std::make_shared<FilterConfigImpl>(
+        proto_config_, "", mock_factory_ctx_.server_factory_context_, mock_factory_ctx_.scope(),
+        makeOptRef<Init::Manager>(mock_factory_ctx_.init_manager_), creation_status);
     ASSERT_TRUE(creation_status.ok());
 
     auto verifier_or = Verifier::create(proto_config_.rules(0).requires_(),

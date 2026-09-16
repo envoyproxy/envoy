@@ -11,6 +11,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -19,6 +20,7 @@
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::_;
+using testing::Contains;
 using testing::NiceMock;
 using testing::Return;
 
@@ -32,7 +34,7 @@ MATCHER_P(MapEq, rhs, "") {
   const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
-    EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
+    EXPECT_THAT(obj.fields(), Contains(IsStructString(entry.first, entry.second)));
   }
   return true;
 }
@@ -41,7 +43,7 @@ MATCHER_P(MapEqNum, rhs, "") {
   const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
-    EXPECT_EQ(obj.fields().at(entry.first).number_value(), entry.second);
+    EXPECT_THAT(obj.fields(), Contains(IsStructNumber(entry.first, entry.second)));
   }
   return true;
 }

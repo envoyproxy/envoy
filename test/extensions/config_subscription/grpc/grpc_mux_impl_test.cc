@@ -47,6 +47,9 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
 
+using testing::Contains;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Config {
 namespace {
@@ -1811,8 +1814,7 @@ TEST_P(GrpcMuxImplTest, XdsResourcesDelegateGetResources) {
       .WillOnce(Invoke([expected_key](const XdsSourceId& source_id,
                                       const absl::flat_hash_set<std::string>& names) {
         EXPECT_EQ(expected_key, source_id.toKey());
-        EXPECT_EQ(1, names.size());
-        EXPECT_TRUE(names.contains("x"));
+        EXPECT_THAT(names, UnorderedElementsAre("x"));
         return std::vector<envoy::service::discovery::v3::Resource>{};
       }));
 

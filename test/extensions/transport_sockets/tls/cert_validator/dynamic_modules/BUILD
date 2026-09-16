@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
+    "envoy_cc_dyn_module_test",
     "envoy_package",
 )
 
@@ -8,7 +8,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "dynamic_modules_cert_validator_test",
     srcs = ["dynamic_modules_cert_validator_test.cc"],
     data = [
@@ -22,7 +22,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:cert_validator_not_validated",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/transport_sockets/tls/cert_validator/dynamic_modules:config",

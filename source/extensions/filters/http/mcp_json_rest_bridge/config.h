@@ -15,22 +15,18 @@ namespace McpJsonRestBridge {
  * Config factory for MCP JSON REST bridge filter.
  */
 class McpJsonRestBridgeFilterConfigFactory
-    : public Common::ExceptionFreeFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge,
           envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute> {
 public:
-  McpJsonRestBridgeFilterConfigFactory() : ExceptionFreeFactoryBase(FilterName) {}
+  McpJsonRestBridgeFilterConfigFactory() : UnifiedFactoryBase(FilterName) {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-          proto_config,
-      const std::string&, Server::Configuration::FactoryContext&) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
           proto_config,
-      const std::string&, Server::Configuration::ServerFactoryContext&) override;
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

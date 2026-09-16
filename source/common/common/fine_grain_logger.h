@@ -157,6 +157,7 @@ public:
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
     absl::WriterMutexLock wl(fine_grain_log_lock_);
     fine_grain_log_map_->erase(key);
+    logger_keys_.erase(key);
   }
 
 private:
@@ -195,13 +196,21 @@ private:
   /**
    * Parses a logger key into its file and name components.
    */
-  static std::pair<absl::string_view, absl::string_view> parseKey(absl::string_view key);
+  std::pair<absl::string_view, absl::string_view> parseKey(absl::string_view key) const
+      ABSL_SHARED_LOCKS_REQUIRED(fine_grain_log_lock_);
 
   /**
    * Map that stores <key, logger> pairs, key can be the file name.
    */
   FineGrainLogMapSharedPtr fine_grain_log_map_ ABSL_GUARDED_BY(fine_grain_log_lock_) =
       std::make_shared<FineGrainLogMap>();
+
+  /**
+   * Map that stores the metadata of registered loggers to reconstruct {file, name}
+   * components.
+   */
+  absl::flat_hash_map<std::string, std::pair<std::string, std::string>>
+      logger_keys_ ABSL_GUARDED_BY(fine_grain_log_lock_);
 
   /**
    * Vector that stores <update, level> pairs, key can be the file basename or glob expressions.

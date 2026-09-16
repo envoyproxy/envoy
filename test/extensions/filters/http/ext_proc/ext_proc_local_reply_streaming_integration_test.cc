@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include <utility>
 
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
@@ -27,6 +30,17 @@ using Http::LowerCaseString;
 
 class ExtProcLocalReplyStreamingIntegrationTest : public ExtProcIntegrationTest {
 public:
+  void SetUp() override {
+    // Increase the per-message timeout to tolerate integration test scheduling delays. These tests
+    // exercise streamed local responses, while message timeout behavior is tested separately.
+    // The default timeout is 200ms.
+    proto_config_.mutable_message_timeout()->set_seconds(2);
+    if (!IsEnvoyGrpc()) {
+      GTEST_SKIP()
+          << "Google gRPC client is not supported for local reply streaming integration tests";
+    }
+  }
+
   void sendLocalResponseBody(bool end_of_stream) {
     ProcessingResponse body_response;
     auto streamed_response =
@@ -112,7 +126,17 @@ TEST_P(ExtProcLocalReplyStreamingIntegrationTest, LocalHeadersOnlyRequestAndResp
   sendLocalResponseBody(true);
 
   ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_EQ(response->body(), "local response body");
+  EXPECT_EQ("200", response->headers().getStatusValue()) << response->debugState();
+  ASSERT_EQ(response->body(), "local response body")
+      << response->debugState() << "\next_proc counters:"
+      << "\n  message_timeouts="
+      << test_server_->counter("http.config_test.ext_proc.message_timeouts")->value()
+      << "\n  streams_failed="
+      << test_server_->counter("http.config_test.ext_proc.streams_failed")->value()
+      << "\n  spurious_msgs_received="
+      << test_server_->counter("http.config_test.ext_proc.spurious_msgs_received")->value()
+      << "\n  immediate_responses_sent="
+      << test_server_->counter("http.config_test.ext_proc.immediate_responses_sent")->value();
   verifyDownstreamResponse(*response, 200);
 }
 

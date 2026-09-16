@@ -2,9 +2,12 @@
 
 #include <atomic>
 
+#include "envoy/init/manager.h"
+#include "envoy/secret/secret_provider.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/secret/secret_provider_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
@@ -74,7 +77,8 @@ using OnHttpFilterConfigHttpStreamResetType =
  * Each filter instance and the factory callback holds a shared pointer to this config.
  */
 class DynamicModuleHttpFilterConfig
-    : public std::enable_shared_from_this<DynamicModuleHttpFilterConfig> {
+    : public std::enable_shared_from_this<DynamicModuleHttpFilterConfig>,
+      public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   /**
    * Constructor for the config.
@@ -84,12 +88,16 @@ public:
    * @param dynamic_module the dynamic module to use.
    * @param stats_scope the stats scope for metric creation.
    * @param context the server factory context.
+   * @param init_manager the init manager to register dynamic secret subscriptions with, if any.
+   * This is only valid for the duration of ``envoy_dynamic_module_on_http_filter_config_new`` and
+   * is cleared afterwards.
    */
   DynamicModuleHttpFilterConfig(const absl::string_view filter_name,
                                 const absl::string_view filter_config,
                                 const absl::string_view metrics_namespace,
                                 DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-                                Server::Configuration::ServerFactoryContext& context);
+                                Server::Configuration::ServerFactoryContext& context,
+                                OptRef<Init::Manager> init_manager = std::nullopt);
 
   ~DynamicModuleHttpFilterConfig();
 
@@ -145,6 +153,20 @@ public:
   // adversarial module spawning a worker thread inside ``on_http_filter_config_new`` could
   // observe the stale ``false`` and reproduce the seed StatNamePool race.
   std::atomic<bool> stat_creation_frozen_{false};
+
+  // Set by the factory once ``envoy_dynamic_module_on_http_filter_config_new`` has returned, after
+  // which ``subscribeGenericSecret`` refuses to create new subscriptions. Uses the same
+  // release/acquire contract as ``stat_creation_frozen_`` above: subscribing allocates a thread
+  // local slot and mutates ``generic_secrets_``, neither of which is safe once a worker can read
+  // the config, so a module that spawns its own thread inside ``config_new`` must observe the
+  // freeze rather than a stale ``false``.
+  std::atomic<bool> secret_subscription_frozen_{false};
+
+  // The init manager to register dynamic secret subscriptions with, so that a listener does not
+  // start serving before its secrets have been delivered. Only valid while the module's
+  // ``config_new`` hook is running: the referenced init manager belongs to the filter chain factory
+  // context, so the factory clears this right after the hook returns.
+  OptRef<Init::Manager> init_manager_;
 
   bool terminal_filter_ = false;
 
@@ -323,7 +345,38 @@ public:
 
 #undef ID_TO_INDEX
 
+  /**
+   * Subscribes to a generic secret so that the module can read its value by the returned ID.
+   *
+   * This is only callable during ``envoy_dynamic_module_on_http_filter_config_new``: creating a
+   * subscription allocates a thread local slot and touches the secret manager, both of which are
+   * main-thread-only, and ``generic_secrets_`` must not be mutated once a worker can read it.
+   *
+   * @param name the name of the secret. For static secrets this is the name in the bootstrap
+   * configuration, and for dynamic secrets the resource name requested from the SDS server.
+   * @param sds_config_source the JSON serialized ``envoy.config.core.v3.ConfigSource`` to fetch the
+   * secret from, or empty to look the name up among the static secrets.
+   * @return a 1-based ID that can be passed to ``getGenericSecretById``, or 0 on failure.
+   */
+  size_t subscribeGenericSecret(absl::string_view name, absl::string_view sds_config_source);
+
+  /**
+   * @param id the ID previously returned by ``subscribeGenericSecret``.
+   * @return the current value of the secret on the calling thread, or nullptr if the ID does not
+   * correspond to a subscribed secret. The value is empty until the first SDS delivery. The
+   * returned reference is invalidated by a secret rotation, which happens between events on the
+   * calling thread, so it must not be retained across events.
+   */
+  const std::string* getGenericSecretById(size_t id) const {
+    if (id == 0 || id > generic_secrets_.size()) {
+      return nullptr;
+    }
+    return &generic_secrets_[id - 1]->secret();
+  }
+
 private:
+  Server::Configuration::ServerFactoryContext& server_context_;
+
   // The name of the filter passed in the constructor.
   const std::string filter_name_;
 
@@ -340,6 +393,12 @@ private:
   std::vector<ModuleGaugeVecHandle> gauge_vecs_;
   std::vector<ModuleHistogramHandle> hists_;
   std::vector<ModuleHistogramVecHandle> hist_vecs_;
+
+  // The generic secrets subscribed by the module during ``config_new``, indexed by ID - 1. Appended
+  // to only while ``secret_subscription_frozen_`` is false, and read-only afterwards, which is what
+  // makes the reads from worker threads safe. Each entry keeps its own thread local copy of the
+  // value so that a read is a thread local lookup rather than a lock.
+  std::vector<std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>> generic_secrets_;
 
   // The handle for the module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -504,13 +563,17 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
  * @param dynamic_module the dynamic module to use.
  * @param stats_scope the stats scope for metric creation.
  * @param context the server factory context.
+ * @param init_manager the init manager that dynamic secret subscriptions created by the module are
+ * registered with. When absent, such subscriptions start immediately instead of gating the owner's
+ * initialization.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     const absl::string_view metrics_namespace, const bool terminal_filter,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-    Server::Configuration::ServerFactoryContext& context);
+    Server::Configuration::ServerFactoryContext& context,
+    OptRef<Init::Manager> init_manager = std::nullopt);
 
 } // namespace HttpFilters
 } // namespace DynamicModules

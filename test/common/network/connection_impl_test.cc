@@ -377,10 +377,10 @@ TEST_P(ConnectionImplTest, DrainFiresOnDrainOnAllCallbacks) {
   client_connection_->addConnectionCallbacks(cb_b);
 
   // client_callbacks_ was registered by setUpBasicConnection(); it also receives onDrain().
-  EXPECT_CALL(client_callbacks_, onDrain());
-  EXPECT_CALL(cb_a, onDrain());
-  EXPECT_CALL(cb_b, onDrain());
-  client_connection_->onDrain();
+  EXPECT_CALL(client_callbacks_, onDrain(_));
+  EXPECT_CALL(cb_a, onDrain(_));
+  EXPECT_CALL(cb_b, onDrain(_));
+  client_connection_->onDrain(Network::ConnectionDrainEvent{});
 
   client_connection_->removeConnectionCallbacks(cb_a);
   client_connection_->removeConnectionCallbacks(cb_b);
@@ -398,12 +398,78 @@ TEST_P(ConnectionImplTest, DrainSkipsRemovedCallbacks) {
   // removeConnectionCallbacks nulls out the slot without resizing; onDrain() must skip it.
   client_connection_->removeConnectionCallbacks(removed_cb);
 
-  EXPECT_CALL(client_callbacks_, onDrain());
-  EXPECT_CALL(kept_cb, onDrain());
+  EXPECT_CALL(client_callbacks_, onDrain(_));
+  EXPECT_CALL(kept_cb, onDrain(_));
   // removed_cb.onDrain must NOT be invoked (StrictMock catches it).
-  client_connection_->onDrain();
+  client_connection_->onDrain(Network::ConnectionDrainEvent{});
 
   client_connection_->removeConnectionCallbacks(kept_cb);
+  disconnect(true);
+}
+
+// A callback registered after the connection has been notified of a drain must be replayed the
+// event. The HTTP codec (and wrappers around it) are created lazily on the first byte of data, so
+// an idle connection whose listener starts draining registers its drain-aware callbacks after the
+// notification and would otherwise never learn of the drain.
+TEST_P(ConnectionImplTest, DrainIsReplayedToLateRegisteredCallbacks) {
+  setUpBasicConnection();
+  connect();
+
+  const MonotonicTime start_time = dispatcher_->timeSource().monotonicTime();
+  EXPECT_CALL(client_callbacks_, onDrain(_));
+  client_connection_->onDrain(
+      Network::ConnectionDrainEvent{start_time, Server::DrainStrategy::Immediate});
+
+  StrictMock<MockConnectionCallbacks> late_cb;
+  Network::ConnectionDrainEvent replayed;
+  EXPECT_CALL(late_cb, onDrain(_))
+      .WillOnce(Invoke([&replayed](Network::ConnectionDrainEvent event) { replayed = event; }));
+  client_connection_->addConnectionCallbacks(late_cb);
+  EXPECT_EQ(start_time, replayed.start_time);
+  EXPECT_EQ(Server::DrainStrategy::Immediate, replayed.strategy);
+
+  client_connection_->removeConnectionCallbacks(late_cb);
+  disconnect(true);
+}
+
+// A callback registered before any drain notification is not replayed anything.
+TEST_P(ConnectionImplTest, NoDrainReplayWithoutNotification) {
+  setUpBasicConnection();
+  connect();
+
+  StrictMock<MockConnectionCallbacks> cb;
+  // cb.onDrain must NOT be invoked (StrictMock catches it).
+  client_connection_->addConnectionCallbacks(cb);
+
+  client_connection_->removeConnectionCallbacks(cb);
+  disconnect(true);
+}
+
+// The first drain event wins: a connection that is already draining stays on its original
+// timeline, and a later notification is ignored rather than re-notifying callbacks or pushing the
+// drain back.
+TEST_P(ConnectionImplTest, DrainKeepsFirstEvent) {
+  setUpBasicConnection();
+  connect();
+
+  const MonotonicTime start_time = dispatcher_->timeSource().monotonicTime();
+  EXPECT_CALL(client_callbacks_, onDrain(_));
+  client_connection_->onDrain(
+      Network::ConnectionDrainEvent{start_time, Server::DrainStrategy::Gradual});
+  // A second notification (an InboundOnly -> All drain escalation, or a filter chain drain
+  // following a server drain) is dropped, even though it is more aggressive.
+  client_connection_->onDrain(Network::ConnectionDrainEvent{start_time + std::chrono::seconds(30),
+                                                            Server::DrainStrategy::Immediate});
+
+  StrictMock<MockConnectionCallbacks> late_cb;
+  Network::ConnectionDrainEvent replayed;
+  EXPECT_CALL(late_cb, onDrain(_))
+      .WillOnce(Invoke([&replayed](Network::ConnectionDrainEvent event) { replayed = event; }));
+  client_connection_->addConnectionCallbacks(late_cb);
+  EXPECT_EQ(start_time, replayed.start_time);
+  EXPECT_EQ(Server::DrainStrategy::Gradual, replayed.strategy);
+
+  client_connection_->removeConnectionCallbacks(late_cb);
   disconnect(true);
 }
 

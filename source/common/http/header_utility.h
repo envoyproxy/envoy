@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <vector>
 
 #include "envoy/common/matchers.h"
@@ -15,6 +16,7 @@
 #include "source/common/common/regex.h"
 #include "source/common/http/status.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -109,7 +111,9 @@ public:
   public:
     HeaderDataBaseImpl(const envoy::config::route::v3::HeaderMatcher& config)
         : name_(config.name()), invert_match_(config.invert_match()),
-          treat_missing_as_empty_(config.treat_missing_header_as_empty()) {}
+          treat_missing_as_empty_(config.treat_missing_header_as_empty()),
+          match_individually_(Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.match_headers_individually")) {}
 
     // HeaderMatcher
     bool matchesHeaders(const HeaderMap& request_headers) const override {
@@ -158,12 +162,20 @@ public:
       return invert_match_;
     }
 
+    bool matches(const HeaderMap& request_headers) const override {
+      return match_individually_ ? matchesHeadersIndividually(request_headers)
+                                 : matchesHeaders(request_headers);
+    }
+
   protected:
     // A matcher specific implementation to match the given header_value.
     virtual bool specificMatchesHeaders(absl::string_view header_value) const PURE;
     const LowerCaseString name_;
     const bool invert_match_;
     const bool treat_missing_as_empty_;
+    // Latched value of the `match_headers_individually` runtime feature, read once at
+    // construction instead of on every match.
+    const bool match_individually_ = false;
   };
 
   // Corresponds to the exact_match from the HeaderMatchSpecifier proto in the RDS API.
@@ -387,6 +399,11 @@ public:
   static bool isConnect(const RequestHeaderMap& headers);
 
   /**
+   * @brief a helper function to determine if the headers represent a QUERY request (RFC 10008).
+   */
+  static bool isQuery(const RequestHeaderMap& headers);
+
+  /**
    * @brief a helper function to determine if the headers represent a CONNECT-UDP request.
    */
   static bool isConnectUdpRequest(const RequestHeaderMap& headers);
@@ -494,6 +511,16 @@ public:
    * or value was invalid.
    */
   static Http::Status checkValidRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /**
+   * When set, checkValidRequestHeaders() accepts every header name and value. This lets
+   * integration tests drive Envoy's own codecs to send deliberately malformed requests at
+   * Envoy's server codecs. Never set this outside of tests.
+   *
+   * Atomic because tests clear it while Envoy's worker threads are still running, and those
+   * threads read it whenever they encode an upstream request.
+   */
+  static std::atomic<bool> disable_request_header_validation_for_tests_;
 
   /**
    * Returns true if a header may be safely removed without causing additional

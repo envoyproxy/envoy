@@ -15,7 +15,11 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -177,6 +181,32 @@ TEST(ResponseCacheControl, StreamingTest) {
   EXPECT_EQ(os.str(), "{must_validate, no_store, no_transform, no_stale, public, max-age=0}");
 }
 
+TEST(RequestCacheControl, DirectiveNamesAreCaseInsensitive) {
+  EXPECT_EQ(RequestCacheControl("no-cache, no-store, no-transform, only-if-cached, max-age=600, "
+                                "min-fresh=10, max-stale=20"),
+            RequestCacheControl("No-Cache, No-Store, No-Transform, Only-If-Cached, Max-Age=600, "
+                                "Min-Fresh=10, Max-Stale=20"));
+}
+
+TEST(ResponseCacheControl, DirectiveNamesAreCaseInsensitive) {
+  EXPECT_EQ(ResponseCacheControl("no-cache, no-store, no-transform, must-revalidate, public, "
+                                 "max-age=600, s-maxage=300"),
+            ResponseCacheControl("No-Cache, No-Store, No-Transform, Must-Revalidate, Public, "
+                                 "Max-Age=600, S-Maxage=300"));
+  EXPECT_EQ(ResponseCacheControl("proxy-revalidate, max-age=600"),
+            ResponseCacheControl("Proxy-Revalidate, Max-Age=600"));
+}
+
+TEST(ResponseCacheControl, StorageDirectivesAreCaseInsensitive) {
+  for (const absl::string_view directive : {"private", "Private", "PRIVATE", "pRiVaTe", "no-store",
+                                            "No-Store", "NO-STORE", "nO-sToRe"}) {
+    SCOPED_TRACE(directive);
+    const ResponseCacheControl cache_control(absl::StrCat("max-age=600, ", directive));
+    EXPECT_EQ(cache_control.max_age_, Seconds(600));
+    EXPECT_TRUE(cache_control.no_store_);
+  }
+}
+
 struct TestResponseCacheControl : public ResponseCacheControl {
   TestResponseCacheControl(bool must_validate, bool no_store, bool no_transform, bool no_stale,
                            bool is_public, OptionalDuration max_age) {
@@ -219,7 +249,7 @@ public:
         {
           "s-maxage=10, private=content-length, no-cache=content-encoding",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, true, false, false, false, Seconds(10)}
+          {true, true, false, true, false, Seconds(10)}
         },
         {
           "private",
@@ -235,7 +265,7 @@ public:
         {
           "s-maxage=\"20\", max-age=\"10\", public",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, true, Seconds(20)}
+          {false, false, false, true, true, Seconds(20)}
         },
         {
           "max-age=\"50\", private",
@@ -245,7 +275,7 @@ public:
         {
           "s-maxage=\"0\"",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, false, Seconds(0)}
+          {false, false, false, true, false, Seconds(0)}
         },
         // Unknown directives are ignored
         {
@@ -516,8 +546,7 @@ TEST(GetAllMatchingHeaderNames, SingleMatchSingleValue) {
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
-  ASSERT_EQ(result.size(), 1);
-  EXPECT_TRUE(result.contains("accept"));
+  EXPECT_THAT(result, UnorderedElementsAre("accept"));
 }
 
 TEST(GetAllMatchingHeaderNames, SingleMatchMultiValue) {
@@ -532,8 +561,7 @@ TEST(GetAllMatchingHeaderNames, SingleMatchMultiValue) {
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
-  ASSERT_EQ(result.size(), 1);
-  EXPECT_TRUE(result.contains("accept"));
+  EXPECT_THAT(result, UnorderedElementsAre("accept"));
 }
 
 TEST(GetAllMatchingHeaderNames, MultipleMatches) {
@@ -550,9 +578,7 @@ TEST(GetAllMatchingHeaderNames, MultipleMatches) {
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
-  ASSERT_EQ(result.size(), 2);
-  EXPECT_TRUE(result.contains("accept"));
-  EXPECT_TRUE(result.contains("accept-language"));
+  EXPECT_THAT(result, UnorderedElementsAre("accept", "accept-language"));
 }
 
 struct ParseCommaDelimitedHeaderTestCase {
@@ -1007,6 +1033,13 @@ TEST(ResponseCacheControl, SMaxageTakesPrecedenceOverMaxAge) {
   ResponseCacheControl cc("s-maxage=100, max-age=200");
   EXPECT_TRUE(cc.max_age_.has_value());
   EXPECT_EQ(cc.max_age_.value(), Seconds(100));
+}
+
+TEST(ResponseCacheControl, SMaxageImpliesNoStale) {
+  ResponseCacheControl cc("s-maxage=100");
+  EXPECT_TRUE(cc.max_age_.has_value());
+  EXPECT_EQ(cc.max_age_.value(), Seconds(100));
+  EXPECT_TRUE(cc.no_stale_);
 }
 
 TEST(ResponseCacheControl, ProxyRevalidateSetsNoStale) {

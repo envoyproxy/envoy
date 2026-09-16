@@ -12,7 +12,7 @@ void FakeResourceMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& c
 
 void FakeResourceMonitorFactory::onMonitorDestroyed() { monitor_ = nullptr; }
 
-Server::ResourceMonitorPtr FakeResourceMonitorFactory::createResourceMonitor(
+absl::StatusOr<Server::ResourceMonitorPtr> FakeResourceMonitorFactory::createResourceMonitor(
     const Protobuf::Message&, Server::Configuration::ResourceMonitorFactoryContext& context) {
   auto monitor = std::make_unique<FakeResourceMonitor>(context.mainThreadDispatcher(), *this);
   monitor_ = monitor.get();

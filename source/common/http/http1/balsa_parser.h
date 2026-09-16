@@ -24,7 +24,7 @@ public:
   ~BalsaParser() override = default;
 
   // Http1::Parser implementation
-  size_t execute(const char* slice, int len) override;
+  size_t execute(const char* slice, size_t len) override;
   void resume() override;
   CallbackResult pause() override;
   ParserStatus getStatus() const override;
@@ -75,6 +75,9 @@ private:
   ParserCallbacks* connection_ = nullptr;
   const bool enable_trailers_ = false;
   const bool allow_custom_methods_ = false;
+  // Latched on construction, which happens per connection, so that flipping the runtime guard
+  // takes effect on new connections without a per-request runtime lookup.
+  const bool allow_query_method_ = false;
   bool first_byte_processed_ = false;
   bool headers_done_ = false;
   // True until the first byte of the second message arrives.

@@ -79,6 +79,7 @@ HeaderValidator::validateMethodHeader(const HeaderString& value) {
       "PROPFIND",
       "PROPPATCH",
       "PUT",
+      "QUERY",
       "REBIND",
       "REPORT",
       "SEARCH",

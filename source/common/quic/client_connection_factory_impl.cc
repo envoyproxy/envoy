@@ -117,20 +117,12 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   QuicClientPacketWriterFactory::CreationResult creation_result =
       info_impl->writer_factory_->createSocketAndQuicPacketWriter(server_addr, current_network,
                                                                   local_addr, options);
-  const bool use_migration_in_quiche =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_migration_in_quiche");
-  quic::QuicForceBlockablePacketWriter* wrapper = nullptr;
-  if (use_migration_in_quiche) {
-    wrapper = new quic::QuicForceBlockablePacketWriter();
-    // Owns the inner writer.
-    wrapper->set_writer(creation_result.writer_.release());
-  }
+  auto* wrapper = new quic::QuicForceBlockablePacketWriter();
+  // Owns the inner writer.
+  wrapper->set_writer(creation_result.writer_.release());
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
       quic::QuicUtils::CreateRandomConnectionId(), info_impl->conn_helper_,
-      info_impl->alarm_factory_,
-      (use_migration_in_quiche
-           ? wrapper
-           : static_cast<quic::QuicPacketWriter*>(creation_result.writer_.release())),
+      info_impl->alarm_factory_, wrapper,
       /*owns_writer=*/true, quic_versions, dispatcher, std::move(creation_result.socket_),
       generator);
   // Override the max packet length of the QUIC connection if the option value is not 0.
@@ -138,19 +130,11 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     connection->SetMaxPacketLength(info_impl->max_packet_length_);
   }
 
-  EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* migration_helper = nullptr;
-  quic::QuicConnectionMigrationConfig migration_config = info_impl->migration_config_;
-  if (use_migration_in_quiche) {
-    migration_helper = &connection->getOrCreateMigrationHelper(
-        *info_impl->writer_factory_, current_network,
-        makeOptRefFromPtr<EnvoyQuicNetworkObserverRegistry>(network_observer_registry));
-  } else {
-    // The connection needs to be aware of the writer factory so it can create migration probing
-    // sockets.
-    connection->setWriterFactory(*info_impl->writer_factory_);
-    // Disable all kinds of migration in QUICHE as the session won't be setup to handle it.
-    migration_config = quicConnectionMigrationDisableAllConfig();
-  }
+  const quic::QuicConnectionMigrationConfig migration_config = info_impl->migration_config_;
+  EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* migration_helper =
+      &connection->getOrCreateMigrationHelper(
+          *info_impl->writer_factory_, current_network,
+          makeOptRefFromPtr<EnvoyQuicNetworkObserverRegistry>(network_observer_registry));
   // TODO (danzh) move this temporary config and initial RTT configuration to h3 pool.
   quic::QuicConfig config = info_impl->quic_config_;
   // Update config with latest srtt, if available.

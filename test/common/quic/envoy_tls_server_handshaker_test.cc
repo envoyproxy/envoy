@@ -13,7 +13,7 @@ TEST(EnvoyTlsServerHandshakerTest, TicketKeyCallbackNullHandshaker) {
   ASSERT_NE(ssl_ctx, nullptr);
   bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
   ASSERT_NE(ssl, nullptr);
-  // No ex_data set → returns 0 gracefully (no crash, no ENVOY_BUG).
+  // No ex_data set, so it returns 0 gracefully (no crash, no ENVOY_BUG).
   EXPECT_EQ(0, EnvoyTlsServerHandshaker::ticketKeyCallback(ssl.get(), nullptr, nullptr, nullptr,
                                                            nullptr, 0));
 }
@@ -23,7 +23,7 @@ TEST(EnvoyTlsServerHandshakerTest, KeylogCallbackNullHandshaker) {
   ASSERT_NE(ssl_ctx, nullptr);
   bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
   ASSERT_NE(ssl, nullptr);
-  // No ex_data set → silently no-ops (no crash, no ENVOY_BUG, no file write).
+  // No ex_data set, so it silently no-ops (no crash, no ENVOY_BUG, no file write).
   EnvoyTlsServerHandshaker::keylogCallback(ssl.get(), "CLIENT_RANDOM 00 11");
 }
 

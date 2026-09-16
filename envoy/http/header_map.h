@@ -822,6 +822,15 @@ public:
    * Matches headers validating each value individually.
    */
   virtual bool matchesHeadersIndividually(const HeaderMap& headers) const PURE;
+
+  /**
+   * Matches headers using the matching mode selected when the matcher was created.
+   * Implementations typically latch the `envoy.reloadable_features.match_headers_individually`
+   * runtime feature at construction time; the default matches each value individually.
+   */
+  virtual bool matches(const HeaderMap& headers) const {
+    return matchesHeadersIndividually(headers);
+  }
 };
 
 using HeaderMatcherSharedPtr = std::shared_ptr<HeaderMatcher>;

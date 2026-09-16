@@ -178,11 +178,16 @@ class DrainingFilterChainsManager {
 public:
   DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
                               uint64_t workers_pending_removal);
-  uint64_t getDrainingListenerTag() const { return draining_listener_->listenerTag(); }
+  DrainingFilterChainsManager(
+      std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains,
+      uint64_t listener_tag, uint64_t workers_pending_removal);
+  uint64_t getDrainingListenerTag() const { return listener_tag_; }
   const std::list<const Network::FilterChain*>& getDrainingFilterChains() const {
     return draining_filter_chains_;
   }
-  ListenerImpl& getDrainingListener() const { return *draining_listener_; }
+  OptRef<ListenerImpl> getDrainingListener() const {
+    return makeOptRefFromPtr(draining_listener_.get());
+  }
   uint64_t decWorkersPendingRemoval() { return --workers_pending_removal_; }
 
   // Schedule listener destroy.
@@ -195,6 +200,7 @@ public:
     drain_timer_->enableTimer(drain_time);
   }
 
+  // Used by the in-place LDS update.
   void addFilterChainToDrain(const Network::FilterChain& filter_chain) {
     draining_filter_chains_.push_back(&filter_chain);
   }
@@ -203,7 +209,11 @@ public:
 
 private:
   ListenerImplPtr draining_listener_;
+  const uint64_t listener_tag_;
   std::list<const Network::FilterChain*> draining_filter_chains_;
+
+  // Used by the FCDS to extend the lifetime, assumes draining_listener_ to be nullptr.
+  const std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chain_shared_ptrs_;
 
   uint64_t workers_pending_removal_;
   Event::TimerPtr drain_timer_;
@@ -238,6 +248,8 @@ public:
   absl::Status startWorkers(OptRef<GuardDog> guard_dog, std::function<void()> callback) override;
   void stopListeners(StopListenersType stop_listeners_type,
                      const Network::ExtraShutdownListenerOptions& options) override;
+  void onServerDrainStart(Network::DrainDirection direction,
+                          Network::ConnectionDrainEvent drain_event) override;
   void stopWorkers() override;
   void beginListenerUpdate() override { lds_error_state_tracker_.clear(); }
   void endListenerUpdate(FailureStates&& failure_state) override;
@@ -247,6 +259,9 @@ public:
   ApiListenerOptRef apiListener() override;
   ListenerUpdateCallbacksHandlePtr
   addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override;
+  void
+  drainFilterChains(ListenerImpl& listener,
+                    std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains);
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
@@ -335,6 +350,8 @@ private:
    * listener.
    */
   void drainFilterChains(ListenerImplPtr&& draining_listener, ListenerImpl& new_listener);
+
+  void drainGroup(std::list<DrainingFilterChainsManager>::iterator draining_group);
 
   /**
    * Stop a listener. The listener will stop accepting new connections and its socket will be

@@ -43,12 +43,8 @@ struct MatchContext {
 class DynamicModuleInputMatcher : public ::Envoy::Matcher::InputMatcher,
                                   public Logger::Loggable<Logger::Id::matcher> {
 public:
-  DynamicModuleInputMatcher(DynamicModuleSharedPtr module,
-                            OnMatcherConfigDestroyType on_config_destroy,
-                            OnMatcherMatchType on_match,
-                            envoy_dynamic_module_type_matcher_config_module_ptr in_module_config);
-
-  ~DynamicModuleInputMatcher() override;
+  DynamicModuleInputMatcher(DynamicModuleSharedPtr module, OnMatcherMatchType on_match,
+                            std::shared_ptr<const void> in_module_config);
 
   ::Envoy::Matcher::MatchResult match(const ::Envoy::Matcher::DataInputGetResult& input) override;
 
@@ -62,9 +58,10 @@ private:
   DynamicModuleInputMatcher& operator=(const DynamicModuleInputMatcher&) = delete;
 
   DynamicModuleSharedPtr module_;
-  OnMatcherConfigDestroyType on_config_destroy_;
   OnMatcherMatchType on_match_;
-  envoy_dynamic_module_type_matcher_config_module_ptr in_module_config_;
+  // Shared owner of the in-module configuration. The configuration is destroyed exactly once, after
+  // the last matcher instance and the factory callback that built it are released.
+  std::shared_ptr<const void> in_module_config_;
 };
 
 } // namespace DynamicModules

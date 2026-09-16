@@ -211,6 +211,17 @@ quic::QuicConnection* EnvoyQuicServerSession::quicConnection() {
 
 void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   quic::QuicServerSessionBase::OnTlsHandshakeComplete();
+  // The client certificate is already validated by `EnvoyTlsServerHandshaker` before this hook
+  // runs. Surface the validated state to downstream consumers, but only when the matched chain
+  // sets `requiresClientCertificate()`, so a certificate presented to a chain that does not
+  // require one is not marked as validated.
+  if (position_.has_value() && quic_ssl_info_->peerCertificatePresented()) {
+    const auto& transport_socket_factory = dynamic_cast<const QuicServerTransportSocketFactory&>(
+        position_->filter_chain_.transportSocketFactory());
+    if (transport_socket_factory.requiresClientCertificate()) {
+      quic_ssl_info_->onCertValidated();
+    }
+  }
   streamInfo().downstreamTiming().onDownstreamHandshakeComplete(dispatcher_.timeSource());
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
@@ -264,16 +275,22 @@ void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionM
 
 quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
   quic::QuicSSLConfig config = quic::QuicServerSessionBase::GetSSLConfig();
-  config.early_data_enabled = position_.has_value()
-                                  ? dynamic_cast<const QuicServerTransportSocketFactory&>(
-                                        position_->filter_chain_.transportSocketFactory())
-                                        .earlyDataEnabled()
-                                  : true;
-  config.disable_ticket_support = position_.has_value()
-                                      ? !dynamic_cast<const QuicServerTransportSocketFactory&>(
-                                             position_->filter_chain_.transportSocketFactory())
-                                             .resumptionEnabled()
-                                      : false;
+  if (position_.has_value()) {
+    const auto& transport_socket_factory = dynamic_cast<const QuicServerTransportSocketFactory&>(
+        position_->filter_chain_.transportSocketFactory());
+    config.client_cert_mode = transport_socket_factory.requiresClientCertificate()
+                                  ? quic::ClientCertMode::kRequire
+                                  : quic::ClientCertMode::kNone;
+    // 0-RTT is disabled when a client certificate is required because early data is replayable and
+    // would bypass client certificate validation.
+    config.early_data_enabled = transport_socket_factory.earlyDataEnabled() &&
+                                config.client_cert_mode == quic::ClientCertMode::kNone;
+    config.disable_ticket_support = !transport_socket_factory.resumptionEnabled();
+  } else {
+    config.early_data_enabled = true;
+    config.client_cert_mode = quic::ClientCertMode::kNone;
+    config.disable_ticket_support = false;
+  }
   return config;
 }
 

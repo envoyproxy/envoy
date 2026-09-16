@@ -172,7 +172,7 @@ TEST_F(DynamicModuleAccessLogTest, EmitLog) {
   NiceMock<ThreadLocal::MockInstance> tls;
   auto* slot = new NiceMock<MockSlot>();
 
-  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotPtr{slot}));
+  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotSharedPtr{slot}));
 
   auto access_log = std::make_unique<DynamicModuleAccessLog>(
       nullptr, config_, static_cast<ThreadLocal::SlotAllocator&>(tls));
@@ -207,7 +207,7 @@ TEST_F(DynamicModuleAccessLogTest, EmitLogNullLogger) {
   NiceMock<ThreadLocal::MockInstance> tls;
   auto* slot = new NiceMock<MockSlot>();
 
-  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotPtr{slot}));
+  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotSharedPtr{slot}));
 
   auto access_log = std::make_unique<DynamicModuleAccessLog>(
       nullptr, config_, static_cast<ThreadLocal::SlotAllocator&>(tls));
@@ -326,6 +326,12 @@ TEST_F(DynamicModuleAccessLogTest, MetricsInvalidId) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_access_logger_set_gauge(static_cast<void*>(config_.get()),
                                                                   999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_access_logger_increment_gauge(
+                static_cast<void*>(config_.get()), 999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_access_logger_decrement_gauge(
+                static_cast<void*>(config_.get()), 999, 1));
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_access_logger_record_histogram_value(
                 static_cast<void*>(config_.get()), 999, 1));

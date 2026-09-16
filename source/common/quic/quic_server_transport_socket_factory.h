@@ -67,6 +67,8 @@ public:
     return ssl_ctx_;
   }
 
+  bool requiresClientCertificate() const { return config_->requireClientCertificate(); }
+
 protected:
   QuicServerTransportSocketFactory(bool enable_early_data, bool enable_resumption,
                                    Stats::Scope& store, Ssl::ServerContextConfigPtr config,

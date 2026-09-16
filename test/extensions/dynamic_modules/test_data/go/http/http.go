@@ -18,6 +18,7 @@ func init() {
 		"recreate_stream":            &recreateStreamConfigFactory{},
 		"socket_option_callbacks":    &socketOptionCallbacksConfigFactory{},
 		"span_callbacks":             &spanCallbacksConfigFactory{},
+		"span_across_callbacks":      &spanAcrossCallbacksConfigFactory{},
 		"cluster_callbacks":          &clusterCallbacksConfigFactory{},
 		"send_response":              &sendResponseConfigFactory{},
 		"dynamic_metadata_callbacks": &dynamicMetadataCallbacksConfigFactory{},
@@ -445,6 +446,51 @@ func (p *spanCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	return shared.HeadersStatusContinue
 }
 
+// --- span_across_callbacks ---
+type spanAcrossCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+type spanAcrossCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *spanAcrossCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &spanAcrossCallbacksFactory{}, nil
+}
+
+// spanAcrossCallbacksFilter spawns a child span in OnRequestHeaders, keeps it, and finishes it in
+// OnRequestTrailers to show that a span can outlive the event hook that created it.
+type spanAcrossCallbacksFilter struct {
+	handle    shared.HttpFilterHandle
+	childSpan shared.ChildSpan
+	shared.EmptyHttpFilter
+}
+
+func (f *spanAcrossCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &spanAcrossCallbacksFilter{handle: handle}
+}
+
+func (p *spanAcrossCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if span := p.handle.GetActiveSpan(); span != nil {
+		p.childSpan = span.SpawnChild("child")
+	}
+	headers.Set("x-span-stored", "true")
+	return shared.HeadersStatusContinue
+}
+
+func (p *spanAcrossCallbacksFilter) OnRequestTrailers(
+	trailers shared.HeaderMap) shared.TrailersStatus {
+	if p.childSpan != nil {
+		p.childSpan.SetTag("child-key", "child-value")
+		p.childSpan.Finish()
+		p.childSpan = nil
+	}
+	return shared.TrailersStatusContinue
+}
+
 // --- cluster_callbacks ---
 type clusterCallbacksConfigFactory struct {
 	shared.EmptyHttpFilterConfigFactory
@@ -524,6 +570,23 @@ func (p *dynamicMetadataCallbacksFilter) OnRequestHeaders(headers shared.HeaderM
 		"ns_req_header", "key"); ok {
 		panic("metadata type mismatch not detected")
 	}
+
+	// Set a whole namespace from a serialized google.protobuf.Struct { "k": "v" }, asserted
+	// end-to-end by the C++ integration test in filter_test.cc. The bytes are hand-encoded because
+	// the test module has no protobuf dependency:
+	//   0a 08              field 1 (fields), LEN 8
+	//     0a 01 6b           entry.key   = "k"
+	//     12 03 1a 01 76     entry.value = Value { string_value = "v" }
+	p.handle.SetMetadataStruct("ns_req_header_struct",
+		[]byte{0x0a, 0x08, 0x0a, 0x01, 0x6b, 0x12, 0x03, 0x1a, 0x01, 0x76})
+
+	// Set a whole typed namespace from a serialized google.protobuf.Any, asserted end-to-end by
+	// the C++ integration test in filter_test.cc. The bytes are hand-encoded because the test
+	// module has no protobuf dependency:
+	//   0a 03 74 2f 78     field 1 (type_url) = "t/x"
+	//   12 02 01 02        field 2 (value)    = 0x01 0x02
+	p.handle.SetTypedMetadata("ns_req_header_typed",
+		[]byte{0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02})
 
 	// Try getting metadata from router, cluster, and host.
 	if val, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeRoute,

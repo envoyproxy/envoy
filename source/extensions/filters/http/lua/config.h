@@ -14,21 +14,16 @@ namespace Lua {
  * Config registration for the Lua filter. @see NamedHttpFilterConfigFactory.
  */
 class LuaFilterConfig
-    : public Common::DualFactoryBase<envoy::extensions::filters::http::lua::v3::Lua,
-                                     envoy::extensions::filters::http::lua::v3::LuaPerRoute> {
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::lua::v3::Lua,
+                                        envoy::extensions::filters::http::lua::v3::LuaPerRoute> {
 public:
-  LuaFilterConfig() : DualFactoryBase("envoy.filters.http.lua") {}
+  LuaFilterConfig() : UnifiedFactoryBase("envoy.filters.http.lua") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
-      const std::string& stats_prefix, DualInfo info,
-      Server::Configuration::ServerFactoryContext& context) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

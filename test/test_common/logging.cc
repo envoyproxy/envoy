@@ -34,9 +34,8 @@ LogLevelSetter::~LogLevelSetter() {
   }
 }
 
-LogExpectation::LogExpectation(
-    LogRecordingSink& sink,
-    absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log)
+LogExpectation::LogExpectation(LogRecordingSink& sink,
+                               absl::AnyInvocable<void(Logger::Levels, const std::string&)> on_log)
     : sink_(sink), on_log_(std::move(on_log)) {
   sink_.addExpectation(this);
 }
@@ -59,7 +58,7 @@ void LogRecordingSink::log(absl::string_view msg, const spdlog::details::log_msg
 
   absl::MutexLock ml(exp_mtx_);
   for (auto* expect : expectations_) {
-    expect->on_log_(static_cast<Logger::Logger::Levels>(log_msg.level), std::string(msg));
+    expect->on_log_(static_cast<Logger::Levels>(log_msg.level), std::string(msg));
   }
 }
 

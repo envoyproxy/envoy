@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package envoy.extensions.health_checkers.udp.v3;
+
+import "envoy/config/core/v3/health_check.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.health_checkers.udp.v3";
+option java_outer_classname = "UdpProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/health_checkers/udp/v3;udpv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: UDP Health Checker]
+// [#not-implemented-hide:]
+// [#extension: envoy.health_checkers.udp]
+
+// Configuration for the UDP health checker.
+//
+// For every health-check attempt, Envoy creates a fresh connected UDP socket targeting the host's
+// :ref:`health check address
+// <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.address>`. UDP ``connect()``
+// only selects the peer; it does not establish connectivity and does not count as a successful
+// health check. The :ref:`reuse_connection
+// <envoy_v3_api_field_config.core.v3.HealthCheck.reuse_connection>` setting does not apply.
+//
+// Attempts for a host are serialized so that only one attempt is active at a time. Envoy sends
+// exactly one datagram containing ``send`` and waits for a response until the enclosing
+// :ref:`HealthCheck.timeout <envoy_v3_api_field_config.core.v3.HealthCheck.timeout>` expires.
+//
+// The connected socket accepts datagrams only from the configured peer. Each complete response
+// datagram is compared byte-for-byte with ``receive``. A matching datagram completes the attempt
+// successfully. Non-matching datagrams do not satisfy the check; Envoy continues waiting until a
+// matching datagram arrives or the attempt times out. A timeout or local socket error completes
+// the attempt unsuccessfully.
+//
+// The enclosing :ref:`HealthCheck
+// <envoy_v3_api_msg_config.core.v3.HealthCheck>` controls thresholds, intervals, jitter,
+// statistics, and event logging.
+message UdpHealthCheck {
+  // Payload sent as exactly one UDP datagram at the start of each health-check attempt.
+  config.core.v3.HealthCheck.Payload send = 1 [(validate.rules).message = {required: true}];
+
+  // Expected response payload. A response datagram must match the entire payload exactly to make
+  // the health-check attempt successful.
+  config.core.v3.HealthCheck.Payload receive = 2 [(validate.rules).message = {required: true}];
+}

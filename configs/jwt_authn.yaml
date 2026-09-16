@@ -46,6 +46,9 @@ static_resources:
                     header_name: x-firebase-uid
                   - claim_name: firebase.sign_in_provider
                     header_name: x-firebase-provider
+                  - header_name: x-firebase-tenant
+                    claim_path:
+                    - key: https://example.com/tenant
                   issuer: https://securetoken.google.com/example.com:example-project-1234567890
                   audiences:
                   - example.com:example-project-1234567890

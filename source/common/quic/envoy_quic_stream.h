@@ -164,17 +164,9 @@ public:
     return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
   }
 
-  void startHeaderBlock() override {
-    if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.validate_http3_pseudo_headers")) {
-      return;
-    }
-    header_validator_.StartHeaderBlock();
-  }
+  void startHeaderBlock() override { header_validator_.StartHeaderBlock(); }
 
   bool finishHeaderBlock(bool is_trailing_headers) override {
-    if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.validate_http3_pseudo_headers")) {
-      return true;
-    }
     if (is_trailing_headers) {
       return header_validator_.FinishHeaderBlock(quic_session_.perspective() ==
                                                          quic::Perspective::IS_CLIENT
@@ -204,6 +196,13 @@ protected:
   virtual void
   onStreamError(std::optional<bool> should_close_connection,
                 quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) PURE;
+
+  // Drain the stream's contribution to the connection-level bytes_to_send_ counter on close.
+  void clearWatermarkBuffer() {
+    if (reported_buffered_bytes_ > 0) {
+      updateBytesBuffered(reported_buffered_bytes_, 0);
+    }
+  }
 
   // TODO(danzh) remove this once QUICHE enforces content-length consistency.
   void updateReceivedContentBytes(size_t payload_length, bool end_stream) {
