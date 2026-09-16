@@ -1240,7 +1240,7 @@ envoy.health_checkers.udp:
   categories:
   - envoy.health_checkers
   security_posture: robust_to_untrusted_downstream
-  status: wip
+  status: alpha
   type_urls:
   - envoy.extensions.health_checkers.udp.v3.UdpHealthCheck
 envoy.health_check.event_sinks.file:

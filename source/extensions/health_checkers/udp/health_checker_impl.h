@@ -94,7 +94,7 @@ class ProdUdpHealthCheckerImpl final : public UdpHealthCheckerImpl {
 public:
   using UdpHealthCheckerImpl::UdpHealthCheckerImpl;
 
-private:
+  // UdpHealthCheckerImpl
   Network::SocketPtr createSocket(const Network::Address::InstanceConstSharedPtr& address) override;
 };
 

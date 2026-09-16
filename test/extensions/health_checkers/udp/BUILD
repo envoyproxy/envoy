@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     deps = [
         "//envoy/registry",
         "//source/common/network:io_socket_error_lib",
+        "//source/common/network:utility_lib",
         "//source/common/upstream:health_checker_lib",
         "//source/extensions/health_checkers/udp:health_checker_lib",
         "//test/common/upstream:health_checker_test_base_lib",

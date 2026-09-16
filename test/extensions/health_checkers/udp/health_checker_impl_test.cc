@@ -10,6 +10,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/network/io_socket_error_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/extensions/health_checkers/udp/health_checker_impl.h"
 
@@ -404,6 +405,9 @@ TEST_F(UdpHealthCheckerTest, TimeoutBeforeDeferredSendDoesNotSend) {
                                           envoy::data::core::v3::NETWORK_TIMEOUT, true, _));
   timeout_timer_->invokeCallback();
 
+  // Simulate a callback that was already dequeued before cancellation.
+  deferred_callback_->enabled_ = true;
+  deferred_callback_->invokeCallback();
   EXPECT_EQ(1, counter("failure"));
   EXPECT_EQ(1, counter("network_failure"));
   EXPECT_TRUE(host_->healthFlagGet(Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT));
@@ -664,11 +668,16 @@ TEST(UdpHealthCheckerFactoryTest, CreatesRegisteredFactory) {
       nullptr,
       Registry::FactoryRegistry<Server::Configuration::CustomHealthCheckerFactory>::getFactory(
           factory.name()));
-  EXPECT_NE(
-      nullptr,
-      dynamic_cast<Upstream::ProdUdpHealthCheckerImpl*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
-              .get()));
+  auto health_checker =
+      factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context);
+  auto* udp_health_checker =
+      dynamic_cast<Upstream::ProdUdpHealthCheckerImpl*>(health_checker.get());
+  ASSERT_NE(nullptr, udp_health_checker);
+
+  Network::SocketPtr socket =
+      udp_health_checker->createSocket(Network::Utility::parseInternetAddressNoThrow("127.0.0.1"));
+  ASSERT_NE(nullptr, socket);
+  EXPECT_EQ(Network::Socket::Type::Datagram, socket->socketType());
 }
 
 TEST(UdpHealthCheckerFactoryTest, RejectsInvalidHexPayload) {
