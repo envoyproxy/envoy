@@ -89,7 +89,8 @@ using LocalReplier = absl::AnyInvocable<void(Http::Code code, std::string detail
 class DecodeAction {
 public:
   static DecodeAction continueChain() { return DecodeAction{}; }
-  static DecodeAction localReply(Http::Code code, std::string details) {
+
+  static DecodeAction localReply(Http::Code code, std::string details = "") {
     return DecodeAction{LocalReply{code, std::move(details)}};
   }
 
@@ -125,14 +126,14 @@ public:
 // protocol; the filter only inspects or mutates the request and returns a DecodeAction.
 class SyncAiFilter : public AiFilter {
 public:
-  virtual absl::StatusOr<DecodeAction> onRequest(AiRequest& request) PURE;
+  virtual DecodeAction decode(AiRequest& request) PURE;
 
 private:
   Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
                                        AiRequestPropagator propagate_request,
                                        LocalReplier reply_locally) final {
     ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
-    ASSIGN_OR_CO_RETURN(DecodeAction action, onRequest(*request));
+    DecodeAction action = decode(*request);
     if (action.isLocalReply()) {
       std::move(reply_locally)(action.code(), std::string(action.details()));
       co_return absl::OkStatus();

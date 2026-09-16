@@ -766,7 +766,7 @@ class TestSyncMutationFilter : public SyncAiFilter {
 public:
   explicit TestSyncMutationFilter(std::string model) : model_(std::move(model)) {}
 
-  absl::StatusOr<DecodeAction> onRequest(AiRequest& request) override {
+  DecodeAction decode(AiRequest& request) override {
     request.json()["model"] = model_;
     return DecodeAction::continueChain();
   }
@@ -802,7 +802,7 @@ TEST_F(FilterManagerTest, SyncAiFilterContinueAndMutate) {
 
 class TestSyncLocalReplyFilter : public SyncAiFilter {
 public:
-  absl::StatusOr<DecodeAction> onRequest(AiRequest&) override {
+  DecodeAction decode(AiRequest&) override {
     return DecodeAction::localReply(Http::Code::Forbidden, "blocked by sync filter");
   }
 };
@@ -837,45 +837,6 @@ TEST_F(FilterManagerTest, SyncAiFilterLocalReply) {
   EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kCancelled));
   EXPECT_EQ(local_reply_code, Http::Code::Forbidden);
   EXPECT_EQ(local_reply_details, "blocked by sync filter");
-}
-
-class TestSyncErrorFilter : public SyncAiFilter {
-public:
-  absl::StatusOr<DecodeAction> onRequest(AiRequest&) override {
-    return absl::InvalidArgumentError("bad request payload");
-  }
-};
-
-TEST_F(FilterManagerTest, SyncAiFilterError) {
-  JsonWithExtBuf doc;
-  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
-
-  Http::Code local_reply_code = Http::Code::OK;
-  std::string local_reply_details;
-
-  std::vector<AiFilterSharedPtr> filters;
-  filters.push_back(std::make_unique<TestSyncErrorFilter>());
-
-  FilterManager manager(
-      std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
-      /*request_headers=*/nullptr,
-      [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
-        local_reply_code = code;
-        local_reply_details = std::move(details);
-      });
-
-  absl::Status status;
-  bool completed = false;
-  manager.start([&status, &completed](absl::Status s) {
-    status = std::move(s);
-    completed = true;
-  });
-
-  drain();
-  EXPECT_TRUE(completed);
-  EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_EQ(local_reply_code, Http::Code::BadGateway);
-  EXPECT_EQ(local_reply_details, "bad request payload");
 }
 
 } // namespace

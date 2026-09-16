@@ -50,8 +50,8 @@ public:
                     const HttpFilters::AiProtocolManager::AiFilterContext& context);
 
   // HttpFilters::AiProtocolManager::SyncAiFilter
-  absl::StatusOr<HttpFilters::AiProtocolManager::DecodeAction>
-  onRequest(HttpFilters::AiProtocolManager::AiRequest& request) override;
+  HttpFilters::AiProtocolManager::DecodeAction
+  decode(HttpFilters::AiProtocolManager::AiRequest& request) override;
 
 private:
   void publish(const nlohmann::json& json);

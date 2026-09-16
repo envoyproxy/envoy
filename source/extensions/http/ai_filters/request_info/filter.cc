@@ -9,7 +9,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_conversion.h"
 #include "source/extensions/http/ai_filters/request_info/extractor.h"
 
-#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp"
 
 namespace Envoy {
@@ -58,7 +58,7 @@ RequestInfoFilter::RequestInfoFilter(RequestInfoFilterConfigSharedPtr config,
                                      const AiFilterContext& context)
     : config_(std::move(config)), context_(context) {}
 
-absl::StatusOr<DecodeAction> RequestInfoFilter::onRequest(AiRequest& request) {
+DecodeAction RequestInfoFilter::decode(AiRequest& request) {
   publish(request.json());
   return DecodeAction::continueChain();
 }
