@@ -1536,6 +1536,70 @@ TEST_F(GcpAuthnFilterTest, PreserveExistingIgnoredWhenTokenMetadataKeySet) {
   EXPECT_EQ(default_headers_.get_("Authorization"), "Bearer existing_token");
 }
 
+TEST_F(GcpAuthnFilterTest, PreserveExistingDefaultHeaderPresent) {
+  config_.mutable_token_header()->mutable_preserve_existing();
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  setupMockFilterMetadata(/*valid=*/true);
+
+  default_headers_.setCopy(authorizationHeaderKey(), "Bearer existing_token");
+
+  EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(default_headers_.get_("Authorization"), "Bearer existing_token");
+}
+
+TEST_F(GcpAuthnFilterTest, PreserveExistingDefaultHeaderAbsent) {
+  config_.mutable_token_header()->mutable_preserve_existing();
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  setupMockFilterMetadata(/*valid=*/true);
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(std::string(GoodTokenStr));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  EXPECT_EQ(default_headers_.get_("Authorization"), absl::StrCat("Bearer ", GoodTokenStr));
+}
+
+TEST_F(GcpAuthnFilterTest, CustomTokenHeaderWithoutPrefix) {
+  auto* token_header = config_.mutable_token_header();
+  token_header->set_name("x-goog-iap-jwt-assertion");
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  setupMockFilterMetadata(/*valid=*/true);
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(std::string(GoodTokenStr));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  EXPECT_EQ(default_headers_.get_("x-goog-iap-jwt-assertion"), GoodTokenStr);
+}
+
 } // namespace GcpAuthn
 } // namespace HttpFilters
 } // namespace Extensions

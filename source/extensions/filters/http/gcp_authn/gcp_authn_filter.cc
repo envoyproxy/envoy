@@ -66,8 +66,13 @@ FilterConfig::FilterConfig(const FilterConfigProto& config,
                            absl::Status& create_status)
     : config_(config), context_(context),
       stats_{ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))},
-      target_header_(config.has_token_header() ? Http::LowerCaseString(config.token_header().name())
-                                               : authorizationHeaderKey()),
+      target_header_(config.token_header().name().empty()
+                         ? authorizationHeaderKey()
+                         : Http::LowerCaseString(config.token_header().name())),
+      header_prefix_(
+          (config.token_header().name().empty() && config.token_header().value_prefix().empty())
+              ? "Bearer "
+              : config.token_header().value_prefix()),
       preserve_existing_header_(config.has_token_header() &&
                                 config.token_header().has_preserve_existing() &&
                                 config.token_metadata_key().empty()) {
@@ -271,9 +276,8 @@ void GcpAuthnFilter::addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::strin
         std::string(decoder_callbacks_->filterConfigName()), metadata);
     return;
   }
-  const absl::string_view prefix =
-      proto.has_token_header() ? absl::string_view(proto.token_header().value_prefix()) : "Bearer ";
-  hdrs.setCopy(filter_config_->targetHeader(), absl::StrCat(prefix, token_str));
+  hdrs.setCopy(filter_config_->targetHeader(),
+               absl::StrCat(filter_config_->headerPrefix(), token_str));
 }
 
 } // namespace GcpAuthn
