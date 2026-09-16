@@ -49,7 +49,12 @@ forwarded for the upstream to interpret differently. Parsing is incremental and 
 stream, so an invalid payload fails as soon as the offending byte arrives rather
 than after the whole upload. Oversized string values are left in the external
 buffer and referenced by offset, so a large prompt does not reappear in
-per-stream memory.
+per-stream memory. What counts as oversized is
+:ref:`inline_string_threshold_bytes
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestParsingLimits.inline_string_threshold_bytes>`,
+1KiB by default -- large enough that ordinary metadata stays inline and small
+enough that conversation content does not. A declared API whose payload schema
+pins its own threshold uses that instead.
 
 Upon stream completion, the parsed document is validated against the payload
 schema of the route's declared :ref:`wire API
@@ -142,6 +147,75 @@ does not parse is forwarded unchanged.
       "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
       request_handling:
         parse_unconfigured_routes: true
+
+.. _config_http_filters_ai_protocol_manager_ai_filters:
+
+AI filters
+----------
+
+After a declared AI endpoint's payload is parsed and validated, and before it
+is replayed, the filter runs the configured :ref:`AI filters
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.filters>`
+in order over the parsed document; they require ``request_handling``. An AI
+filter (category ``envoy.http.ai_filters``)
+may read or modify the document, or reject the request with a local reply.
+Routes without a per-route request declaration, and requests without a body,
+run no AI filters.
+
+Request info
+~~~~~~~~~~~~
+
+The :ref:`request info filter
+<envoy_v3_api_msg_extensions.http.ai_filters.request_info.v3.RequestInfo>` publishes
+the requested model, streaming preference, output token cap, and message and
+tool counts as :ref:`envoy.data.ai.v3.RequestInfo
+<envoy_v3_api_msg_data.ai.v3.RequestInfo>` typed dynamic metadata, under
+``envoy.ai.request_info`` by default. It never modifies or rejects the request.
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.ai_protocol_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+      request_handling: {}
+      filters:
+      - name: envoy.http.ai_filters.request_info
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+
+Attributes are read according to the route's declared :ref:`wire API
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.api_protocol>`:
+
+.. csv-table::
+  :header: Attribute, OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, Gemini
+  :widths: 1, 1, 1, 1, 1
+
+  ``model``, ``model``, ``model``, ``model``, model segment of the request path
+  ``stream``, ``stream``, ``stream``, ``stream``, "``:generateContent`` (false) or ``:streamGenerateContent`` (true) operation in the request path"
+  ``max_output_tokens``, "``max_completion_tokens``, else ``max_tokens``", ``max_output_tokens``, ``max_tokens``, "``generationConfig.maxOutputTokens`` (camelCase or snake_case)"
+  ``message_count``, ``messages``, "``input`` (a string counts as one message)", ``messages``, ``contents``
+  ``tool_count``, ``tools``, ``tools``, ``tools``, ``tools``
+
+Without a declared API, only ``model`` and ``stream`` are read. Every value is
+client-declared and optional. A value Envoy cannot use (wrong type, out of
+range, or a string over 256 bytes) is ignored and counted by
+``request_info.partial``.
+
+The record is written before the held request headers are released, so later
+decode filters see it from their first request-headers callback. An
+:ref:`ext_proc <config_http_filters_ext_proc>` filter listed after this one
+receives it through typed namespace forwarding:
+
+.. code-block:: yaml
+
+  metadata_options:
+    forwarding_namespaces:
+      typed:
+      - envoy.ai.request_info
+
+Only typed metadata is published. If the namespace already holds a record for
+the stream, the new one is skipped and counted by ``request_info.duplicate``.
 
 Response token-usage extraction
 -------------------------------
@@ -341,6 +415,29 @@ namespace alone is not sufficient:
       typed:
       - envoy.ai.token_usage
 
+When the external processor only needs token usage metadata, streaming response body
+bytes across gRPC can be avoided. Configuring :ref:`usage_signal
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.usage_signal>`
+to ``SYNTHESIZE_TRAILERS`` adds empty response trailers at end of stream if none exist.
+A downstream ``ext_proc`` filter with ``response_trailer_mode: SEND`` and
+``response_body_mode: NONE`` receives the token usage metadata in ``metadata_context``
+without streaming response body bytes:
+
+.. code-block:: yaml
+
+  # Upstream filter chain:
+  response_handling:
+    token_usage:
+      usage_signal: SYNTHESIZE_TRAILERS
+
+.. code-block:: yaml
+
+  # Downstream ext_proc:
+  processing_mode:
+    response_header_mode: SKIP
+    response_body_mode: NONE
+    response_trailer_mode: SEND
+
 Upstream (cluster) installation
 -------------------------------
 
@@ -415,3 +512,7 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   response_body_too_large, Counter, A JSON response exceeded ``max_json_body_size``; extraction skipped.
   sse_event_too_large, Counter, Pending or complete SSE event data exceeded ``max_sse_event_size``; that entire event was skipped.
   unsupported_content_encoding, Counter, The response carried a non-identity ``content-encoding``; extraction skipped.
+  usage_trailers_synthesized, Counter, Empty response trailers were synthesized at end of stream to carry token usage to a downstream consumer.
+  request_info.published, Counter, The request info AI filter published an ``envoy.data.ai.v3.RequestInfo`` record.
+  request_info.partial, Counter, A published request info record ignored at least one value Envoy could not use.
+  request_info.duplicate, Counter, Request info publication skipped because another installation of the filter had already published the namespace for this stream.

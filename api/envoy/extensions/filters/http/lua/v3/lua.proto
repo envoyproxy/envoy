@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Lua :ref:`configuration overview <config_http_filters_lua>`.
 // [#extension: envoy.filters.http.lua]
 
-// [#next-free-field: 7]
+// [#next-free-field: 9]
 message Lua {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.lua.v2.Lua";
@@ -101,8 +101,35 @@ message Lua {
   // specific one, such as a virtual host when the route has its own ``LuaPerRoute``, is not
   // reached, and this value is used instead.
   google.protobuf.Struct filter_context = 6;
+
+  // Additional patterns for the Lua ``package.path`` of every VM this filter creates, so that a
+  // script can ``require`` modules from locations the interpreter does not search on its own.
+  // Each entry is one Lua path pattern; the entries are joined with ``;`` in the order given and
+  // placed ahead of the interpreter's built-in default path, which is kept.
+  //
+  // .. code-block:: yaml
+  //
+  //   package_paths:
+  //   - /etc/envoy/lua/?.lua
+  //   - /etc/envoy/lua/?/init.lua
+  //
+  // The patterns are in place before any configured code runs, including the run that validates
+  // the configuration, so a ``require`` at the top level of a script whose module cannot be found
+  // is rejected as a configuration error rather than failing per request.
+  //
+  // Each worker builds its own VM and runs the script again to do so, after the configuration has
+  // been accepted, so the files a script requires must stay readable for as long as the process
+  // runs and not only while the configuration is loaded.
+  repeated string package_paths = 7 [(validate.rules).repeated = {items {string {min_len: 1}}}];
+
+  // As :ref:`package_paths
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_paths>`, but for
+  // ``package.cpath``, i.e. modules which are loadable C libraries rather than Lua source, for
+  // example ``/etc/envoy/lua/?.so``.
+  repeated string package_cpaths = 8 [(validate.rules).repeated = {items {string {min_len: 1}}}];
 }
 
+// [#next-free-field: 7]
 message LuaPerRoute {
   oneof override {
     // Disable the Lua filter for this particular vhost or route. If disabled is specified in
@@ -133,4 +160,22 @@ message LuaPerRoute {
   // <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.filter_context>` rather than merging
   // into it.
   google.protobuf.Struct filter_context = 4;
+
+  // Additional patterns for the Lua ``package.path`` of the VM built from this route's
+  // :ref:`source_code
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>`, with the same
+  // meaning as the filter-level :ref:`package_paths
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_paths>`.
+  //
+  // This route's inline source code gets its own VM, which is why it needs its own patterns: the
+  // filter-level ones are not visible to it. Setting these has no effect when this route selects a
+  // script by :ref:`name
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`, or configures no script
+  // at all, since that VM belongs to the filter and carries the filter-level patterns.
+  repeated string package_paths = 5 [(validate.rules).repeated = {items {string {min_len: 1}}}];
+
+  // As :ref:`package_paths
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.package_paths>`, but for
+  // ``package.cpath``.
+  repeated string package_cpaths = 6 [(validate.rules).repeated = {items {string {min_len: 1}}}];
 }

@@ -7,9 +7,12 @@
 
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/router/router.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_conversion.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
@@ -20,6 +23,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,59 +33,28 @@ namespace AiProtocolManager {
 using PerRouteProto =
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute;
 
-// The inverse pair mapping the shared wire-API enum (envoy.type.ai.v3
-// .ApiProtocol) to and from the internal mirror. Kept side by side as two
-// exhaustive switches -- a shared runtime table would trade away the
-// compiler's missing-case checking when either enum grows.
+class FilterConfig;
+using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
 
-// Unrecognized values -- possible only across a version skew, since configs
-// are validated defined_only -- auto-detect.
-inline ApiProtocol protocolFromProto(envoy::type::ai::v3::ApiProtocol protocol) {
-  switch (protocol) {
-  case envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS:
-    return ApiProtocol::OpenAiChatCompletions;
-  case envoy::type::ai::v3::OPENAI_RESPONSES:
-    return ApiProtocol::OpenAiResponses;
-  case envoy::type::ai::v3::ANTHROPIC_MESSAGES:
-    return ApiProtocol::AnthropicMessages;
-  case envoy::type::ai::v3::GEMINI_GENERATE_CONTENT:
-    return ApiProtocol::GeminiGenerateContent;
-  default:
-    return ApiProtocol::Unspecified;
-  }
-}
-
-inline envoy::type::ai::v3::ApiProtocol protocolToProto(ApiProtocol protocol) {
-  switch (protocol) {
-  case ApiProtocol::OpenAiChatCompletions:
-    return envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS;
-  case ApiProtocol::OpenAiResponses:
-    return envoy::type::ai::v3::OPENAI_RESPONSES;
-  case ApiProtocol::AnthropicMessages:
-    return envoy::type::ai::v3::ANTHROPIC_MESSAGES;
-  case ApiProtocol::GeminiGenerateContent:
-    return envoy::type::ai::v3::GEMINI_GENERATE_CONTENT;
-  case ApiProtocol::Unspecified:
-    break;
-  }
-  return envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED;
-}
-
-// Filter-level configuration, shared by every stream on the chain: which
-// directions are enabled, the token-usage extraction settings, and the
-// filter's stats. Shared across downstream and upstream installations alike.
 class FilterConfig {
 public:
   FilterConfig(
       const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-      Stats::Scope& scope);
+      Stats::Scope& scope, AiFilterFactories ai_filter_factories);
+
+  static absl::StatusOr<FilterConfigSharedPtr>
+  create(const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
+         Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
 
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
+  const AiFilterFactories& aiFilterFactories() const { return ai_filter_factories_; }
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
+  uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
   bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
   ApiProtocol defaultApiProtocol() const { return default_api_protocol_; }
   const std::string& metadataNamespace() const { return metadata_namespace_; }
+  bool synthesizeUsageTrailers() const { return synthesize_usage_trailers_; }
   uint32_t maxSseEventSize() const { return max_sse_event_size_; }
   uint32_t maxJsonBodySize() const { return max_json_body_size_; }
   uint32_t maxParsedSseEvents() const { return max_parsed_sse_events_; }
@@ -93,15 +66,17 @@ private:
   mutable AiProtocolManagerStats stats_;
   const bool request_handling_enabled_ = false;
   const bool parse_unconfigured_routes_ = false;
+  const uint32_t inline_string_threshold_bytes_ = 0;
   const bool token_usage_enabled_ = false;
   const bool include_unconfigured_routes_ = false;
   const ApiProtocol default_api_protocol_ = ApiProtocol::Unspecified;
   const std::string metadata_namespace_;
+  const bool synthesize_usage_trailers_ = false;
   const uint32_t max_sse_event_size_ = 0;
   const uint32_t max_json_body_size_ = 0;
   const uint32_t max_parsed_sse_events_ = 0;
+  const AiFilterFactories ai_filter_factories_;
 };
-using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
 
 // Per-route configuration. Its presence declares the route an AI endpoint.
 // The request and response wire APIs are declared separately (protocol
@@ -180,7 +155,8 @@ private:
 // endpoint carries no such gate.
 //
 // A declared wire API with a registered payload schema is validated at end of
-// payload (schema/schema_registry.h); normalization comes later.
+// payload (schema/schema_registry.h), then the configured AI filters run over the
+// parsed document (filter_manager.h); normalization comes later.
 //
 // Encode (response) path: observe-only token-usage extraction. When
 // response_handling.token_usage is configured, 2xx SSE/JSON responses on
@@ -224,9 +200,14 @@ private:
   // what makes a parse failure fatal.
   bool isAiEndpoint() const { return route_has_request_; }
 
+  // The inline-string threshold for this stream: the route's payload schema
+  // when it pins one, otherwise the filter's configured default.
+  uint32_t inlineStringThresholdBytes() const;
+
   // Publish the accumulated token usage as dynamic metadata and account stats.
   // Called exactly once, at response end of stream (data or trailers).
-  void finalizeResponseHandling();
+  // Returns whether a record was published for this stream.
+  bool finalizeResponseHandling();
 
   // Finalizes the decode path when the full request body (and optional trailers) has been received.
   // Sets endStream on decode_manager_ and executes the AI filter chain or replays the body.
@@ -249,8 +230,6 @@ private:
   bool route_has_request_{false};
   ApiProtocol route_request_protocol_{ApiProtocol::Unspecified};
 
-  // The parsed payload. Populated once the body has been fully received and
-  // parsed; nothing consumes it yet.
   JsonWithExtBuf request_json_;
   // Cleared once parsing is done with, whether it completed, was abandoned, or
   // failed the request.

@@ -95,6 +95,13 @@ void ActiveLookupContext::getHeaders(GetHeadersCallback&& cb) {
         [ranges = std::move(ranges.value()), cl = content_length_,
          cb = std::move(cb)](Http::ResponseHeaderMapPtr headers, EndStream end_stream) mutable {
           ASSERT(headers != nullptr, "it should be impossible for headers to be null");
+          // The Range header field is evaluated after evaluating the precondition header
+          // fields defined in Section 13.1, and only if the result in absence of the Range
+          // header field would be a 200 (OK) response.
+          // https://httpwg.org/specs/rfc9110.html#field.range
+          if (Http::Utility::getResponseStatus(*headers) != enumToInt(Http::Code::OK)) {
+            return cb(std::move(headers), end_stream);
+          }
           if (cl == 0 && headers->ContentLength()) {
             absl::SimpleAtoi(headers->getContentLengthValue(), &cl) || (cl = 0);
           }
@@ -373,10 +380,12 @@ void CacheSession::onCacheError() {
     postUpstreamPassThrough(std::move(sub), CacheEntryStatus::LookupError);
   }
   for (BodySubscriber& sub : body_subscribers_) {
-    sub.callback_(nullptr, EndStream::Reset);
+    sub.dispatcher().post(
+        [cb = std::move(sub.callback_)]() mutable { cb(nullptr, EndStream::Reset); });
   }
   for (TrailerSubscriber& sub : trailer_subscribers_) {
-    sub.callback_(nullptr, EndStream::Reset);
+    sub.dispatcher().post(
+        [cb = std::move(sub.callback_)]() mutable { cb(nullptr, EndStream::Reset); });
   }
   lookup_subscribers_.clear();
   body_subscribers_.clear();
@@ -417,13 +426,11 @@ void CacheSession::abortBodyOutOfRangeSubscribers() {
   std::erase_if(body_subscribers_, [this, end_stream, &cache_sessions](
                                        BodySubscriber& bs) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
     if (bs.range_.begin() >= body_length_available_) {
-      if (bs.range_.begin() == body_length_available_) {
-        auto cb = std::move(bs.callback_);
-        bs.dispatcher().post(
-            [cb = std::move(cb), end_stream]() mutable { cb(nullptr, end_stream); });
-      } else {
-        bs.callback_(nullptr, EndStream::Reset);
-      }
+      const EndStream subscriber_end_stream =
+          (bs.range_.begin() == body_length_available_) ? end_stream : EndStream::Reset;
+      bs.dispatcher().post([cb = std::move(bs.callback_), subscriber_end_stream]() mutable {
+        cb(nullptr, subscriber_end_stream);
+      });
       if (cache_sessions) {
         cache_sessions->stats().subCacheSessionsSubscribers(1);
       }

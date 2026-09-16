@@ -2,11 +2,13 @@
 
 #include <memory>
 
+#include "envoy/common/exception.h"
 #include "envoy/data/ai/v3/token_usage.pb.h"
 #include "envoy/http/codes.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
@@ -131,11 +133,14 @@ envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degrade
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-    Stats::Scope& scope)
+    Stats::Scope& scope, AiFilterFactories ai_filter_factories)
     : stats_(AiProtocolManagerStats{
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
       parse_unconfigured_routes_(proto.request_handling().parse_unconfigured_routes()),
+      inline_string_threshold_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          proto.request_handling().limits(), inline_string_threshold_bytes,
+          JsonWithExtBufParser::kDefaultInlineStringThresholdBytes)),
       token_usage_enabled_(proto.response_handling().has_token_usage()),
       include_unconfigured_routes_(
           proto.response_handling().token_usage().include_unconfigured_routes()),
@@ -144,6 +149,9 @@ FilterConfig::FilterConfig(
       metadata_namespace_(proto.response_handling().token_usage().metadata_namespace().empty()
                               ? std::string(DefaultTokenUsageNamespace)
                               : proto.response_handling().token_usage().metadata_namespace()),
+      synthesize_usage_trailers_(proto.response_handling().token_usage().usage_signal() ==
+                                 envoy::extensions::filters::http::ai_protocol_manager::v3::
+                                     TokenUsageExtraction::SYNTHESIZE_TRAILERS),
       max_sse_event_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.response_handling().token_usage().limits(),
                                           max_sse_event_size, DefaultMaxSseEventSize)),
@@ -152,7 +160,33 @@ FilterConfig::FilterConfig(
                                           max_json_body_size, DefaultMaxJsonBodySize)),
       max_parsed_sse_events_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.response_handling().token_usage().limits(),
-                                          max_parsed_sse_events, DefaultMaxParsedSseEvents)) {}
+                                          max_parsed_sse_events, DefaultMaxParsedSseEvents)),
+      ai_filter_factories_(std::move(ai_filter_factories)) {}
+
+absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
+    const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
+    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
+  if (proto.filters_size() > 0 && !proto.has_request_handling()) {
+    return absl::InvalidArgumentError("ai_protocol_manager: filters require request_handling");
+  }
+  AiFilterFactories factories;
+  for (const auto& entry : proto.filters()) {
+    auto* factory =
+        Config::Utility::getAndCheckFactory<AiFilterConfigFactory>(entry, /*is_optional=*/true);
+    if (factory == nullptr) {
+      return absl::InvalidArgumentError(
+          fmt::format("ai_protocol_manager: unknown AI filter '{}' with type URL '{}'",
+                      entry.name(), Config::Utility::getFactoryType(entry.typed_config())));
+    }
+    const ProtobufTypes::MessagePtr config = factory->createEmptyConfigProto();
+    RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+        entry.typed_config(), context.messageValidationVisitor(), *config));
+    absl::StatusOr<AiFilterFactoryCb> cb = factory->createAiFilterFactory(*config, context, scope);
+    RETURN_IF_NOT_OK_REF(cb.status());
+    factories.push_back(std::move(cb.value()));
+  }
+  return std::make_shared<const FilterConfig>(proto, scope, std::move(factories));
+}
 
 void AiProtocolManagerFilter::onDestroy() {
   if (decode_bridge_ != nullptr) {
@@ -208,7 +242,9 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     return Http::FilterHeadersStatus::Continue;
   }
 
-  request_parser_ = std::make_unique<JsonWithExtBufParser>(JsonWithExtBufParser::Config{});
+  JsonWithExtBufParser::Config parser_config;
+  parser_config.inline_string_threshold_bytes = inlineStringThresholdBytes();
+  request_parser_ = std::make_unique<JsonWithExtBufParser>(parser_config);
   // Built here, not at setDecoderFilterCallbacks(), so a pass-through stream pays
   // for none of it: constructing it subscribes to upstream watermarks and claims
   // a schedulable callback.
@@ -227,6 +263,24 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // for an empty/trailer-only body, when the manager continues iteration).
   ENVOY_LOG(trace, "ai_protocol_manager: holding headers until payload is offloaded");
   return Http::FilterHeadersStatus::StopIteration;
+}
+
+uint32_t AiProtocolManagerFilter::inlineStringThresholdBytes() const {
+  // The filter's configured value is the default. A declared endpoint's payload
+  // schema may pin its own, because what has to stay inline for the payload to
+  // validate is a property of the wire API, not of the deployment.
+  if (isAiEndpoint()) {
+    if (const PayloadSchema* payload_schema =
+            AdapterRegistry::get(route_request_protocol_).schema();
+        payload_schema != nullptr) {
+      if (const std::optional<uint32_t> pinned =
+              payload_schema->requestInlineStringThresholdBytes();
+          pinned.has_value()) {
+        return *pinned;
+      }
+    }
+  }
+  return config_->inlineStringThresholdBytes();
 }
 
 bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_stream) {
@@ -378,7 +432,15 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
 
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
-    std::vector<AiFilterPtr> filters;
+    const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
+                                  route_request_protocol_};
+    std::vector<AiFilterSharedPtr> filters;
+    filters.reserve(config_->aiFilterFactories().size());
+    for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
+      if (AiFilterSharedPtr filter = factory(context); filter != nullptr) {
+        filters.push_back(std::move(filter));
+      }
+    }
     // TODO(penguingao): Avoid always passing downstream StreamInfo when constructing
     // FilterManager; when AI Protocol Manager is placed in an upstream filter chain, it should
     // behave differently.
@@ -494,7 +556,12 @@ Http::FilterDataStatus AiProtocolManagerFilter::encodeData(Buffer::Instance& dat
     response_handler_->onData(data);
     if (end_stream) {
       response_handler_->onEndStream();
-      finalizeResponseHandling();
+      if (finalizeResponseHandling() && config_->synthesizeUsageTrailers()) {
+        // Synthesize empty trailers at end of stream to wake trailer-driven consumers.
+        encoder_callbacks_->addEncodedTrailers();
+        config_->stats().usage_trailers_synthesized_.inc();
+        ENVOY_LOG(trace, "ai_protocol_manager: added end-of-stream trailers to carry usage");
+      }
     }
   }
   return Http::FilterDataStatus::Continue;
@@ -511,7 +578,7 @@ Http::FilterTrailersStatus AiProtocolManagerFilter::encodeTrailers(Http::Respons
   return Http::FilterTrailersStatus::Continue;
 }
 
-void AiProtocolManagerFilter::finalizeResponseHandling() {
+bool AiProtocolManagerFilter::finalizeResponseHandling() {
   response_finalized_ = true;
 
   TokenUsage usage = response_handler_->usage();
@@ -521,7 +588,7 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
     // Legitimately absent usage: e.g. an OpenAI stream without
     // `stream_options.include_usage`, or an unrecognized response shape.
     config_->stats().token_usage_missing_.inc();
-    return;
+    return false;
   }
 
   // Two publications for one stream (both-placement installs) would leave
@@ -535,7 +602,7 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
               "(both-placement installation); skipping duplicate publication",
               config_->metadataNamespace());
     config_->stats().token_usage_duplicate_.inc();
-    return;
+    return false;
   }
 
   // Convert the finalized accumulator once into the authoritative typed
@@ -562,7 +629,7 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
     config_->stats().token_usage_failed_.inc();
     ENVOY_LOG(trace, "ai_protocol_manager: status-only (failed) record published to namespace {}",
               config_->metadataNamespace());
-    return;
+    return true;
   }
   if (degraded) {
     config_->stats().token_usage_partial_.inc();
@@ -574,6 +641,7 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
   config_->stats().token_usage_found_.inc();
   ENVOY_LOG(trace, "ai_protocol_manager: token usage published to namespace {}",
             config_->metadataNamespace());
+  return true;
 }
 
 } // namespace AiProtocolManager

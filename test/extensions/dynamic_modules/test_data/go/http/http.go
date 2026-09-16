@@ -18,6 +18,7 @@ func init() {
 		"recreate_stream":            &recreateStreamConfigFactory{},
 		"socket_option_callbacks":    &socketOptionCallbacksConfigFactory{},
 		"span_callbacks":             &spanCallbacksConfigFactory{},
+		"span_across_callbacks":      &spanAcrossCallbacksConfigFactory{},
 		"cluster_callbacks":          &clusterCallbacksConfigFactory{},
 		"send_response":              &sendResponseConfigFactory{},
 		"dynamic_metadata_callbacks": &dynamicMetadataCallbacksConfigFactory{},
@@ -443,6 +444,51 @@ func (p *spanCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	}
 	headers.Set("x-span-callbacks", "true")
 	return shared.HeadersStatusContinue
+}
+
+// --- span_across_callbacks ---
+type spanAcrossCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+type spanAcrossCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *spanAcrossCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &spanAcrossCallbacksFactory{}, nil
+}
+
+// spanAcrossCallbacksFilter spawns a child span in OnRequestHeaders, keeps it, and finishes it in
+// OnRequestTrailers to show that a span can outlive the event hook that created it.
+type spanAcrossCallbacksFilter struct {
+	handle    shared.HttpFilterHandle
+	childSpan shared.ChildSpan
+	shared.EmptyHttpFilter
+}
+
+func (f *spanAcrossCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &spanAcrossCallbacksFilter{handle: handle}
+}
+
+func (p *spanAcrossCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if span := p.handle.GetActiveSpan(); span != nil {
+		p.childSpan = span.SpawnChild("child")
+	}
+	headers.Set("x-span-stored", "true")
+	return shared.HeadersStatusContinue
+}
+
+func (p *spanAcrossCallbacksFilter) OnRequestTrailers(
+	trailers shared.HeaderMap) shared.TrailersStatus {
+	if p.childSpan != nil {
+		p.childSpan.SetTag("child-key", "child-value")
+		p.childSpan.Finish()
+		p.childSpan = nil
+	}
+	return shared.TrailersStatusContinue
 }
 
 // --- cluster_callbacks ---

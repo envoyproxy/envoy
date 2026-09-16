@@ -322,7 +322,7 @@ at the current time, it is not used for all filters.
 For HTTP filters, the restrictions are specified by the filter implementation, so consult the individual
 filter documentation to understand whether there are restrictions in place.
 
-For example, in the example below, the match tree could not be used with a filter that restricts the the
+For example, in the example below, the match tree could not be used with a filter that restricts the
 match tree to only use
 :ref:`HttpRequestHeaderMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpRequestHeaderMatchInput>`.
 

@@ -408,9 +408,6 @@ absl::Status InstanceUtil::loadBootstrapConfig(
 }
 
 void InstanceUtil::raiseFileLimits() {
-  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.raise_file_limits")) {
-    return;
-  }
   if (const auto result = Api::OsSysCallsSingleton::get().raiseFileLimits();
       result.return_value_ != 0) {
     ENVOY_LOG(warn, "Failed to raise file descriptor limit, error {}.",

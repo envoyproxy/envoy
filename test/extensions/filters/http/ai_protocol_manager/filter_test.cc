@@ -8,6 +8,7 @@
 #include "envoy/http/codes.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/coroutine/status_macros.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
@@ -84,15 +85,37 @@ public:
   // Run at trace so debug/trace-log argument expressions execute too.
   LogLevelSetter log_level_setter_{spdlog::level::trace};
 
-  // A test wanting a different filter-level config calls this again first.
-  void createFilter(bool parse_unconfigured_routes = false) {
+  // A test wanting a different filter-level config calls this again first. A
+  // zero threshold leaves the field unset, so the default applies.
+  void createFilter(bool parse_unconfigured_routes = false,
+                    uint32_t inline_string_threshold_bytes = 0) {
     if (filter_ != nullptr) {
       filter_->onDestroy();
     }
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
     proto.mutable_request_handling()->set_parse_unconfigured_routes(parse_unconfigured_routes);
+    if (inline_string_threshold_bytes != 0) {
+      proto.mutable_request_handling()
+          ->mutable_limits()
+          ->mutable_inline_string_threshold_bytes()
+          ->set_value(inline_string_threshold_bytes);
+    }
     filter_ = std::make_unique<AiProtocolManagerFilter>(
-        factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope()));
+        factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
+                                                       AiFilterFactories{}));
+    filter_->setDecoderFilterCallbacks(callbacks_);
+  }
+
+  // Parses unconfigured routes too, so a test can show the chain is not run there.
+  void createFilterWithAiFilters(AiFilterFactories ai_filter_factories) {
+    if (filter_ != nullptr) {
+      filter_->onDestroy();
+    }
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
+    proto.mutable_request_handling()->set_parse_unconfigured_routes(true);
+    filter_ = std::make_unique<AiProtocolManagerFilter>(
+        factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
+                                                       std::move(ai_filter_factories)));
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -123,6 +146,14 @@ public:
     route_config_ = std::make_unique<RouteConfig>(proto);
     ON_CALL(callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(testing::Return(route_config_.get()));
+  }
+
+  // A valid chat-completions payload whose `model` sits between the default
+  // 1KiB inline-string threshold and 4KiB, so which side of the threshold it
+  // lands on is the configured value's doing.
+  static std::string oversizedModelPayload() {
+    return R"({"model":")" + std::string(2000, 'm') +
+           R"(","messages":[{"role":"user","content":"hi"}]})";
   }
 
   static Http::TestRequestHeaderMapImpl requestHeaders() {
@@ -438,7 +469,8 @@ public:
                      proto_config) {
     metadata_writes_.clear();
     typed_metadata_writes_.clear();
-    config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope());
+    config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
+                                             AiFilterFactories{});
     filter_ = std::make_unique<AiProtocolManagerFilter>(factory_, config_);
     // A stream filter receives both callback sets in production; encode-path
     // code may rely on the decoder callbacks (e.g. the buffer memory account).
@@ -451,6 +483,14 @@ public:
     ON_CALL(encoder_callbacks_.stream_info_, setDynamicTypedMetadata(testing::_, testing::_))
         .WillByDefault(Invoke([this](const std::string& ns, const Protobuf::Any& value) {
           typed_metadata_writes_.emplace_back(ns, value);
+        }));
+    ON_CALL(encoder_callbacks_, addEncodedTrailers())
+        .WillByDefault(Invoke([this]() -> Http::ResponseTrailerMap& {
+          added_trailers_++;
+          if (!synthesized_trailers_) {
+            synthesized_trailers_ = std::make_unique<Http::TestResponseTrailerMapImpl>();
+          }
+          return *synthesized_trailers_;
         }));
   }
 
@@ -507,6 +547,8 @@ public:
   std::unique_ptr<AiProtocolManagerFilter> filter_;
   std::vector<std::pair<std::string, Protobuf::Struct>> metadata_writes_;
   std::vector<std::pair<std::string, Protobuf::Any>> typed_metadata_writes_;
+  int added_trailers_{0};
+  Http::ResponseTrailerMapPtr synthesized_trailers_;
 };
 
 // An SSE response is teed, usage extracted, and published at end of stream
@@ -829,6 +871,53 @@ TEST_F(AiProtocolManagerFilterResponseTest, TrailersFinalize) {
   Http::TestResponseTrailerMapImpl trailers{{"grpc-status", "0"}};
   EXPECT_EQ(filter_->encodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
   EXPECT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
+}
+
+// Verifies empty trailers are added when usage is published.
+TEST_F(AiProtocolManagerFilterResponseTest, UsageSignalSynthesizesTrailers) {
+  setup("{usage_signal: SYNTHESIZE_TRAILERS}");
+  sendHeaders("application/json");
+  sendData(R"({"object":"chat.completion","model":"gpt-4o","usage":)"
+           R"({"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}})",
+           true);
+  ASSERT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
+  EXPECT_EQ(added_trailers_, 1);
+  EXPECT_EQ(counterValue("usage_trailers_synthesized"), 1);
+}
+
+// Verifies trailers are not added when no usage was published.
+TEST_F(AiProtocolManagerFilterResponseTest, NoTrailersWhenNothingPublished) {
+  setup("{usage_signal: SYNTHESIZE_TRAILERS}");
+  sendHeaders("application/json");
+  sendData(R"({"object":"chat.completion","model":"gpt-4o"})", true);
+  EXPECT_TRUE(typed_metadata_writes_.empty());
+  EXPECT_EQ(added_trailers_, 0);
+  EXPECT_EQ(counterValue("usage_trailers_synthesized"), 0);
+}
+
+// Verifies existing trailers are not duplicated.
+TEST_F(AiProtocolManagerFilterResponseTest, ResponseWithOwnTrailersNotSynthesized) {
+  setup("{usage_signal: SYNTHESIZE_TRAILERS}");
+  sendHeaders("application/json");
+  sendData(R"({"object":"chat.completion","model":"gpt-4o","usage":)"
+           R"({"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}})",
+           false);
+  Http::TestResponseTrailerMapImpl trailers{{"grpc-status", "0"}};
+  EXPECT_EQ(filter_->encodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
+  ASSERT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
+  EXPECT_EQ(added_trailers_, 0);
+}
+
+// Verifies no trailers are synthesized by default.
+TEST_F(AiProtocolManagerFilterResponseTest, DefaultSignalAddsNoTrailers) {
+  setup();
+  sendHeaders("application/json");
+  sendData(R"({"object":"chat.completion","model":"gpt-4o","usage":)"
+           R"({"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}})",
+           true);
+  ASSERT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
+  EXPECT_EQ(added_trailers_, 0);
+  EXPECT_EQ(counterValue("usage_trailers_synthesized"), 0);
 }
 
 // A JSON response whose body ends via trailers (no end_stream data frame) is
@@ -1172,6 +1261,92 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
   EXPECT_EQ(counterValue("request_schema_invalid"), 0);
 }
 
+// Rewrites `model` so a test can tell the chain ran ahead of replay.
+class ContextRecordingAiFilter : public AiFilter {
+public:
+  struct Seen {
+    ApiProtocol protocol;
+    std::string path;
+    const StreamInfo::StreamInfo* stream_info;
+  };
+
+  ContextRecordingAiFilter(const AiFilterContext& context, std::vector<Seen>& seen)
+      : context_(context), seen_(seen) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    seen_.push_back({context_.request_protocol,
+                     std::string(context_.request_headers.getPathValue()), &context_.stream_info});
+    request->json()["model"] = "rewritten";
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+
+private:
+  const AiFilterContext context_;
+  std::vector<Seen>& seen_;
+};
+
+TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverDeclaredPayload) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  int built = 0;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    ++built;
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(built, 1);
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].protocol, ApiProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen[0].path, "/chat/completions");
+  EXPECT_EQ(seen[0].stream_info, &callbacks_.stream_info_);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "rewritten");
+  EXPECT_TRUE(injected_end_stream_);
+}
+
+TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  int built = 0;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    ++built;
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(built, 0);
+  EXPECT_TRUE(seen.empty());
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "gpt-4");
+  EXPECT_TRUE(injected_end_stream_);
+}
+
+TEST_F(AiProtocolManagerFilterTest, NullAiFilterIsSkipped) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr { return nullptr; }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string payload = R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
+  EXPECT_TRUE(injected_end_stream_);
+}
+
 // Content-Length header is set to the recalculated length when the filter manager serializes the
 // payload.
 TEST_F(AiProtocolManagerFilterTest, SetsContentLengthOnReplay) {
@@ -1210,6 +1385,42 @@ TEST_F(AiProtocolManagerFilterTest, DoesNotSetContentLengthOnReplayWhenAbsent) {
 
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(request_headers_.ContentLength(), nullptr);
+}
+
+// A payload whose `model` is larger than the inline-string threshold: the
+// parser offloads the value, and the schema declares `model` non-offloadable,
+// so the default 1KiB threshold rejects it.
+TEST_F(AiProtocolManagerFilterTest, ModelOverInlineStringThresholdIsRejected) {
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(oversizedModelPayload());
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
+  EXPECT_EQ(inject_calls_, 0);
+}
+
+// The same payload is accepted once the configured threshold is raised above
+// the value: the configured threshold, not the default, reaches the parser.
+TEST_F(AiProtocolManagerFilterTest, RaisedInlineStringThresholdKeepsLargeValuesInline) {
+  createFilter(/*parse_unconfigured_routes=*/false, /*inline_string_threshold_bytes=*/4096);
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string payload = oversizedModelPayload();
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  // The DOM stores object members in a std::map, so re-serialization does not
+  // preserve key order; compare the parsed JSON rather than the raw bytes.
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
+  EXPECT_TRUE(injected_end_stream_);
 }
 
 // Malformed JSON is answered with a 400 and never reaches the upstream.

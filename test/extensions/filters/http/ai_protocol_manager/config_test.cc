@@ -1,10 +1,14 @@
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.validate.h"
+#include "envoy/registry/registry.h"
 
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/config.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stats/mocks.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -128,6 +132,45 @@ TEST(AiProtocolManagerConfigTest, RejectsZeroCaps) {
   }
 }
 
+// The parser's inline-string threshold comes from the request-handling config,
+// falling back to the parser's own default when unset.
+TEST(AiProtocolManagerConfigTest, InlineStringThresholdDefaultsAndOverrides) {
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_request_handling();
+    const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{});
+    EXPECT_EQ(config.inlineStringThresholdBytes(),
+              JsonWithExtBufParser::kDefaultInlineStringThresholdBytes);
+  }
+  {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_request_handling()
+        ->mutable_limits()
+        ->mutable_inline_string_threshold_bytes()
+        ->set_value(4096);
+    const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{});
+    EXPECT_EQ(config.inlineStringThresholdBytes(), 4096);
+  }
+}
+
+// The threshold is bounded on both ends: a value under the floor offloads
+// strings a payload schema fixes in size, and an unbounded value would defeat
+// the offload it gates.
+TEST(AiProtocolManagerConfigTest, RejectsOutOfRangeInlineStringThreshold) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  AiProtocolManagerFilterConfigFactory factory;
+  for (const uint32_t value : {0u, 32u, 2u * 1024u * 1024u}) {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_request_handling()
+        ->mutable_limits()
+        ->mutable_inline_string_threshold_bytes()
+        ->set_value(value);
+    EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
+                 EnvoyException);
+  }
+}
+
 // Creating the filter from an upstream factory context yields the same stream
 // filter as the downstream path (see #46385: the upstream role installs the
 // full filter, request offload included, with the caveats documented for that
@@ -223,6 +266,113 @@ TEST(AiProtocolManagerConfigTest, EmptyRouteConfigProtoIsPerRouteMessage) {
 TEST(AiProtocolManagerConfigTest, EmptyRouteConfigIsValid) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto_config;
   TestUtility::validate(proto_config);
+}
+
+// Registered with a Struct config type, so only a Struct-typed chain entry resolves to it.
+class TestAiFilterConfigFactory : public AiFilterConfigFactory {
+public:
+  absl::StatusOr<AiFilterFactoryCb>
+  createAiFilterFactory(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
+                        Stats::Scope&) override {
+    ++factories_created_;
+    if (!error_.empty()) {
+      return absl::InvalidArgumentError(error_);
+    }
+    return [](const AiFilterContext&) -> AiFilterSharedPtr { return nullptr; };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  std::string name() const override { return "test.ai_filter"; }
+
+  int factories_created_{0};
+  std::string error_;
+};
+
+envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager
+configWithAiFilter(const Protobuf::Message& typed_config) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
+  proto.mutable_request_handling();
+  auto* entry = proto.add_filters();
+  entry->set_name("test.ai_filter");
+  EXPECT_TRUE(entry->mutable_typed_config()->PackFrom(typed_config));
+  return proto;
+}
+
+// Resolved once per chain, through create() and the HTTP filter factory alike.
+TEST(AiProtocolManagerConfigTest, ResolvesConfiguredAiFilters) {
+  TestAiFilterConfigFactory test_factory;
+  Registry::InjectFactory<AiFilterConfigFactory> registration(test_factory);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  const auto proto = configWithAiFilter(Protobuf::Struct());
+
+  const auto config =
+      FilterConfig::create(proto, context.server_factory_context_, *stats_store.rootScope());
+  ASSERT_TRUE(config.ok()) << config.status();
+  EXPECT_EQ((*config)->aiFilterFactories().size(), 1);
+  EXPECT_EQ(test_factory.factories_created_, 1);
+
+  AiProtocolManagerFilterConfigFactory factory;
+  EXPECT_TRUE(factory.createFilterFactoryFromProto(proto, "stats", context).ok());
+  EXPECT_EQ(test_factory.factories_created_, 2);
+}
+
+TEST(AiProtocolManagerConfigTest, RejectsUnknownAiFilter) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  const auto proto = configWithAiFilter(
+      envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager());
+
+  const auto config =
+      FilterConfig::create(proto, context.server_factory_context_, *stats_store.rootScope());
+  EXPECT_EQ(config.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(std::string(config.status().message()),
+              testing::HasSubstr("unknown AI filter 'test.ai_filter'"));
+
+  AiProtocolManagerFilterConfigFactory factory;
+  EXPECT_FALSE(factory.createFilterFactoryFromProto(proto, "stats", context).ok());
+}
+
+TEST(AiProtocolManagerConfigTest, PropagatesAiFilterConfigError) {
+  TestAiFilterConfigFactory test_factory;
+  test_factory.error_ = "bad ai filter config";
+  Registry::InjectFactory<AiFilterConfigFactory> registration(test_factory);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+
+  const auto config =
+      FilterConfig::create(configWithAiFilter(Protobuf::Struct()), context.server_factory_context_,
+                           *stats_store.rootScope());
+  EXPECT_EQ(config.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(config.status().message(), "bad ai filter config");
+}
+
+// AI filters run only on the request path today, so they need it enabled.
+TEST(AiProtocolManagerConfigTest, RejectsAiFiltersWithoutRequestHandling) {
+  TestAiFilterConfigFactory test_factory;
+  Registry::InjectFactory<AiFilterConfigFactory> registration(test_factory);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  auto proto = configWithAiFilter(Protobuf::Struct());
+  proto.clear_request_handling();
+
+  const auto config =
+      FilterConfig::create(proto, context.server_factory_context_, *stats_store.rootScope());
+  EXPECT_EQ(config.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(config.status().message(), "ai_protocol_manager: filters require request_handling");
+  EXPECT_EQ(test_factory.factories_created_, 0);
+}
+
+TEST(AiProtocolManagerConfigTest, NoAiFiltersByDefault) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
+  proto.mutable_request_handling();
+  const auto config =
+      FilterConfig::create(proto, context.server_factory_context_, *stats_store.rootScope());
+  ASSERT_TRUE(config.ok());
+  EXPECT_TRUE((*config)->aiFilterFactories().empty());
 }
 
 } // namespace

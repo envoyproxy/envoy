@@ -147,7 +147,7 @@ Context::~Context() {
 void Context::activate() {
   Registry::getSink()->setLock(lock_);
   Registry::getSink()->setShouldEscape(should_escape_);
-  Registry::setLogLevel(log_level_);
+  Registry::setLogLevel(static_cast<Levels>(log_level_));
   Registry::setLogFormat(log_format_);
 
   // sets level and format for Fine-grain Logger
@@ -169,19 +169,24 @@ bool Context::useFineGrainLogger() {
   return false;
 }
 
-void Context::changeAllLogLevels(spdlog::level::level_enum level) {
+void Context::changeAllLogLevels(Levels level) {
+  const auto spdlog_level = static_cast<spdlog::level::level_enum>(level);
   if (!useFineGrainLogger()) {
     ENVOY_LOG_MISC(info, "change all log levels: level='{}'",
-                   spdlog::level::level_string_views[level]);
+                   spdlog::level::level_string_views[spdlog_level]);
     Registry::setLogLevel(level);
   } else {
     // Level setting with Fine-Grain Logger.
     FINE_GRAIN_LOG(
         info, "",
         "change all log levels and default verbosity level for fine grain loggers: level='{}'",
-        spdlog::level::level_string_views[level]);
-    getFineGrainLogContext().updateVerbosityDefaultLevel(level);
+        spdlog::level::level_string_views[spdlog_level]);
+    getFineGrainLogContext().updateVerbosityDefaultLevel(spdlog_level);
   }
+}
+
+void Context::changeAllLogLevels(spdlog::level::level_enum level) {
+  changeAllLogLevels(static_cast<Levels>(level));
 }
 
 void Context::enableFineGrainLogger() {
@@ -226,10 +231,14 @@ std::vector<Logger>& Registry::allLoggers() {
 
 spdlog::logger& Registry::getLog(Id id) { return allLoggers()[static_cast<int>(id)].getLogger(); }
 
-void Registry::setLogLevel(spdlog::level::level_enum log_level) {
+void Registry::setLogLevel(Levels log_level) {
   for (Logger& logger : allLoggers()) {
     logger.getLogger().set_level(static_cast<spdlog::level::level_enum>(log_level));
   }
+}
+
+void Registry::setLogLevel(spdlog::level::level_enum log_level) {
+  setLogLevel(static_cast<Levels>(log_level));
 }
 
 void Registry::setLogFormat(const std::string& log_format) {
