@@ -72,6 +72,29 @@ bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
   return supported_mcp_versions->contains(protocol_version);
 }
 
+bool isRequestMcpProtocolVersionSupported(absl::string_view protocol_version,
+                                          absl::string_view max_supported_protocol_version) {
+  if (isMcpProtocolVersionSupported(protocol_version)) {
+    return true;
+  }
+
+  return protocol_version == McpConstants::MCP_VERSION_2026_07_28 &&
+         max_supported_protocol_version == McpConstants::MCP_VERSION_2026_07_28;
+}
+
+bool isStatelessProtocolVersion(absl::string_view protocol_version) {
+  return protocol_version == McpConstants::MCP_VERSION_2026_07_28;
+}
+
+void addCompleteResultTypeIfStateless(json& response, absl::string_view protocol_version) {
+  if (isStatelessProtocolVersion(protocol_version) &&
+      response.contains(McpConstants::RESULT_FIELD) &&
+      response[McpConstants::RESULT_FIELD].is_object()) {
+    response[McpConstants::RESULT_FIELD][McpConstants::RESULT_TYPE_FIELD] =
+        McpConstants::RESULT_TYPE_COMPLETE;
+  }
+}
+
 absl::StatusOr<json> getSessionId(const json& json_rpc) {
   if (auto it = json_rpc.find(McpConstants::ID_FIELD); it != json_rpc.end()) {
     if (it->is_number_integer() || it->is_string()) {
@@ -138,24 +161,30 @@ int getResponseCode(Http::ResponseHeaderMapOptConstRef response_headers) {
   return status_code;
 }
 
-bool validateRequestMcpVersion(absl::string_view method,
-                               Http::RequestHeaderMapOptConstRef request_headers,
-                               absl::string_view fallback_protocol_version) {
+std::string getRequestMcpVersion(Http::RequestHeaderMapOptConstRef request_headers,
+                                 absl::string_view fallback_protocol_version) {
   static const absl::NoDestructor<Http::LowerCaseString> mcp_protocol_version_header(
       McpConstants::MCP_PROTOCOL_VERSION_HEADER);
+
+  if (request_headers.has_value()) {
+    auto headers = request_headers->get(*mcp_protocol_version_header);
+    if (!headers.empty()) {
+      return std::string(headers[0]->value().getStringView());
+    }
+  }
+
+  return std::string(fallback_protocol_version);
+}
+
+bool validateRequestMcpVersion(absl::string_view method, absl::string_view protocol_version,
+                               absl::string_view max_supported_protocol_version) {
   // The initialize request is not expected to have MCP protocol version header.
   // So we will not check the protocol version for this request.
   if (method == McpConstants::Methods::INITIALIZE) {
     return true;
   }
-  absl::string_view protocol_version = fallback_protocol_version;
-  if (request_headers.has_value()) {
-    auto headers = request_headers->get(*mcp_protocol_version_header);
-    if (!headers.empty()) {
-      protocol_version = headers[0]->value().getStringView();
-    }
-  }
-  return isMcpProtocolVersionSupported(protocol_version);
+
+  return isRequestMcpProtocolVersionSupported(protocol_version, max_supported_protocol_version);
 }
 
 void setTraceContextHeaders(Http::RequestHeaderMap& request_headers,
@@ -636,7 +665,11 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
     const bool is_error = response_code >= static_cast<int>(Http::Code::BadRequest);
     std::string synthetic;
     if (mcp_operation_ == McpOperation::ToolsCall) {
-      synthetic = translateJsonRestResponseToJsonRpc("", *session_id_, is_error).dump();
+      json response = translateJsonRestResponseToJsonRpc("", *session_id_, is_error);
+
+      addCompleteResultTypeIfStateless(response, protocol_version_);
+
+      synthetic = response.dump();
     } else if (mcp_operation_ == McpOperation::ToolsList) {
       // headers-only means no tools list is available; return a server error.
       json ret = {
@@ -755,6 +788,7 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
              {McpConstants::IS_ERROR_FIELD, is_error},
          }},
     };
+    addCompleteResultTypeIfStateless(ref, protocol_version_);
     std::string ref_json = ref.dump();
     std::string marker = absl::StrCat("\"", McpConstants::CONTENT_FIELD, "\":[]");
     size_t pos = ref_json.rfind(marker);
@@ -780,6 +814,7 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
            {McpConstants::IS_ERROR_FIELD, is_error},
        }},
   };
+  addCompleteResultTypeIfStateless(ref, protocol_version_);
   std::string ref_json = ref.dump();
 
   // Locate the empty-string placeholder for the text value: `"text":""`.
@@ -810,8 +845,13 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(
   std::vector<absl::string_view> response_fragments;
 
   response_fragments.emplace_back("{\"jsonrpc\":\"2.0\",\"id\":");
-  response_fragments.emplace_back(request_id_json),
-      response_fragments.emplace_back(",\"result\":{\"tools\":[");
+  response_fragments.emplace_back(request_id_json);
+
+  if (isStatelessProtocolVersion(protocol_version_)) {
+    response_fragments.emplace_back(",\"result\":{\"resultType\":\"complete\",\"tools\":[");
+  } else {
+    response_fragments.emplace_back(",\"result\":{\"tools\":[");
+  }
 
   bool first_tool = true;
   for (const auto* tool : tools) {
@@ -877,7 +917,11 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
   }
 
   std::string method = json_rpc[McpConstants::METHOD_FIELD];
-  if (!validateRequestMcpVersion(method, request_headers, config_->fallbackProtocolVersion())) {
+
+  protocol_version_ = getRequestMcpVersion(request_headers, config_->fallbackProtocolVersion());
+
+  if (!validateRequestMcpVersion(method, protocol_version_,
+                                 config_->maxSupportedProtocolVersion())) {
     sendErrorResponse(
         Http::Code::OK, BridgeStatus::RequestUnsupportedMcpVersion,
         generateErrorJsonResponse(-32602, "Unsupported MCP version").dump(), nullptr, method,
@@ -1028,6 +1072,9 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
         {McpConstants::ID_FIELD, *session_id_},
         {McpConstants::RESULT_FIELD, tools},
     };
+
+    addCompleteResultTypeIfStateless(ret, protocol_version_);
+
     response_body_str_ = ret.dump();
     setResponseMetadata(BridgeStatus::Ok, getResponseCode(response_headers));
     break;
@@ -1039,17 +1086,22 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
           warn,
           "API backend returns an invalid UTF-8 payload response. Returns error back to client.",
           *encoder_callbacks_);
-      response_body_str_ =
-          translateJsonRestResponseToJsonRpc("Backend response returns an invalid UTF-8 payload.",
-                                             *session_id_, true)
-              .dump();
+      json response = translateJsonRestResponseToJsonRpc(
+          "Backend response returns an invalid UTF-8 payload.", *session_id_, true);
+
+      addCompleteResultTypeIfStateless(response, protocol_version_);
+
+      response_body_str_ = response.dump();
       setResponseMetadata(BridgeStatus::ResponseToolsCallInvalidUtf8,
                           getResponseCode(response_headers));
     } else {
       bool is_error = getResponseCode(response_headers) >= static_cast<int>(Http::Code::BadRequest);
-      response_body_str_ = translateJsonRestResponseToJsonRpc(
-                               absl::string_view(json_ptr, total_size), *session_id_, is_error)
-                               .dump();
+      json response = translateJsonRestResponseToJsonRpc(absl::string_view(json_ptr, total_size),
+                                                         *session_id_, is_error);
+
+      addCompleteResultTypeIfStateless(response, protocol_version_);
+
+      response_body_str_ = response.dump();
       if (is_error) {
         setResponseMetadata(BridgeStatus::ResponseHttpStatusError,
                             getResponseCode(response_headers));
