@@ -408,6 +408,7 @@
 # Health checkers
 /*/extensions/health_checkers/grpc @botengyao @UNOWNED
 /*/extensions/health_checkers/http @botengyao @UNOWNED
+/*/extensions/health_checkers/multi @ggreenway @UNOWNED
 /*/extensions/health_checkers/tcp @botengyao @UNOWNED
 /*/extensions/health_checkers/udp @nezdolik @botengyao
 /*/extensions/health_checkers/common @botengyao @UNOWNED
