@@ -999,7 +999,7 @@ TEST_F(RdsImplTest, OnDemandVhdsDisabledWithDefaultCollection) {
             }
           }
         },
-        "default_virtual_host_resource_locator":
+        "default_resource_locator":
           "xdstp://test/envoy.config.route.v3.VirtualHost/foo_route_config/*"
       }
     }

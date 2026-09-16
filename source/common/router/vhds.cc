@@ -91,8 +91,7 @@ VhdsSubscription::VhdsSubscription(const envoy::config::route::v3::RouteConfigur
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
       init_target_(
           fmt::format("VhdsConfigSubscription {}", route_config_name_),
-          [this, use_collection =
-                     !route_config.vhds().default_virtual_host_resource_locator().empty()]() {
+          [this, use_collection = !route_config.vhds().default_resource_locator().empty()]() {
             if (use_collection) {
               subscription_->start({});
             } else {
@@ -102,7 +101,7 @@ VhdsSubscription::VhdsSubscription(const envoy::config::route::v3::RouteConfigur
       resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
                             "name") {
   const auto& vhds = route_config.vhds();
-  const auto& default_resource_name = vhds.default_virtual_host_resource_locator();
+  const auto& default_resource_name = vhds.default_resource_locator();
 
   if (default_resource_name.empty()) {
     // Legacy mode: use namespace-matching subscription.
