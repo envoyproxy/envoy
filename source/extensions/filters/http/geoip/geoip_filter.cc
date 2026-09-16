@@ -121,11 +121,9 @@ void GeoipFilter::onLookupComplete(Geolocation::LookupResult&& result) {
     return;
   }
   ASSERT(request_headers_);
-  for (auto it = result.cbegin(); it != result.cend();) {
-    const auto& geo_header = it->first;
-    const auto& lookup_result = it++->second;
-    if (!lookup_result.empty()) {
-      request_headers_->setCopy(Http::LowerCaseString(geo_header), lookup_result);
+  for (const auto& [geo_header, lookup_value] : result) {
+    if (!lookup_value.empty()) {
+      request_headers_->setCopy(Http::LowerCaseString(geo_header), lookup_value);
     }
   }
   config_->incTotal();

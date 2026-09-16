@@ -184,7 +184,7 @@ GeoipProviderConfig::GeoipProviderConfig(
   if (country_db_path_) {
     registerGeoDbStats(COUNTRY_DB_TYPE);
   }
-};
+}
 
 void GeoipProviderConfig::registerGeoDbStats(const absl::string_view& db_type) {
   stat_name_set_->rememberBuiltin(absl::StrCat(db_type, ".total"));
@@ -203,7 +203,7 @@ void GeoipProviderConfig::incCounter(Stats::StatName name) {
   stats_scope_->counterFromStatName(name).inc();
 }
 
-void GeoipProviderConfig::setGuage(Stats::StatName name, const uint64_t value) {
+void GeoipProviderConfig::setGauge(Stats::StatName name, const uint64_t value) {
   stats_scope_->gaugeFromStatName(name, Stats::Gauge::ImportMode::Accumulate).set(value);
 }
 
@@ -257,7 +257,7 @@ void GeoipProvider::lookupInCityDb(
   const bool should_lookup_country_from_city_db =
       !config_->isCountryDbPathSet() && hasConfiguredField(*config_, COUNTRY_LOOKUP_FIELDS);
   if (hasConfiguredField(*config_, CITY_LOOKUP_FIELDS) || should_lookup_country_from_city_db) {
-    int mmdb_error;
+    int mmdb_error = MMDB_SUCCESS;
     auto city_db_ptr = getCityDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(CITY_DB_TYPE).append("_lookup_pre_complete"));
@@ -266,10 +266,9 @@ void GeoipProvider::lookupInCityDb(
       return;
     }
     auto city_db = city_db_ptr.get();
-    MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        city_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
-        &mmdb_error);
-    const uint32_t n_prev_hits = lookup_result.size();
+    MMDB_lookup_result_s mmdb_lookup_result =
+        MMDB_lookup_sockaddr(city_db->mmdb(), remote_address->sockAddr(), &mmdb_error);
+    const size_t n_prev_hits = lookup_result.size();
     if (!mmdb_error && mmdb_lookup_result.found_entry) {
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
@@ -297,7 +296,7 @@ void GeoipProvider::lookupInAsnDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (hasConfiguredField(*config_, ASN_LOOKUP_FIELDS)) {
-    int mmdb_error;
+    int mmdb_error = MMDB_SUCCESS;
     auto asn_db_ptr = getAsnDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(ASN_DB_TYPE).append("_lookup_pre_complete"));
@@ -310,10 +309,9 @@ void GeoipProvider::lookupInAsnDb(
       IS_ENVOY_BUG("Maxmind asn database must be initialised for performing lookups");
       return;
     }
-    MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        asn_db_ptr->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
-        &mmdb_error);
-    const uint32_t n_prev_hits = lookup_result.size();
+    MMDB_lookup_result_s mmdb_lookup_result =
+        MMDB_lookup_sockaddr(asn_db_ptr->mmdb(), remote_address->sockAddr(), &mmdb_error);
+    const size_t n_prev_hits = lookup_result.size();
     if (!mmdb_error && mmdb_lookup_result.found_entry) {
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
@@ -336,7 +334,7 @@ void GeoipProvider::lookupInAnonDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (hasConfiguredField(*config_, ANON_LOOKUP_FIELDS)) {
-    int mmdb_error;
+    int mmdb_error = MMDB_SUCCESS;
     auto anon_db_ptr = getAnonDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(ANON_DB_TYPE).append("_lookup_pre_complete"));
@@ -345,10 +343,9 @@ void GeoipProvider::lookupInAnonDb(
       return;
     }
     auto anon_db = anon_db_ptr.get();
-    MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        anon_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
-        &mmdb_error);
-    const uint32_t n_prev_hits = lookup_result.size();
+    MMDB_lookup_result_s mmdb_lookup_result =
+        MMDB_lookup_sockaddr(anon_db->mmdb(), remote_address->sockAddr(), &mmdb_error);
+    const size_t n_prev_hits = lookup_result.size();
     if (!mmdb_error && mmdb_lookup_result.found_entry) {
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
@@ -372,7 +369,7 @@ void GeoipProvider::lookupInIspDb(
   const bool should_lookup_asn_from_isp_db =
       !config_->isAsnDbPathSet() && hasConfiguredField(*config_, ISP_ASN_LOOKUP_FIELDS);
   if (hasConfiguredField(*config_, ISP_LOOKUP_FIELDS) || should_lookup_asn_from_isp_db) {
-    int mmdb_error;
+    int mmdb_error = MMDB_SUCCESS;
     auto isp_db_ptr = getIspDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(ISP_DB_TYPE).append("_lookup_pre_complete"));
@@ -381,9 +378,9 @@ void GeoipProvider::lookupInIspDb(
       return;
     }
     auto isp_db = isp_db_ptr.get();
-    MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        isp_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
-    const uint32_t n_prev_hits = lookup_result.size();
+    MMDB_lookup_result_s mmdb_lookup_result =
+        MMDB_lookup_sockaddr(isp_db->mmdb(), remote_address->sockAddr(), &mmdb_error);
+    const size_t n_prev_hits = lookup_result.size();
     if (!mmdb_error && mmdb_lookup_result.found_entry) {
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
@@ -414,7 +411,7 @@ void GeoipProvider::lookupInCountryDb(
       // Country lookup will be handled by lookupInCityDb.
       return;
     }
-    int mmdb_error;
+    int mmdb_error = MMDB_SUCCESS;
     auto country_db_ptr = getCountryDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(COUNTRY_DB_TYPE).append("_lookup_pre_complete"));
@@ -428,10 +425,9 @@ void GeoipProvider::lookupInCountryDb(
       return;
     }
     auto country_db = country_db_ptr.get();
-    MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        country_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
-        &mmdb_error);
-    const uint32_t n_prev_hits = lookup_result.size();
+    MMDB_lookup_result_s mmdb_lookup_result =
+        MMDB_lookup_sockaddr(country_db->mmdb(), remote_address->sockAddr(), &mmdb_error);
+    const size_t n_prev_hits = lookup_result.size();
     if (!mmdb_error && mmdb_lookup_result.found_entry) {
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
