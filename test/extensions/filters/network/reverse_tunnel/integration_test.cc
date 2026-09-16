@@ -3,6 +3,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
+#include "envoy/extensions/filters/network/reverse_tunnel/v3/drain_aware_hcm.pb.h"
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
 #include "envoy/http/codec.h"
@@ -17,6 +18,7 @@
 #include "test/integration/utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -735,6 +737,114 @@ TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsGoAwayOnReverseC
   timeSystem().advanceTimeWait(std::chrono::seconds(2));
   // Confirm the full chain completed: workers stopped the listener and called.
   test_server_->waitForCounter("listener_manager.listener_stopped", Ge(1));
+}
+
+class ReverseTunnelDrainIntegrationTest : public Event::TestUsingSimulatedTime,
+                                          public ReverseTunnelFilterIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseTunnelDrainIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ReverseTunnelDrainIntegrationTest, DrainClosesIdleTunnelsAndPreservesActiveStreams) {
+  DISABLE_IF_ADMIN_DISABLED;
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(600);
+  setDeterministicValue();
+  setUpstreamCount(2);
+  addDrainingAwareReverseConnectionHcmListener(/*reverse_connection_count=*/2);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* resources = bootstrap.mutable_static_resources();
+    auto* filter = resources->mutable_listeners(0)->mutable_filter_chains(0)->mutable_filters(0);
+    envoy::extensions::filters::network::reverse_tunnel::v3::DrainAwareHttpConnectionManager config;
+    ASSERT_TRUE(filter->typed_config().UnpackTo(&config));
+    config.set_enable_drain_with_goaway(true);
+    auto* hcm = config.mutable_hcm_config();
+    hcm->mutable_stream_idle_timeout()->set_seconds(0);
+    auto* route = hcm->mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+    route->mutable_route()->set_cluster("cluster_1");
+    route->mutable_route()->mutable_timeout()->set_seconds(0);
+    ASSERT_TRUE(filter->mutable_typed_config()->PackFrom(config));
+
+    envoy::config::cluster::v3::Cluster backend_cluster = resources->clusters(0);
+    backend_cluster.set_name("cluster_1");
+    backend_cluster.mutable_load_assignment()->set_cluster_name("cluster_1");
+    resources->add_clusters()->Swap(&backend_cluster);
+  });
+  initialize();
+
+  FakeRawConnectionPtr active_tunnel;
+  FakeRawConnectionPtr idle_tunnel;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(active_tunnel));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(idle_tunnel));
+  completeReverseTunnelHandshake(*active_tunnel);
+  completeReverseTunnelHandshake(*idle_tunnel);
+  test_server_->waitForGauge("http.reverse_connection_hcm.downstream_cx_active", Eq(2));
+
+  // The spare tunnel has completed its handshake but has never received an HTTP/2 preface.
+  active_tunnel->clearData();
+  ASSERT_TRUE(active_tunnel->write(
+      absl::StrCat(Http::Http2::Http2Frame::Preamble,
+                   std::string(Http::Http2::Http2Frame::makeEmptySettingsFrame()),
+                   std::string(Http::Http2::Http2Frame::makePostRequest(1, "host", "/active")))));
+  FakeHttpConnectionPtr backend_connection;
+  FakeStreamPtr backend_request;
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, backend_connection));
+  ASSERT_TRUE(backend_connection->waitForNewStream(*dispatcher_, backend_request));
+  ASSERT_TRUE(backend_request->waitForHeadersComplete());
+  backend_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ASSERT_TRUE(
+      active_tunnel->waitForData(waitForHttp2FrameType(Http::Http2::Http2Frame::Type::Headers)));
+  ASSERT_TRUE(active_tunnel->write(std::string(Http::Http2::Http2Frame::makeEmptySettingsFrame(
+      Http::Http2::Http2Frame::SettingsFlags::Ack))));
+  active_tunnel->clearData();
+
+  auto admin_response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners?graceful",
+                                         "", Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(admin_response->complete());
+  ASSERT_EQ("200", admin_response->headers().getStatusValue());
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  ASSERT_TRUE(idle_tunnel->waitForDisconnect());
+  const std::string expected_goaway = std::string(Http::Http2::Http2Frame::makeEmptyGoAwayFrame(
+      1, Http::Http2::Http2Frame::ErrorCode::NoError));
+  ASSERT_TRUE(active_tunnel->waitForData([expected_goaway](const std::string& data) {
+    return data.find(expected_goaway) != std::string::npos;
+  }));
+  EXPECT_TRUE(active_tunnel->connected());
+
+  // A request sent after GOAWAY must not reach the backend. Sending data on the original stream
+  // afterwards also synchronizes with the initiator's processing of the new stream's headers.
+  ASSERT_TRUE(active_tunnel->write(
+      absl::StrCat(std::string(Http::Http2::Http2Frame::makeRequest(3, "host", "/after-drain")),
+                   std::string(Http::Http2::Http2Frame::makeDataFrame(1, "before")))));
+  ASSERT_TRUE(backend_request->waitForData(*dispatcher_, "before"));
+  EXPECT_EQ(1, test_server_->counter("http.reverse_connection_hcm.downstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(600));
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
+  ASSERT_TRUE(active_tunnel->write(std::string(Http::Http2::Http2Frame::makeDataFrame(
+      1, "after", Http::Http2::Http2Frame::DataFlags::EndStream))));
+  ASSERT_TRUE(backend_request->waitForEndStream(*dispatcher_));
+  EXPECT_EQ("beforeafter", backend_request->body().toString());
+  backend_request->encodeData("finished after ten minutes", true);
+  ASSERT_TRUE(active_tunnel->waitForData(
+      FakeRawConnection::waitForInexactMatch("finished after ten minutes")));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
+
+  // Neither closing an idle tunnel nor sending GOAWAY may replenish a draining listener's pool.
+  FakeRawConnectionPtr unexpected_tunnel;
+  EXPECT_FALSE(
+      fake_upstreams_[0]->waitForRawConnection(unexpected_tunnel, std::chrono::milliseconds(10)));
+  if (unexpected_tunnel != nullptr) {
+    EXPECT_TRUE(unexpected_tunnel->close());
+  }
+  // With simulated time and every listener stopped, closing the last socket can empty the worker
+  // dispatcher before global thread-local shutdown. Let server shutdown close these connections.
+  test_server_.reset();
+  EXPECT_TRUE(active_tunnel->waitForDisconnect());
+  EXPECT_TRUE(backend_connection->waitForDisconnect());
 }
 
 // Test validation with static expected values.

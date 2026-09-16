@@ -2,7 +2,9 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_config.h"
+#include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_listener.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -270,11 +272,18 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledReverseTunnelWiresRedial) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   Stats::IsolatedStoreImpl stats_store;
   Bootstrap::ReverseConnection::ReverseConnectionSocketConfig rc_config;
-  rc_config.src_node_id = "node";
+  // Leave node ID empty so initializing the parent creates its timer without dialing anything.
   rc_config.src_cluster_id = "cluster";
   auto parent = std::make_unique<Bootstrap::ReverseConnection::ReverseConnectionIOHandle>(
       ::socket(AF_INET, SOCK_STREAM, 0), rc_config, cluster_manager, /*extension=*/nullptr,
       *stats_store.rootScope());
+  NiceMock<Event::MockDispatcher> parent_dispatcher;
+  bool parent_timer_destroyed = false;
+  auto* parent_timer = new NiceMock<Event::MockTimer>(&parent_dispatcher);
+  parent_timer->timer_destroyed_ = &parent_timer_destroyed;
+  parent->initializeFileEvent(
+      parent_dispatcher, [](uint32_t) { return absl::OkStatus(); }, Event::FileTriggerType::Level,
+      Event::FileReadyType::Read);
 
   // The accepted socket's IoHandle is the reverse-tunnel handle owning an (unused) inner socket.
   auto tunnel_handle =
@@ -303,6 +312,23 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledReverseTunnelWiresRedial) {
   // dial a replacement tunnel. With no tunnels tracked this is a safe no-op, but it exercises the
   // wired closure.
   codec->shutdownNotice();
+  EXPECT_FALSE(parent_timer_destroyed);
+
+  ON_CALL(context_.server_factory_context_, healthCheckFailed()).WillByDefault(Return(true));
+  codec->shutdownNotice();
+  EXPECT_FALSE(parent_timer_destroyed);
+  ON_CALL(context_.server_factory_context_, healthCheckFailed()).WillByDefault(Return(false));
+
+  // An explicit listener drain retires the parent's retry timer before any replacement can be
+  // dialed, even if health check failure has already sent GOAWAY and stopped the codec's timer.
+  connection.raiseConnectionDrain({simTime().monotonicTime(), Server::DrainStrategy::Immediate});
+  EXPECT_TRUE(parent_timer_destroyed);
+  EXPECT_EQ(Network::Connection::State::Open, connection.state());
+
+  // The listener can be destroyed while its accepted connection finishes existing streams.
+  parent.reset();
+  EXPECT_EQ(nullptr, tunnel_handle->parent());
+  stopInitiatingReverseConnections(connection);
 }
 
 } // namespace
