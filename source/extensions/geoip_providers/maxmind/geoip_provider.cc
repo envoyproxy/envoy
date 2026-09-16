@@ -210,6 +210,7 @@ void GeoipProviderConfig::setGuage(Stats::StatName name, const uint64_t value) {
 GeoipProvider::GeoipProvider(Event::Dispatcher& dispatcher, Singleton::InstanceSharedPtr owner,
                              GeoipProviderConfigSharedPtr config)
     : config_(config), owner_(owner) {
+  mmdb_watcher_ = dispatcher.createFilesystemWatcher();
   // A database that cannot be opened at startup is a configuration error: the provider would have
   // nothing to serve lookups from. Reject the configuration rather than run without it.
   const auto load_db = [this](const std::optional<std::string>& db_path,
@@ -219,6 +220,10 @@ GeoipProvider::GeoipProvider(Event::Dispatcher& dispatcher, Singleton::InstanceS
     }
     absl::StatusOr<MaxmindDbSharedPtr> db_or_error = initMaxmindDb(db_path.value(), db_type);
     THROW_IF_NOT_OK_REF(db_or_error.status());
+    THROW_IF_NOT_OK(mmdb_watcher_->addWatch(db_path.value(), Filesystem::Watcher::Events::MovedTo,
+                                            [this, path = db_path.value(), db_type](uint32_t) {
+                                              return onMaxmindDbUpdate(path, db_type);
+                                            }));
     return std::move(db_or_error.value());
   };
 
@@ -227,35 +232,6 @@ GeoipProvider::GeoipProvider(Event::Dispatcher& dispatcher, Singleton::InstanceS
   anon_db_ = load_db(config_->anonDbPath(), ANON_DB_TYPE);
   asn_db_ = load_db(config_->asnDbPath(), ASN_DB_TYPE);
   country_db_ = load_db(config_->countryDbPath(), COUNTRY_DB_TYPE);
-  mmdb_watcher_ = dispatcher.createFilesystemWatcher();
-  if (config_->cityDbPath()) {
-    THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-        config_->cityDbPath().value(), Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
-          return onMaxmindDbUpdate(config_->cityDbPath().value(), CITY_DB_TYPE);
-        }));
-  }
-  if (config_->ispDbPath()) {
-    THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-        config_->ispDbPath().value(), Filesystem::Watcher::Events::MovedTo,
-        [this](uint32_t) { return onMaxmindDbUpdate(config_->ispDbPath().value(), ISP_DB_TYPE); }));
-  }
-  if (config_->anonDbPath()) {
-    THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-        config_->anonDbPath().value(), Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
-          return onMaxmindDbUpdate(config_->anonDbPath().value(), ANON_DB_TYPE);
-        }));
-  }
-  if (config_->asnDbPath()) {
-    THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-        config_->asnDbPath().value(), Filesystem::Watcher::Events::MovedTo,
-        [this](uint32_t) { return onMaxmindDbUpdate(config_->asnDbPath().value(), ASN_DB_TYPE); }));
-  }
-  if (config_->countryDbPath()) {
-    THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-        config_->countryDbPath().value(), Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
-          return onMaxmindDbUpdate(config_->countryDbPath().value(), COUNTRY_DB_TYPE);
-        }));
-  }
 }
 
 GeoipProvider::~GeoipProvider() { ENVOY_LOG(debug, "Shutting down Maxmind geolocation provider"); }
