@@ -332,9 +332,10 @@ script:
   end
 
 A script can define either or both of these functions. During the request path, Envoy will
-run *envoy_on_request* as a coroutine, passing a handle to the request API. During the
-response path, Envoy will run *envoy_on_response* as a coroutine, passing handle to the
-response API.
+run *envoy_on_request* as a coroutine, passing a handle to the
+:ref:`request handle API <config_http_filters_lua_request_handle_api>`. During the response path,
+Envoy will run *envoy_on_response* as a coroutine, passing a handle to the
+:ref:`response handle API <config_http_filters_lua_response_handle_api>`.
 
 .. attention::
 
@@ -342,7 +343,12 @@ response API.
   handle should not be assigned to any global variable and should not be used outside of the
   coroutine. Envoy will fail your script if the handle is used incorrectly.
 
-The following methods on the stream handle are supported:
+.. _config_http_filters_lua_request_handle_api:
+
+Request handle API
+------------------
+
+The following methods are available on the request handle passed to ``envoy_on_request``.
 
 ``headers()``
 ^^^^^^^^^^^^^
@@ -844,6 +850,38 @@ Returns a :ref:`route object <config_http_filters_lua_route_wrapper>`.
 Returns a stats scope object that can be used to create and modify stats (counters, gauges, and
 histograms). See :ref:`Stats scope object API <config_http_filters_lua_stats_scope_wrapper>` for
 available methods.
+
+.. _config_http_filters_lua_response_handle_api:
+
+Response handle API
+-------------------
+
+The response handle passed to ``envoy_on_response`` supports all of the same methods as the
+:ref:`request handle <config_http_filters_lua_request_handle_api>`, with two exceptions:
+``respond()`` is not available on the response handle, and ``requestHeaders()`` (documented below)
+is available **only** on the response handle.
+
+``requestHeaders()``
+^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local request_headers = handle:requestHeaders()
+
+Returns the request headers for the stream, so that response-path logic can read values the
+request carried. This method is only available on the response handle passed to
+``envoy_on_response``; on the request handle, ``headers()`` already returns the request headers.
+
+The returned handle is a full :ref:`header object <config_http_filters_lua_header_wrapper>` and
+may be modified. Note that the request has already been sent upstream by this point, so a write
+does not change what the upstream saw — it is visible only to access logging, tracing, and any
+later filter that reads the request headers on the encode path.
+
+Returns ``nil`` if request headers are not available. This occurs when the response is generated
+before the request headers have been fully received — for example, when Envoy produces an early
+error response due to a request header timeout, a stream idle timeout that fires before headers
+arrive, or an immediate protocol-level rejection (e.g. ``400 Bad Request``) triggered during
+header parsing.
 
 .. _config_http_filters_lua_header_wrapper:
 

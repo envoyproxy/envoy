@@ -153,16 +153,28 @@ public:
    * is pre-configured with the appropriate lua stat prefix.
    */
   virtual Stats::Scope& statsScope() PURE;
+
+  /**
+   * @return Http::RequestHeaderMapOptRef the request headers for this stream, if present. Only
+   * meaningful on the response path.
+   */
+  virtual Http::RequestHeaderMapOptRef requestHeaders() PURE;
 };
 
 class Filter;
 
 /**
- * A wrapper for a currently running request/response. This is the primary handle passed to Lua.
- * The script interacts with Envoy entirely through this handle.
+ * Base class for request and response stream handle wrappers. Contains all state and Lua function
+ * implementations shared between the two paths. Not a BaseLuaObject itself — the concrete
+ * subclasses RequestStreamHandleWrapper and ResponseStreamHandleWrapper provide the Lua type
+ * identity and exported function tables.
  */
-class StreamHandleWrapper : public Filters::Common::Lua::BaseLuaObject<StreamHandleWrapper>,
-                            public Http::AsyncClient::Callbacks {
+class StreamHandleWrapperBase : public Http::AsyncClient::Callbacks,
+                                public Filters::Common::Lua::LuaLoggable {
+  // NOTE: BaseLuaObject also derives from LuaLoggable, so a concrete leaf reaches it by two
+  // equal-length paths. That is harmless while only this class logs -- ENVOY_LOG and scriptLog()
+  // resolve within whichever scope names them. Logging from a leaf instead needs an explicit
+  // base, since the unqualified name is ambiguous there.
 public:
   /**
    * The state machine for a stream handler. In the current implementation everything the filter
@@ -192,9 +204,9 @@ public:
     bool return_duplicate_headers_{false};
   };
 
-  StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
-                      Http::RequestOrResponseHeaderMap& headers, bool end_stream, Filter& filter,
-                      FilterCallbacks& callbacks, TimeSource& time_source);
+  StreamHandleWrapperBase(Filters::Common::Lua::Coroutine& coroutine,
+                          Http::RequestOrResponseHeaderMap& headers, bool end_stream,
+                          Filter& filter, FilterCallbacks& callbacks, TimeSource& time_source);
 
   Http::FilterHeadersStatus start(int function_ref);
   Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream);
@@ -211,6 +223,307 @@ public:
     }
     on_reset_called_ = true;
   }
+
+protected:
+  /**
+   * Perform an HTTP call to an upstream host.
+   * @param 1 (string): The name of the upstream cluster to call. This cluster must be configured.
+   * @param 2 (table): A table of HTTP headers. :method, :path, and :authority must be defined.
+   * @param 3 (string): Body. Can be nil.
+   * @param 4 (int): Timeout in milliseconds for the call.
+   * @param 5 (bool): Optional flag. If true, filter continues without waiting for HTTP response
+   * from upstream service. False/synchronous by default.
+   * @return headers (table), body (string/nil)
+   */
+  int luaHttpCall(lua_State* state);
+
+  /**
+   * Perform an inline response. This call is currently only valid on the request path. Further
+   * filter iteration will stop. No further script code will run after this call.
+   * @param 1 (table): A table of HTTP headers. :status must be defined.
+   * @param 2 (string): Body. Can be nil.
+   */
+  int luaRespond(lua_State* state);
+
+  /**
+   * @return a handle to the headers.
+   */
+  int luaHeaders(lua_State* state);
+
+  /**
+   * @return a handle to the full body or nil if there is no body. This call will cause the script
+   *         to yield until the entire body is received (or if there is no body will return nil
+   *         right away).
+   *         NOTE: This call causes Envoy to buffer the body. The max buffer size is configured
+   *         based on the currently active flow control settings.
+   */
+  int luaBody(lua_State* state);
+
+  /**
+   * @return an iterator that allows the script to iterate through all body chunks as they are
+   *         received. The iterator will yield between body chunks. Envoy *will not* buffer
+   *         the body chunks in this case, but the script can look at them as they go by.
+   */
+  int luaBodyChunks(lua_State* state);
+
+  /**
+   * @return a handle to the trailers or nil if there are no trailers. This call will cause the
+   *         script to yield if Envoy does not yet know if there are trailers or not.
+   */
+  int luaTrailers(lua_State* state);
+
+  /**
+   * @return a handle to the metadata.
+   */
+  int luaMetadata(lua_State* state);
+
+  /**
+   * @return a handle to the stream info.
+   */
+  int luaStreamInfo(lua_State* state);
+
+  /**
+   * @return a handle to the network connection.
+   */
+  int luaConnection(lua_State* state);
+
+  /**
+   * @return a handle to the network connection's stream info.
+   */
+  int luaConnectionStreamInfo(lua_State* state);
+
+  /**
+   * Verify cryptographic signatures.
+   * @param 1 (string) hash function(including SHA1, SHA224, SHA256, SHA384, SHA512)
+   * @param 2 (void*)  pointer to public key
+   * @param 3 (string) signature
+   * @param 4 (int)    length of signature
+   * @param 5 (string) clear text
+   * @param 6 (int)    length of clear text
+   * @return (bool, string) If the first element is true, the second element is empty; otherwise,
+   * the second element stores the error message
+   */
+  int luaVerifySignature(lua_State* state);
+
+  /**
+   * Import public key.
+   * @param 1 (string) keyder string
+   * @param 2 (int)    length of keyder string
+   * @return pointer to public key
+   */
+  int luaImportPublicKey(lua_State* state);
+
+  /**
+   * This is the body iterator invoked by the closure returned from luaBodyChunks().
+   */
+  int luaBodyIterator(lua_State* state);
+
+  /**
+   * Returns the concrete type's static body iterator function pointer, used by luaBodyChunks()
+   * to push the closure. Implemented by each concrete subclass via FORWARD_LUA_CLOSURE.
+   */
+  virtual lua_CFunction bodyIteratorFn() const = 0;
+
+  /**
+   * Mark this object as live (callable). Delegates to BaseLuaObject<T>::markLive() on the
+   * concrete subclass.
+   */
+  virtual void markLive() = 0;
+
+  /**
+   * Mark this object as dead (not callable). Delegates to BaseLuaObject<T>::markDead() on the
+   * concrete subclass.
+   */
+  virtual void markDead() = 0;
+
+  /**
+   * Base64 escape a string.
+   * @param1 (string) string to be base64 escaped.
+   * @return (string) base64 escaped string.
+   */
+  int luaBase64Escape(lua_State* state);
+
+  /**
+   * Base64 decode a string.
+   * @param1 (string) base64 encoded string to be decoded.
+   * @return (string) the decoded string, or nil if the input is not valid base64.
+   */
+  int luaBase64Decode(lua_State* state);
+
+  /**
+   * Timestamp.
+   * @param1 (string) optional format (e.g. milliseconds_from_epoch, nanoseconds_from_epoch).
+   * Defaults to milliseconds_from_epoch.
+   * @return timestamp
+   */
+  int luaTimestamp(lua_State* state);
+
+  /**
+   * TimestampString.
+   * @param1 (string) optional format (e.g. milliseconds_from_epoch, microseconds_from_epoch).
+   * Defaults to milliseconds_from_epoch.
+   * @return (string) timestamp.
+   */
+  int luaTimestampString(lua_State* state);
+
+  /**
+   * Set the upstream override host.
+   * @param 1 (string): The host address to override with.
+   * @param 2 (bool): Optional strict flag. Defaults to false.
+   */
+  int luaSetUpstreamOverrideHost(lua_State* state);
+
+  /**
+   * Clear the route cache explicitly.
+   */
+  int luaClearRouteCache(lua_State* state);
+
+  /**
+   * Get the filter context.
+   */
+  int luaFilterContext(lua_State* state);
+
+  /**
+   * @return a handle to the virtual host.
+   */
+  int luaVirtualHost(lua_State* state);
+
+  /**
+   * @return a handle to the route.
+   */
+  int luaRoute(lua_State* state);
+
+  /**
+   * @return a handle to the stats scope for creating custom stats.
+   */
+  int luaStats(lua_State* state);
+
+  enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
+
+  int doHttpCall(lua_State* state, const HttpCallOptions& options);
+
+  // Resumes the coroutine only if it is safe to do so. Returns the coroutine execution status;
+  // OK when resumption was skipped because the stream was reset.
+  absl::Status resumeCoroutine(int num_args,
+                               const Filters::Common::Lua::YieldCallback& yield_callback) {
+    if (!on_reset_called_) {
+      return coroutine_.resume(num_args, yield_callback);
+    }
+    return absl::OkStatus();
+  }
+
+  // Http::AsyncClient::Callbacks
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
+
+  // Coroutine resumption MUST use resumeCoroutine.
+  Filters::Common::Lua::Coroutine& coroutine_;
+  Http::RequestOrResponseHeaderMap& headers_;
+  bool end_stream_;
+  bool headers_continued_{};
+  bool buffered_body_{};
+  bool saw_body_{};
+  bool return_duplicate_headers_{};
+  bool on_reset_called_{};
+  Filter& filter_;
+  FilterCallbacks& callbacks_;
+  Http::HeaderMap* trailers_{};
+  // None of these wrappers survive a yield; onMarkDead() resets them all. The script can
+  // request them again across yields if needed.
+  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper>
+      filter_context_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<ConnectionStreamInfoWrapper> connection_stream_info_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<PublicKeyWrapper> public_key_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> virtual_host_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> route_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> stats_scope_wrapper_;
+  State state_{State::Running};
+  Filters::Common::Lua::YieldCallback yield_callback_;
+  // Set by start()/onData()/onTrailers() from the coroutine execution status; checked by the
+  // Filter after those methods return.
+  absl::Status coroutine_status_{absl::OkStatus()};
+  Http::AsyncClient::Request* http_request_{};
+  TimeSource& time_source_;
+
+  // The inserted crypto object pointers will not be removed from this map.
+  absl::flat_hash_map<std::string, Envoy::Common::Crypto::PKeyObjectPtr> public_key_storage_;
+};
+
+/**
+ * CRTP glue between StreamHandleWrapperBase and a concrete leaf handle type.
+ *
+ * The base holds the state and every Lua method body but is deliberately not a BaseLuaObject,
+ * because a Lua metatable is registered per C++ type. This layer supplies, once, everything a
+ * leaf needs that has to be spelled in terms of the leaf's own type: the per-type static thunks,
+ * and the overrides that reach BaseLuaObject<T>. A leaf only declares which of those thunks it
+ * exports, which is what lets the two paths offer different APIs over one implementation.
+ */
+template <class T>
+class StreamHandleLeaf : public StreamHandleWrapperBase,
+                         public Filters::Common::Lua::BaseLuaObject<T> {
+public:
+  using StreamHandleWrapperBase::StreamHandleWrapperBase;
+
+  lua_CFunction bodyIteratorFn() const override { return static_luaBodyIterator; }
+  void markLive() override { Filters::Common::Lua::BaseLuaObject<T>::markLive(); }
+  void markDead() override { Filters::Common::Lua::BaseLuaObject<T>::markDead(); }
+
+protected:
+  // Filters::Common::Lua::BaseLuaObject
+  // Resets every LuaDeathRef declared in StreamHandleWrapperBase, for the reason given there.
+  void onMarkDead() override {
+    headers_wrapper_.reset();
+    body_wrapper_.reset();
+    trailers_wrapper_.reset();
+    metadata_wrapper_.reset();
+    filter_context_wrapper_.reset();
+    stream_info_wrapper_.reset();
+    connection_wrapper_.reset();
+    public_key_wrapper_.reset();
+    connection_stream_info_wrapper_.reset();
+    virtual_host_wrapper_.reset();
+    route_wrapper_.reset();
+    stats_scope_wrapper_.reset();
+  }
+
+  FORWARD_LUA_FUNCTION(T, luaHeaders)
+  FORWARD_LUA_FUNCTION(T, luaBody)
+  FORWARD_LUA_FUNCTION(T, luaBodyChunks)
+  FORWARD_LUA_FUNCTION(T, luaTrailers)
+  FORWARD_LUA_FUNCTION(T, luaMetadata)
+  FORWARD_LUA_FUNCTION(T, luaHttpCall)
+  FORWARD_LUA_FUNCTION(T, luaRespond)
+  FORWARD_LUA_FUNCTION(T, luaStreamInfo)
+  FORWARD_LUA_FUNCTION(T, luaConnection)
+  FORWARD_LUA_FUNCTION(T, luaImportPublicKey)
+  FORWARD_LUA_FUNCTION(T, luaVerifySignature)
+  FORWARD_LUA_FUNCTION(T, luaBase64Escape)
+  FORWARD_LUA_FUNCTION(T, luaBase64Decode)
+  FORWARD_LUA_FUNCTION(T, luaTimestamp)
+  FORWARD_LUA_FUNCTION(T, luaTimestampString)
+  FORWARD_LUA_FUNCTION(T, luaConnectionStreamInfo)
+  FORWARD_LUA_FUNCTION(T, luaSetUpstreamOverrideHost)
+  FORWARD_LUA_FUNCTION(T, luaClearRouteCache)
+  FORWARD_LUA_FUNCTION(T, luaFilterContext)
+  FORWARD_LUA_FUNCTION(T, luaVirtualHost)
+  FORWARD_LUA_FUNCTION(T, luaRoute)
+  FORWARD_LUA_FUNCTION(T, luaStats)
+  FORWARD_LUA_CLOSURE(T, luaBodyIterator)
+};
+
+/**
+ * Lua handle passed to envoy_on_request. Exposes the request path API.
+ */
+class RequestStreamHandleWrapper : public StreamHandleLeaf<RequestStreamHandleWrapper> {
+public:
+  using StreamHandleLeaf<RequestStreamHandleWrapper>::StreamHandleLeaf;
 
   static ExportedFunctions exportedFunctions() {
     return {{"headers", static_luaHeaders},
@@ -236,235 +549,60 @@ public:
             {"route", static_luaRoute},
             {"stats", static_luaStats}};
   }
+};
+
+/**
+ * Lua handle passed to envoy_on_response. Exposes the same set of methods as the request handle.
+ * The two tables are identical today; they are separate types so that either path can gain or
+ * drop a method without disturbing the other.
+ */
+class ResponseStreamHandleWrapper : public StreamHandleLeaf<ResponseStreamHandleWrapper> {
+public:
+  using StreamHandleLeaf<ResponseStreamHandleWrapper>::StreamHandleLeaf;
+
+  static ExportedFunctions exportedFunctions() {
+    return {{"headers", static_luaHeaders},
+            {"requestHeaders", static_luaRequestHeaders},
+            {"body", static_luaBody},
+            {"bodyChunks", static_luaBodyChunks},
+            {"trailers", static_luaTrailers},
+            {"metadata", static_luaMetadata},
+            {"httpCall", static_luaHttpCall},
+            {"streamInfo", static_luaStreamInfo},
+            {"connection", static_luaConnection},
+            {"importPublicKey", static_luaImportPublicKey},
+            {"verifySignature", static_luaVerifySignature},
+            {"base64Escape", static_luaBase64Escape},
+            {"base64Decode", static_luaBase64Decode},
+            {"timestamp", static_luaTimestamp},
+            {"timestampString", static_luaTimestampString},
+            {"connectionStreamInfo", static_luaConnectionStreamInfo},
+            {"setUpstreamOverrideHost", static_luaSetUpstreamOverrideHost},
+            {"clearRouteCache", static_luaClearRouteCache},
+            {"filterContext", static_luaFilterContext},
+            {"virtualHost", static_luaVirtualHost},
+            {"route", static_luaRoute},
+            {"stats", static_luaStats}};
+  }
 
 private:
   /**
-   * Perform an HTTP call to an upstream host.
-   * @param 1 (string): The name of the upstream cluster to call. This cluster must be configured.
-   * @param 2 (table): A table of HTTP headers. :method, :path, and :authority must be defined.
-   * @param 3 (string): Body. Can be nil.
-   * @param 4 (int): Timeout in milliseconds for the call.
-   * @param 5 (bool): Optional flag. If true, filter continues without waiting for HTTP response
-   * from upstream service. False/synchronous by default.
-   * @return headers (table), body (string/nil)
+   * @return a handle to the request headers, or nil if not available. Reachable only from
+   * envoy_on_response: it is declared here rather than on the shared base, so the request handle
+   * has no such method at all -- there, headers() already returns the request headers.
+   * The handle is writable; the request is long gone upstream by this point, so a write is only
+   * visible to access logging and tracing.
    */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCall);
+  int luaRequestHeaders(lua_State* state);
 
-  /**
-   * Perform an inline response. This call is currently only valid on the request path. Further
-   * filter iteration will stop. No further script code will run after this call.
-   * @param 1 (table): A table of HTTP headers. :status must be defined.
-   * @param 2 (string): Body. Can be nil.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRespond);
-
-  /**
-   * @return a handle to the headers.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHeaders);
-
-  /**
-   * @return a handle to the full body or nil if there is no body. This call will cause the script
-   *         to yield until the entire body is received (or if there is no body will return nil
-   *         right away).
-   *         NOTE: This call causes Envoy to buffer the body. The max buffer size is configured
-   *         based on the currently active flow control settings.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaBody);
-
-  /**
-   * @return an iterator that allows the script to iterate through all body chunks as they are
-   *         received. The iterator will yield between body chunks. Envoy *will not* buffer
-   *         the body chunks in this case, but the script can look at them as they go by.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaBodyChunks);
-
-  /**
-   * @return a handle to the trailers or nil if there are no trailers. This call will cause the
-   *         script to yield if Envoy does not yet know if there are trailers or not.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTrailers);
-
-  /**
-   * @return a handle to the metadata.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
-
-  /**
-   * @return a handle to the stream info.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaStreamInfo);
-
-  /**
-   * @return a handle to the network connection.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaConnection);
-
-  /**
-   * @return a handle to the network connection's stream info.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaConnectionStreamInfo);
-
-  /**
-   * Verify cryptographic signatures.
-   * @param 1 (string) hash function(including SHA1, SHA224, SHA256, SHA384, SHA512)
-   * @param 2 (void*)  pointer to public key
-   * @param 3 (string) signature
-   * @param 4 (int)    length of signature
-   * @param 5 (string) clear text
-   * @param 6 (int)    length of clear text
-   * @return (bool, string) If the first element is true, the second element is empty; otherwise,
-   * the second element stores the error message
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaVerifySignature);
-
-  /**
-   * Import public key.
-   * @param 1 (string) keyder string
-   * @param 2 (int)    length of keyder string
-   * @return pointer to public key
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaImportPublicKey);
-
-  /**
-   * This is the closure/iterator returned by luaBodyChunks() above.
-   */
-  DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
-
-  /**
-   * Base64 escape a string.
-   * @param1 (string) string to be base64 escaped.
-   * @return (string) base64 escaped string.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaBase64Escape);
-
-  /**
-   * Base64 decode a string.
-   * @param1 (string) base64 encoded string to be decoded.
-   * @return (string) the decoded string, or nil if the input is not valid base64.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaBase64Decode);
-
-  /**
-   * Timestamp.
-   * @param1 (string) optional format (e.g. milliseconds_from_epoch, nanoseconds_from_epoch).
-   * Defaults to milliseconds_from_epoch.
-   * @return timestamp
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTimestamp);
-
-  /**
-   * TimestampString.
-   * @param1 (string) optional format (e.g. milliseconds_from_epoch, microseconds_from_epoch).
-   * Defaults to milliseconds_from_epoch.
-   * @return (string) timestamp.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTimestampString);
-
-  /**
-   * Set the upstream override host.
-   * @param 1 (string): The host address to override with.
-   * @param 2 (bool): Optional strict flag. Defaults to false.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaSetUpstreamOverrideHost);
-
-  /**
-   * Clear the route cache explicitly.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaClearRouteCache);
-
-  /**
-   * Get the filter context.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaFilterContext);
-
-  /**
-   * @return a handle to the virtual host.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaVirtualHost);
-
-  /**
-   * @return a handle to the route.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRoute);
-
-  /**
-   * @return a handle to the stats scope for creating custom stats.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaStats);
-
-  enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
-
-  int doHttpCall(lua_State* state, const HttpCallOptions& options);
-
-  // Resumes the coroutine only if it is safe to do so. Returns the coroutine execution status;
-  // OK when resumption was skipped because the stream was reset.
-  absl::Status resumeCoroutine(int num_args,
-                               const Filters::Common::Lua::YieldCallback& yield_callback) {
-    if (!on_reset_called_) {
-      return coroutine_.resume(num_args, yield_callback);
-    }
-    return absl::OkStatus();
-  }
-
-  // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
-    // Headers/body/trailers wrappers do not survive any yields. The user can request them
-    // again across yields if needed.
-    headers_wrapper_.reset();
-    body_wrapper_.reset();
-    trailers_wrapper_.reset();
-    metadata_wrapper_.reset();
-    filter_context_wrapper_.reset();
-    stream_info_wrapper_.reset();
-    connection_wrapper_.reset();
-    public_key_wrapper_.reset();
-    connection_stream_info_wrapper_.reset();
-    virtual_host_wrapper_.reset();
-    route_wrapper_.reset();
-    stats_scope_wrapper_.reset();
+    StreamHandleLeaf<ResponseStreamHandleWrapper>::onMarkDead();
+    request_headers_wrapper_.reset();
   }
 
-  // Http::AsyncClient::Callbacks
-  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
-  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
-  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
+  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> request_headers_wrapper_;
 
-  // Coroutine resumption MUST use resumeCoroutine.
-  Filters::Common::Lua::Coroutine& coroutine_;
-  Http::RequestOrResponseHeaderMap& headers_;
-  bool end_stream_;
-  bool headers_continued_{};
-  bool buffered_body_{};
-  bool saw_body_{};
-  bool return_duplicate_headers_{};
-  bool on_reset_called_{};
-  Filter& filter_;
-  FilterCallbacks& callbacks_;
-  Http::HeaderMap* trailers_{};
-  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper>
-      filter_context_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<ConnectionStreamInfoWrapper> connection_stream_info_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<PublicKeyWrapper> public_key_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> virtual_host_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<RouteWrapper> route_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> stats_scope_wrapper_;
-  State state_{State::Running};
-  Filters::Common::Lua::YieldCallback yield_callback_;
-  // Set by start()/onData()/onTrailers() from the coroutine execution status; checked by the
-  // Filter after those methods return.
-  absl::Status coroutine_status_{absl::OkStatus()};
-  Http::AsyncClient::Request* http_request_{};
-  TimeSource& time_source_;
-
-  // The inserted crypto object pointers will not be removed from this map.
-  absl::flat_hash_map<std::string, Envoy::Common::Crypto::PKeyObjectPtr> public_key_storage_;
+  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaRequestHeaders)
 };
 
 /**
@@ -645,6 +783,10 @@ private:
       return callbacks_->filterConfigName();
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
+    // Only meaningful on the response path. The method exists on FilterCallbacks so the
+    // response handle can reach it uniformly; the request handle exports no Lua method that
+    // reaches this code path.
+    Http::RequestHeaderMapOptRef requestHeaders() override { return {}; }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -679,12 +821,14 @@ private:
       return callbacks_->filterConfigName();
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
+    Http::RequestHeaderMapOptRef requestHeaders() override { return callbacks_->requestHeaders(); }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};
   };
 
-  using StreamHandleRef = Filters::Common::Lua::LuaDeathRef<StreamHandleWrapper>;
+  using RequestStreamHandleRef = Filters::Common::Lua::LuaDeathRef<RequestStreamHandleWrapper>;
+  using ResponseStreamHandleRef = Filters::Common::Lua::LuaDeathRef<ResponseStreamHandleWrapper>;
 
   PerLuaCodeSetup* getPerLuaCodeSetup() {
     if (decoder_callbacks_.callbacks_ != nullptr) {
@@ -717,13 +861,20 @@ private:
     return config_->filterContext();
   }
 
-  Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
+  template <typename Wrapper>
+  Http::FilterHeadersStatus doHeaders(Filters::Common::Lua::LuaDeathRef<Wrapper>& handle,
                                       Filters::Common::Lua::CoroutinePtr& coroutine,
                                       FilterCallbacks& callbacks, int function_ref,
                                       PerLuaCodeSetup* setup,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream);
-  Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
-  Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
+
+  template <typename Wrapper>
+  Http::FilterDataStatus doData(Filters::Common::Lua::LuaDeathRef<Wrapper>& handle,
+                                Buffer::Instance& data, bool end_stream);
+
+  template <typename Wrapper>
+  Http::FilterTrailersStatus doTrailers(Filters::Common::Lua::LuaDeathRef<Wrapper>& handle,
+                                        Http::HeaderMap& trailers);
 
   FilterConfigConstSharedPtr config_;
   const FilterConfigPerRoute* per_route_config_{};
@@ -748,8 +899,8 @@ private:
 
   DecoderCallbacks decoder_callbacks_{*this};
   EncoderCallbacks encoder_callbacks_{*this};
-  StreamHandleRef request_stream_wrapper_;
-  StreamHandleRef response_stream_wrapper_;
+  RequestStreamHandleRef request_stream_wrapper_;
+  ResponseStreamHandleRef response_stream_wrapper_;
   bool destroyed_{};
 };
 
