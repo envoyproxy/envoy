@@ -304,14 +304,17 @@ void SseEventDecoder::finishFrame(std::vector<SseEventPtr>& out) {
   }
 
   auto event = std::make_unique<SseEvent>();
-  ASSERT(event->set_event(event_).ok());
-  ASSERT(event->set_id(id_).ok());
+  const absl::Status event_status = event->set_event(event_);
+  ASSERT(event_status.ok());
+  const absl::Status id_status = event->set_id(id_);
+  ASSERT(id_status.ok());
   if (extras_store_ != nullptr) {
     // No more lines belong to this frame, so nothing more will be appended.
     extras_store_->endStream();
     event->set_extras_store(std::move(extras_store_));
   }
-  ASSERT(event->set_retry(retry_raw_).ok());
+  const absl::Status retry_status = event->set_retry(retry_raw_);
+  ASSERT(retry_status.ok());
 
   if (has_data_ && data_store_ == nullptr) {
     // A `data:` field with nothing after it: the frame carries data, but no payload byte ever

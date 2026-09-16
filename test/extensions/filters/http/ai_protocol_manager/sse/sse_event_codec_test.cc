@@ -708,30 +708,36 @@ TEST_F(SseEventDecoderTest, PartialUtf8BomAtEofIsNotDropped) {
 // InvalidArgumentError without mutating the field), and serialization forbids CR in raw_data.
 TEST_F(SseCodecBufferTest, ForbidsCrOrLfInMetadataSettersAndCrInRawData) {
   SseEvent event;
-  EXPECT_DEBUG_DEATH(
-      EXPECT_EQ(event.set_event("bad\nevent").code(), absl::StatusCode::kInvalidArgument), ".*");
+  EXPECT_ENVOY_BUG(
+      EXPECT_EQ(event.set_event("bad\nevent").code(), absl::StatusCode::kInvalidArgument),
+      "SSE event field must not contain CR or LF");
   EXPECT_TRUE(event.event().empty());
 
-  EXPECT_DEBUG_DEATH(EXPECT_EQ(event.set_id("bad\rid").code(), absl::StatusCode::kInvalidArgument),
-                     ".*");
+  EXPECT_ENVOY_BUG(EXPECT_EQ(event.set_id("bad\rid").code(), absl::StatusCode::kInvalidArgument),
+                   "SSE id field must not contain CR or LF");
   EXPECT_TRUE(event.id().empty());
 
-  EXPECT_DEBUG_DEATH(
-      EXPECT_EQ(event.set_retry("100\r\n").code(), absl::StatusCode::kInvalidArgument), ".*");
+  EXPECT_ENVOY_BUG(
+      EXPECT_EQ(event.set_retry("100\r\n").code(), absl::StatusCode::kInvalidArgument),
+      "SSE retry field must not contain CR or LF");
   EXPECT_TRUE(event.retry().empty());
 
+#if !defined(NDEBUG)
   auto raw = std::make_unique<Buffer::OwnedImpl>();
   raw->add("line1\r\nline2");
   event.set_raw_data(std::move(raw));
   EXPECT_DEBUG_DEATH(serialize(event), ".*");
+#endif
 }
 
 // ExternalRef ranges in raw_data_ext_refs() assert non-null payload_store and are range-checked by
 // ReplayAwaitable.
 TEST_F(SseCodecBufferTest, RejectsOutOfBoundsExternalRefViaReplayAwaitable) {
+#if !defined(NDEBUG)
   SseEvent null_store_event;
   null_store_event.set_raw_data_ext_refs({JsonWithExtBuf::ExternalRef{0, 10}});
   EXPECT_DEBUG_DEATH(serialize(null_store_event), ".*");
+#endif
 
   SseEvent out_of_bounds_event;
   auto store = std::make_shared<BufferManager>(BufferManager::Config{}, factory_, bridge_);
