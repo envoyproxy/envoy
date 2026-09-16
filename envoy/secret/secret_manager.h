@@ -1,7 +1,9 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
@@ -172,6 +174,30 @@ public:
                                     const std::string& config_name,
                                     Server::Configuration::ServerFactoryContext& server_context,
                                     OptRef<Init::Manager> init_manager) PURE;
+
+  /**
+   * @return the names of the dynamic TLS certificate secrets that are currently active (delivered,
+   * not warming).
+   */
+  virtual std::vector<std::string> dynamicActiveTlsCertificateSecretNames() const PURE;
+
+  /**
+   * Callback invoked on the main thread each time a dynamic TLS certificate secret provider is
+   * created, carrying the secret's config name and the provider. Observers typically subscribe to
+   * the provider's update/remove callbacks to learn when the secret becomes active or is removed.
+   */
+  using DynamicTlsCertificateSecretProviderCreatedCb = std::function<void(
+      const std::string& name, const TlsCertificateConfigProviderSharedPtr& provider)>;
+
+  /**
+   * Registers a callback invoked when a dynamic TLS certificate secret provider is created. On
+   * registration the callback is also invoked once for every provider that already exists, so an
+   * observer sees every provider regardless of whether it predates registration. At most one
+   * callback is held; a later call replaces the earlier one. Default is a no-op so only
+   * implementations that support secret lifecycle observation need override it.
+   */
+  virtual void setDynamicTlsCertificateSecretProviderCreatedCallback(
+      DynamicTlsCertificateSecretProviderCreatedCb) {}
 };
 
 using SecretManagerPtr = std::unique_ptr<SecretManager>;

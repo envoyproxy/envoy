@@ -59,7 +59,11 @@ test_program(name = "bootstrap_admin_handler_test")
 
 test_program(name = "bootstrap_cluster_lifecycle_test")
 
+test_program(name = "bootstrap_config_names_test")
+
 test_program(name = "bootstrap_listener_lifecycle_test")
+
+test_program(name = "bootstrap_secret_lifecycle_test")
 
 test_program(name = "network_integration_test")
 

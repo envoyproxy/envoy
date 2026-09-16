@@ -23,6 +23,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -1919,6 +1920,21 @@ TEST_F(BootstrapAbiImplTest, MetricsConcurrentIncrementCounterVecNoRace) {
   for (auto& th : threads) {
     th.join();
   }
+}
+
+// A transport socket match is observed only when present in every cluster that has matches, so a
+// match is reported only once it appears in all the clusters that carry per-endpoint matches.
+TEST_F(BootstrapAbiImplTest, TransportSocketMatchIntersection) {
+  using Config = DynamicModuleBootstrapExtensionConfig;
+  EXPECT_THAT(Config::transportSocketMatchIntersection({}), testing::IsEmpty());
+  EXPECT_THAT(Config::transportSocketMatchIntersection({{"a", "b"}}),
+              testing::UnorderedElementsAre("a", "b"));
+  EXPECT_THAT(Config::transportSocketMatchIntersection({{"a", "b", "c"}, {"b", "c"}, {"b", "d"}}),
+              testing::UnorderedElementsAre("b"));
+  // Clusters with no matches are skipped and do not zero the intersection.
+  EXPECT_THAT(Config::transportSocketMatchIntersection({{"a", "b"}, {}, {"a"}}),
+              testing::UnorderedElementsAre("a"));
+  EXPECT_THAT(Config::transportSocketMatchIntersection({{}, {}}), testing::IsEmpty());
 }
 
 } // namespace DynamicModules
