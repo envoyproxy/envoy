@@ -23,6 +23,16 @@ public:
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
+          auto* route_config = hcm.mutable_route_config();
+          ASSERT_EQ(1, route_config->virtual_hosts_size());
+          auto* virtual_host = route_config->mutable_virtual_hosts(0);
+          virtual_host->set_name("test_vhost");
+          auto* virtual_cluster = virtual_host->add_virtual_clusters();
+          virtual_cluster->set_name("test_vcluster");
+          auto* header = virtual_cluster->add_headers();
+          header->set_name(":path");
+          header->mutable_string_match()->set_exact("/test");
+
           constexpr auto config = R"EOF(
 name: envoy.access_loggers.dynamic_modules
 typed_config:

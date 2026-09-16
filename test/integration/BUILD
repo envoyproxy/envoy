@@ -1634,6 +1634,7 @@ envoy_cc_test_library(
         "//test/test_common:test_time_system_interface",
         "//test/test_common:thread_factory_for_test_lib",
         "@abseil-cpp//absl/synchronization",
+        "@abseil-cpp//absl/types:variant",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
@@ -1985,6 +1986,7 @@ envoy_cc_test(
     deps = [
         ":base_overload_integration_test_lib",
         ":http_protocol_integration_lib",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration/filters:block_filter_lib",
         "//test/test_common:test_runtime_lib",

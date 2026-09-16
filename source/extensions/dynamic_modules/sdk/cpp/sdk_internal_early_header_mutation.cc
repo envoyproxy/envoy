@@ -8,6 +8,7 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "sdk_early_header_mutation.h"
+#include "sdk_internal_common.h"
 
 namespace Envoy {
 namespace DynamicModules {
@@ -192,7 +193,7 @@ public:
 
   void log(LogLevel level, std::string_view message, std::source_location location) override {
     const std::string_view source_file(location.file_name());
-    envoy_dynamic_module_callback_log(
+    envoy_dynamic_module_callback_log_v2(
         static_cast<envoy_dynamic_module_type_log_level>(level),
         envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
         envoy_dynamic_module_type_module_buffer{source_file.data(), source_file.size()},
@@ -204,7 +205,8 @@ private:
   EarlyHeaderMutationHeaderMapImpl request_headers_;
 };
 
-class EarlyHeaderMutationConfigHandleImpl : public EarlyHeaderMutationConfigHandle {
+class EarlyHeaderMutationConfigHandleImpl
+    : public CommonHandleImpl<EarlyHeaderMutationConfigHandle> {
 public:
   // Early header mutation exposes no config-scoped callbacks, so the Envoy config pointer is not
   // retained.
@@ -218,7 +220,7 @@ public:
 
   void log(LogLevel level, std::string_view message, std::source_location location) override {
     const std::string_view source_file(location.file_name());
-    envoy_dynamic_module_callback_log(
+    envoy_dynamic_module_callback_log_v2(
         static_cast<envoy_dynamic_module_type_log_level>(level),
         envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
         envoy_dynamic_module_type_module_buffer{source_file.data(), source_file.size()},

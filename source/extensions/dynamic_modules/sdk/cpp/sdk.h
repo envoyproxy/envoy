@@ -14,6 +14,8 @@
 #include <string_view>
 #include <vector>
 
+#include "sdk_common.h"
+
 namespace Envoy {
 namespace DynamicModules {
 
@@ -248,7 +250,8 @@ enum class AttributeID : uint32_t {
   XdsUpstreamHostMetadata,
   XdsFilterChainName,
   HealthCheck,
-  UpstreamRequestedServerName
+  UpstreamRequestedServerName,
+  XdsVirtualClusterName
 };
 
 enum class LogLevel : uint32_t { Trace, Debug, Info, Warn, Error, Critical, Off };
@@ -1016,9 +1019,9 @@ public:
                    std::source_location location = std::source_location::current()) = 0;
 };
 
-class HttpFilterConfigHandle {
+class HttpFilterConfigHandle : public CommonHandle {
 public:
-  virtual ~HttpFilterConfigHandle();
+  ~HttpFilterConfigHandle() override;
 
   /**
    * Defines a histogram metric with a name and optional tag keys.

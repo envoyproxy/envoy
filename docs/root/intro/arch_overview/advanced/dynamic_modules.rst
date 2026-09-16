@@ -59,10 +59,47 @@ Envoy binary that loads it.
 Envoy's dynamic modules have stricter compatibility requirements than Envoy's other extension mechanisms, such as Lua, Wasm or External Processor.
 Stabilizing the ABI is challenging due to the way the ABI needs to be tightly coupled to Envoy's internals.
 
-Currently, we guarantee **forward compatibility within one version**: a dynamic module built with the SDK for Envoy version X.Y will work with Envoy versions X.Y and X.(Y+1).
-Breaking changes to the ABI may occur in later versions.
+The ABI therefore follows a strict no-breaking-change policy. The rules below are what you can rely
+on as a module author. The full version, including the process a contributor must follow when
+changing the ABI, is documented at the top of the
+:repo:`ABI header <source/extensions/dynamic_modules/abi/abi.h>`.
 
-To ensure compatibility, it is recommended to rebuild your dynamic modules with the SDK matching your target Envoy version in a timely manner.
+**Released ABI is frozen.**
+Once a function, type or struct in the ABI has shipped in an Envoy release, it never changes. That
+covers its name, its signature, its struct layout and enum numbering, and its documented semantics,
+including ownership, buffer lifetime, threading constraints, whether a value may be null, and the
+meaning of each return value. A module compiled against the old documentation stays correct.
+
+**The ABI grows by addition, not by mutation.**
+When an existing function or type needs a different signature or different behavior, a new one is
+added alongside it. This is usually the old name with a numeric suffix such as ``_v2`` or ``_v3``.
+It can instead be a different descriptive name where the concept itself changed and a suffix would
+be misleading. The original keeps working exactly as before.
+
+**Superseded ABI is deprecated for at least four Envoy release cycles.**
+The old entity is marked ``@deprecated`` in the ABI header, naming its replacement and the earliest
+version it may be removed in, and the corresponding SDK wrappers are deprecated too, so you get a
+compile-time warning rather than discovering the removal at runtime. It then keeps working,
+unchanged, for at least four Envoy release cycles, roughly one year, before it may be removed.
+Removals are announced in the release notes.
+
+**The one exception is ABI that has never been released.**
+An entity added to ``main`` since the last release branch was cut is still under development and may
+change, be renamed or disappear without notice until the release branch that first contains it is
+cut. Only entities that have shipped in a release carry the guarantees above.
+
+As a result, a dynamic module built with the SDK for Envoy version X.Y keeps working with later
+Envoy versions, and you have at least four release cycles to migrate away from anything that gets
+deprecated. Rebuilding your modules against a recent SDK is still recommended, since new
+functionality is only available through newly added ABI entities.
+
+.. note::
+
+  The ``ENVOY_DYNAMIC_MODULES_ABI_VERSION`` string in the ABI header is not part of the policy
+  above and is **not** a compatibility gate. It only reflects changes to the header itself, and
+  Envoy never strictly validates it. A module reports the value it was built against from
+  ``envoy_dynamic_module_on_program_init``, and if that differs from Envoy's own value Envoy logs
+  it and loads the module anyway. Neither Envoy nor your module should depend on it.
 
 Module discovery
 --------------------------

@@ -402,6 +402,12 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsInvalidId) {
             envoy_dynamic_module_callback_listener_filter_set_gauge(
                 static_cast<void*>(filter.get()), 999, 1));
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_increment_gauge(
+                static_cast<void*>(filter.get()), 999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_decrement_gauge(
+                static_cast<void*>(filter.get()), 999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_listener_filter_record_histogram_value(
                 static_cast<void*>(filter.get()), 999, 1));
 }
