@@ -34,8 +34,10 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/network:utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",
+        "//source/extensions/common/dynamic_forward_proxy:dynamic_host_candidates_lib",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/mocks/http:http_mocks",
