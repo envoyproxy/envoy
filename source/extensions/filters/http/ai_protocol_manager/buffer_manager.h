@@ -363,6 +363,8 @@ private:
   // back-pressure until onWriteComplete() fires. Zero when no write is in flight.
   uint64_t in_flight_write_size_{0};
 
+  // Keep track of where the current in-progress replay is sourced from: replay() or inject().
+  // None means there isn't an on going replay.
   enum class ReplaySource { None, ExternalBuffer, Injected };
   ReplaySource replay_source_{ReplaySource::None};
   Buffer::OwnedImpl inject_data_;
