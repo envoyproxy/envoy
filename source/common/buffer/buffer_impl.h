@@ -39,9 +39,45 @@ public:
   using Reservation = RawSlice;
   using StoragePtr = std::unique_ptr<uint8_t[]>;
 
+  /**
+   * Owned allocation of len_ bytes at mem_. release() transfers ownership into
+   * a StoragePtr. counted_by is inert on compilers that do not support it.
+   */
   struct SizedStorage {
-    StoragePtr mem_;
     size_t len_{};
+    uint8_t* mem_
+#if defined(__has_attribute) && __has_attribute(__counted_by__)
+        __attribute__((__counted_by__(len_)))
+#endif
+        = nullptr;
+
+    SizedStorage() = default;
+    SizedStorage(StoragePtr ptr, size_t len) : len_(len), mem_(ptr.release()) {}
+    SizedStorage(SizedStorage&& other) noexcept : len_(other.len_), mem_(other.mem_) {
+      other.len_ = 0;
+      other.mem_ = nullptr;
+    }
+    SizedStorage& operator=(SizedStorage&& other) noexcept {
+      if (this != &other) {
+        delete[] mem_;
+        len_ = other.len_;
+        mem_ = other.mem_;
+        other.len_ = 0;
+        other.mem_ = nullptr;
+      }
+      return *this;
+    }
+    ~SizedStorage() { delete[] mem_; }
+    SizedStorage(const SizedStorage&) = delete;
+    SizedStorage& operator=(const SizedStorage&) = delete;
+
+    /** Transfer ownership of mem_ into a StoragePtr; clears this. */
+    StoragePtr release() {
+      StoragePtr ptr(mem_);
+      mem_ = nullptr;
+      len_ = 0;
+      return ptr;
+    }
   };
 
   /**
@@ -73,7 +109,7 @@ public:
    * @param account the account to charge.
    */
   Slice(SizedStorage storage, uint64_t used_size, const BufferMemoryAccountSharedPtr& account)
-      : capacity_(storage.len_), storage_(std::move(storage.mem_)), base_(storage_.get()),
+      : capacity_(storage.len_), storage_(storage.release()), base_(storage_.get()),
         reservable_(used_size) {
     ASSERT(sliceSize(capacity_) == capacity_);
     ASSERT(reservable_ <= capacity_);
@@ -783,7 +819,7 @@ private:
         if (r->mem_ != nullptr) {
           ASSERT(r->len_ == Slice::default_slice_size_);
           if (free_list_ref_.size() < free_list_max_) {
-            free_list_ref_.push_back(std::move(r->mem_));
+            free_list_ref_.push_back(r->release());
           }
         }
       }
@@ -792,15 +828,12 @@ private:
     Slice::SizedStorage newStorage() {
       ASSERT(Slice::sliceSize(Slice::default_slice_size_) == Slice::default_slice_size_);
 
-      Slice::SizedStorage storage{nullptr, Slice::default_slice_size_};
       if (!free_list_ref_.empty()) {
-        storage.mem_ = std::move(free_list_ref_.back());
+        Slice::SizedStorage storage{std::move(free_list_ref_.back()), Slice::default_slice_size_};
         free_list_ref_.pop_back();
-      } else {
-        storage.mem_.reset(new uint8_t[Slice::default_slice_size_]);
+        return storage;
       }
-
-      return storage;
+      return {StoragePtr{new uint8_t[Slice::default_slice_size_]}, Slice::default_slice_size_};
     }
 
     absl::Span<Slice::SizedStorage> ownedStorages() override {
