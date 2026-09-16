@@ -717,9 +717,8 @@ TEST_F(SseCodecBufferTest, ForbidsCrOrLfInMetadataSettersAndCrInRawData) {
                    "SSE id field must not contain CR or LF");
   EXPECT_TRUE(event.id().empty());
 
-  EXPECT_ENVOY_BUG(
-      EXPECT_EQ(event.set_retry("100\r\n").code(), absl::StatusCode::kInvalidArgument),
-      "SSE retry field must not contain CR or LF");
+  EXPECT_ENVOY_BUG(EXPECT_EQ(event.set_retry("100\r\n").code(), absl::StatusCode::kInvalidArgument),
+                   "SSE retry field must not contain CR or LF");
   EXPECT_TRUE(event.retry().empty());
 
 #if !defined(NDEBUG)
