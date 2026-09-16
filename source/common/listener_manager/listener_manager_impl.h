@@ -383,7 +383,11 @@ private:
 
   void maybeCloseSocketsForListener(ListenerImpl& listener);
   absl::Status setupSocketFactoryForListener(ListenerImpl& new_listener,
-                                             const ListenerImpl& existing_listener);
+                                             const ListenerImpl& existing_listener,
+                                             bool in_place_update);
+
+  absl::Status initializeWorkerRoutingForUdpListener(ListenerImpl& new_listener,
+                                                     bool in_place_update);
 
   ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.
