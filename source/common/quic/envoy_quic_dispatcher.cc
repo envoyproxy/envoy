@@ -144,7 +144,7 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       listener_config_->listenerScope(), crypto_server_stream_factory_, std::move(stream_info),
       connection_stats_, debug_visitor_factory_, session_idle_list_.get());
   quic_session->setH3GoAwayLoadShedPoints(h3_go_away_and_close_on_dispatch_,
-                                         h3_go_away_on_dispatch_);
+                                          h3_go_away_on_dispatch_);
   if (filter_chain != nullptr) {
     // Setup filter chain before Initialize().
     const bool has_filter_initialized =
@@ -289,19 +289,16 @@ void EnvoyQuicDispatcher::configureLoadShedPoints(
 }
 
 quic::QuicDispatcher::QuicPacketFate
-EnvoyQuicDispatcher::ValidityChecksOnFullChlo(
-    const quic::ReceivedPacketInfo& packet_info,
-    const quic::ParsedClientHello& parsed_chlo) const {
+EnvoyQuicDispatcher::ValidityChecksOnFullChlo(const quic::ReceivedPacketInfo& packet_info,
+                                              const quic::ParsedClientHello& parsed_chlo) const {
   if (quic::QuicDispatcher::QuicPacketFate fate =
-          quic::QuicDispatcher::ValidityChecksOnFullChlo(packet_info,
-                                                         parsed_chlo);
+          quic::QuicDispatcher::ValidityChecksOnFullChlo(packet_info, parsed_chlo);
       fate != quic::QuicDispatcher::kFateProcess) {
     return fate;
   }
   if ((h3_go_away_and_close_on_dispatch_ != nullptr &&
        h3_go_away_and_close_on_dispatch_->shouldShedLoad()) ||
-      (h3_go_away_on_dispatch_ != nullptr &&
-       h3_go_away_on_dispatch_->shouldShedLoad())) {
+      (h3_go_away_on_dispatch_ != nullptr && h3_go_away_on_dispatch_->shouldShedLoad())) {
     listener_stats_.downstream_cx_overload_reject_.inc();
     return quic::QuicDispatcher::kFateTimeWait;
   }
