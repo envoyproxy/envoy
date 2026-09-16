@@ -429,6 +429,40 @@ TEST_F(GeoipFilterTest, ClientIpFormatterAccessor) {
   EXPECT_NE(nullptr, config_->clientIpFormatter());
 }
 
+// A geolocation lookup needs an IP address, and the downstream connection address is not
+// necessarily one. The filter must skip the lookup rather than pass a non-IP address to the
+// provider, which asserts on one.
+class GeoipFilterNonIpAddressTest : public GeoipFilterTest {
+public:
+  void expectLookupSkipped(Network::Address::InstanceConstSharedPtr remote_address) {
+    initializeProviderFactory();
+    initializeFilter(BasicGeoipConfig);
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(remote_address);
+    // No lookup is attempted, so nothing is counted as a completed lookup either.
+    expectStatsTotalIncremented(0);
+    EXPECT_CALL(stats_, counter("prefix.geoip.skipped"));
+    EXPECT_CALL(*dummy_driver_, lookup(_, _)).Times(0);
+    EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+    EXPECT_FALSE(filter_state_->hasData<GeoipInfo>(std::string(GeoipFilterStateKey)));
+  }
+};
+
+TEST_F(GeoipFilterNonIpAddressTest, SkipLookupForNonIpDownstreamAddress) {
+  expectLookupSkipped(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_address_for_test"));
+}
+
+TEST_F(GeoipFilterNonIpAddressTest, SkipLookupForPipeDownstreamAddress) {
+  auto pipe_or_error = Network::Address::PipeInstance::create("/tmp/envoy_geoip_test.sock");
+  ASSERT_TRUE(pipe_or_error.ok());
+  expectLookupSkipped(std::move(*pipe_or_error));
+}
+
+TEST_F(GeoipFilterNonIpAddressTest, SkipLookupForNullDownstreamAddress) {
+  expectLookupSkipped(nullptr);
+}
+
 } // namespace
 } // namespace Geoip
 } // namespace NetworkFilters

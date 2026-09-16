@@ -24,6 +24,7 @@ GeoipFilterConfig::GeoipFilterConfig(
                                    config.custom_header_config().header_name())
                              : std::nullopt) {
   stat_name_set_->rememberBuiltin("total");
+  stat_name_set_->rememberBuiltin("skipped");
 }
 
 void GeoipFilterConfig::incCounter(Stats::StatName name) {
@@ -36,7 +37,7 @@ GeoipFilter::GeoipFilter(GeoipFilterConfigSharedPtr config, Geolocation::DriverS
 
 GeoipFilter::~GeoipFilter() = default;
 
-void GeoipFilter::onDestroy() {}
+void GeoipFilter::onDestroy() { destroyed_ = true; }
 
 Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Save request headers for later header manipulation once geolocation lookups are complete.
@@ -66,6 +67,16 @@ Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // or if extraction from the configured source failed.
   if (!remote_address) {
     remote_address = decoder_callbacks_->streamInfo().downstreamAddressProvider().remoteAddress();
+  }
+
+  // A geolocation lookup needs an IP address, and the downstream connection address is not
+  // necessarily one: a connection accepted on an internal listener carries an Envoy internal
+  // address, and a Unix domain socket carries a pipe address. Skip the lookup rather than hand
+  // either to the provider, and let the request through untouched.
+  if (remote_address == nullptr || remote_address->ip() == nullptr) {
+    ENVOY_LOG(debug, "Geoip filter: skipping lookup, no IP address available for the request");
+    config_->incSkipped();
+    return Http::FilterHeadersStatus::Continue;
   }
 
   ASSERT(driver_, "No driver is available to perform geolocation lookup");
@@ -102,6 +113,13 @@ void GeoipFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& 
 }
 
 void GeoipFilter::onLookupComplete(Geolocation::LookupResult&& result) {
+  // The lookup may complete after the stream has been torn down: the posted callback holds a
+  // shared_ptr to this filter, so it stays alive, but the decoder callbacks and the request headers
+  // it refers to do not. Drop the result rather than continue decoding a stream that is gone.
+  if (destroyed_) {
+    ENVOY_LOG(debug, "Geoip filter: stream destroyed before lookup completed, dropping result");
+    return;
+  }
   ASSERT(request_headers_);
   for (auto it = result.cbegin(); it != result.cend();) {
     const auto& geo_header = it->first;

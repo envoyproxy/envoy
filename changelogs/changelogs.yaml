@@ -64,6 +64,8 @@ areas:
     title: dynamic_modules
   gcp_authn:
     title: gcp_authn
+  geoip:
+    title: geoip
   golang:
     title: golang
   http:

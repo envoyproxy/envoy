@@ -207,78 +207,64 @@ void GeoipProviderConfig::setGuage(Stats::StatName name, const uint64_t value) {
   stats_scope_->gaugeFromStatName(name, Stats::Gauge::ImportMode::Accumulate).set(value);
 }
 
-GeoipProvider::GeoipProvider(Event::Dispatcher& dispatcher, Api::Api& api,
-                             Singleton::InstanceSharedPtr owner,
+GeoipProvider::GeoipProvider(Event::Dispatcher& dispatcher, Singleton::InstanceSharedPtr owner,
                              GeoipProviderConfigSharedPtr config)
     : config_(config), owner_(owner) {
-  city_db_ =
-      config_->cityDbPath() ? initMaxmindDb(config_->cityDbPath().value(), CITY_DB_TYPE) : nullptr;
-  isp_db_ =
-      config_->ispDbPath() ? initMaxmindDb(config_->ispDbPath().value(), ISP_DB_TYPE) : nullptr;
-  anon_db_ =
-      config_->anonDbPath() ? initMaxmindDb(config_->anonDbPath().value(), ANON_DB_TYPE) : nullptr;
-  asn_db_ =
-      config_->asnDbPath() ? initMaxmindDb(config_->asnDbPath().value(), ASN_DB_TYPE) : nullptr;
-  country_db_ = config_->countryDbPath()
-                    ? initMaxmindDb(config_->countryDbPath().value(), COUNTRY_DB_TYPE)
-                    : nullptr;
-  mmdb_reload_dispatcher_ = api.allocateDispatcher("mmdb_reload_routine");
-  mmdb_watcher_ = dispatcher.createFilesystemWatcher();
-  mmdb_reload_thread_ = api.threadFactory().createThread(
-      [this]() -> void {
-        ENVOY_LOG_MISC(debug, "Started mmdb_reload_routine");
-        if (config_->cityDbPath()) {
-          THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-              config_->cityDbPath().value(), Filesystem::Watcher::Events::MovedTo,
-              [this](uint32_t) {
-                return onMaxmindDbUpdate(config_->cityDbPath().value(), CITY_DB_TYPE);
-              }));
-        }
-        if (config_->ispDbPath()) {
-          THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-              config_->ispDbPath().value(), Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
-                return onMaxmindDbUpdate(config_->ispDbPath().value(), ISP_DB_TYPE);
-              }));
-        }
-        if (config_->anonDbPath()) {
-          THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-              config_->anonDbPath().value(), Filesystem::Watcher::Events::MovedTo,
-              [this](uint32_t) {
-                return onMaxmindDbUpdate(config_->anonDbPath().value(), ANON_DB_TYPE);
-              }));
-        }
-        if (config_->asnDbPath()) {
-          THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-              config_->asnDbPath().value(), Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
-                return onMaxmindDbUpdate(config_->asnDbPath().value(), ASN_DB_TYPE);
-              }));
-        }
-        if (config_->countryDbPath()) {
-          THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-              config_->countryDbPath().value(), Filesystem::Watcher::Events::MovedTo,
-              [this](uint32_t) {
-                return onMaxmindDbUpdate(config_->countryDbPath().value(), COUNTRY_DB_TYPE);
-              }));
-        }
-        mmdb_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-      },
-      Thread::Options{std::string("mmdb_reload_routine")});
-};
+  // A database that cannot be opened at startup is a configuration error: the provider would have
+  // nothing to serve lookups from. Reject the configuration rather than run without it.
+  const auto load_db = [this](const std::optional<std::string>& db_path,
+                              absl::string_view db_type) -> MaxmindDbSharedPtr {
+    if (!db_path.has_value()) {
+      return nullptr;
+    }
+    absl::StatusOr<MaxmindDbSharedPtr> db_or_error = initMaxmindDb(db_path.value(), db_type);
+    THROW_IF_NOT_OK_REF(db_or_error.status());
+    return std::move(db_or_error.value());
+  };
 
-GeoipProvider::~GeoipProvider() {
-  ENVOY_LOG(debug, "Shutting down Maxmind geolocation provider");
-  if (mmdb_reload_dispatcher_) {
-    mmdb_reload_dispatcher_->exit();
+  city_db_ = load_db(config_->cityDbPath(), CITY_DB_TYPE);
+  isp_db_ = load_db(config_->ispDbPath(), ISP_DB_TYPE);
+  anon_db_ = load_db(config_->anonDbPath(), ANON_DB_TYPE);
+  asn_db_ = load_db(config_->asnDbPath(), ASN_DB_TYPE);
+  country_db_ = load_db(config_->countryDbPath(), COUNTRY_DB_TYPE);
+  mmdb_watcher_ = dispatcher.createFilesystemWatcher();
+  if (config_->cityDbPath()) {
+    THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
+        config_->cityDbPath().value(), Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
+          return onMaxmindDbUpdate(config_->cityDbPath().value(), CITY_DB_TYPE);
+        }));
   }
-  if (mmdb_reload_thread_) {
-    mmdb_reload_thread_->join();
-    mmdb_reload_thread_.reset();
+  if (config_->ispDbPath()) {
+    THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
+        config_->ispDbPath().value(), Filesystem::Watcher::Events::MovedTo,
+        [this](uint32_t) { return onMaxmindDbUpdate(config_->ispDbPath().value(), ISP_DB_TYPE); }));
+  }
+  if (config_->anonDbPath()) {
+    THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
+        config_->anonDbPath().value(), Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
+          return onMaxmindDbUpdate(config_->anonDbPath().value(), ANON_DB_TYPE);
+        }));
+  }
+  if (config_->asnDbPath()) {
+    THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
+        config_->asnDbPath().value(), Filesystem::Watcher::Events::MovedTo,
+        [this](uint32_t) { return onMaxmindDbUpdate(config_->asnDbPath().value(), ASN_DB_TYPE); }));
+  }
+  if (config_->countryDbPath()) {
+    THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
+        config_->countryDbPath().value(), Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
+          return onMaxmindDbUpdate(config_->countryDbPath().value(), COUNTRY_DB_TYPE);
+        }));
   }
 }
+
+GeoipProvider::~GeoipProvider() { ENVOY_LOG(debug, "Shutting down Maxmind geolocation provider"); }
 
 void GeoipProvider::lookup(Geolocation::LookupRequest&& request,
                            Geolocation::LookupGeoHeadersCallback&& cb) const {
   auto& remote_address = request.remoteAddress();
+  ASSERT(remote_address != nullptr && remote_address->ip() != nullptr,
+         "geolocation lookup requires an IP address");
   auto lookup_result = absl::flat_hash_map<std::string, std::string>{};
   lookupInCountryDb(remote_address, lookup_result);
   lookupInCityDb(remote_address, lookup_result);
@@ -488,54 +474,38 @@ void GeoipProvider::lookupInCountryDb(
   }
 }
 
-MaxmindDbSharedPtr GeoipProvider::initMaxmindDb(const std::string& db_path,
-                                                const absl::string_view& db_type, bool reload) {
+absl::StatusOr<MaxmindDbSharedPtr> GeoipProvider::initMaxmindDb(const std::string& db_path,
+                                                                absl::string_view db_type) {
   MMDB_s maxmind_db;
-  int result_code = MMDB_open(db_path.c_str(), MMDB_MODE_MMAP, &maxmind_db);
-
-  if (reload && MMDB_SUCCESS != result_code) {
-    ENVOY_LOG(error, "Failed to reload Maxmind database {} from file {}. Error {}", db_type,
-              db_path, std::string(MMDB_strerror(result_code)));
-    return nullptr;
-  } else if (MMDB_SUCCESS != result_code) {
-    // Crash if this is a failure during initial load.
-    RELEASE_ASSERT(MMDB_SUCCESS == result_code,
-                   fmt::format("Unable to open Maxmind database file {}. Error {}", db_path,
-                               std::string(MMDB_strerror(result_code))));
-    return nullptr;
+  const int result_code = MMDB_open(db_path.c_str(), MMDB_MODE_MMAP, &maxmind_db);
+  if (MMDB_SUCCESS != result_code) {
+    return absl::InvalidArgumentError(fmt::format(
+        "Unable to open Maxmind database file {}. Error {}", db_path, MMDB_strerror(result_code)));
   }
 
   config_->setDbBuildEpoch(db_type, maxmind_db.metadata.build_epoch);
 
-  ENVOY_LOG(info, "Succeeded to reload Maxmind database {} from file {}.", db_type, db_path);
+  ENVOY_LOG(info, "Loaded Maxmind database {} from file {}.", db_type, db_path);
   return std::make_shared<MaxmindDb>(std::move(maxmind_db));
 }
 
-absl::Status GeoipProvider::mmdbReload(const MaxmindDbSharedPtr reloaded_db,
-                                       const absl::string_view& db_type) {
-  if (reloaded_db) {
-    if (db_type == CITY_DB_TYPE) {
-      updateCityDb(reloaded_db);
-      config_->incDbReloadSuccess(db_type);
-    } else if (db_type == ISP_DB_TYPE) {
-      updateIspDb(reloaded_db);
-      config_->incDbReloadSuccess(db_type);
-    } else if (db_type == ANON_DB_TYPE) {
-      updateAnonDb(reloaded_db);
-      config_->incDbReloadSuccess(db_type);
-    } else if (db_type == ASN_DB_TYPE) {
-      updateAsnDb(reloaded_db);
-      config_->incDbReloadSuccess(db_type);
-    } else if (db_type == COUNTRY_DB_TYPE) {
-      updateCountryDb(reloaded_db);
-      config_->incDbReloadSuccess(db_type);
-    } else {
-      ENVOY_LOG(error, "Unsupported maxmind db type {}", db_type);
-      return absl::InvalidArgumentError(fmt::format("Unsupported maxmind db type {}", db_type));
-    }
+absl::Status GeoipProvider::mmdbReload(MaxmindDbSharedPtr reloaded_db, absl::string_view db_type) {
+  ASSERT(reloaded_db != nullptr);
+  if (db_type == CITY_DB_TYPE) {
+    updateCityDb(std::move(reloaded_db));
+  } else if (db_type == ISP_DB_TYPE) {
+    updateIspDb(std::move(reloaded_db));
+  } else if (db_type == ANON_DB_TYPE) {
+    updateAnonDb(std::move(reloaded_db));
+  } else if (db_type == ASN_DB_TYPE) {
+    updateAsnDb(std::move(reloaded_db));
+  } else if (db_type == COUNTRY_DB_TYPE) {
+    updateCountryDb(std::move(reloaded_db));
   } else {
-    config_->incDbReloadError(db_type);
+    ENVOY_LOG(error, "Unsupported maxmind db type {}", db_type);
+    return absl::InvalidArgumentError(fmt::format("Unsupported maxmind db type {}", db_type));
   }
+  config_->incDbReloadSuccess(db_type);
   return absl::OkStatus();
 }
 
@@ -546,7 +516,7 @@ MaxmindDbSharedPtr GeoipProvider::getCityDb() const ABSL_LOCKS_EXCLUDED(mmdb_mut
 
 void GeoipProvider::updateCityDb(MaxmindDbSharedPtr city_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
   absl::MutexLock lock(mmdb_mutex_);
-  city_db_ = city_db;
+  city_db_ = std::move(city_db);
 }
 
 MaxmindDbSharedPtr GeoipProvider::getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
@@ -556,7 +526,7 @@ MaxmindDbSharedPtr GeoipProvider::getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mute
 
 void GeoipProvider::updateIspDb(MaxmindDbSharedPtr isp_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
   absl::MutexLock lock(mmdb_mutex_);
-  isp_db_ = isp_db;
+  isp_db_ = std::move(isp_db);
 }
 
 MaxmindDbSharedPtr GeoipProvider::getAsnDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
@@ -566,7 +536,7 @@ MaxmindDbSharedPtr GeoipProvider::getAsnDb() const ABSL_LOCKS_EXCLUDED(mmdb_mute
 
 void GeoipProvider::updateAsnDb(MaxmindDbSharedPtr asn_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
   absl::MutexLock lock(mmdb_mutex_);
-  asn_db_ = asn_db;
+  asn_db_ = std::move(asn_db);
 }
 
 MaxmindDbSharedPtr GeoipProvider::getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
@@ -576,7 +546,7 @@ MaxmindDbSharedPtr GeoipProvider::getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mut
 
 void GeoipProvider::updateAnonDb(MaxmindDbSharedPtr anon_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
   absl::MutexLock lock(mmdb_mutex_);
-  anon_db_ = anon_db;
+  anon_db_ = std::move(anon_db);
 }
 
 MaxmindDbSharedPtr GeoipProvider::getCountryDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
@@ -587,13 +557,26 @@ MaxmindDbSharedPtr GeoipProvider::getCountryDb() const ABSL_LOCKS_EXCLUDED(mmdb_
 void GeoipProvider::updateCountryDb(MaxmindDbSharedPtr country_db)
     ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
   absl::MutexLock lock(mmdb_mutex_);
-  country_db_ = country_db;
+  country_db_ = std::move(country_db);
 }
 
 absl::Status GeoipProvider::onMaxmindDbUpdate(const std::string& db_path,
-                                              const absl::string_view& db_type) {
-  MaxmindDbSharedPtr reloaded_db = initMaxmindDb(db_path, db_type, true /* reload */);
-  return mmdbReload(reloaded_db, db_type);
+                                              absl::string_view db_type) {
+  absl::StatusOr<MaxmindDbSharedPtr> reloaded_db = initMaxmindDb(db_path, db_type);
+  absl::Status status = absl::OkStatus();
+  if (reloaded_db.ok()) {
+    status = mmdbReload(std::move(reloaded_db.value()), db_type);
+  } else {
+    status = reloaded_db.status();
+  }
+
+  if (!status.ok()) {
+    // A failed reload is not fatal: the previously loaded database stays in place and keeps
+    // serving lookups.
+    ENVOY_LOG(error, "Failed to reload Maxmind database {}: {}", db_type, status.message());
+    config_->incDbReloadError(db_type);
+  }
+  return status;
 }
 
 } // namespace Maxmind

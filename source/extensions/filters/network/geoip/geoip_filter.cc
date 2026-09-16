@@ -42,6 +42,7 @@ GeoipFilterConfig::GeoipFilterConfig(const envoy::extensions::filters::network::
       stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")),
       client_ip_formatter_(std::move(client_ip_formatter)) {
   stat_name_set_->rememberBuiltin("total");
+  stat_name_set_->rememberBuiltin("skipped");
 }
 
 void GeoipFilterConfig::incCounter(Stats::StatName name) {
@@ -82,6 +83,16 @@ Network::FilterStatus GeoipFilter::onNewConnection() {
   // Fall back to the downstream connection remote address if no formatter override is available.
   if (remote_address == nullptr) {
     remote_address = read_callbacks_->connection().connectionInfoProvider().remoteAddress();
+  }
+
+  // A geolocation lookup needs an IP address, and the downstream connection address is not
+  // necessarily one: a connection accepted on an internal listener carries an Envoy internal
+  // address, and a Unix domain socket carries a pipe address. Skip the lookup rather than hand
+  // either to the provider.
+  if (remote_address == nullptr || remote_address->ip() == nullptr) {
+    ENVOY_LOG(debug, "geoip: skipping lookup, no IP address available for the connection");
+    config_->incSkipped();
+    return Network::FilterStatus::Continue;
   }
 
   // Capture weak_ptr to GeoipFilter so that filter can be safely accessed in the posted callback.
