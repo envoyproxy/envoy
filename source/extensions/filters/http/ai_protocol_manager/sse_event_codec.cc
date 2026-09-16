@@ -83,6 +83,11 @@ absl::Status SseEventDecoder::onData(const Buffer::Instance& data, std::vector<S
 }
 
 absl::Status SseEventDecoder::onEndStream(std::vector<SseEventPtr>& out) {
+  if (const absl::string_view pending_bom = scanner_.flushPendingBom(); !pending_bom.empty()) {
+    if (absl::Status status = onLineBytes(pending_bom); !status.ok()) {
+      return status;
+    }
+  }
   // A line is pending only if it carried a colon (so its field resolved) or accumulated a name.
   if (prefix_done_ || !line_prefix_.empty()) {
     if (absl::Status status = finishLine(); !status.ok()) {
@@ -112,11 +117,12 @@ absl::Status SseEventDecoder::onLineBytes(absl::string_view bytes) {
       kind_ = LineKind::Unknown;
       prefix_done_ = true;
       if (!line_prefix_.empty()) {
-        appendExtras(line_prefix_);
+        if (absl::Status status = appendExtras(line_prefix_); !status.ok()) {
+          return status;
+        }
         line_prefix_.clear();
       }
-      appendExtras(bytes);
-      return absl::OkStatus();
+      return appendExtras(bytes);
     }
     if (colon == absl::string_view::npos) {
       absl::StrAppend(&line_prefix_, bytes);
@@ -133,7 +139,9 @@ absl::Status SseEventDecoder::onLineBytes(absl::string_view bytes) {
     if (kind_ == LineKind::Unknown) {
       // The separator the name was split on. A line that carried none is stored without one, so
       // that it goes back out the way it came rather than gaining punctuation.
-      appendExtras(":");
+      if (absl::Status status = appendExtras(":"); !status.ok()) {
+        return status;
+      }
     }
   }
 
@@ -157,14 +165,17 @@ absl::Status SseEventDecoder::onLineBytes(absl::string_view bytes) {
 absl::Status SseEventDecoder::beginField(absl::string_view name) {
   saw_field_ = true;
   if (name == kEventField) {
+    event_.clear();
     kind_ = LineKind::Event;
     return absl::OkStatus();
   }
   if (name == kIdField) {
+    id_.clear();
     kind_ = LineKind::Id;
     return absl::OkStatus();
   }
   if (name == kRetryField) {
+    retry_raw_.clear();
     kind_ = LineKind::Retry;
     return absl::OkStatus();
   }
@@ -174,8 +185,7 @@ absl::Status SseEventDecoder::beginField(absl::string_view name) {
     kind_ = LineKind::Unknown;
     // The name was consumed to resolve the field, so it is put back. Its caller adds the colon if
     // the line carried one.
-    appendExtras(name);
-    return absl::OkStatus();
+    return appendExtras(name);
   }
 
   kind_ = LineKind::Data;
@@ -187,7 +197,9 @@ absl::Status SseEventDecoder::beginField(absl::string_view name) {
     // The spec joins multiple data lines with a newline whatever terminated them on the wire, so
     // the value is the same for CR, LF and CRLF. The joiner goes through the store like any other
     // byte so offsets stay aligned with what was written out.
-    appendPayload("\n");
+    if (absl::Status status = appendPayload("\n"); !status.ok()) {
+      return status;
+    }
   }
   has_data_ = true;
   data_spans_.emplace_back(payload_len_, 0);
@@ -197,7 +209,9 @@ absl::Status SseEventDecoder::beginField(absl::string_view name) {
 absl::Status SseEventDecoder::onValueBytes(absl::string_view bytes) {
   switch (kind_) {
   case LineKind::Data:
-    appendPayload(bytes);
+    if (absl::Status status = appendPayload(bytes); !status.ok()) {
+      return status;
+    }
     data_spans_.back().second += bytes.size();
     break;
   case LineKind::Event:
@@ -207,8 +221,7 @@ absl::Status SseEventDecoder::onValueBytes(absl::string_view bytes) {
   case LineKind::Retry:
     return appendMetadata(retry_raw_, bytes);
   case LineKind::Unknown:
-    appendExtras(bytes);
-    break;
+    return appendExtras(bytes);
   }
   return absl::OkStatus();
 }
@@ -220,12 +233,14 @@ absl::Status SseEventDecoder::finishLine() {
     const std::string name = std::move(line_prefix_);
     line_prefix_.clear();
     status = beginField(name);
+    if (!status.ok()) {
+      resetLine();
+      return status;
+    }
   }
-  // Only beginField()'s data line cap fails, and that leaves the line a data line, so this cannot
-  // terminate a line that failed.
   if (kind_ == LineKind::Unknown) {
     // Terminate it, so the store holds the line exactly as it will be written back out.
-    appendExtras("\n");
+    status = appendExtras("\n");
   }
   resetLine();
   return status;
@@ -241,9 +256,14 @@ absl::Status SseEventDecoder::appendMetadata(std::string& field, absl::string_vi
   return absl::OkStatus();
 }
 
-void SseEventDecoder::appendPayload(absl::string_view bytes) {
+absl::Status SseEventDecoder::appendPayload(absl::string_view bytes) {
+  if (config_.max_frame_bytes > 0 &&
+      payload_len_ + extras_len_ + bytes.size() > config_.max_frame_bytes) {
+    return absl::ResourceExhaustedError(
+        absl::StrCat("SSE frame exceeded the ", config_.max_frame_bytes, " byte limit"));
+  }
   if (data_store_ == nullptr) {
-    data_store_ = std::make_unique<BufferManager>(
+    data_store_ = std::make_shared<BufferManager>(
         BufferManager::Config{config_.max_in_memory_frame_bytes}, buffer_factory_, bridge_);
     json_parser_ = std::make_unique<JsonWithExtBufParser>(config_.parser);
   }
@@ -257,16 +277,24 @@ void SseEventDecoder::appendPayload(absl::string_view bytes) {
   buf.add(bytes);
   data_store_->onData(buf);
   payload_len_ += bytes.size();
+  return absl::OkStatus();
 }
 
-void SseEventDecoder::appendExtras(absl::string_view bytes) {
+absl::Status SseEventDecoder::appendExtras(absl::string_view bytes) {
+  if (config_.max_frame_bytes > 0 &&
+      payload_len_ + extras_len_ + bytes.size() > config_.max_frame_bytes) {
+    return absl::ResourceExhaustedError(
+        absl::StrCat("SSE frame exceeded the ", config_.max_frame_bytes, " byte limit"));
+  }
   if (extras_store_ == nullptr) {
-    extras_store_ = std::make_unique<BufferManager>(
+    extras_store_ = std::make_shared<BufferManager>(
         BufferManager::Config{config_.max_in_memory_frame_bytes}, buffer_factory_, bridge_);
   }
   Buffer::OwnedImpl buf;
   buf.add(bytes);
   extras_store_->onData(buf);
+  extras_len_ += bytes.size();
+  return absl::OkStatus();
 }
 
 void SseEventDecoder::finishFrame(std::vector<SseEventPtr>& out) {
@@ -276,14 +304,14 @@ void SseEventDecoder::finishFrame(std::vector<SseEventPtr>& out) {
   }
 
   auto event = std::make_unique<SseEvent>();
-  event->set_event(event_);
-  event->set_id(id_);
+  ASSERT(event->set_event(event_).ok());
+  ASSERT(event->set_id(id_).ok());
   if (extras_store_ != nullptr) {
     // No more lines belong to this frame, so nothing more will be appended.
     extras_store_->endStream();
     event->set_extras_store(std::move(extras_store_));
   }
-  event->set_retry(retry_raw_);
+  ASSERT(event->set_retry(retry_raw_).ok());
 
   if (has_data_ && data_store_ == nullptr) {
     // A `data:` field with nothing after it: the frame carries data, but no payload byte ever
@@ -335,6 +363,7 @@ void SseEventDecoder::resetFrame() {
   id_.clear();
   retry_raw_.clear();
   metadata_bytes_ = 0;
+  extras_len_ = 0;
   // Reset rather than assume null.
   extras_store_.reset();
   has_data_ = false;
@@ -346,6 +375,9 @@ void SseEventDecoder::resetFrame() {
 }
 
 Coroutine::Task<absl::Status> SseEventSerializer::serialize(SseEvent& event, BufferManager& out) {
+  ASSERT(event.event().find_first_of("\r\n") == absl::string_view::npos);
+  ASSERT(event.id().find_first_of("\r\n") == absl::string_view::npos);
+  ASSERT(event.retry().find_first_of("\r\n") == absl::string_view::npos);
   if (!event.event().empty()) {
     CO_RETURN_IF_ERROR(co_await writeOut(out, absl::StrCat("event: ", event.event(), "\n")));
   }
@@ -372,6 +404,7 @@ Coroutine::Task<absl::Status> SseEventSerializer::serialize(SseEvent& event, Buf
       CO_RETURN_IF_ERROR(serialized.status());
       CO_RETURN_IF_ERROR(co_await writeOut(out, "\n"));
     } else if (!event.raw_data_ext_refs().empty()) {
+      ASSERT(event.payload_store() != nullptr);
       // One data line per reference: this is exactly how the decoder split them, so a payload
       // whose bytes contain newlines reassembles unchanged.
       for (const JsonWithExtBuf::ExternalRef& ref : event.raw_data_ext_refs()) {
@@ -392,6 +425,7 @@ Coroutine::Task<absl::Status> SseEventSerializer::serialize(SseEvent& event, Buf
         CO_RETURN_IF_ERROR(co_await writeDataLine(out, payload));
       } else {
         for (absl::string_view line : absl::StrSplit(payload, '\n')) {
+          ASSERT(line.find('\r') == absl::string_view::npos);
           CO_RETURN_IF_ERROR(co_await writeDataLine(out, line));
         }
       }

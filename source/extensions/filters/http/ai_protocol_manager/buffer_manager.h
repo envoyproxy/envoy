@@ -12,6 +12,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/functional/any_invocable.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
@@ -20,6 +21,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
+
+class BufferManager;
 
 // Invoked once a replay() range has been fully injected into the filter chain (or on error). The
 // caller can start to stream further sub-ranges or to terminate the stream.
@@ -48,7 +51,13 @@ public:
   explicit FilterChainBridge(uint32_t buffer_limit)
       : high_watermark_(buffer_limit), low_watermark_(buffer_limit / 2) {}
 
-  virtual ~FilterChainBridge() = default;
+  virtual ~FilterChainBridge();
+
+  // Registers/unregisters a BufferManager on this path so detachFromFilterChain() can detach all
+  // active stores on stream teardown.
+  void registerBufferManager(BufferManager& manager) { registered_managers_.insert(&manager); }
+
+  void unregisterBufferManager(BufferManager& manager) { registered_managers_.erase(&manager); }
 
   // Dispatcher the external buffer should use for completion/watermark callbacks.
   virtual Event::Dispatcher& dispatcher() PURE;
@@ -137,12 +146,14 @@ private:
   const uint32_t low_watermark_;
   // Tracked so each crossing pauses or resumes the source exactly once.
   bool source_paused_{false};
+  bool detached_{false};
 
   // Depth of unmatched replay high-watermark callbacks. The connection manager may raise the
   // watermark more than once (stream and connection), so replay resumes only when this returns to
   // zero.
   uint32_t replay_high_watermark_count_{0};
   ReplayResumeHandler* replay_handler_{nullptr};
+  absl::flat_hash_set<BufferManager*> registered_managers_;
 };
 using FilterChainBridgePtr = std::unique_ptr<FilterChainBridge>;
 
@@ -167,7 +178,19 @@ using FilterChainBridgePtr = std::unique_ptr<FilterChainBridge>;
 //   - Replay: re-injected data is paced against the chain's back-pressure, which
 //     the bridge tracks. We pause issuing reads/injects while the chain is backed
 //     up and resume on the bridge's ReplayResumeHandler callback.
-class BufferManager : public ReplayResumeHandler, Logger::Loggable<Logger::Id::filter> {
+//
+// TODO(penguingao): Decouple passive storage from active filter-chain replay/injection.
+// Currently BufferManager combines a passive payload store (in-memory queue + ExternalBuffer)
+// with a callback-driven injection state machine (replay/inject -> bridge_.injectData). When
+// short-lived values like SseEvent own BufferManager instances, child-to-parent callback
+// reentrancy during injectData() can cancel the parent coroutine while BufferManager methods
+// are still on the stack, requiring shared_ptr/weak_from_this() lifetime pinning and bridge
+// registration. Refactoring replay/injection into a coroutine loop on the stream writer while
+// keeping SseEvent stores purely passive (exposing async readChunk()) will restore strict
+// std::unique_ptr lexical ownership without callback reentrancy.
+class BufferManager : public ReplayResumeHandler,
+                      public std::enable_shared_from_this<BufferManager>,
+                      Logger::Loggable<Logger::Id::filter> {
 public:
   struct Config {
     // Bytes the manager will hold in memory before it creates an external buffer at all. A
@@ -231,14 +254,9 @@ public:
 
   // Detaches the manager from the filter chain: releases the external buffer, releases the
   // bridge's replay handler slot, and cancels the pending replay continuation, so async
-  // completions and replay reentrancy become inert (they early-out on destroyed_). Run by the
-  // destructor, but must NOT be followed by a synchronous destruction from within a replay
-  // callback:
-  // onDestroy() can run on-stack while a replay is mid-inject (a downstream filter
-  // may answer an injected frame with a stream-ending local reply), and the replay
-  // machinery relies on the manager still being alive-but-detached when that inject
-  // returns. Callers therefore detach here and free later (the owning filter frees
-  // it at its own deferred destruction). Idempotent.
+  // completions and replay reentrancy become inert (they early-out on destroyed_). Idempotent.
+  // Re-entrant replay/inject methods pin a shared_ptr via weak_from_this() so dropping the
+  // external BufferManagerPtr synchronously during injectData() or replay completion is safe.
   void onDestroy();
 
   // ReplayResumeHandler
@@ -385,7 +403,7 @@ private:
   bool destroyed_{false};
 };
 
-using BufferManagerPtr = std::unique_ptr<BufferManager>;
+using BufferManagerPtr = std::shared_ptr<BufferManager>;
 
 } // namespace AiProtocolManager
 } // namespace HttpFilters

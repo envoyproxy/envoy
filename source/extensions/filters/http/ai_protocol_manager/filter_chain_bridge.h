@@ -23,6 +23,8 @@ public:
     callbacks_.addUpstreamWatermarkCallbacks(*this);
   }
 
+  ~DecoderFilterChainBridge() override { detachFromFilterChain(); }
+
   // FilterChainBridge
   Event::Dispatcher& dispatcher() override { return callbacks_.dispatcher(); }
   void injectData(Buffer::Instance& data) override {
@@ -64,6 +66,8 @@ public:
         stats_(stats) {
     decoder_callbacks_.addDownstreamWatermarkCallbacks(*this);
   }
+
+  ~EncoderFilterChainBridge() override { detachFromFilterChain(); }
 
   // FilterChainBridge
   Event::Dispatcher& dispatcher() override { return encoder_callbacks_.dispatcher(); }

@@ -60,6 +60,10 @@ public:
   // again with the remainder. `data` must not be empty.
   LineScan scanLine(absl::string_view data);
 
+  // Returns any bytes withheld while waiting to resolve a partial UTF-8 BOM at EOF, and marks
+  // BOM resolution complete.
+  absl::string_view flushPendingBom();
+
   // Returns the scanner to the start of a line. Called after a complete event has been consumed
   // out of a separate buffer, where the scanner's state no longer describes the pending input.
   void reset() { state_ = ScanState::LineStart; }

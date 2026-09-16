@@ -176,7 +176,7 @@ public:
     bridges_.push_back(std::make_unique<FakeBridge>(dispatcher_, bridge_buffer_limit_));
     bridge_ = bridges_.back().get();
     replay_cb_ = nullptr;
-    return std::make_unique<BufferManager>(manager_config_, factory, *bridge_);
+    return std::make_shared<BufferManager>(manager_config_, factory, *bridge_);
   }
 
   // Swaps in a manager backed by `factory`, detaching the outgoing one first so it
@@ -1030,6 +1030,143 @@ TEST_F(BufferManagerTest, SynchronousCancelReplayStopsExternalBufferReplayImmedi
   EXPECT_EQ(bridge_->inject_calls_, 1);
   EXPECT_EQ(bridge_->injected_.length(), 64 * 1024);
   EXPECT_FALSE(replay_done);
+}
+
+// Destroying a spilled BufferManager while writes are in-flight or pending releases its unacked
+// byte count back to the bridge so ingest backpressure does not permanently deadlock the stream.
+TEST_F(BufferManagerTest, DestroyReleasesUnackedBytesAndUnpausesSource) {
+  bridge_buffer_limit_ = 1024;
+  PostingExternalBufferFactory posting_factory;
+  resetManager(posting_factory);
+
+  // Feed 2048 bytes (> 1024 high watermark). Write is posted but not yet completed.
+  Buffer::OwnedImpl body(std::string(2048, 'a'));
+  manager_->onData(body);
+  EXPECT_TRUE(bridge_->ingestPaused());
+  EXPECT_EQ(bridge_->pause_source_calls_, 1);
+  EXPECT_EQ(bridge_->resume_source_calls_, 0);
+
+  // Destroy the manager before the write completes (e.g. an SSE frame store discarded).
+  manager_->onDestroy();
+
+  // Unacked bytes must be released and the source resumed immediately.
+  EXPECT_FALSE(bridge_->ingestPaused());
+  EXPECT_EQ(bridge_->resume_source_calls_, 1);
+}
+
+// If the FilterChainBridge is destroyed while a BufferManager (e.g. owned by an SseEvent) is still
+// alive, the bridge detaches all registered managers so subsequent BufferManager destruction does
+// not access the destroyed bridge.
+TEST_F(BufferManagerTest, BridgeDestructionDetachesRegisteredManagers) {
+  auto local_bridge = std::make_unique<FakeBridge>(dispatcher_, 1024);
+  auto local_manager =
+      std::make_shared<BufferManager>(BufferManager::Config{}, factory_, *local_bridge);
+
+  Buffer::OwnedImpl body("payload");
+  local_manager->onData(body);
+  local_manager->endStream();
+
+  // Destroy the bridge first (simulating filter teardown while coroutine still holds SseEvent).
+  local_bridge.reset();
+
+  // Destroying local_manager afterwards must be a safe no-op (already detached by bridge dtor).
+  local_manager.reset();
+}
+
+// Dropping the last external shared_ptr<BufferManager> synchronously inside injectData() (e.g.
+// stream reset destroying SseEvent on stack) must not cause stack UAF when onReadComplete /
+// maybeReadNextChunk unwinds.
+TEST_F(BufferManagerTest, SynchronousDeallocationDuringInjectDataDoesNotUAF) {
+  manager_config_.max_in_memory_bytes = 1024 * 1024;
+  BufferManagerPtr local_manager = makeManager(factory_);
+
+  Buffer::OwnedImpl body("hello world");
+  local_manager->onData(body);
+  local_manager->endStream();
+
+  bridge_->on_inject_ = [&local_manager]() {
+    local_manager->onDestroy();
+    local_manager.reset();
+  };
+
+  local_manager->replay(0, 11, [](absl::Status) {});
+  ASSERT_NE(replay_cb_, nullptr);
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  EXPECT_EQ(local_manager, nullptr);
+  EXPECT_EQ(bridge_->injected_.toString(), "hello world");
+}
+
+// When replay has yielded for the per-iteration inject budget, a watermark resume must not
+// overwrite the scheduled next-iteration callback with a current-iteration callback.
+TEST_F(BufferManagerTest, OnReplayResumedWhileBudgetYieldedDoesNotScheduleCurrentIteration) {
+  manager_config_.max_in_memory_bytes = 1024 * 1024;
+  resetManager(factory_);
+
+  // 10 chunks of 64KB > 8 chunks per iteration budget.
+  const std::string big_payload(10 * 64 * 1024, 'x');
+  Buffer::OwnedImpl body(big_payload);
+  manager_->onData(body);
+  manager_->endStream();
+
+  manager_->replay(0, big_payload.size(), [](absl::Status) {});
+  ASSERT_TRUE(replay_cb_->enabled());
+
+  // Capture calls to scheduleCallbackCurrentIteration vs NextIteration during watermark lower.
+  int current_iter_calls = 0;
+  ON_CALL(*replay_cb_, scheduleCallbackCurrentIteration()).WillByDefault(Invoke([&]() {
+    ++current_iter_calls;
+  }));
+
+  // First continuation consumes the 8-chunk budget and yields via scheduleCallbackNextIteration().
+  replay_cb_->invokeCallback();
+  EXPECT_EQ(bridge_->inject_calls_, 8);
+
+  // Simulate a watermark cycle while budget_yielded_ is true.
+  current_iter_calls = 0;
+  bridge_->raiseReplayWatermark();
+  bridge_->lowerReplayWatermark();
+  EXPECT_EQ(current_iter_calls, 0);
+}
+
+// Write failure completion that triggers onUnrecoverableError() and drops the last external
+// shared_ptr<BufferManager> while onWriteComplete() is on the call stack must not cause UAF.
+TEST_F(BufferManagerTest, SynchronousDeallocationDuringWriteFailureDoesNotUAF) {
+  manager_config_.max_in_memory_bytes = 0;
+  FailingExternalBufferFactory failing_factory(FailingExternalBuffer::FailMode::Write);
+  BufferManagerPtr local_manager = makeManager(failing_factory);
+
+  bridge_->on_error_ = [&]() {
+    bridge_->detachFromFilterChain();
+    local_manager.reset();
+  };
+
+  Buffer::OwnedImpl body(std::string(128 * 1024, 'x'));
+  local_manager->onData(body);
+  drain();
+
+  EXPECT_EQ(local_manager, nullptr);
+  EXPECT_EQ(bridge_->error_calls_, 1);
+}
+
+// If onDestroy() releases unacked bytes, which lowers ingest backpressure and calls resumeSource(),
+// and resumeSource() synchronously triggers bridge_.detachFromFilterChain(), unregistering from
+// registered_managers_ before releaseUnacked() prevents an infinite loop in
+// detachFromFilterChain().
+TEST_F(BufferManagerTest, SynchronousDetachDuringResumeSourceInOnDestroyDoesNotInfiniteLoop) {
+  bridge_buffer_limit_ = 1024;
+  PostingExternalBufferFactory posting_factory;
+  resetManager(posting_factory);
+
+  Buffer::OwnedImpl body(std::string(2048, 'a'));
+  manager_->onData(body);
+  ASSERT_TRUE(bridge_->ingestPaused());
+
+  bridge_->on_resume_source_ = [this]() { bridge_->detachFromFilterChain(); };
+
+  manager_->onDestroy();
+  EXPECT_EQ(bridge_->resume_source_calls_, 1);
 }
 
 } // namespace

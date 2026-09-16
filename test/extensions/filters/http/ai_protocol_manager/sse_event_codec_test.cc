@@ -547,9 +547,9 @@ TEST_F(SseCodecBufferTest, SpilledFrameKeepsItsMetadata) {
 
 TEST_F(SseCodecBufferTest, SerializesEveryMetadataField) {
   SseEvent event;
-  event.set_event("delta");
-  event.set_id("42");
-  event.set_retry("1500");
+  EXPECT_THAT(event.set_event("delta"), IsOk());
+  EXPECT_THAT(event.set_id("42"), IsOk());
+  EXPECT_THAT(event.set_retry("1500"), IsOk());
 
   EXPECT_EQ(serialize(event), "event: delta\nid: 42\nretry: 1500\n\n");
 }
@@ -675,6 +675,119 @@ TEST_F(SseCodecBufferTest, SpilledUnknownFieldRoundTrips) {
   EXPECT_EQ(events_[0]->extras_store()->inMemoryBytes(), nullptr) << "extras did not spill";
 
   EXPECT_EQ(serialize(*events_[0]), absl::StrCat("x-big: ", value, "\ndata: p\n\n"));
+}
+
+// Per the SSE specification, repeated event:, id:, or retry: fields within a single frame
+// overwrite the previous value ("last occurrence wins") rather than concatenating.
+TEST_F(SseEventDecoderTest, RepeatedEventIdRetryLinesLastOccurrenceWins) {
+  SseEventDecoder decoder = makeDecoder();
+  ASSERT_THAT(
+      feed(decoder,
+           "event: first\nevent: second\nid: 1\nid: 2\nretry: 100\nretry: 200\ndata: p\n\n"),
+      IsOk());
+
+  ASSERT_EQ(events_.size(), 1);
+  EXPECT_EQ(events_[0]->event(), "second");
+  EXPECT_EQ(events_[0]->id(), "2");
+  EXPECT_EQ(events_[0]->retry(), "200");
+}
+
+// If the stream ends after 1 or 2 bytes of a UTF-8 BOM prefix without completing
+// the 3-byte BOM, onEndStream() flushes the withheld prefix as ordinary content rather than
+// dropping it.
+TEST_F(SseEventDecoderTest, PartialUtf8BomAtEofIsNotDropped) {
+  SseEventDecoder decoder = makeDecoder();
+  ASSERT_THAT(feed(decoder, "\xEF\xBB"), IsOk());
+  ASSERT_THAT(decoder.onEndStream(events_), IsOk());
+
+  ASSERT_EQ(events_.size(), 1);
+  EXPECT_EQ(extras(*events_[0]), "\xEF\xBB\n");
+}
+
+// SseEvent metadata setters forbid CR and LF (triggering IS_ENVOY_BUG and returning
+// InvalidArgumentError without mutating the field), and serialization forbids CR in raw_data.
+TEST_F(SseCodecBufferTest, ForbidsCrOrLfInMetadataSettersAndCrInRawData) {
+  SseEvent event;
+  EXPECT_DEBUG_DEATH(
+      EXPECT_EQ(event.set_event("bad\nevent").code(), absl::StatusCode::kInvalidArgument), ".*");
+  EXPECT_TRUE(event.event().empty());
+
+  EXPECT_DEBUG_DEATH(EXPECT_EQ(event.set_id("bad\rid").code(), absl::StatusCode::kInvalidArgument),
+                     ".*");
+  EXPECT_TRUE(event.id().empty());
+
+  EXPECT_DEBUG_DEATH(
+      EXPECT_EQ(event.set_retry("100\r\n").code(), absl::StatusCode::kInvalidArgument), ".*");
+  EXPECT_TRUE(event.retry().empty());
+
+  auto raw = std::make_unique<Buffer::OwnedImpl>();
+  raw->add("line1\r\nline2");
+  event.set_raw_data(std::move(raw));
+  EXPECT_DEBUG_DEATH(serialize(event), ".*");
+}
+
+// ExternalRef ranges in raw_data_ext_refs() assert non-null payload_store and are range-checked by
+// ReplayAwaitable.
+TEST_F(SseCodecBufferTest, RejectsOutOfBoundsExternalRefViaReplayAwaitable) {
+  SseEvent null_store_event;
+  null_store_event.set_raw_data_ext_refs({JsonWithExtBuf::ExternalRef{0, 10}});
+  EXPECT_DEBUG_DEATH(serialize(null_store_event), ".*");
+
+  SseEvent out_of_bounds_event;
+  auto store = std::make_shared<BufferManager>(BufferManager::Config{}, factory_, bridge_);
+  Buffer::OwnedImpl short_data("12345");
+  store->onData(short_data);
+  store->endStream();
+  out_of_bounds_event.set_payload_store(std::move(store));
+  out_of_bounds_event.set_raw_data_ext_refs({JsonWithExtBuf::ExternalRef{0, 10}});
+
+  absl::Status result = absl::OkStatus();
+  Coroutine::DetachedHandle handle = Coroutine::launch(
+      SseEventSerializer::serialize(out_of_bounds_event, buffer_manager_), executor_,
+      [&result](absl::Status status) { result = std::move(status); }, Coroutine::StartMode::Inline);
+  drain();
+  EXPECT_EQ(result.code(), absl::StatusCode::kInvalidArgument);
+}
+
+// Synchronous stream reset (detaching bridge and cancelling coroutine) inside bridge.injectData()
+// during SseEventSerializer::serialize() must not cause stack UAF when SseEvent and its
+// payload_store are destroyed on-stack.
+TEST_F(SseCodecBufferTest, SynchronousStreamResetDuringSerializationDoesNotUAF) {
+  const std::string value(120, 'x');
+  const std::string payload = absl::StrCat(R"({"k":")", value, R"("})");
+  SseEventDecoder decoder = makeDecoder(spillConfig());
+  ASSERT_THAT(feed(decoder, absl::StrCat("data: ", payload, "\n\n")), IsOk());
+  ASSERT_EQ(events_.size(), 1);
+
+  std::optional<Coroutine::DetachedHandle> handle;
+  // On the 2nd inject (the ExternalRef replay from event.payload_store()), simulate downstream
+  // stream reset: detach the bridge, cancel the coroutine handle, and destroy events_[0].
+  bridge_.on_inject_ = [this, &handle]() {
+    if (bridge_.inject_calls_ == 2) {
+      bridge_.detachFromFilterChain();
+      if (handle.has_value()) {
+        handle->cancel();
+      }
+      events_.clear();
+    }
+  };
+
+  absl::Status result = absl::OkStatus();
+  handle = Coroutine::launch(
+      SseEventSerializer::serialize(*events_[0], buffer_manager_), executor_,
+      [&result](absl::Status status) { result = std::move(status); }, Coroutine::StartMode::Inline);
+  drain();
+  EXPECT_TRUE(events_.empty());
+}
+
+// Exceeding max_frame_bytes fails the stream with ResourceExhaustedError.
+TEST_F(SseEventDecoderTest, FrameExceedingMaxFrameBytesFails) {
+  SseEventDecoder::Config config;
+  config.max_frame_bytes = 32;
+  SseEventDecoder decoder = makeDecoder(config);
+
+  const absl::Status status = feed(decoder, absl::StrCat("data: ", std::string(40, 'a'), "\n\n"));
+  EXPECT_EQ(status.code(), absl::StatusCode::kResourceExhausted);
 }
 
 } // namespace

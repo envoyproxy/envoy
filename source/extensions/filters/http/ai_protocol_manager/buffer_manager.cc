@@ -10,6 +10,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
+FilterChainBridge::~FilterChainBridge() {
+  detached_ = true;
+  replay_handler_ = nullptr;
+  // BufferManager::onDestroy() calls unregisterBufferManager(), erasing itself from
+  // registered_managers_. Re-querying begin() on each iteration avoids holding an iterator across
+  // flat_hash_set mutations.
+  while (!registered_managers_.empty()) {
+    (*registered_managers_.begin())->onDestroy();
+  }
+}
+
 void FilterChainBridge::addUnacked(uint64_t bytes) {
   unacked_ += bytes;
   updateIngestBackpressure();
@@ -22,8 +33,8 @@ void FilterChainBridge::releaseUnacked(uint64_t bytes) {
 }
 
 void FilterChainBridge::updateIngestBackpressure() {
-  if (high_watermark_ == 0) {
-    return; // Ingest flow control disabled.
+  if (detached_ || high_watermark_ == 0) {
+    return; // Detached or ingest flow control disabled.
   }
   if (!source_paused_ && unacked_ > high_watermark_) {
     source_paused_ = true;
@@ -39,8 +50,17 @@ void FilterChainBridge::updateIngestBackpressure() {
 }
 
 void FilterChainBridge::detachFromFilterChain() {
-  unsubscribeReplayWatermarks();
+  if (!detached_) {
+    detached_ = true;
+    unsubscribeReplayWatermarks();
+  }
   replay_handler_ = nullptr;
+  // BufferManager::onDestroy() calls unregisterBufferManager(), erasing itself from
+  // registered_managers_. Re-querying begin() on each iteration avoids holding an iterator across
+  // flat_hash_set mutations.
+  while (!registered_managers_.empty()) {
+    (*registered_managers_.begin())->onDestroy();
+  }
 }
 
 void FilterChainBridge::onAboveReplayWatermark() {
@@ -71,7 +91,9 @@ void FilterChainBridge::resetInjectBudget() { inject_budget_used_ = 0; }
 
 BufferManager::BufferManager(Config config, ExternalBufferFactory& buffer_factory,
                              FilterChainBridge& bridge)
-    : config_(config), buffer_factory_(buffer_factory), bridge_(bridge) {}
+    : config_(config), buffer_factory_(buffer_factory), bridge_(bridge) {
+  bridge_.registerBufferManager(*this);
+}
 
 Event::SchedulableCallback& BufferManager::replayCallback() {
   // Created on first use: a manager that never replays -- every SSE frame small enough to stay in
@@ -88,10 +110,18 @@ void BufferManager::onDestroy() {
     return;
   }
   destroyed_ = true;
+  bridge_.unregisterBufferManager(*this);
   // Cancel any requested or in-flight replay operation and disarm callbacks.
   cancelReplay();
-  // Dropping the buffer cancels any pending write/read completion callbacks.
+  const bool had_buffer = (buffer_ != nullptr);
+  const uint64_t unacked = had_buffer ? (in_flight_write_size_ + pending_.length()) : 0;
+  in_flight_write_size_ = 0;
+  pending_.drain(pending_.length());
+  // Dropping the buffer cancels any pending async write/read completion callbacks.
   buffer_.reset();
+  if (unacked > 0) {
+    bridge_.releaseUnacked(unacked);
+  }
 }
 
 void BufferManager::onData(Buffer::Instance& data) {
@@ -229,21 +259,24 @@ void BufferManager::maybeIssueWrite() {
 }
 
 void BufferManager::onWriteComplete(ExternalBufferStatus status) {
+  // Asynchronous entry point (via ExternalBuffer::write callback capturing raw `this`).
+  // Pinning `self` here keeps `*this` alive across any downstream stream reset or
+  // coroutine cancellation triggered by onExternalBufferError() or maybeStartReplay().
+  auto self = weak_from_this().lock();
   // A conforming store cancels pending completions when it is destroyed in
   // onDestroy() (see ExternalBuffer), so this never fires once detached.
   ASSERT(!destroyed_);
-  if (status != ExternalBufferStatus::Ok) {
-    onExternalBufferError();
-    return;
-  }
-
-  // The just-written bytes are now durable.
   const uint64_t acked = in_flight_write_size_;
   write_in_flight_ = false;
   in_flight_write_size_ = 0;
   // Let the source resume if the not-yet-durable total has fallen below the low
   // watermark.
   bridge_.releaseUnacked(acked);
+  if (status != ExternalBufferStatus::Ok) {
+    onExternalBufferError();
+    return;
+  }
+
   // Drain the next queued write, if any; replay waits until the queue empties.
   maybeIssueWrite();
   // Begin a requested replay only after the last byte has been offloaded. A replay that is already
@@ -369,14 +402,17 @@ void BufferManager::maybeReadNextChunk() {
   }
   // A synchronous store completes this read on-stack (onReadComplete, and on the
   // final chunk the replay-done callback) before read() returns, which may detach us
-  // via onDestroy(). Per the destruction contract we are only detached, never freed,
-  // so this manager is still alive -- and clearing in_read_ on a detached manager is
-  // harmless, so no destroyed_ guard is needed here (unlike onReadComplete, which
-  // would go on to read another chunk from the released buffer).
+  // via onDestroy(). Because the caller at the root of this call stack
+  // (onReplayContinuation or onWriteComplete) pins `self`, `*this` remains alive
+  // until read() and maybeReadNextChunk() return.
   in_read_ = false;
 }
 
 void BufferManager::onReplayContinuation() {
+  // Asynchronous entry point (via Event::SchedulableCallback capturing raw `this`).
+  // Pinning `self` here protects all downstream helper calls (maybeStartReplay,
+  // maybeDrainInjected, maybeReadNextChunk, finishReplay) for the entire stack frame.
+  auto self = weak_from_this().lock();
   // onDestroy() cancels replay_cb_, so the continuation never fires once detached.
   ASSERT(!destroyed_);
   if (replay_cancelled_) {
@@ -403,6 +439,10 @@ void BufferManager::onReplayContinuation() {
 }
 
 void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::InstancePtr data) {
+  // Asynchronous entry point (via ExternalBuffer::read callback capturing raw `this`).
+  // Pinning `self` here protects all downstream calls (injectData, finishReplay,
+  // maybeReadNextChunk, onExternalBufferError) for the entire stack frame.
+  auto self = weak_from_this().lock();
   // A conforming store cancels pending completions on destruction, so we never enter
   // here already detached. (destroyed_ can still flip mid-method when the inject
   // below ends the stream -- handled by the runtime check after injectData().)
@@ -469,6 +509,11 @@ void BufferManager::onExternalBufferError() {
 }
 
 void BufferManager::onReplayResumed() {
+  if (budget_yielded_) {
+    // Already scheduled for next iteration to refill the inject budget; do not overwrite with
+    // scheduleCallbackCurrentIteration().
+    return;
+  }
   // Resume replay where we paused, deferred via replay_cb_ rather than reading here: this runs
   // inside an Envoy watermark callback, and injecting a chunk (or failing the stream on a buffer
   // error) can re-enter the watermark callbacks during router cleanup, which is unsafe. The

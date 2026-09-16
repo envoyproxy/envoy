@@ -48,12 +48,13 @@ protected:
     if ((is_injected_ && data_.length() == 0) || (!is_injected_ && length_ == 0)) {
       return absl::OkStatus();
     }
+    if (!is_injected_ &&
+        (offset_ > buffer_manager_.length() || length_ > buffer_manager_.length() - offset_)) {
+      return absl::InvalidArgumentError("replay range exceeds buffer length");
+    }
     return std::nullopt;
   }
 
-  // TODO(penguingao): Consider updating LeafAwaitable::onStart to return a bool (indicating
-  // whether to suspend) so that if buffer_manager_.replay completes synchronously on-stack, we can
-  // avoid await_suspend as defense-in-depth without splitting state across tryImmediate.
   void onStart() override {
     if (is_injected_) {
       buffer_manager_.inject(data_, [this](absl::Status status) { complete(std::move(status)); });
@@ -67,6 +68,7 @@ protected:
 
 private:
   BufferManager& buffer_manager_;
+  std::shared_ptr<BufferManager> manager_lifetime_{buffer_manager_.weak_from_this().lock()};
   uint64_t offset_{0};
   uint64_t length_{0};
   bool is_injected_{false};

@@ -8,9 +8,11 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -43,17 +45,38 @@ public:
   // SSE event name (e.g. "message", "content_block_delta", "error"). Empty when the frame
   // carried no `event:` field, which is how OpenAI Chat Completions streams frame every chunk.
   absl::string_view event() const { return event_; }
-  void set_event(absl::string_view event) { event_ = std::string(event); }
+  absl::Status set_event(absl::string_view event) {
+    if (event.find_first_of("\r\n") != absl::string_view::npos) {
+      IS_ENVOY_BUG("SSE event field must not contain CR or LF");
+      return absl::InvalidArgumentError("SSE event field must not contain CR or LF");
+    }
+    event_ = std::string(event);
+    return absl::OkStatus();
+  }
 
   // SSE event ID, used by clients for reconnection. Empty when absent.
   absl::string_view id() const { return id_; }
-  void set_id(absl::string_view id) { id_ = std::string(id); }
+  absl::Status set_id(absl::string_view id) {
+    if (id.find_first_of("\r\n") != absl::string_view::npos) {
+      IS_ENVOY_BUG("SSE id field must not contain CR or LF");
+      return absl::InvalidArgumentError("SSE id field must not contain CR or LF");
+    }
+    id_ = std::string(id);
+    return absl::OkStatus();
+  }
 
   // SSE retry interval, verbatim. Nothing here acts on it, so it is neither parsed nor validated:
   // a value the grammar would have a client ignore is carried through rather than dropped. Empty
   // when absent.
   absl::string_view retry() const { return retry_; }
-  void set_retry(absl::string_view retry) { retry_ = std::string(retry); }
+  absl::Status set_retry(absl::string_view retry) {
+    if (retry.find_first_of("\r\n") != absl::string_view::npos) {
+      IS_ENVOY_BUG("SSE retry field must not contain CR or LF");
+      return absl::InvalidArgumentError("SSE retry field must not contain CR or LF");
+    }
+    retry_ = std::string(retry);
+    return absl::OkStatus();
+  }
 
   // Whether the frame carried any `data:` field at all. False for a comment-only keepalive,
   // which must be re-serialized without a data line; distinct from a present-but-empty payload.

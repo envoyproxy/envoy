@@ -69,6 +69,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/functional:any_invocable",
     ],
 )
@@ -192,6 +193,8 @@ envoy_cc_library(
         ":json_with_ext_buf_lib",
         "//envoy/buffer:buffer_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
     ],
 )

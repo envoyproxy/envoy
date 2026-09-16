@@ -41,6 +41,10 @@ public:
   // upstream cannot make one frame cost unbounded memory.
   static constexpr uint64_t kDefaultMaxInMemoryFrameBytes = 64 * 1024;
 
+  // Hard cap on total bytes (payload + extras) accepted for a single SSE frame to bound external
+  // storage growth if an upstream streams data without frame-terminating blank lines.
+  static constexpr uint64_t kDefaultMaxFrameBytes = 64 * 1024 * 1024;
+
   // `event:`, `id:` and `retry:` are bounded metadata; a megabyte of them is likely a misbehaving
   // backend, and unlike the payload and the lines kept verbatim they are copied into strings for
   // direct access rather than held in a store.
@@ -54,6 +58,8 @@ public:
     // Size past which a frame's payload store, and its extras store, each offload to the external
     // buffer.
     uint64_t max_in_memory_frame_bytes{kDefaultMaxInMemoryFrameBytes};
+    // Per-frame cap on total payload + unmodeled field bytes. Exceeding it fails the stream.
+    uint64_t max_frame_bytes{kDefaultMaxFrameBytes};
     // Per-frame cap on the total size of the modeled metadata fields. Exceeding it fails the
     // stream.
     uint32_t max_metadata_line_bytes{kDefaultMaxMetadataLineBytes};
@@ -104,11 +110,11 @@ private:
   void finishFrame(std::vector<SseEventPtr>& out);
 
   // Appends payload bytes to the frame's store and parser, opening both on the first byte.
-  void appendPayload(absl::string_view bytes);
+  absl::Status appendPayload(absl::string_view bytes);
 
   // Appends bytes of an unmodeled field line to the frame's extras store, opening it on the first
   // byte.
-  void appendExtras(absl::string_view bytes);
+  absl::Status appendExtras(absl::string_view bytes);
 
   // Appends to a metadata field, enforcing max_metadata_line_bytes.
   absl::Status appendMetadata(std::string& field, absl::string_view bytes);
@@ -135,6 +141,7 @@ private:
   std::string id_;
   std::string retry_raw_;
   size_t metadata_bytes_{0};
+  uint64_t extras_len_{0};
   // Unmodeled field lines, verbatim and in arrival order. Written as they are scanned, so the
   // line currently being scanned, if it is one, is whatever is at the end.
   BufferManagerPtr extras_store_;

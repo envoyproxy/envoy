@@ -21,6 +21,7 @@ constexpr absl::string_view OpenAiDoneSentinel{"[DONE]"};
 // Returns the last `event:` field value in a raw event region as a view (per
 // the SSE spec the last occurrence wins; one leading space is stripped).
 std::optional<absl::string_view> sseEventTypeView(absl::string_view region) {
+  absl::ConsumePrefix(&region, "\xEF\xBB\xBF");
   std::optional<absl::string_view> event_type;
   size_t pos = 0;
   while (pos < region.size()) {

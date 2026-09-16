@@ -24,6 +24,8 @@ public:
   explicit FakeBridge(Event::Dispatcher& dispatcher, uint32_t buffer_limit = 1024 * 1024)
       : FilterChainBridge(buffer_limit), dispatcher_(dispatcher) {}
 
+  ~FakeBridge() override { detachFromFilterChain(); }
+
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   void injectData(Buffer::Instance& data) override {
     injected_.add(data);
@@ -39,9 +41,19 @@ public:
     }
   }
   void pauseSource() override { ++pause_source_calls_; }
-  void resumeSource() override { ++resume_source_calls_; }
+  void resumeSource() override {
+    ++resume_source_calls_;
+    if (on_resume_source_ != nullptr) {
+      on_resume_source_();
+    }
+  }
   void unsubscribeReplayWatermarks() override { subscribed_ = false; }
-  void onUnrecoverableError() override { ++error_calls_; }
+  void onUnrecoverableError() override {
+    ++error_calls_;
+    if (on_error_ != nullptr) {
+      on_error_();
+    }
+  }
 
   // Drives replay back-pressure as the connection manager would.
   void raiseReplayWatermark() { onAboveReplayWatermark(); }
@@ -58,6 +70,8 @@ public:
   int error_calls_{0};
   int raise_replay_watermark_at_inject_{0}; // 0 = never.
   std::function<void()> on_inject_;
+  std::function<void()> on_error_;
+  std::function<void()> on_resume_source_;
 };
 
 } // namespace AiProtocolManager

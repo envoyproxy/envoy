@@ -58,6 +58,16 @@ std::optional<SseScanner::LineScan> SseScanner::scanBom(absl::string_view data) 
   return out;
 }
 
+absl::string_view SseScanner::flushPendingBom() {
+  if (bom_resolved_ || bom_len_ == 0) {
+    bom_resolved_ = true;
+    return {};
+  }
+  bom_resolved_ = true;
+  state_ = ScanState::LineContent;
+  return kUtf8Bom.substr(0, bom_len_);
+}
+
 SseScanner::LineScan SseScanner::scanLine(absl::string_view data) {
   LineScan out;
   if (data.empty()) {
