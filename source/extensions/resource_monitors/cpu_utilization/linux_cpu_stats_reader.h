@@ -113,6 +113,17 @@ private:
   CpuTimesV2 previous_cpu_times_{false, 0, 0, 0};
 };
 
+// Fail-open reader used when no supported cgroup CPU implementation is found. It
+// always succeeds and reports zero utilization, so this optional overload input
+// neither blocks startup nor triggers any CPU-based overload action.
+class UnsupportedCgroupCpuStatsReader : public LinuxContainerCpuStatsReader,
+                                        private Logger::Loggable<Logger::Id::main> {
+public:
+  UnsupportedCgroupCpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source);
+
+  absl::StatusOr<double> getUtilization() override;
+};
+
 } // namespace CpuUtilizationMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

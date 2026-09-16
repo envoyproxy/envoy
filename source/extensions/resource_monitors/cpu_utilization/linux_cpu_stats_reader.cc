@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <sstream>
+#include <thread>
 #include <vector>
 
 #include "envoy/common/exception.h"
@@ -25,6 +26,12 @@ constexpr uint64_t NUMBER_OF_CPU_TIMES_TO_PARSE =
     4; // we are interested in user, nice, system and idle times.
 
 namespace {
+
+// Fallback CPU count when cpuset.cpus.effective is unavailable. Floors at 1 to
+// avoid divide-by-zero in downstream utilization math.
+int defaultCpuCount() {
+  return static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+}
 
 absl::StatusOr<int> parseEffectiveCpus(absl::string_view effective_cpu_list,
                                        const std::string& effective_path) {
@@ -173,7 +180,9 @@ LinuxContainerCpuStatsReader::create(Filesystem::Instance& fs, TimeSource& time_
     return std::make_unique<CgroupV1CpuStatsReader>(fs, time_source);
   }
 
-  return absl::InvalidArgumentError(std::string(NoSupportedCGroupMessage));
+  // No supported cgroup found: return a fail-open reader instead of an error so
+  // this optional overload monitor never blocks server startup.
+  return std::make_unique<UnsupportedCgroupCpuStatsReader>(fs, time_source);
 }
 
 CgroupV1CpuStatsReader::CgroupV1CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)
@@ -306,35 +315,39 @@ CpuTimesV2 CgroupV2CpuStatsReader::getCpuTimes() {
     return {false, 0, 0, 0};
   }
 
-  // Read cpuset.cpus.effective
-  auto effective_result = fs_.fileReadToEnd(effective_path_);
-  if (!effective_result.ok()) {
-    ENVOY_LOG(error, "Unable to read effective CPUs file at {}", effective_path_);
-    return {false, 0, 0, 0};
-  }
-
-  // Parse effective CPUs
+  // CPU count from cpuset.cpus.effective, falling back to the host online CPU
+  // count when absent. If present it must be well-formed.
   // Format can be: "0", "0-3", "0,2,4", "0-2,4", "0-3,5-7", etc.
-  absl::StatusOr<int> cpu_count = parseEffectiveCpus(effective_result.value(), effective_path_);
-  if (!cpu_count.ok()) {
-    ENVOY_LOG(error, "Failed to parse effective CPUs file {}: {}", effective_path_,
-              cpu_count.status().message());
-    return {false, 0, 0, 0};
+  int N = 0;
+  auto effective_result = fs_.fileReadToEnd(effective_path_);
+  if (effective_result.ok()) {
+    absl::StatusOr<int> cpu_count = parseEffectiveCpus(effective_result.value(), effective_path_);
+    if (!cpu_count.ok()) {
+      ENVOY_LOG(error, "Failed to parse effective CPUs file {}: {}", effective_path_,
+                cpu_count.status().message());
+      return {false, 0, 0, 0};
+    }
+    N = cpu_count.value();
+  } else {
+    N = defaultCpuCount();
+    ENVOY_LOG(trace, "cpuset.cpus.effective unavailable at {}, falling back to {} online CPU(s)",
+              effective_path_, N);
   }
-  const int N = cpu_count.value();
 
-  // Read cpu.max
+  // Effective core count from cpu.max. Absent file or "max" quota means no limit,
+  // i.e. all available CPUs; a present-but-malformed cpu.max is still an error.
+  double effective_cores = static_cast<double>(N);
   auto max_result = fs_.fileReadToEnd(max_path_);
-  if (!max_result.ok()) {
-    ENVOY_LOG(error, "Unable to read CPU max file at {}", max_path_);
-    return {false, 0, 0, 0};
-  }
-
-  absl::StatusOr<double> effective_cores = parseEffectiveCores(max_result.value(), N);
-  if (!effective_cores.ok()) {
-    ENVOY_LOG(error, "Failed to parse cpu.max file {}: {}", max_path_,
-              effective_cores.status().message());
-    return {false, 0, 0, 0};
+  if (max_result.ok()) {
+    absl::StatusOr<double> parsed_cores = parseEffectiveCores(max_result.value(), N);
+    if (!parsed_cores.ok()) {
+      ENVOY_LOG(error, "Failed to parse cpu.max file {}: {}", max_path_,
+                parsed_cores.status().message());
+      return {false, 0, 0, 0};
+    }
+    effective_cores = parsed_cores.value();
+  } else {
+    ENVOY_LOG(trace, "cpu.max unavailable at {}, assuming no CPU limit ({} core(s))", max_path_, N);
   }
 
   // Convert usage from usec to match our time units
@@ -344,9 +357,9 @@ CpuTimesV2 CgroupV2CpuStatsReader::getCpuTimes() {
                                     .count();
 
   ENVOY_LOG(trace, "cgroupv2 usage_usec: {}, effective_cores: {}, current_time: {}", usage_usec,
-            effective_cores.value(), current_time);
+            effective_cores, current_time);
 
-  return {true, cpu_times_value_us, current_time, effective_cores.value()};
+  return {true, cpu_times_value_us, current_time, effective_cores};
 }
 
 absl::StatusOr<double> CgroupV2CpuStatsReader::getUtilization() {
@@ -389,6 +402,16 @@ absl::StatusOr<double> CgroupV2CpuStatsReader::getUtilization() {
 
   return clamped_utilization;
 }
+
+UnsupportedCgroupCpuStatsReader::UnsupportedCgroupCpuStatsReader(Filesystem::Instance& fs,
+                                                                 TimeSource& time_source)
+    : LinuxContainerCpuStatsReader(fs, time_source) {
+  ENVOY_LOG(warn,
+            "{}; CPU utilization resource monitor will report zero utilization in CONTAINER mode",
+            NoSupportedCGroupMessage);
+}
+
+absl::StatusOr<double> UnsupportedCgroupCpuStatsReader::getUtilization() { return 0.0; }
 
 } // namespace CpuUtilizationMonitor
 } // namespace ResourceMonitors
