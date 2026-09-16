@@ -1,10 +1,9 @@
 use crate::{
-  abi, drop_wrapped_c_void_ptr, str_to_module_buffer, strs_to_module_buffers, wrap_into_c_void_ptr,
-  EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId,
-  EnvoyHistogramVecId, NEW_LOAD_BALANCER_CONFIG_FUNCTION,
+  abi, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer, strs_to_module_buffers,
+  wrap_into_c_void_ptr, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
+  EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId, NEW_LOAD_BALANCER_CONFIG_FUNCTION,
 };
 use mockall::*;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 
 /// Trait for interacting with the Envoy load balancer and its context.
@@ -1236,17 +1235,16 @@ pub trait LoadBalancer {
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
-  lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> abi::envoy_dynamic_module_type_lb_config_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_lb_config_new(
+    lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> abi::envoy_dynamic_module_type_lb_config_module_ptr {
     let name_str =
       unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
     let config_slice = unsafe {
@@ -1262,39 +1260,31 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
       Some(config) => wrap_into_c_void_ptr!(config),
       None => std::ptr::null(),
     }
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_lb_config_new", panic);
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_destroy(
-  config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_lb_config_destroy(
+    config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
+  ) {
     drop_wrapped_c_void_ptr!(config_ptr, LoadBalancerConfig);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_lb_config_destroy", panic);
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_lb_new(
-  config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
-  lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
-) -> abi::envoy_dynamic_module_type_lb_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_lb_new(
+    config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
+    lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
+  ) -> abi::envoy_dynamic_module_type_lb_module_ptr {
     // During new_load_balancer, context is not available.
     let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
     let lb_config = {
@@ -1303,26 +1293,22 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_new(
     };
     let lb = lb_config.new_load_balancer(&envoy_lb);
     wrap_into_c_void_ptr!(lb)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_lb_new", panic);
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
-  lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
-  lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
-  context_envoy_ptr: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
-  result_priority: *mut u32,
-  result_index: *mut u32,
-) -> bool {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_lb_choose_host(
+    lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
+    lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
+    context_envoy_ptr: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
+    result_priority: *mut u32,
+    result_index: *mut u32,
+  ) -> bool {
     let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, context_envoy_ptr);
     let lb = {
       let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
@@ -1336,54 +1322,40 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
       },
       None => false,
     }
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_lb_choose_host", panic);
-    // Fail-closed: return `false` so Envoy treats this as "no host selected"
-    // rather than reading the (uninitialised) out parameters.
-    false
-  })
+  }
+  // Fail-closed: return `false` so Envoy treats this as "no host selected"
+  // rather than reading the (uninitialised) out parameters.
+  on_panic = false
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_lb_on_host_membership_update(
-  lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
-  lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
-  num_hosts_added: usize,
-  num_hosts_removed: usize,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_lb_on_host_membership_update(
+    lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
+    lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
+    num_hosts_added: usize,
+    num_hosts_removed: usize,
+  ) {
     let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
     let lb = {
       let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
       &mut **raw
     };
     lb.on_host_membership_update(&envoy_lb, num_hosts_added, num_hosts_removed);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_lb_on_host_membership_update",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_lb_destroy(
-  lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_lb_destroy(
+    lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
+  ) {
     drop_wrapped_c_void_ptr!(lb_module_ptr, LoadBalancer);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_lb_destroy", panic);
-  });
+  }
 }

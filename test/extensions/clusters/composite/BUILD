@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     extension_names = ["envoy.clusters.composite"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/clusters/composite:cluster",
         "//source/extensions/load_balancing_policies/cluster_provided:config",

@@ -5,6 +5,7 @@
 
 #include "source/common/protobuf/utility.h"
 
+#include "test/config/utility.h"
 #include "test/integration/base_overload_integration_test.h"
 #include "test/integration/filters/block_filter.pb.h"
 #include "test/integration/http_protocol_integration.h"
@@ -934,6 +935,157 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   EXPECT_TRUE(connect_callbacks.closed());
 }
 
+class MultipleReduceTimeoutsActionsIntegrationTest : public OverloadIntegrationTest {
+protected:
+  MultipleReduceTimeoutsActionsIntegrationTest() {
+    second_factory_ = std::make_unique<FakeResourceMonitorFactory2>();
+    inject_second_factory_ =
+        std::make_unique<Registry::InjectFactory<Server::Configuration::ResourceMonitorFactory>>(
+            *second_factory_);
+  }
+
+  void updateSecondResource(double pressure) {
+    auto* monitor = second_factory_->monitor();
+    ASSERT(monitor != nullptr);
+    monitor->setResourcePressure(pressure);
+  }
+
+  void initializeOverloadManager() {
+    overload_manager_config_ = TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(
+        R"EOF(
+        refresh_interval:
+          seconds: 0
+          nanos: 1000000
+        resource_monitors:
+          - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+            typed_config:
+              "@type": type.googleapis.com/test.common.config.DummyConfig
+          - name: "envoy.resource_monitors.testonly.fake_resource_monitor2"
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Timestamp
+        actions:
+          - name: "envoy.overload_actions.reduce_timeouts"
+            triggers:
+              - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+                scaled:
+                  scaling_threshold: 0.5
+                  saturation_threshold: 0.9
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+              timer_scale_factors:
+                - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+                  min_timeout: 3s
+          - name: "connection_idle_timeouts"
+            triggers:
+              - name: "envoy.resource_monitors.testonly.fake_resource_monitor2"
+                scaled:
+                  scaling_threshold: 0.5
+                  saturation_threshold: 0.9
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+              timer_scale_factors:
+                - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+                  min_timeout: 5s
+      )EOF");
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    config_helper_.addConfigModifier(
+        [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                cm) -> void {
+          auto* options = cm.mutable_common_http_protocol_options();
+          options->mutable_idle_timeout()->MergeFrom(ProtobufUtil::TimeUtil::SecondsToDuration(20));
+          options->mutable_max_connection_duration()->MergeFrom(
+              ProtobufUtil::TimeUtil::SecondsToDuration(20));
+        });
+    initialize();
+    updateResource(0);
+    updateSecondResource(0);
+  }
+
+private:
+  class FakeResourceMonitorFactory2;
+  class FakeResourceMonitor2 : public Server::ResourceMonitor {
+  public:
+    FakeResourceMonitor2(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+    void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override {
+      Server::ResourceUsage usage;
+      usage.resource_pressure_ = pressure_;
+      callbacks.onSuccess(usage);
+    }
+    void setResourcePressure(double pressure) {
+      dispatcher_.post([this, pressure] { pressure_ = pressure; });
+    }
+
+  private:
+    Event::Dispatcher& dispatcher_;
+    double pressure_{0.0};
+  };
+
+  class FakeResourceMonitorFactory2 : public Server::Configuration::ResourceMonitorFactory {
+  public:
+    absl::StatusOr<Server::ResourceMonitorPtr>
+    createResourceMonitor(const Protobuf::Message&,
+                          Server::Configuration::ResourceMonitorFactoryContext& context) override {
+      auto monitor = std::make_unique<FakeResourceMonitor2>(context.mainThreadDispatcher());
+      monitor_ = monitor.get();
+      return monitor;
+    }
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      // Registered factories require distinct config proto types.
+      return std::make_unique<Protobuf::Timestamp>();
+    }
+    std::string name() const override {
+      return "envoy.resource_monitors.testonly.fake_resource_monitor2";
+    }
+    FakeResourceMonitor2* monitor() const { return monitor_; }
+
+  private:
+    FakeResourceMonitor2* monitor_{nullptr};
+  };
+
+  std::unique_ptr<FakeResourceMonitorFactory2> second_factory_;
+  std::unique_ptr<Registry::InjectFactory<Server::Configuration::ResourceMonitorFactory>>
+      inject_second_factory_;
+};
+
+INSTANTIATE_TEST_SUITE_P(Protocols, MultipleReduceTimeoutsActionsIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(MultipleReduceTimeoutsActionsIntegrationTest, TimerTypesScaleIndependently) {
+  initializeOverloadManager();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  ASSERT_TRUE(codec_client_->connected());
+
+  // Scale max duration to 3 seconds; named idle timeout remains 20 seconds.
+  updateResource(0.9);
+  test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
+                             Eq(100));
+  test_server_->waitForGauge("overload.connection_idle_timeouts.scale_percent", Eq(0));
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  test_server_->waitForCounter("http.config_test.downstream_cx_max_duration_reached", Eq(1));
+  const uint64_t max_duration_count =
+      test_server_->counter("http.config_test.downstream_cx_max_duration_reached")->value();
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+  codec_client_->close();
+
+  // Scale idle timeout to 5 seconds; the new connection's max duration remains 20 seconds.
+  updateResource(0);
+  updateSecondResource(0.9);
+  test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
+                             Eq(0));
+  test_server_->waitForGauge("overload.connection_idle_timeouts.scale_percent", Eq(100));
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  ASSERT_TRUE(codec_client_->connected());
+  timeSystem().advanceTimeWait(std::chrono::seconds(5));
+  test_server_->waitForCounter("http.config_test.downstream_cx_idle_timeout", Eq(1));
+  EXPECT_EQ(max_duration_count,
+            test_server_->counter("http.config_test.downstream_cx_max_duration_reached")->value());
+  codec_client_->close();
+}
+
 class LoadShedPointIntegrationTest : public BaseOverloadIntegrationTest,
                                      public HttpProtocolIntegrationTest {
 protected:
@@ -1665,6 +1817,72 @@ TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMissDisabled) {
 
   EXPECT_TRUE(response->waitForEndStream(std::chrono::seconds(20)));
   EXPECT_TRUE(response->complete());
+}
+
+class TcpProxyLoadShedPointIntegrationTest
+    : public BaseOverloadIntegrationTest,
+      public BaseIntegrationTest,
+      public testing::TestWithParam<Network::Address::IpVersion> {
+public:
+  TcpProxyLoadShedPointIntegrationTest()
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {
+    // Disable half-close so server-initiated closes trigger a full RemoteClose on the client.
+    enableHalfClose(false);
+  }
+
+  void
+  initializeOverloadManager(const envoy::config::overload::v3::LoadShedPoint& load_shed_point) {
+    setupOverloadManagerConfig(load_shed_point);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    initialize();
+    updateResource(0);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyLoadShedPointIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(TcpProxyLoadShedPointIntegrationTest, TcpProxyUpstreamConnectShedsLoad) {
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.tcp_proxy_upstream_connect"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // Put envoy in overloaded state and check that it drops the downstream connection
+  // when establishing upstream connection.
+  updateResource(0.95);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.tcp_proxy_upstream_connect.scale_percent", Eq(100));
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  // Pass ignore_spurious_events = true to loop until disconnected_ == true.
+  // In heavily loaded CI environments (especially under MSAN/ASAN/TSAN), the socket's Connected
+  // event and RemoteClose event can arrive in separate dispatcher iterations. Without this flag,
+  // the default single block step unblocks on the Connected event and immediately asserts
+  // EXPECT_TRUE(disconnected_) before the second iteration has a chance to process the disconnect.
+  tcp_client->waitForDisconnect(/*ignore_spurious_events=*/true);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.downstream_cx_overload_close", Eq(1));
+
+  // Disable overload, connections should succeed.
+  updateResource(0.80);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.tcp_proxy_upstream_connect.scale_percent", Eq(0));
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("listener_0"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(tcp_client2->write("hello"));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5, &data));
+  EXPECT_EQ("hello", data);
+  tcp_client2->close();
 }
 
 } // namespace Envoy

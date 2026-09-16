@@ -1319,7 +1319,7 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateReverseConnectionWithCustomScope) 
 
   // Replace the class member io_handle_ with our custom one for this test
   auto original_io_handle = std::move(io_handle_);
-  io_handle_ = std::make_unique<ReverseConnectionIOHandle>(8, // dummy fd
+  io_handle_ = std::make_unique<ReverseConnectionIOHandle>(-1, // dummy fd
                                                            custom_prefix_config, cluster_manager_,
                                                            custom_extension.get(), *stats_scope_);
 
