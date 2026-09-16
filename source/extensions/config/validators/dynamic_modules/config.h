@@ -2,26 +2,24 @@
 
 #include "envoy/config/config_validator.h"
 
-#include "source/extensions/config/validators/minimum_clusters/minimum_clusters_validator.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Config {
 namespace Validators {
+namespace DynamicModules {
 
-class MinimumClustersValidatorFactory : public Envoy::Config::ConfigValidatorFactory {
+class DynamicModuleConfigValidatorFactory : public Envoy::Config::ConfigValidatorFactory {
 public:
-  MinimumClustersValidatorFactory() = default;
-
   Envoy::Config::ConfigValidatorPtr
   createConfigValidator(const Protobuf::Any& config,
                         ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
-  std::string name() const override;
+  std::string name() const override { return "envoy.config.validators.dynamic_modules"; }
 };
 
+} // namespace DynamicModules
 } // namespace Validators
 } // namespace Config
 } // namespace Extensions
