@@ -25,3 +25,22 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    extension_names = [
+        "envoy.router.cluster_specifier_plugin.priority_group",
+        "envoy.filters.http.lua",
+    ],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/http/lua:config",
+        "//source/extensions/router/cluster_specifiers/priority_group:config",
+        "//test/integration:autonomous_upstream_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/extensions/router/cluster_specifiers/priority_group/v3:pkg_cc_proto",
+    ],
+)

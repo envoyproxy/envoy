@@ -57,6 +57,9 @@ message PriorityGroup {
 // <envoy_v3_api_field_config.route.v3.RetryPolicy.refresh_cluster_on_retry>` option of the retry
 // policy to ensure the reselecting of the cluster on every attempt.
 //
+// See the :ref:`cluster specifier documentation
+// <config_http_cluster_specifier_priority_group>` for more details.
+//
 // Example:
 //
 // .. validated-code-block:: yaml
@@ -111,8 +114,12 @@ message PriorityGroupClusterSpecifier {
   // and the configured clusters and weights of that group are used.
   //
   // The dynamic metadata is typically set by a filter that runs before the router filter, for
-  // example the :ref:`header to metadata filter
-  // <config_http_filters_header_to_metadata>`.
+  // example the :ref:`Lua filter <config_http_filters_lua>` or the :ref:`external processing
+  // filter <config_http_filters_ext_proc>`.
+  //
+  // .. note::
+  //   The route, and with it the cluster of the initial attempt, is resolved before the HTTP
+  //   filter chain runs, so the filter that sets the metadata must also clear the route cache.
   //
   // Example of a matching dynamic metadata value:
   //
@@ -151,8 +158,12 @@ message PriorityGroupClusterSpecifier {
     string header_name = 3
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
-    // When set to true, the hash policies will be used to generate the random value for weighted cluster selection.
+    // When set to true, the :ref:`hash policies
+    // <envoy_v3_api_field_config.route.v3.RouteAction.hash_policy>` of the route will be used to
+    // generate the random value for weighted cluster selection.
     // This could ensure consistent cluster picking across multiple proxy levels for weighted traffic.
+    // If the route has no hash policy or the hash policies can not generate a hash for the request,
+    // Envoy will fall back to use the internally generated random value.
     google.protobuf.BoolValue use_hash_policy = 4;
   }
 }
