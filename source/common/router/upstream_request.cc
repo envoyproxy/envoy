@@ -426,15 +426,12 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   } else if (Http::Utility::isWebSocketUpgradeRequest(*headers)) {
     paused_for_websocket_ = true;
 
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.websocket_enable_timeout_on_upgrade_response")) {
-      // For websocket upgrades, we need to set up timeouts immediately
-      // because the upstream request will be paused waiting for the upgrade response.
-      if (!per_try_timeout_) {
-        setupPerTryTimeout();
-      }
-      parent_.setupRouteTimeoutForWebsocketUpgrade();
+    // For websocket upgrades, we need to set up timeouts immediately
+    // because the upstream request will be paused waiting for the upgrade response.
+    if (!per_try_timeout_) {
+      setupPerTryTimeout();
     }
+    parent_.setupRouteTimeoutForWebsocketUpgrade();
   } else if (!end_stream &&
              Runtime::runtimeFeatureEnabled(
                  "envoy.reloadable_features.http_pause_generic_upgrade_request_body") &&

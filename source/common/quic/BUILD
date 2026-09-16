@@ -134,6 +134,7 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/tls:server_context_lib",
+        "@abseil-cpp//absl/types:span",
         "@quiche//:quic_server_session_lib",
     ]),
 )

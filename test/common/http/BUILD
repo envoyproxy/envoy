@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/router:context_lib",
+        "//source/common/router:router_lib",
         "//source/extensions/upstreams/http/generic:config",
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
@@ -58,6 +59,16 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:character_set_validation_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "codec_helper_test",
+    srcs = ["codec_helper_test.cc"],
+    deps = [
+        "//source/common/http:codec_helper_lib",
+        "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -145,6 +156,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

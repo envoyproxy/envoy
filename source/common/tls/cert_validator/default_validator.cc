@@ -594,14 +594,21 @@ void DefaultCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
   // the client connection. This ensures that the client is always validated against
   // the correct settings, even if session resumption across different listeners
   // is enabled.
-  if (ca_cert_ != nullptr) {
-    rc = X509_digest(ca_cert_.get(), EVP_sha256(), hash_buffer, &hash_length);
-    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
-    RELEASE_ASSERT(hash_length == SHA256_DIGEST_LENGTH,
-                   fmt::format("invalid SHA256 hash length {}", hash_length));
+  if (shared_ca_certs_ != nullptr) {
+    // Hash every certificate in the trust bundle, not just the first one. Otherwise a
+    // change to any CA after the first one, e.g. a rotation or removal through an xDS
+    // update, would leave previously issued session IDs valid, letting a resumed
+    // session bypass validation against the current trust bundle. A bundle with a
+    // single certificate produces byte-identical input to the previous behavior.
+    for (const auto& cert : shared_ca_certs_->certs) {
+      rc = X509_digest(cert.get(), EVP_sha256(), hash_buffer, &hash_length);
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+      RELEASE_ASSERT(hash_length == SHA256_DIGEST_LENGTH,
+                     fmt::format("invalid SHA256 hash length {}", hash_length));
 
-    rc = EVP_DigestUpdate(md.get(), hash_buffer, hash_length);
-    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+      rc = EVP_DigestUpdate(md.get(), hash_buffer, hash_length);
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
   }
 
   for (const auto& hash : verify_certificate_hash_list_) {

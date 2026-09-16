@@ -1,3 +1,4 @@
+#include "envoy/common/logger.h"
 #include "envoy/config/core/v3/extension.pb.h"
 
 #include "source/common/quic/quic_server_transport_socket_factory.h"
@@ -87,11 +88,11 @@ public:
     Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
   }
 
-  ~ClientIntegrationTest() override { Logger::Context::changeAllLogLevels(spdlog::level::info); }
+  ~ClientIntegrationTest() override { Logger::Context::changeAllLogLevels(Logger::Levels::info); }
 
   void initialize() override {
     builder_.setLogLevel(log_level_);
-    Logger::Context::changeAllLogLevels(static_cast<spdlog::level::level_enum>(log_level_));
+    Logger::Context::changeAllLogLevels(log_level_);
     builder_.enableWorkerThread(getUseWorkerThread());
     if (getUseWorkerThread()) {
       // Platform cert validation is disabled when using worker thread. The engine will use the
