@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,40 +43,128 @@ public:
   SseEvent(const SseEvent&) = delete;
   SseEvent& operator=(const SseEvent&) = delete;
 
-  // SSE event name (e.g. "message", "content_block_delta", "error"). Empty when the frame
-  // carried no `event:` field, which is how OpenAI Chat Completions streams frame every chunk.
-  absl::string_view event() const { return event_; }
+  // A modeled SSE metadata line (`event:`, `id:`, or `retry:`).
+  //
+  // All metadata lines in a frame are stored as raw values in arrival order in `metadata_`:
+  // - On passthrough (when no filter mutates the metadata), reserialization emits every entry in
+  //   its original order and raw form (preserving empty `id:`, non-numeric `retry:`, and
+  //   duplicates).
+  // - On inspection (`event()`, `id()`, `retry()`), getters apply the WHATWG SSE specification's
+  //   "last-valid wins" rule so filters and transcoders see the exact effective value a spec-
+  //   compliant client would act on.
+  // - On mutation (`set_event()`, `set_id()`, `set_retry()`), setters validate the new value and
+  //   normalize the vector to a single valid entry for that field kind.
+  struct MetadataField {
+    enum class Kind { Event, Id, Retry };
+    Kind kind;
+    std::string value;
+  };
+
+  static bool isValidRetry(absl::string_view retry) {
+    if (retry.empty()) {
+      return false;
+    }
+    for (const char c : retry) {
+      if (c < '0' || c > '9') {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  const std::vector<MetadataField>& metadata() const { return metadata_; }
+  void set_metadata(std::vector<MetadataField> metadata) { metadata_ = std::move(metadata); }
+
+  // Effective SSE event name (e.g. "message", "content_block_delta", "error") using last-occurrence
+  // wins. Empty when the frame carried no `event:` field or when the last `event:` line was empty
+  // (both of which dispatch as event type "message" per the SSE specification).
+  absl::string_view event() const {
+    for (auto it = metadata_.rbegin(); it != metadata_.rend(); ++it) {
+      if (it->kind == MetadataField::Kind::Event) {
+        return it->value;
+      }
+    }
+    return {};
+  }
+
+  // Validates `event` (forbidding CR/LF) and replaces all `event:` entries with a single entry.
+  // Passing an empty string removes all `event:` entries so no `event:` header is emitted.
   absl::Status set_event(absl::string_view event) {
     if (event.find_first_of("\r\n") != absl::string_view::npos) {
       IS_ENVOY_BUG("SSE event field must not contain CR or LF");
       return absl::InvalidArgumentError("SSE event field must not contain CR or LF");
     }
-    event_ = std::string(event);
+    clear_event();
+    if (!event.empty()) {
+      metadata_.push_back(MetadataField{MetadataField::Kind::Event, std::string(event)});
+    }
     return absl::OkStatus();
   }
 
-  // SSE event ID, used by clients for reconnection. Empty when absent.
-  absl::string_view id() const { return id_; }
+  void clear_event() {
+    std::erase_if(metadata_,
+                  [](const MetadataField& f) { return f.kind == MetadataField::Kind::Event; });
+  }
+
+  // Effective SSE event ID using last-valid wins per the WHATWG SSE specification:
+  // lines containing U+0000 NULL are ignored.
+  // Returns std::nullopt when no valid `id:` line is present in the frame. Returns "" when an
+  // explicit empty `id:` line is present (which instructs the client to reset `lastEventId`).
+  std::optional<absl::string_view> id() const {
+    for (auto it = metadata_.rbegin(); it != metadata_.rend(); ++it) {
+      if (it->kind == MetadataField::Kind::Id && it->value.find('\0') == std::string::npos) {
+        return it->value;
+      }
+    }
+    return std::nullopt;
+  }
+
+  // Validates `id` (forbidding CR, LF, and NULL) and replaces all `id:` entries with a single
+  // entry. Passing an empty string emits `id:\n` to reset the client's `lastEventId`; use
+  // clear_id() to omit the `id:` header altogether.
   absl::Status set_id(absl::string_view id) {
-    if (id.find_first_of("\r\n") != absl::string_view::npos) {
-      IS_ENVOY_BUG("SSE id field must not contain CR or LF");
-      return absl::InvalidArgumentError("SSE id field must not contain CR or LF");
+    if (id.find_first_of("\r\n") != absl::string_view::npos ||
+        id.find('\0') != absl::string_view::npos) {
+      IS_ENVOY_BUG("SSE id field must not contain CR, LF, or NULL");
+      return absl::InvalidArgumentError("SSE id field must not contain CR, LF, or NULL");
     }
-    id_ = std::string(id);
+    clear_id();
+    metadata_.push_back(MetadataField{MetadataField::Kind::Id, std::string(id)});
     return absl::OkStatus();
   }
 
-  // SSE retry interval, verbatim. Nothing here acts on it, so it is neither parsed nor validated:
-  // a value the grammar would have a client ignore is carried through rather than dropped. Empty
-  // when absent.
-  absl::string_view retry() const { return retry_; }
-  absl::Status set_retry(absl::string_view retry) {
-    if (retry.find_first_of("\r\n") != absl::string_view::npos) {
-      IS_ENVOY_BUG("SSE retry field must not contain CR or LF");
-      return absl::InvalidArgumentError("SSE retry field must not contain CR or LF");
+  void clear_id() {
+    std::erase_if(metadata_,
+                  [](const MetadataField& f) { return f.kind == MetadataField::Kind::Id; });
+  }
+
+  // Effective SSE retry interval using last-valid wins per the WHATWG SSE specification:
+  // only non-empty values consisting solely of ASCII digits are valid; all others are ignored.
+  // Returns std::nullopt when no valid `retry:` line is present in the frame.
+  std::optional<absl::string_view> retry() const {
+    for (auto it = metadata_.rbegin(); it != metadata_.rend(); ++it) {
+      if (it->kind == MetadataField::Kind::Retry && isValidRetry(it->value)) {
+        return it->value;
+      }
     }
-    retry_ = std::string(retry);
+    return std::nullopt;
+  }
+
+  // Validates `retry` (must be non-empty ASCII digits without CR/LF) and replaces all `retry:`
+  // entries with a single entry. Use clear_retry() to omit the `retry:` header.
+  absl::Status set_retry(absl::string_view retry) {
+    if (retry.find_first_of("\r\n") != absl::string_view::npos || !isValidRetry(retry)) {
+      IS_ENVOY_BUG("SSE retry field must consist of ASCII digits");
+      return absl::InvalidArgumentError("SSE retry field must consist of ASCII digits");
+    }
+    clear_retry();
+    metadata_.push_back(MetadataField{MetadataField::Kind::Retry, std::string(retry)});
     return absl::OkStatus();
+  }
+
+  void clear_retry() {
+    std::erase_if(metadata_,
+                  [](const MetadataField& f) { return f.kind == MetadataField::Kind::Retry; });
   }
 
   // Whether the frame carried any `data:` field at all. False for a comment-only keepalive,
@@ -145,9 +234,7 @@ public:
   void set_extras_store(BufferManagerPtr store) { extras_store_ = std::move(store); }
 
 private:
-  std::string event_;
-  std::string id_;
-  std::string retry_;
+  std::vector<MetadataField> metadata_;
   bool has_data_{false};
   bool is_json_{false};
   JsonWithExtBuf json_;

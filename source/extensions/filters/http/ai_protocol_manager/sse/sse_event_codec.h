@@ -35,6 +35,8 @@ namespace AiProtocolManager {
 // A payload that is not valid JSON is not an error -- `[DONE]`, a binary audio delta and a
 // provider error dump all reach filters through SseEvent::raw_data() (or, once offloaded,
 // raw_data_ext_refs()). Only exceeding a Config cap fails the stream.
+//
+// TODO(penguingao): Add a fuzz test for SseEventDecoder and SseEventSerializer.
 class SseEventDecoder {
 public:
   // Big enough that typical frames do not reach it, small enough that a hostile or broken
@@ -49,6 +51,7 @@ public:
   // backend, and unlike the payload and the lines kept verbatim they are copied into strings for
   // direct access rather than held in a store.
   static constexpr uint32_t kDefaultMaxMetadataLineBytes = 16 * 1024;
+  static constexpr uint32_t kDefaultMaxMetadataFields = 32;
 
   // One entry is retained per `data:` line so an offloaded raw payload can be re-emitted line by
   // line. Typical frames use one or two.
@@ -63,6 +66,9 @@ public:
     // Per-frame cap on the total size of the modeled metadata fields. Exceeding it fails the
     // stream.
     uint32_t max_metadata_line_bytes{kDefaultMaxMetadataLineBytes};
+    // Per-frame cap on the number of modeled metadata lines (`event:`, `id:`, `retry:`).
+    // Exceeding it fails the stream.
+    uint32_t max_metadata_fields{kDefaultMaxMetadataFields};
     // Per-frame cap on the number of `data:` lines. Exceeding it fails the stream.
     uint32_t max_data_lines{kDefaultMaxDataLines};
     // Settings for parsing each frame's JSON payload, notably the size past which a string value
@@ -137,9 +143,7 @@ private:
 
   // Current frame state.
   bool saw_field_{false}; // Distinguishes a real frame from consecutive blank lines.
-  std::string event_;
-  std::string id_;
-  std::string retry_raw_;
+  std::vector<SseEvent::MetadataField> metadata_;
   size_t metadata_bytes_{0};
   uint64_t extras_len_{0};
   // Unmodeled field lines, verbatim and in arrival order. Written as they are scanned, so the

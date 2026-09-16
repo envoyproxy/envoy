@@ -116,14 +116,17 @@ TEST_F(SseEventDecoderTest, AllMetadataFields) {
   EXPECT_TRUE(events_[0]->is_json());
 }
 
-// The grammar would have a client ignore a retry that is not all digits. Nothing here acts on the
-// value, so it is carried through instead of dropped.
+// The grammar would have a client ignore a retry that is not all digits. The raw entry is
+// retained in metadata() for passthrough reserialization, while retry() returns std::nullopt
+// per last-valid-wins semantics.
 TEST_F(SseEventDecoderTest, NonNumericRetryIsKept) {
   SseEventDecoder decoder = makeDecoder();
   ASSERT_THAT(feed(decoder, "retry: soon\ndata: {}\n\n"), IsOk());
 
   ASSERT_EQ(events_.size(), 1);
-  EXPECT_EQ(events_[0]->retry(), "soon");
+  EXPECT_EQ(events_[0]->retry(), std::nullopt);
+  ASSERT_EQ(events_[0]->metadata().size(), 1);
+  EXPECT_EQ(events_[0]->metadata()[0].value, "soon");
 }
 
 TEST_F(SseEventDecoderTest, MultipleDataLinesJoinWithNewline) {
@@ -704,8 +707,9 @@ TEST_F(SseEventDecoderTest, PartialUtf8BomAtEofIsNotDropped) {
   EXPECT_EQ(extras(*events_[0]), "\xEF\xBB\n");
 }
 
-// SseEvent metadata setters forbid CR and LF (triggering IS_ENVOY_BUG and returning
-// InvalidArgumentError without mutating the field), and serialization forbids CR in raw_data.
+// SseEvent metadata setters forbid CR, LF, NULL in id, and non-digits in retry (triggering
+// IS_ENVOY_BUG and returning InvalidArgumentError without mutating the field), and serialization
+// forbids CR in raw_data.
 TEST_F(SseCodecBufferTest, ForbidsCrOrLfInMetadataSettersAndCrInRawData) {
   SseEvent event;
   EXPECT_ENVOY_BUG(
@@ -714,12 +718,21 @@ TEST_F(SseCodecBufferTest, ForbidsCrOrLfInMetadataSettersAndCrInRawData) {
   EXPECT_TRUE(event.event().empty());
 
   EXPECT_ENVOY_BUG(EXPECT_EQ(event.set_id("bad\rid").code(), absl::StatusCode::kInvalidArgument),
-                   "SSE id field must not contain CR or LF");
-  EXPECT_TRUE(event.id().empty());
+                   "SSE id field must not contain CR, LF, or NULL");
+  EXPECT_FALSE(event.id().has_value());
+
+  constexpr absl::string_view kNullId("bad\0id", 6);
+  EXPECT_ENVOY_BUG(EXPECT_EQ(event.set_id(kNullId).code(), absl::StatusCode::kInvalidArgument),
+                   "SSE id field must not contain CR, LF, or NULL");
+  EXPECT_FALSE(event.id().has_value());
 
   EXPECT_ENVOY_BUG(EXPECT_EQ(event.set_retry("100\r\n").code(), absl::StatusCode::kInvalidArgument),
-                   "SSE retry field must not contain CR or LF");
-  EXPECT_TRUE(event.retry().empty());
+                   "SSE retry field must consist of ASCII digits");
+  EXPECT_FALSE(event.retry().has_value());
+
+  EXPECT_ENVOY_BUG(EXPECT_EQ(event.set_retry("soon").code(), absl::StatusCode::kInvalidArgument),
+                   "SSE retry field must consist of ASCII digits");
+  EXPECT_FALSE(event.retry().has_value());
 
 #if !defined(NDEBUG)
   auto raw = std::make_unique<Buffer::OwnedImpl>();
@@ -727,6 +740,50 @@ TEST_F(SseCodecBufferTest, ForbidsCrOrLfInMetadataSettersAndCrInRawData) {
   event.set_raw_data(std::move(raw));
   EXPECT_DEBUG_DEATH(serialize(event), ".*");
 #endif
+}
+
+// Empty metadata values (`id:`, `event:`, `retry:`) are preserved on passthrough reserialization,
+// and an explicit empty `id:` returns `""` (distinct from `std::nullopt` when absent) so filters
+// know the frame resets the client's `lastEventId`.
+TEST_F(SseCodecBufferTest, EmptyMetadataValuesRoundTripOnPassthrough) {
+  SseEventDecoder decoder = makeDecoder();
+  ASSERT_THAT(feed(decoder, "id:\nevent:\nretry:\ndata: p\n\n"), IsOk());
+
+  ASSERT_EQ(events_.size(), 1);
+  EXPECT_EQ(events_[0]->id(), "");
+  EXPECT_EQ(events_[0]->event(), "");
+  EXPECT_EQ(events_[0]->retry(), std::nullopt);
+  EXPECT_EQ(serialize(*events_[0]), "id:\nevent:\nretry:\ndata: p\n\n");
+}
+
+// When duplicated metadata lines contain both valid and invalid entries, getters return the last
+// valid value per the WHATWG SSE spec, passthrough reserialization preserves all raw lines in
+// order, and calling setters normalizes the vector to single valid entries.
+TEST_F(SseCodecBufferTest, RepeatedMetadataLastValidWinsOnReadAndPreservesRawOnPassthrough) {
+  SseEventDecoder decoder = makeDecoder();
+  static constexpr char kRawInput[] =
+      "id: 1\nid: 2\nid: bad\0id\nretry: 100\nretry: 200\nretry: soon\ndata: p\n\n";
+  constexpr absl::string_view kInput(kRawInput, sizeof(kRawInput) - 1);
+  ASSERT_THAT(feed(decoder, kInput), IsOk());
+
+  ASSERT_EQ(events_.size(), 1);
+  EXPECT_EQ(events_[0]->id(), "2");
+  EXPECT_EQ(events_[0]->retry(), "200");
+  EXPECT_EQ(serialize(*events_[0]), kInput);
+
+  EXPECT_THAT(events_[0]->set_id("3"), IsOk());
+  EXPECT_THAT(events_[0]->set_retry("300"), IsOk());
+  EXPECT_EQ(serialize(*events_[0]), "id: 3\nretry: 300\ndata: p\n\n");
+}
+
+// Exceeding max_metadata_fields fails the stream with ResourceExhaustedError.
+TEST_F(SseEventDecoderTest, FrameExceedingMaxMetadataFieldsFails) {
+  SseEventDecoder::Config config;
+  config.max_metadata_fields = 2;
+  SseEventDecoder decoder = makeDecoder(config);
+
+  const absl::Status status = feed(decoder, "id: 1\nid: 2\nid: 3\ndata: p\n\n");
+  EXPECT_EQ(status.code(), absl::StatusCode::kResourceExhausted);
 }
 
 // ExternalRef ranges in raw_data_ext_refs() assert non-null payload_store and are range-checked by

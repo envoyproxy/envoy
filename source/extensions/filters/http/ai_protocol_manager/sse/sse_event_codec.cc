@@ -164,19 +164,21 @@ absl::Status SseEventDecoder::onLineBytes(absl::string_view bytes) {
 
 absl::Status SseEventDecoder::beginField(absl::string_view name) {
   saw_field_ = true;
-  if (name == kEventField) {
-    event_.clear();
-    kind_ = LineKind::Event;
-    return absl::OkStatus();
-  }
-  if (name == kIdField) {
-    id_.clear();
-    kind_ = LineKind::Id;
-    return absl::OkStatus();
-  }
-  if (name == kRetryField) {
-    retry_raw_.clear();
-    kind_ = LineKind::Retry;
+  if (name == kEventField || name == kIdField || name == kRetryField) {
+    if (metadata_.size() >= config_.max_metadata_fields) {
+      return absl::ResourceExhaustedError(
+          absl::StrCat("SSE frame metadata exceeded ", config_.max_metadata_fields, " fields"));
+    }
+    if (name == kEventField) {
+      kind_ = LineKind::Event;
+      metadata_.push_back(SseEvent::MetadataField{SseEvent::MetadataField::Kind::Event, {}});
+    } else if (name == kIdField) {
+      kind_ = LineKind::Id;
+      metadata_.push_back(SseEvent::MetadataField{SseEvent::MetadataField::Kind::Id, {}});
+    } else {
+      kind_ = LineKind::Retry;
+      metadata_.push_back(SseEvent::MetadataField{SseEvent::MetadataField::Kind::Retry, {}});
+    }
     return absl::OkStatus();
   }
   if (name != kDataField) {
@@ -215,11 +217,10 @@ absl::Status SseEventDecoder::onValueBytes(absl::string_view bytes) {
     data_spans_.back().second += bytes.size();
     break;
   case LineKind::Event:
-    return appendMetadata(event_, bytes);
   case LineKind::Id:
-    return appendMetadata(id_, bytes);
   case LineKind::Retry:
-    return appendMetadata(retry_raw_, bytes);
+    ASSERT(!metadata_.empty());
+    return appendMetadata(metadata_.back().value, bytes);
   case LineKind::Unknown:
     return appendExtras(bytes);
   }
@@ -304,17 +305,12 @@ void SseEventDecoder::finishFrame(std::vector<SseEventPtr>& out) {
   }
 
   auto event = std::make_unique<SseEvent>();
-  const absl::Status event_status = event->set_event(event_);
-  ASSERT(event_status.ok());
-  const absl::Status id_status = event->set_id(id_);
-  ASSERT(id_status.ok());
+  event->set_metadata(std::move(metadata_));
   if (extras_store_ != nullptr) {
     // No more lines belong to this frame, so nothing more will be appended.
     extras_store_->endStream();
     event->set_extras_store(std::move(extras_store_));
   }
-  const absl::Status retry_status = event->set_retry(retry_raw_);
-  ASSERT(retry_status.ok());
 
   if (has_data_ && data_store_ == nullptr) {
     // A `data:` field with nothing after it: the frame carries data, but no payload byte ever
@@ -362,9 +358,7 @@ void SseEventDecoder::resetLine() {
 
 void SseEventDecoder::resetFrame() {
   saw_field_ = false;
-  event_.clear();
-  id_.clear();
-  retry_raw_.clear();
+  metadata_.clear();
   metadata_bytes_ = 0;
   extras_len_ = 0;
   // Reset rather than assume null.
@@ -378,17 +372,25 @@ void SseEventDecoder::resetFrame() {
 }
 
 Coroutine::Task<absl::Status> SseEventSerializer::serialize(SseEvent& event, BufferManager& out) {
-  ASSERT(event.event().find_first_of("\r\n") == absl::string_view::npos);
-  ASSERT(event.id().find_first_of("\r\n") == absl::string_view::npos);
-  ASSERT(event.retry().find_first_of("\r\n") == absl::string_view::npos);
-  if (!event.event().empty()) {
-    CO_RETURN_IF_ERROR(co_await writeOut(out, absl::StrCat("event: ", event.event(), "\n")));
-  }
-  if (!event.id().empty()) {
-    CO_RETURN_IF_ERROR(co_await writeOut(out, absl::StrCat("id: ", event.id(), "\n")));
-  }
-  if (!event.retry().empty()) {
-    CO_RETURN_IF_ERROR(co_await writeOut(out, absl::StrCat("retry: ", event.retry(), "\n")));
+  for (const SseEvent::MetadataField& field : event.metadata()) {
+    ASSERT(field.value.find_first_of("\r\n") == std::string::npos);
+    absl::string_view prefix;
+    switch (field.kind) {
+    case SseEvent::MetadataField::Kind::Event:
+      prefix = field.value.empty() ? "event:\n" : "event: ";
+      break;
+    case SseEvent::MetadataField::Kind::Id:
+      prefix = field.value.empty() ? "id:\n" : "id: ";
+      break;
+    case SseEvent::MetadataField::Kind::Retry:
+      prefix = field.value.empty() ? "retry:\n" : "retry: ";
+      break;
+    }
+    if (field.value.empty()) {
+      CO_RETURN_IF_ERROR(co_await writeOut(out, std::string(prefix)));
+    } else {
+      CO_RETURN_IF_ERROR(co_await writeOut(out, absl::StrCat(prefix, field.value, "\n")));
+    }
   }
   // Comments and fields this codec does not model, put back byte for byte. The store holds those
   // lines and nothing else, so its whole range is what goes out.
