@@ -168,9 +168,6 @@ void DynamicModuleBootstrapExtensionConfig::getActiveResourceNames(
       emit(secret_name);
     }
     break;
-  default:
-    // An unrecognized kind (e.g. from a newer module ABI) emits nothing.
-    break;
   }
 }
 

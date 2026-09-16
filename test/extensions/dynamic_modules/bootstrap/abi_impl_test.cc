@@ -1937,9 +1937,9 @@ TEST_F(BootstrapAbiImplTest, TransportSocketMatchIntersection) {
   EXPECT_THAT(Config::transportSocketMatchIntersection({{}, {}}), testing::IsEmpty());
 }
 
-// An unrecognized resource kind emits nothing and does not crash; a valid kind with no active
-// objects likewise emits nothing.
-TEST_F(BootstrapAbiImplTest, GetActiveResourceNamesUnknownKindIsNoOp) {
+// With the server initialized but no active objects, every valid resource kind emits nothing and
+// does not crash.
+TEST_F(BootstrapAbiImplTest, GetActiveResourceNamesEmptyEmitsNothing) {
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_OK(dynamic_module);
@@ -1959,17 +1959,13 @@ TEST_F(BootstrapAbiImplTest, GetActiveResourceNamesUnknownKindIsNoOp) {
     ++static_cast<Recorder*>(user_data)->calls;
   };
 
-  // An out-of-range kind hits the default branch: no callback, no crash.
-  envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
-      config.value()->thisAsVoidPtr(),
-      static_cast<envoy_dynamic_module_type_bootstrap_active_resource_kind>(9999), name_fn,
-      &recorder);
-  EXPECT_EQ(recorder.calls, 0);
-
-  // A valid kind with no active objects also emits nothing.
-  envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
-      config.value()->thisAsVoidPtr(),
-      envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster, name_fn, &recorder);
+  for (auto kind : {envoy_dynamic_module_type_bootstrap_active_resource_kind_FilterChain,
+                    envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster,
+                    envoy_dynamic_module_type_bootstrap_active_resource_kind_TransportSocketMatch,
+                    envoy_dynamic_module_type_bootstrap_active_resource_kind_Secret}) {
+    envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+        config.value()->thisAsVoidPtr(), kind, name_fn, &recorder);
+  }
   EXPECT_EQ(recorder.calls, 0);
 }
 
