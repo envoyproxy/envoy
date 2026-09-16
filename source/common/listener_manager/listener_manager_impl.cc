@@ -295,7 +295,7 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
   if (netns.has_value()) {
     // A listen socket inherited from the hot restart parent is already bound inside the target
     // network namespace, so ask the parent for it before entering the namespace. The namespace
-    // path may no longer be openable (e.g. it was removed after the parent bound the socket)
+    // path may no longer open (e.g. it was removed after the parent bound the socket)
     // while the parent's socket is still valid; entering the namespace first would fail the
     // listener even though it could have been inherited.
     if (bind_type != BindType::NoBind && address->type() == Network::Address::Type::Ip &&
