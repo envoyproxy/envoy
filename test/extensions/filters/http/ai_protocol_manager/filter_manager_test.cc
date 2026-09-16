@@ -762,6 +762,122 @@ TEST_F(FilterManagerTest, FilterOutlivesManagerUntilItsCoroutineCompletes) {
   EXPECT_TRUE(destroyed);
 }
 
+class TestSyncMutationFilter : public SyncAiFilter {
+public:
+  explicit TestSyncMutationFilter(std::string model) : model_(std::move(model)) {}
+
+  absl::StatusOr<DecodeAction> onRequest(AiRequest& request) override {
+    request.json()["model"] = model_;
+    return DecodeAction::continueChain();
+  }
+
+private:
+  std::string model_;
+};
+
+TEST_F(FilterManagerTest, SyncAiFilterContinueAndMutate) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-3.5"}});
+
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_unique<TestSyncMutationFilter>("gpt-4o"));
+
+  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
+                        stream_info_);
+
+  absl::Status status;
+  bool completed = false;
+  manager.start([&status, &completed](absl::Status s) {
+    status = std::move(s);
+    completed = true;
+  });
+
+  drain();
+  EXPECT_TRUE(completed);
+  ASSERT_OK(status);
+
+  auto parsed = nlohmann::json::parse(bridge_raw_->injected_.toString());
+  EXPECT_EQ(parsed["model"], "gpt-4o");
+}
+
+class TestSyncLocalReplyFilter : public SyncAiFilter {
+public:
+  absl::StatusOr<DecodeAction> onRequest(AiRequest&) override {
+    return DecodeAction::localReply(Http::Code::Forbidden, "blocked by sync filter");
+  }
+};
+
+TEST_F(FilterManagerTest, SyncAiFilterLocalReply) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+
+  Http::Code local_reply_code = Http::Code::OK;
+  std::string local_reply_details;
+
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_unique<TestSyncLocalReplyFilter>());
+
+  FilterManager manager(
+      std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      /*request_headers=*/nullptr,
+      [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
+        local_reply_code = code;
+        local_reply_details = std::move(details);
+      });
+
+  absl::Status status;
+  bool completed = false;
+  manager.start([&status, &completed](absl::Status s) {
+    status = std::move(s);
+    completed = true;
+  });
+
+  drain();
+  EXPECT_TRUE(completed);
+  EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kCancelled));
+  EXPECT_EQ(local_reply_code, Http::Code::Forbidden);
+  EXPECT_EQ(local_reply_details, "blocked by sync filter");
+}
+
+class TestSyncErrorFilter : public SyncAiFilter {
+public:
+  absl::StatusOr<DecodeAction> onRequest(AiRequest&) override {
+    return absl::InvalidArgumentError("bad request payload");
+  }
+};
+
+TEST_F(FilterManagerTest, SyncAiFilterError) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+
+  Http::Code local_reply_code = Http::Code::OK;
+  std::string local_reply_details;
+
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_unique<TestSyncErrorFilter>());
+
+  FilterManager manager(
+      std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      /*request_headers=*/nullptr,
+      [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
+        local_reply_code = code;
+        local_reply_details = std::move(details);
+      });
+
+  absl::Status status;
+  bool completed = false;
+  manager.start([&status, &completed](absl::Status s) {
+    status = std::move(s);
+    completed = true;
+  });
+
+  drain();
+  EXPECT_TRUE(completed);
+  EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(local_reply_code, Http::Code::BadGateway);
+  EXPECT_EQ(local_reply_details, "bad request payload");
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

@@ -43,17 +43,15 @@ using RequestInfoFilterConfigSharedPtr = std::shared_ptr<const RequestInfoFilter
 
 // Publishes envoy.data.ai.v3.RequestInfo before the manager releases the request headers, so
 // later decode filters see it from their first headers callback. First writer owns the namespace.
-class RequestInfoFilter : public HttpFilters::AiProtocolManager::AiFilter,
+class RequestInfoFilter : public HttpFilters::AiProtocolManager::SyncAiFilter,
                           public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
   RequestInfoFilter(RequestInfoFilterConfigSharedPtr config,
                     const HttpFilters::AiProtocolManager::AiFilterContext& context);
 
-  // HttpFilters::AiProtocolManager::AiFilter
-  Coroutine::Task<absl::Status>
-  decode(HttpFilters::AiProtocolManager::AiRequestReceiver receive_request,
-         HttpFilters::AiProtocolManager::AiRequestPropagator propagate_request,
-         HttpFilters::AiProtocolManager::LocalReplier reply_locally) override;
+  // HttpFilters::AiProtocolManager::SyncAiFilter
+  absl::StatusOr<HttpFilters::AiProtocolManager::DecodeAction>
+  onRequest(HttpFilters::AiProtocolManager::AiRequest& request) override;
 
 private:
   void publish(const nlohmann::json& json);

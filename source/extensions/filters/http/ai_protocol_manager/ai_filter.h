@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -15,6 +16,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/coroutine/status_macros.h"
 #include "source/common/coroutine/task.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
@@ -83,6 +85,30 @@ private:
 // Callable callback to send an immediate HTTP local reply and abort processing.
 using LocalReplier = absl::AnyInvocable<void(Http::Code code, std::string details) &&>;
 
+// What a filter decided: continue the chain or send an immediate HTTP local reply.
+class DecodeAction {
+public:
+  static DecodeAction continueChain() { return DecodeAction{}; }
+  static DecodeAction localReply(Http::Code code, std::string details) {
+    return DecodeAction{LocalReply{code, std::move(details)}};
+  }
+
+  bool isLocalReply() const { return local_reply_.has_value(); }
+  Http::Code code() const { return local_reply_->code; }
+  absl::string_view details() const { return local_reply_->details; }
+
+private:
+  struct LocalReply {
+    Http::Code code;
+    std::string details;
+  };
+
+  DecodeAction() = default;
+  explicit DecodeAction(LocalReply reply) : local_reply_(std::move(reply)) {}
+
+  std::optional<LocalReply> local_reply_;
+};
+
 // Abstract interface implemented by AI filter instances.
 class AiFilter {
 public:
@@ -93,6 +119,26 @@ public:
   virtual Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
                                                AiRequestPropagator propagate_request,
                                                LocalReplier reply_locally) = 0;
+};
+
+// Base class for synchronous AI filters. The adapter owns the receive-act-propagate
+// protocol; the filter only inspects or mutates the request and returns a DecodeAction.
+class SyncAiFilter : public AiFilter {
+public:
+  virtual absl::StatusOr<DecodeAction> onRequest(AiRequest& request) PURE;
+
+private:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier reply_locally) final {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    ASSIGN_OR_CO_RETURN(DecodeAction action, onRequest(*request));
+    if (action.isLocalReply()) {
+      std::move(reply_locally)(action.code(), std::string(action.details()));
+      co_return absl::OkStatus();
+    }
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
 };
 
 using AiFilterSharedPtr = std::shared_ptr<AiFilter>;
