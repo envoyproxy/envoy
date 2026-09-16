@@ -1,8 +1,5 @@
 #include "source/common/quic/server_codec_impl.h"
 
-#include "envoy/server/overload/load_shed_point.h"
-#include "envoy/server/overload/overload_manager.h"
-
 #include "source/common/quic/envoy_quic_server_stream.h"
 
 namespace Envoy {
@@ -21,8 +18,7 @@ QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action,
-    Server::OverloadManager& overload_manager)
+        headers_with_underscores_action)
     : QuicHttpConnectionImplBase(quic_session, stats), quic_server_session_(quic_session) {
   quic_session.setCodecStats(stats);
   quic_session.setHttp3Options(http3_options);

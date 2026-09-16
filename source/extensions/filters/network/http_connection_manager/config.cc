@@ -844,7 +844,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
             connection, callbacks,
             Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()),
             http3_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-            headersWithUnderscoresAction(), overload_manager);
+            headersWithUnderscoresAction());
 #else
     // Should be blocked by configuration checking at an earlier point.
     PANIC("unexpected");
