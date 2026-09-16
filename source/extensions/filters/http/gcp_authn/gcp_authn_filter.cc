@@ -65,7 +65,12 @@ FilterConfig::FilterConfig(const FilterConfigProto& config,
                            const std::string& stats_prefix, Stats::Scope& scope,
                            absl::Status& create_status)
     : config_(config), context_(context),
-      stats_{ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))} {
+      stats_{ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))},
+      target_header_(config.has_token_header() ? Http::LowerCaseString(config.token_header().name())
+                                               : authorizationHeaderKey()),
+      preserve_existing_header_(config.has_token_header() &&
+                                config.token_header().has_preserve_existing() &&
+                                config.token_metadata_key().empty()) {
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.cache_config(), cache_size, 0) > 0) {
     token_cache_ = std::make_shared<TokenCache>(config.cache_config(), context);
   }
@@ -120,6 +125,13 @@ GcpAuthnFilter::getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster) 
 
 // TODO(tyxia) Handle the duplicated outstanding requests.
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& hdrs, bool) {
+  // Presence is checked by header key existence in the map, even if the header value is empty.
+  if (filter_config_->preserveExistingHeader() &&
+      !hdrs.get(filter_config_->targetHeader()).empty()) {
+    state_ = State::Complete;
+    return FilterHeadersStatus::Continue;
+  }
+
   const auto route = decoder_callbacks_->route();
   if (!route || !route->routeEntry()) {
     // Nothing to do if no route, continue the filter chain iteration.
@@ -251,7 +263,7 @@ void GcpAuthnFilter::onDestroy() {
 }
 
 void GcpAuthnFilter::addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str) {
-  const FilterConfigProto proto = filter_config_->config();
+  const FilterConfigProto& proto = filter_config_->config();
   if (!proto.token_metadata_key().empty()) {
     Protobuf::Struct metadata;
     (*metadata.mutable_fields())[proto.token_metadata_key()].set_string_value(token_str);
@@ -259,14 +271,9 @@ void GcpAuthnFilter::addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::strin
         std::string(decoder_callbacks_->filterConfigName()), metadata);
     return;
   }
-  const envoy::extensions::filters::http::gcp_authn::v3::TokenHeader& header = proto.token_header();
-  if (header.ByteSizeLong() == 0) {
-    std::string id_token = absl::StrCat("Bearer ", token_str);
-    hdrs.setCopy(authorizationHeaderKey(), id_token);
-  } else {
-    std::string id_token = absl::StrCat(header.value_prefix(), token_str);
-    hdrs.setCopy(Http::LowerCaseString(header.name()), id_token);
-  }
+  const absl::string_view prefix =
+      proto.has_token_header() ? absl::string_view(proto.token_header().value_prefix()) : "Bearer ";
+  hdrs.setCopy(filter_config_->targetHeader(), absl::StrCat(prefix, token_str));
 }
 
 } // namespace GcpAuthn

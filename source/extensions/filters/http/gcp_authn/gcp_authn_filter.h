@@ -52,6 +52,8 @@ public:
   }
   const Formatter::Formatter* accountFormatter() const { return account_formatter_.get(); }
   const Formatter::Formatter* authFormatter() const { return auth_formatter_.get(); }
+  const Http::LowerCaseString& targetHeader() const { return target_header_; }
+  bool preserveExistingHeader() const { return preserve_existing_header_; }
 
 private:
   const FilterConfigProto config_;
@@ -60,6 +62,8 @@ private:
   std::shared_ptr<TokenCache> token_cache_;
   Formatter::FormatterPtr account_formatter_;
   Formatter::FormatterPtr auth_formatter_;
+  Http::LowerCaseString target_header_{authorizationHeaderKey()};
+  bool preserve_existing_header_{false};
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
