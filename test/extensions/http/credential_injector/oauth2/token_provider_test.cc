@@ -140,7 +140,7 @@ TEST(TokenProvider, FetchFailureClearsExpiredTokenAndInjectFails) {
   EXPECT_TRUE(headers.get(Envoy::Http::CustomHeaders::get().Authorization).empty());
 }
 
-TEST(TokenProvider, TokenProviderMtlsAuthNullSecretReader) {
+TEST(TokenProvider, TokenProviderTlsClientAuthNullSecretReader) {
   const std::string yaml_string = R"EOF(
       token_fetch_retry_interval: 5s
       token_endpoint:
@@ -149,7 +149,7 @@ TEST(TokenProvider, TokenProviderMtlsAuthNullSecretReader) {
         uri: "oauth.com/token"
       client_credentials:
         client_id: "client-id"
-        auth_type: MTLS_AUTH
+        auth_type: TLS_CLIENT_AUTH
   )EOF";
 
   envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2 proto_config;

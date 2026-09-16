@@ -47,7 +47,7 @@ TEST(Config, NullClientSecret) {
                           EnvoyException, "Invalid oauth2 client secret configuration");
 }
 
-TEST(Config, MtlsAuthNoClientSecretRequired) {
+TEST(Config, TlsClientAuthNoClientSecretRequired) {
   const std::string yaml_string = R"EOF(
       token_fetch_retry_interval: 1s
       token_endpoint:
@@ -56,7 +56,7 @@ TEST(Config, MtlsAuthNoClientSecretRequired) {
         uri: "oauth.com/token"
       client_credentials:
         client_id: "client-id"
-        auth_type: MTLS_AUTH
+        auth_type: TLS_CLIENT_AUTH
   )EOF";
 
   envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2 proto_config;
@@ -65,7 +65,7 @@ TEST(Config, MtlsAuthNoClientSecretRequired) {
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   NiceMock<Init::MockManager> init_manager;
 
-  // With MTLS_AUTH, no client_secret is required - should not throw
+  // With TLS_CLIENT_AUTH, no client_secret is required - should not throw
   EXPECT_NO_THROW(factory.createOauth2ClientCredentialInjector(
       proto_config, "stats", server_factory_context, init_manager));
 }

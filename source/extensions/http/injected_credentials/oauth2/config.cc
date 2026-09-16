@@ -49,7 +49,8 @@ OAuth2CredentialInjectorFactory::createOauth2ClientCredentialInjector(
   Common::SecretReaderConstSharedPtr secret_reader;
   const auto auth_type = proto_config.client_credentials().auth_type();
 
-  if (auth_type != envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::MTLS_AUTH) {
+  if (auth_type !=
+      envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::TLS_CLIENT_AUTH) {
     const auto& client_secret_secret = proto_config.client_credentials().client_secret();
     auto client_secret_provider = secretsProvider(client_secret_secret, context, init_manager);
     if (client_secret_provider == nullptr) {

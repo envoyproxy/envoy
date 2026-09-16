@@ -26,9 +26,9 @@ constexpr const char* GetAccessTokenBodyFormatString =
     "grant_type=client_credentials&client_id={0}&client_secret={1}";
 constexpr const char* GetAccessTokenBodyFormatStringWithScopes =
     "grant_type=client_credentials&client_id={0}&client_secret={1}&scope={2}";
-constexpr const char* GetAccessTokenBodyMtlsFormatString =
+constexpr const char* GetAccessTokenBodyTlsClientAuthFormatString =
     "grant_type=client_credentials&client_id={0}";
-constexpr const char* GetAccessTokenBodyMtlsFormatStringWithScopes =
+constexpr const char* GetAccessTokenBodyTlsClientAuthFormatStringWithScopes =
     "grant_type=client_credentials&client_id={0}&scope={1}";
 } // namespace
 
@@ -44,12 +44,13 @@ OAuth2Client::GetTokenResult OAuth2ClientImpl::asyncGetAccessToken(
   Envoy::Http::RequestMessagePtr request = createPostRequest();
   std::string body;
 
-  if (auth_type == envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::MTLS_AUTH) {
+  if (auth_type ==
+      envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::TLS_CLIENT_AUTH) {
     if (scopes.empty()) {
-      body = fmt::format(GetAccessTokenBodyMtlsFormatString, encoded_client_id);
+      body = fmt::format(GetAccessTokenBodyTlsClientAuthFormatString, encoded_client_id);
     } else {
       const auto encoded_scopes = Envoy::Http::Utility::PercentEncoding::encode(scopes, ":/=&?");
-      body = fmt::format(GetAccessTokenBodyMtlsFormatStringWithScopes, encoded_client_id,
+      body = fmt::format(GetAccessTokenBodyTlsClientAuthFormatStringWithScopes, encoded_client_id,
                          encoded_scopes);
     }
   } else {

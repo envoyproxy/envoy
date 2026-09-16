@@ -803,8 +803,8 @@ typed_config:
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// MTLS_AUTH: token request body contains only client_id and grant_type (no client_secret)
-TEST_P(CredentialInjectorIntegrationTest, MtlsAuthNoClientSecret) {
+// TLS_CLIENT_AUTH: token request body contains only client_id and grant_type (no client_secret)
+TEST_P(CredentialInjectorIntegrationTest, TlsClientAuthNoClientSecret) {
   const std::string filter_config =
       R"EOF(
 name: envoy.filters.http.credential_injector
@@ -821,7 +821,7 @@ typed_config:
         uri: "oauth.com/token"
       client_credentials:
         client_id: test_client_id
-        auth_type: MTLS_AUTH
+        auth_type: TLS_CLIENT_AUTH
 )EOF";
   initializeFilter(filter_config);
 
@@ -851,8 +851,8 @@ typed_config:
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// MTLS_AUTH with scopes: request body contains client_id and scope, no client_secret
-TEST_P(CredentialInjectorIntegrationTest, MtlsAuthWithScopesNoClientSecret) {
+// TLS_CLIENT_AUTH with scopes: request body contains client_id and scope, no client_secret
+TEST_P(CredentialInjectorIntegrationTest, TlsClientAuthWithScopesNoClientSecret) {
   const std::string filter_config =
       R"EOF(
 name: envoy.filters.http.credential_injector
@@ -871,7 +871,7 @@ typed_config:
         - "openid"
       client_credentials:
         client_id: test_client_id
-        auth_type: MTLS_AUTH
+        auth_type: TLS_CLIENT_AUTH
 )EOF";
   initializeFilter(filter_config);
 

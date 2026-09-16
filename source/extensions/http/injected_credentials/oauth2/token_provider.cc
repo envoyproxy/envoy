@@ -77,7 +77,7 @@ void TokenProvider::asyncGetAccessToken() {
   if (timer_->enabled()) {
     timer_->disableTimer();
   }
-  // For MTLS_AUTH, secret_reader_ is null and no client secret is needed.
+  // For TLS_CLIENT_AUTH, secret_reader_ is null and no client secret is needed.
   if (secret_reader_ != nullptr && secret_reader_->credential().empty()) {
     ENVOY_LOG(error, "asyncGetAccessToken: client secret is empty, retrying in {} seconds.",
               retry_interval_.count());
