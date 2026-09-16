@@ -57,6 +57,7 @@ public:
   MOCK_METHOD(GenericSecretConfigProviderSharedPtr, findOrCreateGenericSecretProvider,
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
                Server::Configuration::ServerFactoryContext&, OptRef<Init::Manager> init_manager));
+  MOCK_METHOD(std::vector<std::string>, dynamicActiveTlsCertificateSecretNames, (), (const));
 };
 
 class MockSecretCallbacks : public SecretCallbacks {
