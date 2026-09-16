@@ -87,7 +87,9 @@ bool isStatelessProtocolVersion(absl::string_view protocol_version) {
 }
 
 void addCompleteResultTypeIfStateless(json& response, absl::string_view protocol_version) {
-  if (isStatelessProtocolVersion(protocol_version)) {
+  if (isStatelessProtocolVersion(protocol_version) &&
+      response.contains(McpConstants::RESULT_FIELD) &&
+      response[McpConstants::RESULT_FIELD].is_object()) {
     response[McpConstants::RESULT_FIELD][McpConstants::RESULT_TYPE_FIELD] =
         McpConstants::RESULT_TYPE_COMPLETE;
   }

@@ -838,6 +838,52 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListStatelessResponseIncludesResultType
           R"json({"jsonrpc":"2.0","id":123,"result":{"resultType":"complete","tools":[{"name":"google.api.CreateApiKey"}]}})json"));
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, ToolsListStatelessNonObjectResponseDoesNotAddResultType) {
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {
+      {":method", "POST"},
+      {":path", "/mcp"},
+      {"mcp-protocol-version", "2026-07-28"},
+  };
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0","id":123,"method":"tools/list"})json");
+
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  EXPECT_THAT(request_headers_.getPathValue(),
+              StrEq("/discovery/v1/service/foo.googleapis.com/mcptools"));
+  EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
+
+  response_headers_ = {
+      {"content-type", "application/json"},
+      {"content-length", "123456"},
+      {":status", "200"},
+  };
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // Valid JSON, but the top-level value is not an object.
+  Buffer::OwnedImpl response_body(R"json([])json");
+
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(),
+              StrEq(std::to_string(response_body.length())));
+
+  EXPECT_EQ(nlohmann::json::parse(response_body.toString()),
+            nlohmann::json::parse(R"json({"jsonrpc":"2.0","id":123,"result":[]})json"));
+}
+
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithoutHttpRuleBody) {
   ASSERT_OK(makeFilter());
 
@@ -2561,6 +2607,55 @@ TEST_F(McpJsonRestBridgeStreamingFilterTest, MultipleChunksAreStreamedCorrectly)
       nlohmann::json::parse(full),
       nlohmann::json::parse(
           R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"part1part2part3","type":"text"}],"isError":false}})json"));
+}
+
+TEST_F(McpJsonRestBridgeStreamingFilterTest, StatelessMultipleChunksIncludeResultType) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge
+      stateless_proto_config;
+
+  TestUtility::loadFromYaml(R"yaml(
+server_info:
+  max_supported_protocol_version: "2026-07-28"
+tool_config:
+  tools:
+    - name: get_api_key
+      http_rule:
+        get: "/v1/apiKeys"
+      text_content_streaming_enabled: true
+)yaml",
+                            stateless_proto_config);
+
+  ASSERT_OK_AND_ASSIGN(config_, McpJsonRestBridgeFilterConfig::create(stateless_proto_config));
+
+  filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  sendToolsCallRequest("2026-07-28");
+
+  response_headers_ = {{":status", "200"}, {"content-length", "100"}};
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl chunk1("part1");
+  EXPECT_EQ(filter_->encodeData(chunk1, /*end_stream=*/false), Http::FilterDataStatus::Continue);
+  EXPECT_THAT(chunk1.toString(), testing::StartsWith("{\"id\":"));
+
+  Buffer::OwnedImpl chunk2("part2");
+  EXPECT_EQ(filter_->encodeData(chunk2, /*end_stream=*/false), Http::FilterDataStatus::Continue);
+  EXPECT_THAT(chunk2.toString(), StrEq("part2"));
+
+  Buffer::OwnedImpl chunk3("part3");
+  EXPECT_EQ(filter_->encodeData(chunk3, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+  EXPECT_THAT(chunk3.toString(), testing::EndsWith("}}"));
+
+  const std::string full = chunk1.toString() + chunk2.toString() + chunk3.toString();
+
+  EXPECT_EQ(
+      nlohmann::json::parse(full),
+      nlohmann::json::parse(
+          R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"part1part2part3","type":"text"}],"isError":false,"resultType":"complete"}})json"));
 }
 
 TEST_F(McpJsonRestBridgeStreamingFilterTest, SpecialCharactersAreEscaped) {
