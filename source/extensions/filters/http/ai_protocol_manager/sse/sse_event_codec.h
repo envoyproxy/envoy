@@ -12,8 +12,8 @@
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf_parser.h"
-#include "source/extensions/filters/http/ai_protocol_manager/sse_event.h"
-#include "source/extensions/filters/http/ai_protocol_manager/sse_scanner.h"
+#include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event.h"
+#include "source/extensions/filters/http/ai_protocol_manager/sse/sse_scanner.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"

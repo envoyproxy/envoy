@@ -12,7 +12,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf_parser.h"
-#include "source/extensions/filters/http/ai_protocol_manager/sse_scanner.h"
+#include "source/extensions/filters/http/ai_protocol_manager/sse/sse_scanner.h"
 #include "source/extensions/filters/http/ai_protocol_manager/stats.h"
 
 #include "absl/strings/string_view.h"

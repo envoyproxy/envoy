@@ -134,23 +134,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "sse_scanner_lib",
-    srcs = ["sse_scanner.cc"],
-    hdrs = ["sse_scanner.h"],
-    deps = [
-        "//source/common/common:assert_lib",
-        "@abseil-cpp//absl/strings",
-    ],
-)
-
-envoy_cc_library(
     name = "response_handler_lib",
     srcs = ["response_handler.cc"],
     hdrs = ["response_handler.h"],
     deps = [
         ":api_protocol_adapters_lib",
         ":json_with_ext_buf_parser_lib",
-        ":sse_scanner_lib",
         ":stats_lib",
         ":token_usage_lib",
         "//envoy/buffer:buffer_interface",
@@ -160,6 +149,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/http/sse:sse_parser_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/sse:sse_scanner_lib",
         "@abseil-cpp//absl/strings",
     ],
 )
@@ -181,44 +171,6 @@ envoy_cc_library(
     hdrs = ["ai_request.h"],
     deps = [
         ":json_with_ext_buf_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "sse_event_lib",
-    srcs = ["sse_event.cc"],
-    hdrs = ["sse_event.h"],
-    deps = [
-        ":buffer_manager_lib",
-        ":json_with_ext_buf_lib",
-        "//envoy/buffer:buffer_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:assert_lib",
-        "@abseil-cpp//absl/status",
-        "@abseil-cpp//absl/strings",
-    ],
-)
-
-envoy_cc_library(
-    name = "sse_event_codec_lib",
-    srcs = ["sse_event_codec.cc"],
-    hdrs = ["sse_event_codec.h"],
-    deps = [
-        ":buffer_manager_lib",
-        ":external_buffer_interface",
-        ":json_with_ext_buf_lib",
-        ":json_with_ext_buf_parser_lib",
-        ":replay_awaitable_lib",
-        ":serializer_lib",
-        ":sse_event_lib",
-        ":sse_scanner_lib",
-        "//envoy/buffer:buffer_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/coroutine:status_macros_lib",
-        "//source/common/coroutine:task_lib",
-        "@abseil-cpp//absl/status",
-        "@abseil-cpp//absl/strings",
     ],
 )
 

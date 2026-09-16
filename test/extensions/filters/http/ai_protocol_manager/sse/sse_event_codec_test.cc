@@ -7,8 +7,8 @@
 #include "source/common/coroutine/launch.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
-#include "source/extensions/filters/http/ai_protocol_manager/sse_event_codec.h"
-#include "source/extensions/filters/http/ai_protocol_manager/sse_scanner.h"
+#include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event_codec.h"
+#include "source/extensions/filters/http/ai_protocol_manager/sse/sse_scanner.h"
 
 #include "test/extensions/filters/http/ai_protocol_manager/fake_bridge.h"
 #include "test/test_common/status_utility.h"

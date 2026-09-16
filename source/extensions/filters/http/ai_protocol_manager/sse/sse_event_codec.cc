@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/ai_protocol_manager/sse_event_codec.h"
+#include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event_codec.h"
 
 #include <algorithm>
 #include <memory>

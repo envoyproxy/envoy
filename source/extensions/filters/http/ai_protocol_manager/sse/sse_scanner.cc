@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/ai_protocol_manager/sse_scanner.h"
+#include "source/extensions/filters/http/ai_protocol_manager/sse/sse_scanner.h"
 
 #include "source/common/common/assert.h"
 
