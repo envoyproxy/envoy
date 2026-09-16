@@ -130,12 +130,22 @@ public:
   }
 
 protected:
-  absl::StatusOr<Network::SocketSharedPtr> createListenSocketInternal(
-      Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
-      const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
-      const Network::SocketCreationOptions& creation_options, uint32_t worker_index);
+  // Creates the listen socket in the current network namespace. With `try_parent_socket` the hot
+  // restart parent is first asked for an existing socket for the address.
+  absl::StatusOr<Network::SocketSharedPtr>
+  createListenSocketInternal(Network::Address::InstanceConstSharedPtr address,
+                             Network::Socket::Type socket_type,
+                             const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+                             const Network::SocketCreationOptions& creation_options,
+                             uint32_t worker_index, bool try_parent_socket);
 
 private:
+  // Requests the listen socket for an IP `address` from the hot restart parent. Returns nullptr
+  // when the parent has no socket to hand over.
+  Network::SocketSharedPtr duplicateParentListenSocket(
+      const Network::Address::InstanceConstSharedPtr& address, Network::Socket::Type socket_type,
+      const Network::Socket::OptionsSharedPtr& options, uint32_t worker_index);
+
   Instance& server_;
   uint64_t next_listener_tag_{1};
   Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
