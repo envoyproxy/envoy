@@ -17,6 +17,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/macros.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/stat_sinks/common/statsd/tag_formats.h"
 
 namespace Envoy {
@@ -26,6 +27,20 @@ namespace Common {
 namespace Statsd {
 
 static const std::string& getDefaultPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "envoy"); }
+
+/**
+ * Converts a histogram sample to the value reported for a statsd timer, which is always in
+ * milliseconds. Samples of histograms recording microseconds are scaled; samples of histograms
+ * recording milliseconds are passed through. Histograms without a unit are passed through as well
+ * since many of them measure milliseconds already, as are byte histograms, for which statsd has no
+ * dedicated metric type. With `scale_by_unit` false every sample is passed through unchanged,
+ * which is the behavior before unit scaling was introduced.
+ * @param histogram the histogram the sample was recorded on.
+ * @param value the recorded sample in the histogram's unit.
+ * @param scale_by_unit whether to scale by the histogram's unit.
+ * @return double the value in milliseconds.
+ */
+double timerMilliseconds(const Stats::Histogram& histogram, uint64_t value, bool scale_by_unit);
 
 /**
  * Implementation of Sink that writes to a UDP statsd address.
@@ -52,7 +67,9 @@ public:
                 const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat())
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
         prefix_(prefix.empty() ? getDefaultPrefix() : prefix),
-        buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format) {
+        buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format),
+        scale_histogram_units_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.statsd_scale_histogram_units")) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }
@@ -98,6 +115,9 @@ private:
   const std::string prefix_;
   const uint64_t buffer_size_;
   const Statsd::TagFormat tag_format_;
+  // Latched at construction: whether histogram samples are scaled to milliseconds according to
+  // the histogram's unit before being reported as timers.
+  const bool scale_histogram_units_;
 };
 
 /**
@@ -138,7 +158,7 @@ private:
     void flushCounter(const std::string& name, uint64_t delta);
     void flushGauge(const std::string& name, uint64_t value);
     void endFlush(bool do_write);
-    void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms);
+    void onTimespanComplete(const std::string& name, double milliseconds);
     void onPercentHistogramComplete(const std::string& name, float value);
     uint64_t usedBuffer() const;
     void write(Buffer::Instance& buffer);
@@ -161,6 +181,8 @@ private:
 
   // Prefix for all flushed stats.
   const std::string prefix_;
+  // See UdpStatsdSink::scale_histogram_units_.
+  const bool scale_histogram_units_;
 
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   ThreadLocal::SlotSharedPtr tls_;

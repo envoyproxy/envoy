@@ -14,6 +14,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -403,9 +404,13 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
   duration_micro.name_ = "duration";
   duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
 
+  // Microseconds are scaled to milliseconds.
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
-              write("envoy.duration:3|ms"));
+              write("envoy.duration:0.003|ms"));
   sink.onHistogramComplete(duration_micro, 3);
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.duration:1.5|ms"));
+  sink.onHistogramComplete(duration_micro, 1500);
 
   NiceMock<Stats::MockHistogram> duration_milli;
   duration_milli.name_ = "duration";
@@ -414,6 +419,25 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.duration:4|ms"));
   sink.onHistogramComplete(duration_milli, 4);
+
+  tls_.shutdownThread();
+}
+
+// With the runtime guard disabled every sample is reported unscaled, as before unit scaling.
+TEST(UdpStatsdSinkTest, HistogramUnitScalingDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.statsd_scale_histogram_units", "false"}});
+  auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  UdpStatsdSink sink(tls_, writer_ptr, false);
+
+  NiceMock<Stats::MockHistogram> duration_micro;
+  duration_micro.name_ = "duration";
+  duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.duration:1500|ms"));
+  sink.onHistogramComplete(duration_micro, 1500);
 
   tls_.shutdownThread();
 }
@@ -510,7 +534,7 @@ TEST(UdpStatsdSinkWithTagsTest, SiSuffix) {
   duration_micro.setTags(tags);
 
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
-              write("envoy.duration:3|ms|#key1:value1,key2:value2"));
+              write("envoy.duration:0.003|ms|#key1:value1,key2:value2"));
   sink.onHistogramComplete(duration_micro, 3);
 
   NiceMock<Stats::MockHistogram> duration_milli;

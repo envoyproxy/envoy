@@ -43,13 +43,32 @@ void UdpStatsdSink::WriterImpl::writeBuffer(Buffer::Instance& data) {
   Network::Utility::writeToSocket(*io_handle_, data, nullptr, *parent_.server_address_);
 }
 
+double timerMilliseconds(const Stats::Histogram& histogram, uint64_t value, bool scale_by_unit) {
+  if (!scale_by_unit) {
+    return static_cast<double>(value);
+  }
+  switch (histogram.unit()) {
+  case Stats::Histogram::Unit::Microseconds:
+    return static_cast<double>(value) / 1000.0;
+  case Stats::Histogram::Unit::Milliseconds:
+  case Stats::Histogram::Unit::Unspecified:
+  case Stats::Histogram::Unit::Bytes:
+  case Stats::Histogram::Unit::Percent:
+  case Stats::Histogram::Unit::Null:
+    return static_cast<double>(value);
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag,
                              const std::string& prefix, std::optional<uint64_t> buffer_size,
                              const Statsd::TagFormat& tag_format)
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
       prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix),
-      buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format) {
+      buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format),
+      scale_histogram_units_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.statsd_scale_histogram_units")) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<WriterImpl>(*this);
   });
@@ -115,12 +134,9 @@ void UdpStatsdSink::flushBuffer(Buffer::OwnedImpl& buffer, Writer& writer) const
 }
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
-  // For statsd histograms are all timers in milliseconds, Envoy histograms are however
-  // not necessarily timers in milliseconds, for Envoy histograms suffixed with their corresponding
-  // SI unit symbol this is acceptable, but for histograms without a suffix, especially those which
-  // are timers but record in units other than milliseconds, it may make sense to scale the value to
-  // milliseconds here and potentially suffix the names accordingly (minus the pre-existing ones for
-  // backwards compatibility).
+  // For statsd histograms are all timers in milliseconds except percents. Envoy histograms are not
+  // necessarily timers in milliseconds, so samples are scaled according to the histogram's unit
+  // where one is declared; see timerMilliseconds().
   std::string message;
   if (histogram.unit() == Stats::Histogram::Unit::Percent) {
     // 32-bit floating point values should have plenty of range for these values, and are faster to
@@ -130,7 +146,8 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
     const float scaled = float_value / divisor;
     message = buildMessage(histogram, scaled, "|h");
   } else {
-    message = buildMessage(histogram, std::chrono::milliseconds(value).count(), "|ms");
+    message = buildMessage(
+        histogram, Statsd::timerMilliseconds(histogram, value, scale_histogram_units_), "|ms");
   }
   tls_->getTyped<Writer>().write(message);
 }
@@ -189,8 +206,10 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::SlotAllocator& tls,
                              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                              absl::Status& creation_status, const std::string& prefix)
-    : prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), tls_(tls.allocateSlot()),
-      cluster_manager_(cluster_manager),
+    : prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix),
+      scale_histogram_units_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.statsd_scale_histogram_units")),
+      tls_(tls.allocateSlot()), cluster_manager_(cluster_manager),
       cx_overflow_stat_(scope.counterFromStatName(
           Stats::StatNameManagedStorage("statsd.cx_overflow", scope.symbolTable()).statName())) {
   SET_AND_RETURN_IF_NOT_OK(Config::Utility::checkLocalInfo("tcp statsd", local_info),
@@ -252,8 +271,8 @@ void TcpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
     const float scaled = float_value / divisor;
     tls_->getTyped<TlsSink>().onPercentHistogramComplete(histogram.name(), scaled);
   } else {
-    tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),
-                                                 std::chrono::milliseconds(value));
+    tls_->getTyped<TlsSink>().onTimespanComplete(
+        histogram.name(), Statsd::timerMilliseconds(histogram, value, scale_histogram_units_));
   }
 }
 
@@ -334,14 +353,12 @@ void TcpStatsdSink::TlsSink::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void TcpStatsdSink::TlsSink::onTimespanComplete(const std::string& name,
-                                                std::chrono::milliseconds ms) {
+void TcpStatsdSink::TlsSink::onTimespanComplete(const std::string& name, double milliseconds) {
   // Ultimately it would be nice to perf optimize this path also, but it's not very frequent. It's
   // also currently not possible that this interleaves with any counter/gauge flushing.
-  // See the comment at UdpStatsdSink::onHistogramComplete with respect to unit suffixes.
   ASSERT(current_slice_mem_ == nullptr);
   Buffer::OwnedImpl buffer(
-      fmt::format("{}.{}:{}|ms\n", parent_.getPrefix().c_str(), name, ms.count()));
+      fmt::format("{}.{}:{}|ms\n", parent_.getPrefix().c_str(), name, milliseconds));
   write(buffer);
 }
 
