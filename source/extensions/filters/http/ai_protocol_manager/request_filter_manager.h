@@ -35,25 +35,17 @@ public:
 
   RequestFilterManager(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
                        BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
-                       StreamInfo::StreamInfo& stream_info,
+                       StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
                        Http::RequestHeaderMap* request_headers = nullptr,
                        LocalReplyFn local_reply_fn = nullptr);
   ~RequestFilterManager();
 
-  // Launches the request filter chain. Invokes `on_complete` with the final completion status.
-  void start(OnCompleteFn on_complete);
-
   // Cancels all in-flight request coroutines and cleans up state on stream reset.
   void cancel();
 
+  class AsyncState;
+
 private:
-  struct AsyncState;
-
-  void launchFilters();
-  void launchSink();
-
-  std::vector<AiFilterSharedPtr> filters_;
-  JsonWithExtBuf payload_index_;
   std::shared_ptr<AsyncState> async_state_;
 };
 

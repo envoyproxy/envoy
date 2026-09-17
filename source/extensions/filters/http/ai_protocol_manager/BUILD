@@ -198,15 +198,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "filter_pipeline_lib",
-    hdrs = ["filter_pipeline.h"],
+    name = "task_group_lib",
+    hdrs = ["task_group.h"],
     deps = [
         "//envoy/event:dispatcher_interface",
-        "//source/common/coroutine:async_queue_lib",
         "//source/common/coroutine:dispatcher_executor_lib",
         "//source/common/coroutine:launch_lib",
         "//source/common/coroutine:task_lib",
         "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_pipeline_lib",
+    hdrs = ["filter_pipeline.h"],
+    deps = [
+        "//source/common/coroutine:async_queue_lib",
+        "//source/common/coroutine:task_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
     ],
@@ -222,6 +231,7 @@ envoy_cc_library(
         ":buffer_manager_lib",
         ":external_buffer_interface",
         ":filter_pipeline_lib",
+        ":task_group_lib",
         "//envoy/buffer:buffer_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
@@ -305,6 +315,7 @@ envoy_cc_library(
         ":filter_pipeline_lib",
         ":json_with_ext_buf_lib",
         ":serializer_lib",
+        ":task_group_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:header_map_interface",

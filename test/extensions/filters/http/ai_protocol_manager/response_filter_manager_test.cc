@@ -486,6 +486,31 @@ TEST_F(ResponseFilterManagerTest, DataAfterCancelIsDropped) {
   EXPECT_EQ(output(), "");
 }
 
+// Synchronous destruction of ResponseFilterManager inside the on_complete callback must not UAF
+// the unwinding AsyncState on the call stack.
+TEST_F(ResponseFilterManagerTest, DestroyedInsideOnCompleteCallbackIsSafe) {
+  bool callback_ran = false;
+  bridge_ = std::make_unique<FakeBridge>(*dispatcher_, 1024 * 1024);
+  out_buffer_manager_ =
+      std::make_unique<BufferManager>(BufferManager::Config{}, factory_, *bridge_);
+  manager_ = std::make_unique<ResponseFilterManager>(
+      std::vector<AiFilterSharedPtr>{}, factory_, *bridge_, *out_buffer_manager_,
+      [&](absl::Status status) {
+        callback_ran = true;
+        result_ = std::move(status);
+        manager_.reset();
+      },
+      ResponseFilterManager::Config{});
+
+  Buffer::OwnedImpl buf("data: {\"ok\":1}\n\n");
+  manager_->onData(buf, true);
+  drain();
+
+  EXPECT_TRUE(callback_ran);
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(manager_, nullptr);
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

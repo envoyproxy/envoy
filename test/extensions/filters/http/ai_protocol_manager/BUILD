@@ -333,6 +333,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/coroutine:status_macros_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_pipeline_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:task_group_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],

@@ -21,9 +21,8 @@ void FilterManager::startRequest(JsonWithExtBuf payload_index, BufferManager* bu
                                  LocalReplyFn local_reply_fn) {
   ASSERT(request_manager_ == nullptr);
   request_manager_ = std::make_unique<RequestFilterManager>(
-      filters_, std::move(payload_index), buffer_manager, dispatcher, stream_info, request_headers,
-      std::move(local_reply_fn));
-  request_manager_->start(std::move(on_complete));
+      filters_, std::move(payload_index), buffer_manager, dispatcher, stream_info,
+      std::move(on_complete), request_headers, std::move(local_reply_fn));
 }
 
 void FilterManager::startSseResponse(ExternalBufferFactory& buffer_factory,

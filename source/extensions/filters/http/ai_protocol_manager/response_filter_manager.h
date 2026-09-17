@@ -58,10 +58,10 @@ public:
   void cancel();
 
   // Pipeline internals, kept out of this header.
-  class State;
+  class AsyncState;
 
 private:
-  std::shared_ptr<State> state_;
+  std::shared_ptr<AsyncState> async_state_;
 };
 
 using ResponseFilterManagerPtr = std::unique_ptr<ResponseFilterManager>;
