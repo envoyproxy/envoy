@@ -42,7 +42,8 @@ constexpr unsigned int operator""_case_insensitive_hash(const char* directive, s
 
 template <size_t ValidDirectiveCount>
 std::vector<std::string>
-makeDirectiveCorpus(const std::array<absl::string_view, ValidDirectiveCount>& valid_directives) {
+makeDirectiveCorpus(const std::array<absl::string_view, ValidDirectiveCount>& valid_directives,
+                    const bool randomize_case = false) {
   constexpr size_t kValidDirectiveCount = 63;
   constexpr size_t kUnknownDirectiveCount = 7;
   static_assert(kValidDirectiveCount % ValidDirectiveCount == 0);
@@ -72,6 +73,17 @@ makeDirectiveCorpus(const std::array<absl::string_view, ValidDirectiveCount>& va
     corpus.push_back(std::move(unknown_directive));
   }
 
+  if (randomize_case) {
+    std::uniform_int_distribution<int> case_distribution(0, 1);
+    for (std::string& directive : corpus) {
+      for (char& c : directive) {
+        if (c >= 'a' && c <= 'z' && case_distribution(generator) == 1) {
+          c += 'A' - 'a';
+        }
+      }
+    }
+  }
+
   std::shuffle(corpus.begin(), corpus.end(), generator);
   return corpus;
 }
@@ -83,6 +95,16 @@ const std::vector<std::string>& requestDirectiveCorpus() {
 
 const std::vector<std::string>& responseDirectiveCorpus() {
   static const std::vector<std::string> corpus = makeDirectiveCorpus(kResponseDirectives);
+  return corpus;
+}
+
+const std::vector<std::string>& requestRandomizedCaseDirectiveCorpus() {
+  static const std::vector<std::string> corpus = makeDirectiveCorpus(kRequestDirectives, true);
+  return corpus;
+}
+
+const std::vector<std::string>& responseRandomizedCaseDirectiveCorpus() {
+  static const std::vector<std::string> corpus = makeDirectiveCorpus(kResponseDirectives, true);
   return corpus;
 }
 
@@ -263,6 +285,40 @@ void bmResponseDirectiveWithEqualsIgnoreCase(benchmark::State& state) {
 }
 BENCHMARK(bmResponseDirectiveWithEqualsIgnoreCase);
 
+void bmRequestDirectiveWithSwitchRandomizedCase(benchmark::State& state) {
+  runDirectiveBenchmark(state, requestRandomizedCaseDirectiveCorpus(), requestDirectiveWithSwitch);
+}
+BENCHMARK(bmRequestDirectiveWithSwitchRandomizedCase);
+
+void bmRequestDirectiveWithPreTransformedStringEqualityRandomizedCase(benchmark::State& state) {
+  runDirectiveBenchmark(state, requestRandomizedCaseDirectiveCorpus(),
+                        requestDirectiveWithPreTransformedStringEquality);
+}
+BENCHMARK(bmRequestDirectiveWithPreTransformedStringEqualityRandomizedCase);
+
+void bmRequestDirectiveWithEqualsIgnoreCaseRandomizedCase(benchmark::State& state) {
+  runDirectiveBenchmark(state, requestRandomizedCaseDirectiveCorpus(),
+                        requestDirectiveWithEqualsIgnoreCase);
+}
+BENCHMARK(bmRequestDirectiveWithEqualsIgnoreCaseRandomizedCase);
+
+void bmResponseDirectiveWithSwitchRandomizedCase(benchmark::State& state) {
+  runDirectiveBenchmark(state, responseRandomizedCaseDirectiveCorpus(),
+                        responseDirectiveWithSwitch);
+}
+BENCHMARK(bmResponseDirectiveWithSwitchRandomizedCase);
+
+void bmResponseDirectiveWithPreTransformedStringEqualityRandomizedCase(benchmark::State& state) {
+  runDirectiveBenchmark(state, responseRandomizedCaseDirectiveCorpus(),
+                        responseDirectiveWithPreTransformedStringEquality);
+}
+BENCHMARK(bmResponseDirectiveWithPreTransformedStringEqualityRandomizedCase);
+
+void bmResponseDirectiveWithEqualsIgnoreCaseRandomizedCase(benchmark::State& state) {
+  runDirectiveBenchmark(state, responseRandomizedCaseDirectiveCorpus(),
+                        responseDirectiveWithEqualsIgnoreCase);
+}
+BENCHMARK(bmResponseDirectiveWithEqualsIgnoreCaseRandomizedCase);
 } // namespace
 } // namespace CacheV2
 } // namespace HttpFilters
