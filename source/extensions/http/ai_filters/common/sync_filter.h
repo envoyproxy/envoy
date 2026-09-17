@@ -22,16 +22,16 @@ namespace Common {
 // without suspending or awaiting asynchronous operations (such as gRPC/HTTP calls, timers, or
 // external buffer reads).
 //
-// Subclasses implement decodeSync(), which receives the in-memory AiRequest and a LocalReplier
-// callback. This base class manages receiving and propagating the request:
-// - If decodeSync() invokes reply_locally, the filter chain stops and sends the local reply.
-// - If decodeSync() returns a non-OK absl::Status without invoking reply_locally, the filter chain
-//   fails with a 502 Bad Gateway local reply.
-// - If decodeSync() returns absl::OkStatus() without invoking reply_locally, the request is
+// Subclasses implement `decodeSync()`, which receives the in-memory `AiRequest` and a
+// `LocalReplier` callback. This base class manages receiving and propagating the request:
+// - If `decodeSync()` invokes `reply_locally`, the filter chain stops and sends the local reply.
+// - If `decodeSync()` returns a non-OK `absl::Status` without invoking `reply_locally`, the filter
+//   chain fails with a 502 Bad Gateway local reply.
+// - If `decodeSync()` returns `absl::OkStatus()` without invoking `reply_locally`, the request is
 //   automatically forwarded to the next filter in the chain.
 //
-// DO NOT use this base class if the filter needs to co_await any asynchronous operation;
-// implement HttpFilters::AiProtocolManager::AiFilter directly instead.
+// DO NOT use this base class if the filter needs to `co_await` any asynchronous operation;
+// implement `HttpFilters::AiProtocolManager::AiFilter` directly instead.
 class SyncAiFilter : public HttpFilters::AiProtocolManager::AiFilter {
 public:
   virtual absl::Status decodeSync(HttpFilters::AiProtocolManager::AiRequest& request,
