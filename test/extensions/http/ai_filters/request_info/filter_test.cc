@@ -44,8 +44,7 @@ class RequestInfoFilterTest : public testing::Test {
 public:
   RequestInfoFilterTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")),
-        bridge_raw_(new FakeBridge(*dispatcher_)),
-        buffer_manager_(factory_, std::unique_ptr<FakeBridge>(bridge_raw_)),
+        bridge_(*dispatcher_), buffer_manager_(BufferManager::Config{}, factory_, bridge_),
         stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain) {}
 
   ~RequestInfoFilterTest() override { buffer_manager_.onDestroy(); }
@@ -82,7 +81,7 @@ public:
     }
     EXPECT_TRUE(completed);
     EXPECT_TRUE(status.ok()) << status;
-    return bridge_raw_->injected_.toString();
+    return bridge_.injected_.toString();
   }
 
   std::optional<envoy::data::ai::v3::RequestInfo>
@@ -106,7 +105,7 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   InMemoryExternalBufferFactory factory_;
-  FakeBridge* bridge_raw_{nullptr};
+  FakeBridge bridge_;
   BufferManager buffer_manager_;
   StreamInfo::StreamInfoImpl stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;

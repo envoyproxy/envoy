@@ -69,6 +69,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/functional:any_invocable",
     ],
 )
@@ -158,6 +159,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/http/sse:sse_parser_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/sse:sse_scanner_lib",
         "@abseil-cpp//absl/strings",
     ],
 )
@@ -184,17 +186,29 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "replay_awaitable_lib",
+    hdrs = ["replay_awaitable.h"],
+    deps = [
+        ":buffer_manager_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "@abseil-cpp//absl/status",
+    ],
+)
+
+envoy_cc_library(
     name = "serializer_lib",
     srcs = ["serializer.cc"],
     hdrs = ["serializer.h"],
     deps = [
         ":buffer_manager_lib",
         ":json_with_ext_buf_lib",
+        ":replay_awaitable_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:thread_lib",
-        "//source/common/coroutine:leaf_awaitable_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
         "@abseil-cpp//absl/functional:any_invocable",

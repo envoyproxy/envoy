@@ -216,6 +216,9 @@ private:
   ExternalBufferFactory& buffer_factory_;
   FilterConfigSharedPtr config_;
 
+  // Declared before decode_manager_ so it outlives the manager that references it.
+  FilterChainBridgePtr decode_bridge_;
+
   // Non-null exactly when decodeHeaders() decided to inspect this stream, so it
   // doubles as the engaged flag. Outlives request_parser_, which is released as
   // soon as parsing is done with.
