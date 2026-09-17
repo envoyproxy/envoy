@@ -36,6 +36,21 @@ namespace Server {
 
 namespace {
 
+std::string drainRequest(Admin::Request& request, uint64_t chunk_size) {
+  std::string output;
+  bool more;
+  do {
+    Buffer::OwnedImpl chunk;
+    more = request.nextChunk(chunk);
+    EXPECT_LE(chunk.length(), chunk_size);
+    output.append(chunk.toString());
+  } while (more);
+  Buffer::OwnedImpl after_end;
+  EXPECT_FALSE(request.nextChunk(after_end));
+  EXPECT_EQ(0, after_end.length());
+  return output;
+}
+
 // Exercise the existing text golden cases through both formatters, with deliberately small
 // chunks that split labels, TYPE annotations, and histogram bucket lines.
 uint64_t statsAsPrometheusText(const std::vector<Stats::CounterSharedPtr>& counters,
@@ -150,21 +165,6 @@ protected:
   }
 
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
-
-  std::string drainRequest(Admin::Request& request, uint64_t chunk_size) {
-    std::string output;
-    bool more;
-    do {
-      Buffer::OwnedImpl chunk;
-      more = request.nextChunk(chunk);
-      EXPECT_LE(chunk.length(), chunk_size);
-      output.append(chunk.toString());
-    } while (more);
-    Buffer::OwnedImpl after_end;
-    EXPECT_FALSE(request.nextChunk(after_end));
-    EXPECT_EQ(0, after_end.length());
-    return output;
-  }
 
   // Format tags into the name to create a unique stat_name for each name:tag combination.
   // If the same stat_name is passed to makeGauge() or makeCounter(), even with different
@@ -2128,21 +2128,13 @@ TEST_F(RealHistogramNativePrometheusTest, StreamingSnapshotsRemainIndependentAcr
         {}, {}, histograms, {}, endpoints_helper_->cm_, params, custom_namespaces_, 1);
     recordValue(histogram, 40);
     mergeHistograms();
-    const auto drain = [](Admin::Request& request) {
-      Http::TestResponseHeaderMapImpl headers;
-      EXPECT_EQ(Http::Code::OK, request.start(headers));
-      std::string result;
-      bool more;
-      do {
-        Buffer::OwnedImpl chunk;
-        more = request.nextChunk(chunk);
-        EXPECT_LE(chunk.length(), 1);
-        result.append(chunk.toString());
-      } while (more);
-      return result;
-    };
-    EXPECT_EQ(expected_second.toString(), drain(*second));
-    EXPECT_EQ(expected_first.toString(), drain(*first));
+    Http::TestResponseHeaderMapImpl second_headers;
+    EXPECT_EQ(Http::Code::OK, second->start(second_headers));
+    EXPECT_EQ(expected_second.toString(), drainRequest(*second, 1));
+
+    Http::TestResponseHeaderMapImpl first_headers;
+    EXPECT_EQ(Http::Code::OK, first->start(first_headers));
+    EXPECT_EQ(expected_first.toString(), drainRequest(*first, 1));
   }
 }
 
