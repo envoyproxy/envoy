@@ -102,6 +102,77 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   filter->onDestroy();
 }
 
+TEST_P(DynamicModuleTestLanguages, NullInModuleFilterFailsClosed) {
+  // A module whose filter constructor returns null must fail the request closed rather than call a
+  // null filter. initializeInModuleFilter() is intentionally skipped so in_module_filter_ stays
+  // null, which is the same state the filter is in after a failed constructor.
+  const auto language = GetParam();
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
+  EXPECT_OK(dynamic_module);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+      "foo", "bar", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+      *stats_store.createScope(""), context);
+  EXPECT_OK(filter_config_or_status);
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_store.symbolTable(), 0);
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  // decodeHeaders sends a 500 with the init-failed details and stops the request.
+  EXPECT_CALL(decoder_callbacks,
+              sendLocalReply(Code::InternalServerError, _, _, _,
+                             absl::string_view("dynamic_module_filter_init_failed")));
+  TestRequestHeaderMapImpl headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
+
+  // No remaining hook calls into the null filter.
+  Buffer::OwnedImpl data;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter->decodeData(data, false));
+  TestRequestTrailerMapImpl trailers;
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter->decodeTrailers(trailers));
+  TestResponseHeaderMapImpl response_headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(data, false));
+  TestResponseTrailerMapImpl response_trailers;
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
+  filter->onStreamComplete();
+  filter->onDestroy();
+}
+
+TEST_P(DynamicModuleTestLanguages, NullInModuleFilterEncodePassesThrough) {
+  // A null in-module filter on the encode path passes the response through instead of calling a
+  // null filter. This covers the encode guard on its own, without a prior decode local reply.
+  const auto language = GetParam();
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
+  EXPECT_OK(dynamic_module);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+      "foo", "bar", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+      *stats_store.createScope(""), context);
+  EXPECT_OK(filter_config_or_status);
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_store.symbolTable(), 0);
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  TestResponseHeaderMapImpl response_headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data;
+  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(data, false));
+  TestResponseTrailerMapImpl response_trailers;
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
+  filter->onDestroy();
+}
+
 #ifndef __SANITIZE_ADDRESS__
 // TODO(wbpcode): address sanitizer cannot handle the cross shared libraries vptr casts.
 // and we need to figure out a way to fix it.
