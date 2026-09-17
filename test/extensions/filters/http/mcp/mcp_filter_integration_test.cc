@@ -192,7 +192,7 @@ TEST_P(McpFilterIntegrationTest, VerifyRejectsHeaderBodyMismatch) {
 name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
-  traffic_mode: PASS_THROUGH
+  traffic_mode: REJECT_NO_MCP
   attribute_source: VERIFY
 )EOF");
 
@@ -227,7 +227,7 @@ TEST_P(McpFilterIntegrationTest, RejectsProtocolVersionHeaderBodyMismatch) {
 name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
-  traffic_mode: PASS_THROUGH
+  traffic_mode: REJECT_NO_MCP
 )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -260,7 +260,7 @@ TEST_P(McpFilterIntegrationTest, RejectsProtocolVersionHeaderBodyMismatchReply) 
 name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
-  traffic_mode: PASS_THROUGH
+  traffic_mode: REJECT_NO_MCP
   max_supported_protocol_version: "2026-07-28"
 )EOF");
 
@@ -300,7 +300,7 @@ TEST_P(McpFilterIntegrationTest, NewSpecRejectsMissingMethodHeader) {
 name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
-  traffic_mode: PASS_THROUGH
+  traffic_mode: REJECT_NO_MCP
   max_supported_protocol_version: "2026-07-28"
 )EOF");
 
@@ -329,12 +329,47 @@ typed_config:
   EXPECT_EQ(nullptr, upstream_request_);
 }
 
-TEST_P(McpFilterIntegrationTest, NewSpecRejectsMissingNameHeader) {
+TEST_P(McpFilterIntegrationTest, NewSpecPassThroughAllowsMissingMethodHeader) {
   initializeFilter(R"EOF(
 name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   traffic_mode: PASS_THROUGH
+  max_supported_protocol_version: "2026-07-28"
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-protocol-version", "2026-07-28"},
+                                     {"mcp-name", "task-123"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(McpFilterIntegrationTest, NewSpecRejectsMissingNameHeader) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: REJECT_NO_MCP
   max_supported_protocol_version: "2026-07-28"
 )EOF");
 
@@ -438,7 +473,7 @@ TEST_P(McpFilterIntegrationTest, RejectsUnsupportedProtocolVersion) {
 name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
-  traffic_mode: PASS_THROUGH
+  traffic_mode: REJECT_NO_MCP
   max_supported_protocol_version: "2025-11-25"
 )EOF");
 
@@ -469,7 +504,7 @@ TEST_P(McpFilterIntegrationTest, RejectsUnsupportedProtocolVersionReply) {
 name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
-  traffic_mode: PASS_THROUGH
+  traffic_mode: REJECT_NO_MCP
   max_supported_protocol_version: "2025-11-25"
 )EOF");
 
@@ -507,7 +542,7 @@ TEST_P(McpFilterIntegrationTest, NewSpecRejectsDeleteWithMethodNotAllowed) {
 name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
-  traffic_mode: PASS_THROUGH
+  traffic_mode: REJECT_NO_MCP
   max_supported_protocol_version: "2026-07-28"
 )EOF");
 
@@ -533,7 +568,7 @@ TEST_P(McpFilterIntegrationTest, NewSpecRejectsSseGetWithMethodNotAllowed) {
 name: envoy.filters.http.mcp
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
-  traffic_mode: PASS_THROUGH
+  traffic_mode: REJECT_NO_MCP
   max_supported_protocol_version: "2026-07-28"
 )EOF");
 
