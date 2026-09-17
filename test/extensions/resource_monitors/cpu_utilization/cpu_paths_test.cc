@@ -49,6 +49,19 @@ TEST(CpuPathsV2Test, GetEffectiveCpusPathReturnsCorrectPath) {
   EXPECT_EQ(CpuPaths::V2::getEffectiveCpusPath(), "/sys/fs/cgroup/cpuset.cpus.effective");
 }
 
+TEST(CpuPathsV2Test, GetBasePathReturnsMountPoint) {
+  EXPECT_EQ(CpuPaths::V2::getBasePath(), "/sys/fs/cgroup");
+}
+
+// Paths are relative to a caller-supplied cgroup directory so a resolved container cgroup can be
+// read instead of the mount point.
+TEST(CpuPathsV2Test, PathsAreRelativeToSuppliedBase) {
+  const std::string base = "/sys/fs/cgroup/kubepods.slice/pod.slice/container.scope";
+  EXPECT_EQ(CpuPaths::V2::getStatPath(base), base + "/cpu.stat");
+  EXPECT_EQ(CpuPaths::V2::getMaxPath(base), base + "/cpu.max");
+  EXPECT_EQ(CpuPaths::V2::getEffectiveCpusPath(base), base + "/cpuset.cpus.effective");
+}
+
 // =============================================================================
 // CpuPaths::isV1() Detection Tests
 // =============================================================================
@@ -116,6 +129,14 @@ TEST(CpuPathsDetectionTest, IsV2ReturnsFalseWhenStatFileMissing) {
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(false));
 
   EXPECT_FALSE(CpuPaths::isV2(mock_fs));
+}
+
+TEST(CpuPathsDetectionTest, IsV2ProbesSuppliedBase) {
+  Filesystem::MockInstance mock_fs;
+
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/pod.slice/cpu.stat")).WillOnce(Return(true));
+
+  EXPECT_TRUE(CpuPaths::isV2(mock_fs, "/sys/fs/cgroup/pod.slice"));
 }
 
 } // namespace

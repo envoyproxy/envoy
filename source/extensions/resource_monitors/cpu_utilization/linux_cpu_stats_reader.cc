@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <optional>
 #include <sstream>
 #include <thread>
 #include <vector>
@@ -12,9 +13,12 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/extensions/resource_monitors/cpu_utilization/cgroup_path_resolver.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
 
 namespace Envoy {
@@ -172,6 +176,20 @@ absl::StatusOr<double> LinuxCpuStatsReader::getUtilization() {
 
 absl::StatusOr<LinuxContainerCpuStatsReader::ContainerStatsReaderPtr>
 LinuxContainerCpuStatsReader::create(Filesystem::Instance& fs, TimeSource& time_source) {
+  // Prefer the container's own cgroup over the mount point, which is the cgroup root in the host
+  // cgroup namespace and therefore reports the whole machine's usage and has no cpu.max.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.cpu_utilization_resolve_container_cgroup")) {
+    const std::optional<std::string> resolved = resolveCgroupV2Dir(fs);
+    if (resolved.has_value()) {
+      if (CpuPaths::isV2(fs, *resolved)) {
+        return std::make_unique<CgroupV2CpuStatsReader>(fs, time_source, *resolved);
+      }
+      ENVOY_LOG_MISC(debug, "Resolved container cgroup {} has no cpu.stat, falling back to {}",
+                     *resolved, CpuPaths::V2::getBasePath());
+    }
+  }
+
   if (CpuPaths::isV2(fs)) {
     return std::make_unique<CgroupV2CpuStatsReader>(fs, time_source);
   }
@@ -270,9 +288,14 @@ absl::StatusOr<double> CgroupV1CpuStatsReader::getUtilization() {
 }
 
 CgroupV2CpuStatsReader::CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)
-    : LinuxContainerCpuStatsReader(fs, time_source), stat_path_(CpuPaths::V2::getStatPath()),
-      max_path_(CpuPaths::V2::getMaxPath()), effective_path_(CpuPaths::V2::getEffectiveCpusPath()) {
-}
+    : CgroupV2CpuStatsReader(fs, time_source, CpuPaths::V2::getBasePath()) {}
+
+CgroupV2CpuStatsReader::CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source,
+                                               absl::string_view base_path)
+    : LinuxContainerCpuStatsReader(fs, time_source),
+      stat_path_(CpuPaths::V2::getStatPath(base_path)),
+      max_path_(CpuPaths::V2::getMaxPath(base_path)),
+      effective_path_(CpuPaths::V2::getEffectiveCpusPath(base_path)) {}
 
 CgroupV2CpuStatsReader::CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source,
                                                const std::string& stat_path,

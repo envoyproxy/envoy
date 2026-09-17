@@ -12,6 +12,8 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 
+#include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -534,6 +536,21 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationFirstCallReturnsZero)
 // Factory Method Tests
 // =============================================================================
 
+// create() resolves the container's own cgroup before falling back to the mount point. Making the
+// mountinfo read fail keeps these cases on the mount-point path.
+void expectNoCgroupResolution(Filesystem::MockInstance& fs) {
+  EXPECT_CALL(fs, fileReadToEnd("/proc/self/mountinfo"))
+      .WillOnce(Return(absl::NotFoundError("no mountinfo")));
+}
+
+// A cgroup2 mount exposing the whole hierarchy, as seen in the host cgroup namespace.
+void expectCgroupResolution(Filesystem::MockInstance& fs, const std::string& cgroup_path) {
+  EXPECT_CALL(fs, fileReadToEnd("/proc/self/mountinfo"))
+      .WillOnce(Return("2848 2847 0:30 / /sys/fs/cgroup rw,nosuid,relatime - cgroup2 cgroup rw\n"));
+  EXPECT_CALL(fs, fileReadToEnd("/proc/self/cgroup"))
+      .WillOnce(Return(absl::StrCat("0::", cgroup_path, "\n")));
+}
+
 TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV2ReaderWhenV2FilesExist) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::MockDispatcher dispatcher;
@@ -543,7 +560,55 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV2ReaderWhenV2FilesExist) {
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
   Filesystem::MockInstance mock_fs;
+  expectNoCgroupResolution(mock_fs);
   // Keyed only on cpu.stat; the optional v2 files are not probed.
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
+
+  auto reader_or_error = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+  EXPECT_TRUE(reader_or_error.ok());
+  EXPECT_NE(reader_or_error.value(), nullptr);
+}
+
+// In the host cgroup namespace the mount point is the cgroup root, so the reader must be built on
+// the container's own cgroup directory instead.
+TEST(LinuxContainerCpuStatsReaderFactoryTest, UsesResolvedContainerCgroup) {
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
+
+  Filesystem::MockInstance mock_fs;
+  expectCgroupResolution(mock_fs, "/kubepods.slice/pod.slice/container.scope");
+  const std::string leaf = "/sys/fs/cgroup/kubepods.slice/pod.slice/container.scope";
+  EXPECT_CALL(mock_fs, fileExists(leaf + "/cpu.stat")).WillRepeatedly(Return(true));
+
+  auto reader_or_error = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+  ASSERT_TRUE(reader_or_error.ok());
+  ASSERT_NE(reader_or_error.value(), nullptr);
+
+  // The reader reads the resolved leaf, not the mount point.
+  EXPECT_CALL(mock_fs, fileReadToEnd(leaf + "/cpu.stat")).WillOnce(Return("usage_usec 1000\n"));
+  EXPECT_CALL(mock_fs, fileReadToEnd(leaf + "/cpuset.cpus.effective")).WillOnce(Return("0-31"));
+  EXPECT_CALL(mock_fs, fileReadToEnd(leaf + "/cpu.max")).WillOnce(Return("max 100000"));
+  EXPECT_OK(reader_or_error.value()->getUtilization());
+}
+
+// If the resolved directory does not expose cpu.stat, fall back to the mount point rather than
+// giving up on container mode.
+TEST(LinuxContainerCpuStatsReaderFactoryTest, FallsBackWhenResolvedCgroupHasNoStatFile) {
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
+
+  Filesystem::MockInstance mock_fs;
+  expectCgroupResolution(mock_fs, "/kubepods.slice/gone.scope");
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/kubepods.slice/gone.scope/cpu.stat"))
+      .WillOnce(Return(false));
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
 
   auto reader_or_error = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
@@ -560,6 +625,7 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV1ReaderWhenOnlyV1FilesExis
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
   Filesystem::MockInstance mock_fs;
+  expectNoCgroupResolution(mock_fs);
 
   // V2 not detected (cpu.stat missing).
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(false));
@@ -584,6 +650,7 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, ReturnsFallbackReaderWhenNoCgroupF
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
   Filesystem::MockInstance mock_fs;
+  expectNoCgroupResolution(mock_fs);
 
   // No V2 files (cpu.stat missing).
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(false));
