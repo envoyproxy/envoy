@@ -1,5 +1,5 @@
 use crate::abi::envoy_dynamic_module_type_metrics_result;
-use crate::buffer::EnvoyBuffer;
+use crate::buffer::{read_buffer_chunks, EnvoyBuffer};
 use crate::{
   abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
   wrap_into_c_void_ptr, ClusterHostCount, EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId,
@@ -881,63 +881,22 @@ impl EnvoyNetworkFilterImpl {
 
 impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
   fn get_read_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer<'_>>, usize) {
-    let size = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(self.raw)
-    };
-    if size == 0 {
-      return (Vec::new(), 0);
-    }
-
-    let total_length =
-      unsafe { abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_size(self.raw) };
-    if total_length == 0 {
-      return (Vec::new(), 0);
-    }
-
-    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
-        self.raw,
-        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
-      )
-    };
-    if !ok {
-      return (Vec::new(), 0);
-    }
-    unsafe {
-      buffers.set_len(size);
-    }
-    (buffers, total_length)
+    let raw = self.raw;
+    let count =
+      unsafe { abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(raw) };
+    read_buffer_chunks(count, |chunks| unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(raw, chunks)
+    })
   }
 
   fn get_write_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer<'_>>, usize) {
-    let size = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(self.raw)
+    let raw = self.raw;
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(raw)
     };
-    if size == 0 {
-      return (Vec::new(), 0);
-    }
-
-    let total_length =
-      unsafe { abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_size(self.raw) };
-    if total_length == 0 {
-      return (Vec::new(), 0);
-    }
-
-    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
-        self.raw,
-        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
-      )
-    };
-    if !ok {
-      return (Vec::new(), 0);
-    }
-    unsafe {
-      buffers.set_len(size);
-    }
-    (buffers, total_length)
+    read_buffer_chunks(count, |chunks| unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(raw, chunks)
+    })
   }
 
   fn drain_read_buffer(&mut self, length: usize) {
