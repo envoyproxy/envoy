@@ -707,6 +707,17 @@ public:
 };
 
 /**
+ * RAII handle for a session a filter has registered via
+ * UdpReadFilterCallbacks::registerHotRestartSession() to keep on this instance during a hot
+ * restart. Destroying it unregisters the session.
+ */
+class UdpHotRestartSessionHandle {
+public:
+  virtual ~UdpHotRestartSessionHandle() = default;
+};
+using UdpHotRestartSessionHandlePtr = std::unique_ptr<UdpHotRestartSessionHandle>;
+
+/**
  * Callbacks used by individual UDP listener read filter instances to communicate with the filter
  * manager.
  */
@@ -718,6 +729,18 @@ public:
    * @return the udp listener that owns this read filter.
    */
   virtual UdpListener& udpListener() PURE;
+
+  /**
+   * Register a session the filter is serving. For the lifetime of the returned handle the listener
+   * keeps serving the session locally during hot restart drain, instead of forwarding it to the
+   * child instance.
+   * @param local_address the session's downstream local address.
+   * @param peer_address the session's downstream peer address.
+   * @return an RAII handle that unregisters the session when destroyed.
+   */
+  virtual UdpHotRestartSessionHandlePtr
+  registerHotRestartSession(const Address::InstanceConstSharedPtr& local_address,
+                            const Address::InstanceConstSharedPtr& peer_address) PURE;
 };
 
 /**

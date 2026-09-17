@@ -31,6 +31,7 @@ envoy_package()
 envoy_cc_test(
     name = "config_impl_test",
     size = "large",
+    shard_count = 4,
     tags = ["skip_on_windows"],
     deps = [":config_impl_test_lib"],
 )

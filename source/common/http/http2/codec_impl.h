@@ -169,7 +169,16 @@ public:
   bool wantsToWrite() override { return adapter_->want_write(); }
   // Propagate network connection watermark events to each stream on the connection.
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
+    // Snapshot the streams before invoking callbacks. A callback may encode on its stream and
+    // reorder active_streams_, invalidating the traversal. Stream deletion is deferred, so the
+    // pointers remain valid for the duration of this synchronous callback fanout.
+    std::vector<StreamImpl*> streams;
+    streams.reserve(active_streams_.size());
     for (auto& stream : active_streams_) {
+      streams.push_back(stream.get());
+    }
+
+    for (StreamImpl* stream : streams) {
       stream->runHighWatermarkCallbacks();
     }
   }
@@ -748,11 +757,6 @@ protected:
   // Latched value of the `http2_include_cookies_in_limits` runtime feature, read once per
   // connection instead of on every header field in saveHeader().
   const bool http2_include_cookies_in_limits_ = false;
-#ifndef ENVOY_ENABLE_UHV
-  // Latched value of the `validate_upstream_headers` runtime feature, consulted per encoded
-  // request instead of performing a runtime lookup there.
-  const bool validate_upstream_headers_ = false;
-#endif
 
   // Status for any errors encountered by the nghttp2 callbacks.
   // nghttp2 library uses single return code to indicate callback failure and

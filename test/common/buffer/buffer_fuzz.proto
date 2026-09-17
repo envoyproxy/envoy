@@ -43,6 +43,8 @@ message Action {
     Search search = 15;
     string starts_with = 16;
     uint32 copy_out_to_slices = 17;
+    google.protobuf.Empty extract_mutable_front_slice = 18;
+    google.protobuf.Empty extract_immutable_front_slice = 19;
   }
 }
 

@@ -1,0 +1,1 @@
+ext_authz: added :ref:`emit_client_span <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.emit_client_span>` and per-route :ref:`emit_client_span <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.emit_client_span>` to allow suppressing client-side egress spans for external authorization calls while preserving trace context propagation.

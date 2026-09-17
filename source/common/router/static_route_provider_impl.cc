@@ -78,8 +78,9 @@ StaticRouteConfigProviderImpl::VhdsContext::VhdsContext(
     const envoy::config::route::v3::RouteConfiguration& config,
     Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
     Rds::ProtoTraits& proto_traits)
-    : config_update_info_(
-          std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits, factory_context, "")),
+    : config_update_info_(std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits,
+                                                                          factory_context, "",
+                                                                          /*from_rds=*/false)),
       factory_context_(factory_context), route_config_name_(config.name()),
       tls_(factory_context.threadLocal()),
       local_init_target_(

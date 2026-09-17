@@ -167,12 +167,13 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
           *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
-      stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
-                                      POOL_GAUGE(*fake_stats_.rootScope()),
-                                      POOL_HISTOGRAM(*fake_stats_.rootScope()))},
-             "", *fake_stats_.rootScope()),
+      stats_({ALL_HTTP_CONN_MAN_STATS(
+                 POOL_COUNTER(*fake_stats_.rootScope()), POOL_GAUGE(*fake_stats_.rootScope()),
+                 POOL_HISTOGRAM(*fake_stats_.rootScope()), POOL_COUNTER(*fake_stats_.rootScope()))},
+             *fake_stats_.rootScope()),
 
-      listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))}),
+      listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_),
+                                               POOL_COUNTER(fake_listener_stats_))}),
       request_id_extension_(
           Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(random_)),
       local_reply_(LocalReply::Factory::createDefault()) {

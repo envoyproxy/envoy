@@ -385,7 +385,7 @@ ie3qKR3an4KC20CtFbpZfv540BVuTTOCtQ5xqZ/LTE78
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
-  // This is a cert generated with the test/config/integration/certs/certs.sh. And the config that
+  // This is a cert generated from test/config/integration/certs/certs.spec. And the config that
   // used to generate this cert is same as test/config/integration/certs/servercert.cfg but with
   // 'extKeyUsage: clientAuth'.
   const std::string certs{R"(-----BEGIN CERTIFICATE-----

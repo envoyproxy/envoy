@@ -242,7 +242,7 @@ message PrivateKeyProvider {
   bool fallback = 4;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message TlsCertificate {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsCertificate";
 
@@ -309,6 +309,26 @@ message TlsCertificate {
 
   // [#not-implemented-hide:]
   repeated config.core.v3.DataSource signed_certificate_timestamp = 5;
+
+  // Optional per-certificate TLS parameters. When set on a server certificate, any specified
+  // fields override the corresponding context-level
+  // :ref:`tls_params <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.tls_params>`
+  // for that certificate during the TLS handshake; unset fields continue to use the context-level
+  // values. This allows different cipher suites, ECDH curves, protocol versions, signature
+  // algorithms, or compliance policies per certificate.
+  //
+  // These parameters do not affect certificate selection, which continues to be based only on SNI,
+  // the client's ECDSA capability, and OCSP capability. They are applied after a certificate has
+  // been selected. For a multi-certificate configuration this means each certificate's parameters
+  // must be compatible with the clients that select it: if the selected certificate's parameters
+  // leave nothing in common with the client, the handshake fails and no other certificate is tried.
+  //
+  // Note: because these are overrides rather than constraints, a certificate-level
+  // ``tls_minimum_protocol_version`` can lower the floor set by the context-level
+  // ``tls_params``, weakening the listener's overall TLS security policy.
+  // Setting this on a client certificate is not supported and is ignored.
+  // This field has no effect on QUIC/HTTP3 downstream connections.
+  TlsParameters tls_params = 9;
 }
 
 message TlsSessionTicketKeys {

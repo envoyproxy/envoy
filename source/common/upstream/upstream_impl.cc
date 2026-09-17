@@ -1183,8 +1183,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
                : std::nullopt),
           config.protocol_selection() ==
               envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
-          config.has_http2_protocol_options(), factory_context.serverFactoryContext(),
-          factory_context.messageValidationVisitor());
+          config.has_http2_protocol_options(), factory_context);
   RETURN_IF_NOT_OK_REF(options_or_error.status());
   return options_or_error.value();
 }
