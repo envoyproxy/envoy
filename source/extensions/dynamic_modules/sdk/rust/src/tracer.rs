@@ -85,16 +85,16 @@ impl TracerConfigContext {
   pub fn define_counter_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<TracerCounterVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_names: Vec<_> = label_names.iter().map(|l| str_to_module_buffer(l)).collect();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_define_counter(
         self.envoy_ptr,
         str_to_module_buffer(name),
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_names.as_ptr() as *mut _,
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -127,16 +127,16 @@ impl TracerConfigContext {
   pub fn define_gauge_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<TracerGaugeVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_names: Vec<_> = label_names.iter().map(|l| str_to_module_buffer(l)).collect();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_define_gauge(
         self.envoy_ptr,
         str_to_module_buffer(name),
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_names.as_ptr() as *mut _,
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -169,16 +169,16 @@ impl TracerConfigContext {
   pub fn define_histogram_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<TracerHistogramVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_names: Vec<_> = label_names.iter().map(|l| str_to_module_buffer(l)).collect();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_define_histogram(
         self.envoy_ptr,
         str_to_module_buffer(name),
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_names.as_ptr() as *mut _,
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -206,16 +206,16 @@ impl TracerConfigContext {
   pub fn increment_counter_vec(
     &self,
     handle: TracerCounterVecHandle,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_values: Vec<_> = label_values.iter().map(|l| str_to_module_buffer(l)).collect();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_increment_counter(
         self.envoy_ptr,
         handle.id,
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_values.as_ptr() as *mut _,
+        label_values.len(),
         value,
       )
     })
@@ -242,16 +242,16 @@ impl TracerConfigContext {
   pub fn set_gauge_vec(
     &self,
     handle: TracerGaugeVecHandle,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_values: Vec<_> = label_values.iter().map(|l| str_to_module_buffer(l)).collect();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_set_gauge(
         self.envoy_ptr,
         handle.id,
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_values.as_ptr() as *mut _,
+        label_values.len(),
         value,
       )
     })
@@ -278,16 +278,16 @@ impl TracerConfigContext {
   pub fn record_histogram_vec(
     &self,
     handle: TracerHistogramVecHandle,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_values: Vec<_> = label_values.iter().map(|l| str_to_module_buffer(l)).collect();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_record_histogram_value(
         self.envoy_ptr,
         handle.id,
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_values.as_ptr() as *mut _,
+        label_values.len(),
         value,
       )
     })
