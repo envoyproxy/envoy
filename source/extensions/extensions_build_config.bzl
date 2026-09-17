@@ -50,6 +50,7 @@ EXTENSIONS = {
     # Config validators
     #
 
+    "envoy.config.validators.dynamic_modules":                "//source/extensions/config/validators/dynamic_modules:config",
     "envoy.config.validators.minimum_clusters_validator":     "//source/extensions/config/validators/minimum_clusters:config",
 
     #
@@ -490,6 +491,11 @@ EXTENSIONS = {
     # External Processing Response Processors
     #
     "envoy.http.ext_proc.response_processors.save_processing_response":         "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
+
+    #
+    # AI filters
+    #
+    "envoy.http.ai_filters.request_info":               "//source/extensions/http/ai_filters/request_info:config",
 
     #
     # Injected credentials

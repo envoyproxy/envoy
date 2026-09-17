@@ -273,6 +273,7 @@
 # Key Value store
 /*/extensions/key_value @abeyad @ryantheoptimist
 # Config Validators
+/*/extensions/config/validators/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/config/validators/minimum_clusters @UNOWNED @yanavlasov
 # File system based extensions
 /*/extensions/common/async_files @mattklein123 @ravenblackx
@@ -447,6 +448,8 @@
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 # AI Protocol Manager filter
 /*/extensions/filters/http/ai_protocol_manager @penguingao @botengyao @tyxia
+# AI filters (run by the AI Protocol Manager)
+/*/extensions/http/ai_filters/request_info @botengyao @penguingao
 # HTTP body size limit filter
 /*/extensions/filters/http/body_size_limit @wbpcode @ivaradi
 

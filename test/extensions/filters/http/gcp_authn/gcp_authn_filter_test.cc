@@ -453,6 +453,9 @@ TEST_F(GcpAuthnFilterTest, CacheHit) {
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
   EXPECT_EQ(default_headers_.get_("Authorization"), "Bearer cached_token");
+  EXPECT_EQ(filter_config_->stats().token_cache_hit_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().token_cache_miss_.value(), 0);
+  EXPECT_EQ(filter_config_->stats().token_fetch_success_.value(), 0);
 }
 
 TEST_F(GcpAuthnFilterTest, CacheMissAndInsert) {
@@ -489,6 +492,11 @@ TEST_F(GcpAuthnFilterTest, CacheMissAndInsert) {
   auto cached_val = filter_config_->tokenCache()->lookUp(audience, std::nullopt);
   EXPECT_TRUE(cached_val.has_value());
   EXPECT_EQ(cached_val.value(), std::string(GoodTokenStr));
+
+  EXPECT_EQ(filter_config_->stats().token_cache_miss_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().token_cache_hit_.value(), 0);
+  EXPECT_EQ(filter_config_->stats().token_fetch_success_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().token_fetch_failed_.value(), 0);
 }
 
 TEST_F(GcpAuthnFilterTest, BoundJwtCacheMissAndInsert) {
@@ -636,6 +644,7 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithoutFingerprintFails) {
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
   EXPECT_FALSE(filter_->fingerprint().has_value());
+  EXPECT_EQ(filter_config_->stats().bound_token_fingerprint_unavailable_.value(), 1);
 }
 
 TEST_F(GcpAuthnFilterTest, GetClientCertFingerprintWithNullClusterReturnsNullopt) {
@@ -1239,6 +1248,7 @@ TEST_F(GcpAuthnFilterTest, IamAccessTokenResolutionFailed) {
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  EXPECT_EQ(filter_config_->stats().iam_token_resolution_failed_.value(), 1);
 }
 
 TEST_F(GcpAuthnFilterTest, IamAccessTokenInClusterMetadataRejected) {
@@ -1264,6 +1274,7 @@ TEST_F(GcpAuthnFilterTest, IamAccessTokenInClusterMetadataRejected) {
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  EXPECT_EQ(filter_config_->stats().iam_token_config_error_.value(), 1);
 }
 
 TEST_F(GcpAuthnFilterTest, IamAccessTokenCacheMissAndHit) {
@@ -1598,6 +1609,30 @@ TEST_F(GcpAuthnFilterTest, CustomTokenHeaderWithoutPrefix) {
   client_callback_->onSuccess(client_request_, std::move(response));
 
   EXPECT_EQ(default_headers_.get_("x-goog-iap-jwt-assertion"), GoodTokenStr);
+}
+
+TEST_F(GcpAuthnFilterTest, TokenFetchFailure) {
+  setupFilterAndCallback();
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  // A failed fetch is not fatal: the request continues upstream without a token, so the counter
+  // is the only signal that this happened.
+  filter_->onComplete(absl::InternalError("failed to fetch token"));
+
+  EXPECT_EQ(filter_->state(), GcpAuthnFilter::State::Complete);
+  EXPECT_EQ(filter_config_->stats().token_fetch_failed_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().token_fetch_success_.value(), 0);
+}
+
+// Stats are namespaced under the filter name, below the prefix supplied by the connection manager.
+TEST_F(GcpAuthnFilterTest, StatsNamespacedUnderFilterName) {
+  absl::Status status;
+  FilterConfig filter_config(config_, context_.server_factory_context_, "http.foo.",
+                             context_.scope_, status);
+  ASSERT_OK(status);
+
+  filter_config.stats().token_fetch_failed_.inc();
+  EXPECT_EQ(context_.scope_.counterFromString("http.foo.gcp_authn.token_fetch_failed").value(), 1);
 }
 
 } // namespace GcpAuthn

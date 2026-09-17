@@ -12,6 +12,8 @@
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
 #include "source/extensions/filters/http/gcp_authn/token_cache.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -27,7 +29,14 @@ inline const Envoy::Http::LowerCaseString& authorizationHeaderKey() {
 #define ALL_GCP_AUTHN_FILTER_STATS(COUNTER)                                                        \
   COUNTER(retrieve_audience_failed)                                                                \
   COUNTER(empty_audience)                                                                          \
-  COUNTER(client_cert_fingerprint_calculated)
+  COUNTER(client_cert_fingerprint_calculated)                                                      \
+  COUNTER(token_fetch_success)                                                                     \
+  COUNTER(token_fetch_failed)                                                                      \
+  COUNTER(token_cache_hit)                                                                         \
+  COUNTER(token_cache_miss)                                                                        \
+  COUNTER(iam_token_config_error)                                                                  \
+  COUNTER(iam_token_resolution_failed)                                                             \
+  COUNTER(bound_token_fingerprint_unavailable)
 
 /**
  * Wrapper struct for stats. @see stats_macros.h
@@ -57,6 +66,13 @@ public:
   bool preserveExistingHeader() const { return preserve_existing_header_; }
 
 private:
+  // Stats are namespaced under the filter name, so that they can be distinguished from the stats
+  // of other filters sharing the HTTP connection manager's scope.
+  static GcpAuthnFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    const std::string final_prefix = absl::StrCat(prefix, "gcp_authn.");
+    return {ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  }
+
   const FilterConfigProto config_;
   Server::Configuration::ServerFactoryContext& context_;
   GcpAuthnFilterStats stats_;
@@ -102,10 +118,6 @@ private:
 
   std::optional<std::string> getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster);
   void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str);
-
-  GcpAuthnFilterStats generateStats(const std::string& stats_prefix, Stats::Scope& scope) {
-    return {ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))};
-  }
 
   FilterConfigSharedPtr filter_config_;
   const CertFingerprinterSharedPtr fingerprinter_;

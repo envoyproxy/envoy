@@ -406,6 +406,16 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MetricsNotFound) {
       static_cast<void*>(filter.get()), 999, 1);
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound, result);
 
+  // Try to increment a gauge that doesn't exist.
+  result = envoy_dynamic_module_callback_udp_listener_filter_increment_gauge(
+      static_cast<void*>(filter.get()), 999, 1);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound, result);
+
+  // Try to decrement a gauge that doesn't exist.
+  result = envoy_dynamic_module_callback_udp_listener_filter_decrement_gauge(
+      static_cast<void*>(filter.get()), 999, 1);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound, result);
+
   // Try to record a histogram that doesn't exist.
   result = envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(
       static_cast<void*>(filter.get()), 999, 1);
