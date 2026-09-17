@@ -4,6 +4,7 @@
 #include <map>
 #include <set>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/regex.h"
@@ -82,6 +83,8 @@ struct PrimitiveMetricSnapshotLessThan {
 
 class TextFormat : public PrometheusStatsFormatter::OutputFormat {
 public:
+  void setEmitType(bool emit_type) { emit_type_ = emit_type; }
+
   void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Counter*>& counters,
                       const std::string& prefixed_tag_extracted_name) const override {
     generateNumericOutput(output, counters, prefixed_tag_extracted_name);
@@ -144,7 +147,9 @@ public:
 private:
   void generateTypeOutput(Buffer::Instance& output, absl::string_view type,
                           const std::string& prefixed_tag_extracted_name) const {
-    output.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
+    if (emit_type_) {
+      output.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
+    }
   }
 
   template <class StatType>
@@ -259,6 +264,7 @@ private:
                              stats.sampleCount()));
     }
   }
+  bool emit_type_{true};
 };
 
 class ProtobufFormat : public PrometheusStatsFormatter::OutputFormat {
@@ -702,23 +708,13 @@ private:
 };
 
 /**
- * Processes a stat type (counter, gauge, histogram) by generating all output lines, sorting
- * them by tag-extracted metric name, and then outputting them in the correct sorted order into
- * response.
- *
- * @param response The buffer to put the output into.
- * @param used_only Whether to only output stats that are used.
- * @param regex A filter on which stats to output.
- * @param metrics The metrics to output stats for. This must contain all stats of the given type
- *        to be included in the same output.
- * @param generate_output A function which returns the output text for this metric.
- * @param type The name of the prometheus metric type for used in TYPE annotations.
+ * Visits globally grouped metrics in stable order. The caller either serializes each complete
+ * family or retains its metric pointers for incremental rendering. Ownership remains with metrics.
  */
-template <class StatType>
-uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
-                        const std::vector<Stats::RefcountPtr<StatType>>& metrics,
-                        const PrometheusStatsFormatter::OutputFormat& output_format,
-                        const Stats::CustomStatNamespaces& custom_namespaces) {
+template <class StatType, class Visit>
+uint64_t visitStatType(const StatsParams& params,
+                       const std::vector<Stats::RefcountPtr<StatType>>& metrics,
+                       const Stats::CustomStatNamespaces& custom_namespaces, Visit visit) {
 
   /*
    * From
@@ -784,15 +780,14 @@ uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
     // be consistent across calls.
     std::sort(group.begin(), group.end(), MetricLessThan());
 
-    output_format.generateOutput(response, group, prefixed_tag_extracted_name.value());
+    visit(std::move(group), prefixed_tag_extracted_name.value());
   }
   return result;
 }
 
-template <class StatType, class OutputFormat>
-uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& params,
-                                 std::vector<StatType>&& metrics, const OutputFormat& output_format,
-                                 const Stats::CustomStatNamespaces& custom_namespaces) {
+template <class StatType, class Visit>
+uint64_t visitPrimitiveStatType(const StatsParams& params, std::vector<StatType>& metrics,
+                                const Stats::CustomStatNamespaces& custom_namespaces, Visit visit) {
 
   /*
    * From
@@ -849,16 +844,209 @@ uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& 
     // be consistent across calls.
     std::sort(group.begin(), group.end(), PrimitiveMetricSnapshotLessThan());
 
-    output_format.generateOutput(response, std::move(group), prefixed_tag_extracted_name.value());
+    visit(std::move(group), prefixed_tag_extracted_name.value());
   }
   return result;
+}
+
+class TextStatCursor {
+public:
+  virtual ~TextStatCursor() = default;
+  virtual bool next(Buffer::Instance& output, TextFormat& format) PURE;
+};
+
+template <class StatType> class TextStatCursorImpl : public TextStatCursor {
+public:
+  void addFamily(std::vector<StatType*>&& metrics, const std::string& name) {
+    families_.push_back({std::move(metrics), name});
+  }
+
+  bool next(Buffer::Instance& output, TextFormat& format) override {
+    if (family_ == families_.size()) {
+      return false;
+    }
+    const auto& family = families_[family_];
+    format.setEmitType(metric_ == 0);
+    format.generateOutput(output, std::vector<StatType*>{family.metrics_[metric_++]}, family.name_);
+    if (metric_ == family.metrics_.size()) {
+      metric_ = 0;
+      ++family_;
+    }
+    return true;
+  }
+
+private:
+  struct Family {
+    std::vector<StatType*> metrics_;
+    std::string name_;
+  };
+  std::vector<Family> families_;
+  size_t family_{0};
+  size_t metric_{0};
+};
+
+// Requests are driven serially on the admin dispatcher. The raw pointers in the cursor refer
+// to these owned snapshots, never to a live store container or a scope's metric collection.
+class PrometheusTextRequest : public Admin::Request {
+public:
+  PrometheusTextRequest(const std::vector<Stats::CounterSharedPtr>& counters,
+                        const std::vector<Stats::GaugeSharedPtr>& gauges,
+                        const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                        const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+                        const Upstream::ClusterManager& cluster_manager, const StatsParams& params,
+                        const Stats::CustomStatNamespaces& custom_namespaces, uint64_t chunk_size)
+      : counters_(counters), gauges_(gauges), histograms_(histograms),
+        text_readouts_(text_readouts), cluster_manager_(cluster_manager), params_(params),
+        custom_namespaces_(custom_namespaces), chunk_size_(chunk_size) {
+    ASSERT(chunk_size_ > 0);
+    format_.setHistogramType(
+        params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Summary
+            ? PrometheusStatsFormatter::OutputFormat::HistogramType::Summary
+            : PrometheusStatsFormatter::OutputFormat::HistogramType::ClassicHistogram);
+  }
+
+  Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
+
+  bool nextChunk(Buffer::Instance& response) override {
+    uint64_t remaining = chunk_size_;
+    while (remaining != 0) {
+      if (pending_.length() != 0) {
+        const uint64_t size = std::min(remaining, pending_.length());
+        response.move(pending_, size);
+        remaining -= size;
+        continue;
+      }
+      if (cursor_ != nullptr && cursor_->next(pending_, format_)) {
+        continue;
+      }
+      cursor_.reset();
+      if (!nextPhase()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+private:
+  enum class Phase { Counters, Gauges, TextReadouts, Histograms, HostCounters, HostGauges, Done };
+
+  template <class StatType> void prepare(const std::vector<Stats::RefcountPtr<StatType>>& metrics) {
+    auto cursor = std::make_unique<TextStatCursorImpl<const StatType>>();
+    visitStatType(params_, metrics, custom_namespaces_, [&](auto&& group, const auto& name) {
+      cursor->addFamily(std::move(group), name);
+    });
+    cursor_ = std::move(cursor);
+  }
+
+  template <class StatType> void preparePrimitive(std::vector<StatType>& metrics) {
+    auto cursor = std::make_unique<TextStatCursorImpl<StatType>>();
+    visitPrimitiveStatType(
+        params_, metrics, custom_namespaces_,
+        [&](auto&& group, const auto& name) { cursor->addFamily(std::move(group), name); });
+    cursor_ = std::move(cursor);
+  }
+
+  bool nextPhase() {
+    switch (phase_) {
+    case Phase::Counters:
+      prepare(counters_);
+      phase_ = Phase::Gauges;
+      break;
+    case Phase::Gauges:
+      prepare(gauges_);
+      phase_ = Phase::TextReadouts;
+      break;
+    case Phase::TextReadouts:
+      prepare(text_readouts_);
+      phase_ = Phase::Histograms;
+      break;
+    case Phase::Histograms:
+      prepare(histograms_);
+      phase_ = Phase::HostCounters;
+      break;
+    case Phase::HostCounters:
+      // Preserve the buffered formatter's collection point for per-endpoint metrics.
+      Upstream::HostUtility::forEachHostMetric(
+          cluster_manager_,
+          [&](Stats::PrimitiveCounterSnapshot&& metric) {
+            host_counters_.push_back(std::move(metric));
+          },
+          [&](Stats::PrimitiveGaugeSnapshot&& metric) {
+            host_gauges_.push_back(std::move(metric));
+          });
+      preparePrimitive(host_counters_);
+      phase_ = Phase::HostGauges;
+      break;
+    case Phase::HostGauges:
+      preparePrimitive(host_gauges_);
+      phase_ = Phase::Done;
+      break;
+    case Phase::Done:
+      return false;
+    }
+    return true;
+  }
+
+  const std::vector<Stats::CounterSharedPtr> counters_;
+  const std::vector<Stats::GaugeSharedPtr> gauges_;
+  const std::vector<Stats::ParentHistogramSharedPtr> histograms_;
+  const std::vector<Stats::TextReadoutSharedPtr> text_readouts_;
+  const Upstream::ClusterManager& cluster_manager_;
+  const StatsParams params_;
+  const Stats::CustomStatNamespaces& custom_namespaces_;
+  const uint64_t chunk_size_;
+  std::vector<Stats::PrimitiveCounterSnapshot> host_counters_;
+  std::vector<Stats::PrimitiveGaugeSnapshot> host_gauges_;
+  std::unique_ptr<TextStatCursor> cursor_;
+  TextFormat format_;
+  // A histogram is serialized once, including all bucket/sum/count lines, before it is drained
+  // across chunks. One unusually large metric can exceed the chunk size; an entire family is
+  // never materialized here.
+  Buffer::OwnedImpl pending_;
+  Phase phase_{Phase::Counters};
+};
+
+template <class StatType>
+uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
+                        const std::vector<Stats::RefcountPtr<StatType>>& metrics,
+                        const PrometheusStatsFormatter::OutputFormat& output_format,
+                        const Stats::CustomStatNamespaces& custom_namespaces) {
+  return visitStatType(params, metrics, custom_namespaces, [&](auto&& group, const auto& name) {
+    output_format.generateOutput(response, group, name);
+  });
+}
+
+template <class StatType>
+uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& params,
+                                 std::vector<StatType>&& metrics,
+                                 const PrometheusStatsFormatter::OutputFormat& output_format,
+                                 const Stats::CustomStatNamespaces& custom_namespaces) {
+  return visitPrimitiveStatType(params, metrics, custom_namespaces,
+                                [&](auto&& group, const auto& name) {
+                                  output_format.generateOutput(response, std::move(group), name);
+                                });
+}
+
+} // namespace
+
+Admin::RequestPtr PrometheusStatsFormatter::makeTextRequest(
+    const std::vector<Stats::CounterSharedPtr>& counters,
+    const std::vector<Stats::GaugeSharedPtr>& gauges,
+    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+    const Upstream::ClusterManager& cluster_manager, const StatsParams& params,
+    const Stats::CustomStatNamespaces& custom_namespaces, uint64_t chunk_size) {
+  return std::make_unique<PrometheusTextRequest>(counters, gauges, histograms, text_readouts,
+                                                 cluster_manager, params, custom_namespaces,
+                                                 chunk_size);
 }
 
 // Determine the format based on Accept header, using first-match priority.
 // Per HTTP spec, clients SHOULD send media types in priority order.
 // Text format is only selected if explicitly requested as version 0.0.4 or as fallback.
 // Returns true if protobuf format should be used, false for text format.
-bool useProtobufFormat(const StatsParams& params, const Http::RequestHeaderMap& headers) {
+bool PrometheusStatsFormatter::useProtobufFormat(const StatsParams& params,
+                                                 const Http::RequestHeaderMap& headers) {
   bool use_protobuf = false; // Default to using the text format.
 
   if (auto prom_format = params.query_.getFirstValue("prom_protobuf"); prom_format.has_value()) {
@@ -898,8 +1086,6 @@ bool useProtobufFormat(const StatsParams& params, const Http::RequestHeaderMap& 
   // If no match found, default to text format for backward compatibility
   return use_protobuf;
 }
-
-} // namespace
 
 std::string PrometheusStatsFormatter::formattedTags(std::vector<Stats::Tag>&& tags) {
   std::vector<std::string> buf;
