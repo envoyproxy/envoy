@@ -622,17 +622,17 @@ TEST_F(FilterManagerTest, FilterNullPropagationFails) {
   std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestNullPropagatorFilter>());
 
-  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
-                        stream_info_);
+  FilterManager manager(std::move(filters));
 
   EXPECT_ENVOY_BUG(
       {
         absl::Status status;
         bool completed = false;
-        manager.start([&status, &completed](absl::Status s) {
-          status = std::move(s);
-          completed = true;
-        });
+        manager.startRequest(std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+                             [&status, &completed](absl::Status s) {
+                               status = std::move(s);
+                               completed = true;
+                             });
         drain();
         EXPECT_TRUE(completed);
         EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kInvalidArgument));
@@ -648,15 +648,17 @@ TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeaders) {
       {":method", "POST"}, {":path", "/chat/completions"}, {"content-length", "1000"}};
 
   std::vector<AiFilterSharedPtr> filters;
-  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
-                        stream_info_, &headers);
+  FilterManager manager(std::move(filters));
 
   absl::Status status;
   bool completed = false;
-  manager.start([&status, &completed](absl::Status s) {
-    status = std::move(s);
-    completed = true;
-  });
+  manager.startRequest(
+      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&status, &completed](absl::Status s) {
+        status = std::move(s);
+        completed = true;
+      },
+      &headers);
 
   drain();
   EXPECT_TRUE(completed);
@@ -676,15 +678,17 @@ TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeadersAfterMutation) {
   std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestMutationFilter>("gpt-4-turbo-extra-long"));
 
-  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
-                        stream_info_, &headers);
+  FilterManager manager(std::move(filters));
 
   absl::Status status;
   bool completed = false;
-  manager.start([&status, &completed](absl::Status s) {
-    status = std::move(s);
-    completed = true;
-  });
+  manager.startRequest(
+      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&status, &completed](absl::Status s) {
+        status = std::move(s);
+        completed = true;
+      },
+      &headers);
 
   drain();
   EXPECT_TRUE(completed);
@@ -701,15 +705,17 @@ TEST_F(FilterManagerTest, DoesNotSetContentLengthWhenNotPreviouslyPresent) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/chat/completions"}};
 
   std::vector<AiFilterSharedPtr> filters;
-  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
-                        stream_info_, &headers);
+  FilterManager manager(std::move(filters));
 
   absl::Status status;
   bool completed = false;
-  manager.start([&status, &completed](absl::Status s) {
-    status = std::move(s);
-    completed = true;
-  });
+  manager.startRequest(
+      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&status, &completed](absl::Status s) {
+        status = std::move(s);
+        completed = true;
+      },
+      &headers);
 
   drain();
   EXPECT_TRUE(completed);
@@ -750,10 +756,10 @@ TEST_F(FilterManagerTest, FilterOutlivesManagerUntilItsCoroutineCompletes) {
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});
   std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_shared<OutlivingFilter>(queue, seen, destroyed));
-  auto manager = std::make_unique<FilterManager>(std::move(filters), std::move(doc),
-                                                 &buffer_manager_, *dispatcher_, stream_info_);
+  auto manager = std::make_unique<FilterManager>(std::move(filters));
   bool completed = false;
-  manager->start([&completed](absl::Status s) { completed = s.ok(); });
+  manager->startRequest(std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+                        [&completed](absl::Status s) { completed = s.ok(); });
   drain();
   ASSERT_TRUE(completed);
 
@@ -813,7 +819,6 @@ TEST_F(FilterManagerTest, RequestAndResponseShareFilterInstancesInReverseOrder) 
   req_doc.setJson(nlohmann::json{{"model", "gpt-4"}});
   bool req_completed = false;
   manager.startRequest(std::move(req_doc), &buffer_manager_, *dispatcher_, stream_info_,
-                       /*request_headers=*/nullptr, /*local_reply_fn=*/nullptr,
                        [&req_completed](absl::Status s) { req_completed = s.ok(); });
   drain();
   ASSERT_TRUE(req_completed);
