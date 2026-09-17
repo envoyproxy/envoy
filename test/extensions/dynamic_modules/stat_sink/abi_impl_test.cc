@@ -249,6 +249,55 @@ TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterTagOutOfRange) {
   EXPECT_EQ('Z', name_buffer[0]);
 }
 
+// Reading a second metric and then returning to the first must not serve stale cached tags. This
+// exercises the per-flush tag cache invalidating when the metric changes.
+TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterTagCachesPerMetric) {
+  c0_.name_ = "cluster.foo.rq_total";
+  c0_.setTags({{"envoy.cluster_name", "foo"}});
+  c1_.name_ = "cluster.bar.rq_total";
+  c1_.setTags({{"envoy.cluster_name", "bar"}, {"envoy.response_code", "200"}});
+  snapshot_.counters_.push_back({/*delta=*/1, c0_});
+  snapshot_.counters_.push_back({/*delta=*/1, c1_});
+
+  auto read_tag = [&](size_t index, size_t tag_index, std::string& name, std::string& value) {
+    char tag_name[256];
+    char tag_value[256];
+    size_t tag_name_size = 0;
+    size_t tag_value_size = 0;
+    bool ok = envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+        snapshotHandle(), index, tag_index, tag_name, sizeof(tag_name), &tag_name_size, tag_value,
+        sizeof(tag_value), &tag_value_size);
+    name = written(tag_name, tag_name_size, sizeof(tag_name));
+    value = written(tag_value, tag_value_size, sizeof(tag_value));
+    return ok;
+  };
+
+  // Read the first metric, then the second, then the first again so the cache switches metrics
+  // between reads and must refill each time.
+  std::string name;
+  std::string value;
+  ASSERT_TRUE(read_tag(0, 0, name, value));
+  EXPECT_EQ("envoy.cluster_name", name);
+  EXPECT_EQ("foo", value);
+
+  ASSERT_TRUE(read_tag(1, 1, name, value));
+  EXPECT_EQ("envoy.response_code", name);
+  EXPECT_EQ("200", value);
+
+  ASSERT_TRUE(read_tag(0, 0, name, value));
+  EXPECT_EQ("envoy.cluster_name", name);
+  EXPECT_EQ("foo", value);
+
+  // The counts must track the active metric rather than a stale cached one.
+  size_t tag_count = 0;
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+      snapshotHandle(), 1, &tag_count));
+  EXPECT_EQ(2u, tag_count);
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+      snapshotHandle(), 0, &tag_count));
+  EXPECT_EQ(1u, tag_count);
+}
+
 // Gauge and text-readout tag callbacks share the counter code path; a gauge spot check confirms
 // the wiring reaches the right snapshot collection.
 TEST_F(DynamicModuleStatsSinkAbiTest, GetGaugeTagExtractedNameAndTags) {
