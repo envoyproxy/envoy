@@ -233,10 +233,30 @@ public:
   BufferManager* extras_store() const { return extras_store_.get(); }
   void set_extras_store(BufferManagerPtr store) { extras_store_ = std::move(store); }
 
+  // How the frame was terminated on the wire (BlankLine by default).
+  enum class Termination {
+    // Complete frame terminated by an empty line (e.g. \n\n, \r\n\r\n, \r\r). Dispatched by SSE
+    // clients.
+    BlankLine,
+    // Trailing frame at end-of-stream whose final line ended with a line break (\n, \r\n, or \r),
+    // but without a terminating blank line. Discarded by SSE clients at EOF.
+    LineBreak,
+    // Trailing frame at end-of-stream truncated mid-line without any line break (\n or \r).
+    // Discarded by SSE clients at EOF.
+    None,
+  };
+
+  Termination termination() const { return termination_; }
+  void set_termination(Termination termination) { termination_ = termination; }
+
+  // Convenience helper returning true when termination() == Termination::BlankLine.
+  bool blank_line_terminated() const { return termination_ == Termination::BlankLine; }
+
 private:
   std::vector<MetadataField> metadata_;
   bool has_data_{false};
   bool is_json_{false};
+  Termination termination_{Termination::BlankLine};
   JsonWithExtBuf json_;
   // Never null; replaced wholesale by set_raw_data().
   Buffer::InstancePtr raw_data_;

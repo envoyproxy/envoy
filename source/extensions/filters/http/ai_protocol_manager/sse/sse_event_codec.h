@@ -113,7 +113,8 @@ private:
   absl::Status finishLine();
 
   // Emits the accumulated frame to `out`, parsing its payload, and resets for the next one.
-  void finishFrame(std::vector<SseEventPtr>& out);
+  void finishFrame(std::vector<SseEventPtr>& out,
+                   SseEvent::Termination termination = SseEvent::Termination::BlankLine);
 
   // Appends payload bytes to the frame's store and parser, opening both on the first byte.
   absl::Status appendPayload(absl::string_view bytes);

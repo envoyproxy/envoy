@@ -60,9 +60,23 @@ public:
   // again with the remainder. `data` must not be empty.
   LineScan scanLine(absl::string_view data);
 
+  // The framing state at end-of-stream, returned by flushEndStream().
+  enum class EndStreamState {
+    // The stream ended with a CR that completed an empty (blank) line.
+    BlankLine,
+    // The stream ended after a line break (LF, CRLF, or a trailing CR on a content line).
+    LineBreak,
+    // The stream ended mid-line without any line break.
+    MidLine,
+  };
+
   // Returns any bytes withheld while waiting to resolve a partial UTF-8 BOM at EOF, and marks
   // BOM resolution complete.
   absl::string_view flushPendingBom();
+
+  // Resolves any withheld CR at EOF, resets the scanner to LineStart, and returns how the
+  // stream ended. Must be called after flushPendingBom().
+  EndStreamState flushEndStream();
 
   // Returns the scanner to the start of a line. Called after a complete event has been consumed
   // out of a separate buffer, where the scanner's state no longer describes the pending input.

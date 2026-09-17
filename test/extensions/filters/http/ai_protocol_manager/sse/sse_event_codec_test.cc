@@ -174,7 +174,9 @@ TEST_F(SseEventDecoderTest, CrlfAndBareCrTerminators) {
 
   ASSERT_EQ(events_.size(), 2);
   EXPECT_EQ(events_[0]->raw_data_as_string(), "crlf");
+  EXPECT_TRUE(events_[0]->blank_line_terminated());
   EXPECT_EQ(events_[1]->raw_data_as_string(), "cr");
+  EXPECT_TRUE(events_[1]->blank_line_terminated());
 }
 
 // A boundary CR at the end of a chunk is resolved by the first byte of the next one, whether or
@@ -283,6 +285,8 @@ TEST_F(SseEventDecoderTest, EndStreamEmitsUnterminatedFrame) {
   ASSERT_THAT(decoder.onEndStream(events_), IsOk());
   ASSERT_EQ(events_.size(), 1);
   EXPECT_EQ(events_[0]->raw_data_as_string(), "tail");
+  EXPECT_EQ(events_[0]->termination(), SseEvent::Termination::None);
+  EXPECT_FALSE(events_[0]->blank_line_terminated());
 }
 
 TEST_F(SseEventDecoderTest, EndStreamWithNothingPendingEmitsNothing) {
@@ -850,6 +854,78 @@ TEST_F(SseEventDecoderTest, FrameExceedingMaxFrameBytesFails) {
 
   const absl::Status status = feed(decoder, absl::StrCat("data: ", std::string(40, 'a'), "\n\n"));
   EXPECT_EQ(status.code(), absl::StatusCode::kResourceExhausted);
+}
+
+// A frame flushed at end-of-stream without a terminating blank line must not have a trailing blank
+// line inserted during serialization, ensuring downstream clients discard the incomplete trailing
+// frame just as they would when receiving the original stream.
+TEST_F(SseCodecBufferTest, UnterminatedFrameAtEndStreamDoesNotInsertBlankLineOnSerialization) {
+  SseEventDecoder decoder = makeDecoder();
+  ASSERT_THAT(feed(decoder, "data: complete\n\nevent: partial\ndata: incomplete\n"), IsOk());
+  ASSERT_EQ(events_.size(), 1);
+  EXPECT_EQ(events_[0]->termination(), SseEvent::Termination::BlankLine);
+  EXPECT_EQ(serialize(*events_[0]), "data: complete\n\n");
+
+  events_.clear();
+  ASSERT_THAT(decoder.onEndStream(events_), IsOk());
+  ASSERT_EQ(events_.size(), 1);
+  EXPECT_EQ(events_[0]->termination(), SseEvent::Termination::LineBreak);
+  EXPECT_EQ(serialize(*events_[0]), "event: partial\ndata: incomplete\n");
+}
+
+// Verifies that all three EOF termination states (BlankLine, LineBreak including PendingCrContent,
+// and None) serialize without inserting spurious line breaks or blank lines, so a downstream client
+// sees identical event completion and discard behavior as when the proxy is absent.
+TEST_F(SseCodecBufferTest, EndStreamTerminationStatesPreserveWireEndingAndClientBehavior) {
+  struct Case {
+    absl::string_view input;
+    SseEvent::Termination expected_termination;
+    absl::string_view expected_serialized;
+    bool client_dispatches_on_data;
+  };
+  const Case cases[] = {
+      // Complete frames terminated by blank line (LF or CR at EOF).
+      {"data: ok\n\n", SseEvent::Termination::BlankLine, "data: ok\n\n", true},
+      {"data: ok\r\r", SseEvent::Termination::BlankLine, "data: ok\n\n", true},
+      // Frames ending after a single line break (LF, CRLF, or trailing CR via PendingCrContent).
+      {"data: line_lf\n", SseEvent::Termination::LineBreak, "data: line_lf\n", false},
+      {"data: line_crlf\r\n", SseEvent::Termination::LineBreak, "data: line_crlf\n", false},
+      {"data: line_cr\r", SseEvent::Termination::LineBreak, "data: line_cr\n", false},
+      {": comment_cr\r", SseEvent::Termination::LineBreak, ": comment_cr\n", false},
+      // Frames truncated mid-line without any line break (ScanState::LineContent).
+      {"data: midline", SseEvent::Termination::None, "data: midline", false},
+      {"event: midline", SseEvent::Termination::None, "event: midline", false},
+      {": comment_midline", SseEvent::Termination::None, ": comment_midline", false},
+      {"event: a\ndata: b", SseEvent::Termination::None, "event: a\ndata: b", false},
+  };
+
+  for (const Case& c : cases) {
+    events_.clear();
+    SseEventDecoder upstream_decoder = makeDecoder();
+    ASSERT_THAT(feed(upstream_decoder, c.input), IsOk()) << c.input;
+    ASSERT_THAT(upstream_decoder.onEndStream(events_), IsOk()) << c.input;
+    ASSERT_EQ(events_.size(), 1) << c.input;
+    EXPECT_EQ(events_[0]->termination(), c.expected_termination) << c.input;
+
+    const std::string proxied = serialize(*events_[0]);
+    EXPECT_EQ(proxied, c.expected_serialized) << c.input;
+
+    // Feed the proxied wire bytes to a fresh downstream client decoder and verify that:
+    // 1) An event is dispatched during onData iff it was terminated by a blank line.
+    // 2) At EOF (onEndStream), the downstream client observes the exact same termination state.
+    std::vector<SseEventPtr> client_events;
+    SseEventDecoder client_decoder = makeDecoder();
+    Buffer::OwnedImpl buf(proxied);
+    ASSERT_THAT(client_decoder.onData(buf, client_events), IsOk()) << c.input;
+    if (c.client_dispatches_on_data) {
+      EXPECT_EQ(client_events.size(), 1) << c.input;
+    } else {
+      EXPECT_TRUE(client_events.empty()) << c.input;
+    }
+    ASSERT_THAT(client_decoder.onEndStream(client_events), IsOk()) << c.input;
+    ASSERT_EQ(client_events.size(), 1) << c.input;
+    EXPECT_EQ(client_events[0]->termination(), c.expected_termination) << c.input;
+  }
 }
 
 } // namespace

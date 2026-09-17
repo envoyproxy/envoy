@@ -44,9 +44,11 @@ Coroutine::Task<absl::Status> writeOut(BufferManager& out, std::string bytes) {
 
 // Emits one `data:` line holding `line`. An empty value is written without the conventional
 // space, so `data:` round-trips as `data:` rather than gaining a trailing blank.
-Coroutine::Task<absl::Status> writeDataLine(BufferManager& out, absl::string_view line) {
-  co_return co_await writeOut(out, line.empty() ? std::string("data:\n")
-                                                : absl::StrCat("data: ", line, "\n"));
+Coroutine::Task<absl::Status> writeDataLine(BufferManager& out, absl::string_view line,
+                                            bool emit_newline = true) {
+  const absl::string_view suffix = emit_newline ? "\n" : "";
+  co_return co_await writeOut(out, line.empty() ? absl::StrCat("data:", suffix)
+                                                : absl::StrCat("data: ", line, suffix));
 }
 
 } // namespace
@@ -88,7 +90,9 @@ absl::Status SseEventDecoder::onEndStream(std::vector<SseEventPtr>& out) {
       return status;
     }
   }
-  // A line is pending only if it carried a colon (so its field resolved) or accumulated a name.
+  const SseScanner::EndStreamState end_state = scanner_.flushEndStream();
+  // A line is pending if it carried a colon (so its field resolved), accumulated a name, or
+  // ended with a trailing CR at the end of the final chunk (PendingCrContent).
   if (prefix_done_ || !line_prefix_.empty()) {
     if (absl::Status status = finishLine(); !status.ok()) {
       return status;
@@ -97,9 +101,23 @@ absl::Status SseEventDecoder::onEndStream(std::vector<SseEventPtr>& out) {
   if (!saw_field_) {
     return absl::OkStatus();
   }
-  // The upstream ended without the blank line that terminates the frame. Emitting it anyway
-  // keeps this path from losing content a plain proxy would have forwarded.
-  finishFrame(out);
+  SseEvent::Termination termination = SseEvent::Termination::LineBreak;
+  switch (end_state) {
+  case SseScanner::EndStreamState::BlankLine:
+    termination = SseEvent::Termination::BlankLine;
+    break;
+  case SseScanner::EndStreamState::LineBreak:
+    termination = SseEvent::Termination::LineBreak;
+    break;
+  case SseScanner::EndStreamState::MidLine:
+    termination = SseEvent::Termination::None;
+    break;
+  }
+  // When upstream ends without the blank line that terminates the frame, emitting it anyway
+  // keeps this path from losing content a plain proxy would have forwarded, while recording
+  // termination ensures serialization does not insert a blank line or trailing line break that
+  // would alter client behavior.
+  finishFrame(out, termination);
   return absl::OkStatus();
 }
 
@@ -298,13 +316,15 @@ absl::Status SseEventDecoder::appendExtras(absl::string_view bytes) {
   return absl::OkStatus();
 }
 
-void SseEventDecoder::finishFrame(std::vector<SseEventPtr>& out) {
+void SseEventDecoder::finishFrame(std::vector<SseEventPtr>& out,
+                                  SseEvent::Termination termination) {
   if (!saw_field_) {
     // Consecutive blank lines: no frame in between.
     return;
   }
 
   auto event = std::make_unique<SseEvent>();
+  event->set_termination(termination);
   event->set_metadata(std::move(metadata_));
   if (extras_store_ != nullptr) {
     // No more lines belong to this frame, so nothing more will be appended.
@@ -372,31 +392,47 @@ void SseEventDecoder::resetFrame() {
 }
 
 Coroutine::Task<absl::Status> SseEventSerializer::serialize(SseEvent& event, BufferManager& out) {
-  for (const SseEvent::MetadataField& field : event.metadata()) {
+  const bool has_extras = event.extras_store() != nullptr && event.extras_store()->length() > 0;
+  const bool metadata_is_last = !event.has_data() && !has_extras;
+  for (size_t i = 0; i < event.metadata().size(); ++i) {
+    const SseEvent::MetadataField& field = event.metadata()[i];
     ASSERT(field.value.find_first_of("\r\n") == std::string::npos);
-    absl::string_view prefix;
+    const bool is_last_line = metadata_is_last && (i + 1 == event.metadata().size());
+    const bool emit_newline = !is_last_line || (event.termination() != SseEvent::Termination::None);
+    absl::string_view name;
     switch (field.kind) {
     case SseEvent::MetadataField::Kind::Event:
-      prefix = field.value.empty() ? "event:\n" : "event: ";
+      name = "event";
       break;
     case SseEvent::MetadataField::Kind::Id:
-      prefix = field.value.empty() ? "id:\n" : "id: ";
+      name = "id";
       break;
     case SseEvent::MetadataField::Kind::Retry:
-      prefix = field.value.empty() ? "retry:\n" : "retry: ";
+      name = "retry";
       break;
     }
+    const absl::string_view suffix = emit_newline ? "\n" : "";
     if (field.value.empty()) {
-      CO_RETURN_IF_ERROR(co_await writeOut(out, std::string(prefix)));
+      CO_RETURN_IF_ERROR(co_await writeOut(out, absl::StrCat(name, ":", suffix)));
     } else {
-      CO_RETURN_IF_ERROR(co_await writeOut(out, absl::StrCat(prefix, field.value, "\n")));
+      CO_RETURN_IF_ERROR(co_await writeOut(out, absl::StrCat(name, ": ", field.value, suffix)));
     }
   }
+
   // Comments and fields this codec does not model, put back byte for byte. The store holds those
   // lines and nothing else, so its whole range is what goes out.
-  if (event.extras_store() != nullptr) {
+  if (has_extras) {
     BufferManager& extras = *event.extras_store();
-    CO_RETURN_IF_ERROR(co_await ReplayAwaitable(extras, 0, extras.length()));
+    const bool extras_is_last = !event.has_data();
+    uint64_t len = extras.length();
+    if (extras_is_last && event.termination() == SseEvent::Termination::None && len > 0) {
+      // finishLine() terminates every unknown/comment line in extras_store with '\n'. Strip the
+      // trailing '\n' when this is the final line of a mid-line truncated frame.
+      len -= 1;
+    }
+    if (len > 0) {
+      CO_RETURN_IF_ERROR(co_await ReplayAwaitable(extras, 0, len));
+    }
   }
 
   if (event.has_data()) {
@@ -407,16 +443,24 @@ Coroutine::Task<absl::Status> SseEventSerializer::serialize(SseEvent& event, Buf
       absl::StatusOr<JsonWithExtBuf> serialized =
           co_await Serializer::serialize(event.json(), &out, event.payload_store());
       CO_RETURN_IF_ERROR(serialized.status());
-      CO_RETURN_IF_ERROR(co_await writeOut(out, "\n"));
+      if (event.termination() != SseEvent::Termination::None) {
+        CO_RETURN_IF_ERROR(co_await writeOut(out, "\n"));
+      }
     } else if (!event.raw_data_ext_refs().empty()) {
       ASSERT(event.payload_store() != nullptr);
       // One data line per reference: this is exactly how the decoder split them, so a payload
       // whose bytes contain newlines reassembles unchanged.
-      for (const JsonWithExtBuf::ExternalRef& ref : event.raw_data_ext_refs()) {
+      for (size_t i = 0; i < event.raw_data_ext_refs().size(); ++i) {
+        const JsonWithExtBuf::ExternalRef& ref = event.raw_data_ext_refs()[i];
+        const bool is_last_line = (i + 1 == event.raw_data_ext_refs().size());
+        const bool emit_newline =
+            !is_last_line || (event.termination() != SseEvent::Termination::None);
         CO_RETURN_IF_ERROR(co_await writeOut(out, "data: "));
         CO_RETURN_IF_ERROR(
             co_await ReplayAwaitable(*event.payload_store(), ref.offset, ref.length));
-        CO_RETURN_IF_ERROR(co_await writeOut(out, "\n"));
+        if (emit_newline) {
+          CO_RETURN_IF_ERROR(co_await writeOut(out, "\n"));
+        }
       }
     } else {
       // The decoder joined multiple data lines with newlines; split them back apart so each is
@@ -426,18 +470,24 @@ Coroutine::Task<absl::Status> SseEventSerializer::serialize(SseEvent& event, Buf
       // did carry a `data:` field, and splitting an empty view yields no pieces at all, which
       // would drop the line and turn the frame into one with no data.
       const absl::string_view payload = event.raw_data_as_string();
+      const bool omit_last_newline = (event.termination() == SseEvent::Termination::None);
       if (payload.empty()) {
-        CO_RETURN_IF_ERROR(co_await writeDataLine(out, payload));
+        CO_RETURN_IF_ERROR(co_await writeDataLine(out, payload, !omit_last_newline));
       } else {
-        for (absl::string_view line : absl::StrSplit(payload, '\n')) {
-          ASSERT(line.find('\r') == absl::string_view::npos);
-          CO_RETURN_IF_ERROR(co_await writeDataLine(out, line));
+        const std::vector<absl::string_view> lines = absl::StrSplit(payload, '\n');
+        for (size_t i = 0; i < lines.size(); ++i) {
+          ASSERT(lines[i].find('\r') == absl::string_view::npos);
+          const bool is_last_line = (i + 1 == lines.size());
+          CO_RETURN_IF_ERROR(
+              co_await writeDataLine(out, lines[i], !is_last_line || !omit_last_newline));
         }
       }
     }
   }
 
-  CO_RETURN_IF_ERROR(co_await writeOut(out, "\n"));
+  if (event.termination() == SseEvent::Termination::BlankLine) {
+    CO_RETURN_IF_ERROR(co_await writeOut(out, "\n"));
+  }
   co_return absl::OkStatus();
 }
 

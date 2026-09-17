@@ -68,6 +68,24 @@ absl::string_view SseScanner::flushPendingBom() {
   return kUtf8Bom.substr(0, bom_len_);
 }
 
+SseScanner::EndStreamState SseScanner::flushEndStream() {
+  EndStreamState result = EndStreamState::LineBreak;
+  switch (state_) {
+  case ScanState::PendingCrBlank:
+    result = EndStreamState::BlankLine;
+    break;
+  case ScanState::PendingCrContent:
+  case ScanState::LineStart:
+    result = EndStreamState::LineBreak;
+    break;
+  case ScanState::LineContent:
+    result = EndStreamState::MidLine;
+    break;
+  }
+  state_ = ScanState::LineStart;
+  return result;
+}
+
 SseScanner::LineScan SseScanner::scanLine(absl::string_view data) {
   LineScan out;
   if (data.empty()) {
