@@ -1811,6 +1811,16 @@ WEAK_STUB(StatSinkSnapshotGetTextReadout,
 WEAK_STUB(StatSinkSnapshotGetCounterTagExtractedName,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
               nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+              nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(nullptr, 0,
+                                                                                   nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(nullptr, 0, 0, nullptr,
+                                                                             0, nullptr, nullptr, 0,
+                                                                             nullptr))
 WEAK_STUB(StatSinkSnapshotGetCounterTagCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(nullptr, 0,
                                                                                  nullptr))
