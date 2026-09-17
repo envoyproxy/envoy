@@ -56,8 +56,7 @@ And with the optional ``default_filter_chain``, a default chain can be provided 
 which individual routes then extend or override by name.
 
 In most cases route level filter chains and global filters are complementary rather than
-exclusive, and the filter chain filter makes it possible to hybrid them freely. Because the
-placeholder is just an ordinary entry in ``http_filters``, its position decides where the route
+exclusive, and the filter chain filter makes it possible to combine them freely. Because
 level chain runs relative to the global filters: everything listed before it runs first and
 everything listed after it runs last. Multiple ``filter_chain`` entries may also be configured in
 ``http_filters`` to support multiple route level chains in a single route and order them freely
