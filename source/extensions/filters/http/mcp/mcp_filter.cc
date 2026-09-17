@@ -454,14 +454,6 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
 
   use_new_spec_semantics_ = shouldUseNewSpecSemantics();
 
-  if (protocol_version_headers.empty() && use_new_spec_semantics_) {
-    config_->stats().header_mismatch_.inc();
-    if (shouldRejectRequest()) {
-      sendHeaderMismatchReply("Missing required MCP-Protocol-Version header");
-      return Http::FilterHeadersStatus::StopIteration;
-    }
-  }
-
   if (use_new_spec_semantics_ && shouldRejectRequest()) {
     if (isValidMcpDeleteRequest(headers)) {
       sendMethodNotAllowedReply(
