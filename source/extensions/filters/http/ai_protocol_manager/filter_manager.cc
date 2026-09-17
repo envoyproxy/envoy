@@ -207,7 +207,7 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
   bool terminated_{false};
 };
 
-FilterManager::FilterManager(std::vector<AiFilterPtr> filters, JsonWithExtBuf payload_index,
+FilterManager::FilterManager(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
                              BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
                              StreamInfo::StreamInfo& stream_info,
                              Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn)
@@ -267,7 +267,8 @@ void FilterManager::launchFilters() {
     auto task = filters_[i]->decode(std::move(receiver), std::move(propagator), std::move(replier));
     auto handle = Coroutine::launch(
         std::move(task), executor_,
-        [weak_state, i](absl::Status status) {
+        // Holds the filter until its coroutine completes, which can be after ~FilterManager.
+        [weak_state, i, filter = filters_[i]](absl::Status status) {
           if (auto state = weak_state.lock()) {
             state->onFilterCompletion(i, std::move(status));
           }
