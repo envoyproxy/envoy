@@ -207,8 +207,15 @@ TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithPreserveExistingMissingName) {
   )EOF";
   GcpAuthnFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
-  EXPECT_THROW_WITH_REGEX(TestUtility::validate(filter_config), ProtoValidationException,
-                          "TokenHeaderValidationError.Name");
+  TestUtility::validate(filter_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  GcpAuthnFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
 }
 
 } // namespace
