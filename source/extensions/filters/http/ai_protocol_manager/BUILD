@@ -219,7 +219,6 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
-        "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/status",

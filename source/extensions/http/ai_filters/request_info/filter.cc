@@ -19,7 +19,7 @@ namespace RequestInfo {
 
 using HttpFilters::AiProtocolManager::AiFilterContext;
 using HttpFilters::AiProtocolManager::AiRequest;
-using HttpFilters::AiProtocolManager::DecodeAction;
+using HttpFilters::AiProtocolManager::LocalReplier;
 
 namespace {
 
@@ -58,9 +58,9 @@ RequestInfoFilter::RequestInfoFilter(RequestInfoFilterConfigSharedPtr config,
                                      const AiFilterContext& context)
     : config_(std::move(config)), context_(context) {}
 
-DecodeAction RequestInfoFilter::decode(AiRequest& request) {
+absl::Status RequestInfoFilter::decodeSync(AiRequest& request, LocalReplier) {
   publish(request.json());
-  return DecodeAction::continueChain();
+  return absl::OkStatus();
 }
 
 void RequestInfoFilter::publish(const nlohmann::json& json) {
