@@ -27,8 +27,7 @@ public:
 protected:
   // Configures the downstream listener to request a client certificate and validate it against
   // `trusted_ca` (a file under test/config/integration/certs). With `accept_untrusted` a
-  // certificate that fails validation is still accepted; QUIC rejects that combination at
-  // configuration load time, so it is only usable with TCP-based downstream protocols.
+  // certificate that fails validation is still accepted but not reported as validated.
   void setDownstreamClientCertValidation(const std::string& trusted_ca,
                                          bool accept_untrusted = false);
   // Creates a downstream connection presenting the client certificate selected by `options`.

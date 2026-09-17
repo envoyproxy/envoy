@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/common/logger.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/xds_config_tracker.h"
@@ -1872,7 +1873,7 @@ TEST_P(ServerInstanceImplTest, BootstrapApplicationLogsAndCLIThrows) {
 TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/json_application_log.yaml"));
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
     EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
@@ -1900,7 +1901,7 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagUnderscore
 TEST_P(ServerInstanceImplTest, TextApplicationLog) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/text_application_log.yaml"));
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
     EXPECT_THAT(msg, HasSubstr("[lvl: info][msg: hello]"));

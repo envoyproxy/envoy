@@ -221,13 +221,6 @@ void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
-void EnvoyQuicServerSession::onClientCertValidated(
-    const std::vector<bssl::UniquePtr<X509>>& validated_chain) {
-  // The client certificate was validated by EnvoyTlsServerHandshaker against the matched filter
-  // chain's context; a certificate is only ever presented when that chain requests one.
-  quic_ssl_info_->onCertValidated(validated_chain);
-}
-
 void EnvoyQuicServerSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {
   QuicServerSessionBase::OnRstStream(frame);
   incrementSentQuicResetStreamErrorStats(frame.error(),
@@ -275,18 +268,29 @@ void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionM
   position_.emplace(connection_map, filter_chain, position);
 }
 
+void EnvoyQuicServerSession::setClientCertificateValidated(
+    const std::vector<bssl::UniquePtr<X509>>& validated_chain) {
+  quic_ssl_info_->onCertValidated(validated_chain);
+}
+
 quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
   quic::QuicSSLConfig config = quic::QuicServerSessionBase::GetSSLConfig();
   if (position_.has_value()) {
     const auto& transport_socket_factory = dynamic_cast<const QuicServerTransportSocketFactory&>(
         position_->filter_chain_.transportSocketFactory());
-    config.client_cert_mode = transport_socket_factory.requiresClientCertificate()
-                                  ? quic::ClientCertMode::kRequire
-                                  : quic::ClientCertMode::kNone;
-    // 0-RTT is disabled when a client certificate is required because early data is replayable and
-    // would bypass client certificate validation.
-    config.early_data_enabled = transport_socket_factory.earlyDataEnabled() &&
-                                config.client_cert_mode == quic::ClientCertMode::kNone;
+    if (transport_socket_factory.requiresClientCertificate()) {
+      config.client_cert_mode = quic::ClientCertMode::kRequire;
+    } else if (transport_socket_factory.clientCertificateValidationConfigured() &&
+               Runtime::runtimeFeatureEnabled(
+                   "envoy.reloadable_features.quic_mtls_server_enabled")) {
+      // Request but do not require a client certificate when a validation context is configured
+      // without `require_client_certificate`, matching the TCP TLS behavior. The required path is
+      // gated at config time, so this optional path is gated by the runtime guard here.
+      config.client_cert_mode = quic::ClientCertMode::kRequest;
+    } else {
+      config.client_cert_mode = quic::ClientCertMode::kNone;
+    }
+    config.early_data_enabled = transport_socket_factory.earlyDataEnabled();
     config.disable_ticket_support = !transport_socket_factory.resumptionEnabled();
   } else {
     config.early_data_enabled = true;

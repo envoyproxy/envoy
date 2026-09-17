@@ -7,8 +7,6 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "source/common/runtime/runtime_features.h"
-
 #include "quiche/quic/core/quic_ack_listener_interface.h"
 #include "quiche/quic/platform/api/quic_flags.h"
 
@@ -82,8 +80,6 @@ private:
   const bool notify_ack_listener_before_soon_to_be_destroyed_{
       GetQuicReloadableFlag(quic_notify_ack_listener_earlier) &&
       GetQuicReloadableFlag(quic_notify_stream_soon_to_destroy)};
-  const bool fix_defer_logging_miss_for_half_closed_stream_{Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream")};
 };
 
 } // namespace Quic

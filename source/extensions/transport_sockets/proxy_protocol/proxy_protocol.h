@@ -1,13 +1,17 @@
 #pragma once
 
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/transport_sockets/common/passthrough.h"
+
+#include "absl/status/statusor.h"
 
 using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
@@ -16,6 +20,28 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace ProxyProtocol {
+
+// A TLV whose value is produced from a format string, evaluated per connection against the
+// connection's stream info.
+struct TlvFormatter {
+  uint8_t type;
+  Formatter::FormatterPtr formatter;
+};
+
+// The parsed config-level added TLVs, shared across all connections. Static entries are emitted
+// as-is and dynamic entries are evaluated per connection.
+struct AddedTlvs {
+  std::vector<Network::ProxyProtocolTLV> static_tlvs;
+  std::vector<TlvFormatter> dynamic_tlvs;
+};
+using AddedTlvsConstSharedPtr = std::shared_ptr<const AddedTlvs>;
+
+// Parses the added TLVs into static values and dynamic formatters, requiring each entry to set
+// exactly one of value or format_string. Falls back to reading only value when the runtime guard
+// is disabled.
+absl::StatusOr<AddedTlvsConstSharedPtr>
+parseTLVs(const ProxyProtocolConfig& config,
+          Server::Configuration::TransportSocketFactoryContext& context);
 
 #define ALL_PROXY_PROTOCOL_TRANSPORT_SOCKET_STATS(COUNTER)                                         \
   /* Upstream events counter. */                                                                   \
@@ -33,7 +59,8 @@ class UpstreamProxyProtocolSocket : public TransportSockets::PassthroughSocket,
 public:
   UpstreamProxyProtocolSocket(Network::TransportSocketPtr&& transport_socket,
                               Network::TransportSocketOptionsConstSharedPtr options,
-                              ProxyProtocolConfig config, const UpstreamProxyProtocolStats& stats);
+                              ProxyProtocolConfig config, const UpstreamProxyProtocolStats& stats,
+                              AddedTlvsConstSharedPtr tlvs);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
@@ -56,14 +83,14 @@ private:
   const UpstreamProxyProtocolStats& stats_;
   const bool pass_all_tlvs_;
   absl::flat_hash_set<uint8_t> pass_through_tlvs_;
-  std::vector<Envoy::Network::ProxyProtocolTLV> added_tlvs_;
+  AddedTlvsConstSharedPtr tlvs_;
 };
 
 class UpstreamProxyProtocolSocketFactory : public PassthroughFactory {
 public:
   UpstreamProxyProtocolSocketFactory(
       Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
-      ProxyProtocolConfig config, Stats::Scope& scope);
+      ProxyProtocolConfig config, Stats::Scope& scope, AddedTlvsConstSharedPtr tlvs);
 
   // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr
@@ -80,6 +107,7 @@ public:
 private:
   ProxyProtocolConfig config_;
   UpstreamProxyProtocolStats stats_;
+  AddedTlvsConstSharedPtr tlvs_;
 };
 
 } // namespace ProxyProtocol

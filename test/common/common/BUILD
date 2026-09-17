@@ -291,6 +291,7 @@ envoy_cc_test(
     srcs = ["logger_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:logger",
         "//source/common/common:minimal_logger_lib",
         "//source/common/version:version_string_lib",
         "//test/mocks/http:http_mocks",

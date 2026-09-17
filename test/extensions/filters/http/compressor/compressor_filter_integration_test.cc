@@ -133,9 +133,9 @@ public:
               default_value: true
               runtime_key: foo_key
             min_content_length: 100
-            content_type:
-              - text/html
-              - application/json
+            content_type_matcher:
+              - exact: text/html
+              - exact: application/json
           uncompressible_response_codes:
             - 206
         request_direction_config:
@@ -144,9 +144,9 @@ public:
               default_value: true
               runtime_key: enable_requests
             min_content_length: 100
-            content_type:
-              - text/html
-              - application/json
+            content_type_matcher:
+              - exact: text/html
+              - exact: application/json
         compressor_library:
           name: testlib
           typed_config:
@@ -170,9 +170,9 @@ public:
               default_value: true
               runtime_key: foo_key
             min_content_length: 100
-            content_type:
-              - text/html
-              - application/json
+            content_type_matcher:
+              - exact: text/html
+              - exact: application/json
           uncompressible_response_codes:
             - 206
         request_direction_config:
@@ -181,9 +181,9 @@ public:
               default_value: true
               runtime_key: enable_requests
             min_content_length: 100
-            content_type:
-              - text/html
-              - application/json
+            content_type_matcher:
+              - exact: text/html
+              - exact: application/json
         compressor_library:
           name: testlib
           typed_config:
@@ -517,9 +517,9 @@ TEST_P(CompressorIntegrationTest, PerRouteDisable) {
               enabled:
                 default_value: true
                 runtime_key: foo_key
-              content_type:
-                - text/html
-                - application/json
+              content_type_matcher:
+                - exact: text/html
+                - exact: application/json
       )EOF");
   } else {
     initializeFilter(R"EOF(
@@ -535,9 +535,9 @@ TEST_P(CompressorIntegrationTest, PerRouteDisable) {
                 enabled:
                   default_value: true
                   runtime_key: foo_key
-                content_type:
-                  - text/html
-                  - application/json
+                content_type_matcher:
+                  - exact: text/html
+                  - exact: application/json
         )EOF");
   }
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -582,8 +582,8 @@ TEST_P(CompressorIntegrationTest, PerRouteEnable) {
               enabled:
                 default_value: false
                 runtime_key: foo_key
-              content_type:
-                - text/xml
+              content_type_matcher:
+                - exact: text/xml
       )EOF");
   } else {
     initializeFilter(R"EOF(
@@ -599,8 +599,8 @@ TEST_P(CompressorIntegrationTest, PerRouteEnable) {
             enabled:
               default_value: false
               runtime_key: foo_key
-            content_type:
-              - text/xml
+            content_type_matcher:
+              - exact: text/xml
     )EOF");
   }
 
@@ -651,9 +651,9 @@ TEST_P(CompressorIntegrationTest, PerRouteCompressorLibraryOverride) {
             common_config:
               enabled:
                 default_value: true
-              content_type:
-                - text/html
-                - application/json
+              content_type_matcher:
+                - exact: text/html
+                - exact: application/json
     )EOF");
   } else {
     initializeFilter(R"EOF(
@@ -668,9 +668,9 @@ TEST_P(CompressorIntegrationTest, PerRouteCompressorLibraryOverride) {
             common_config:
               enabled:
                 default_value: true
-              content_type:
-                - text/html
-                - application/json
+              content_type_matcher:
+                - exact: text/html
+                - exact: application/json
     )EOF");
   }
 

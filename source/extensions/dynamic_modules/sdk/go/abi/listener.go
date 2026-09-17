@@ -692,6 +692,8 @@ func (h *dymListenerFilterHandle) Log(level shared.LogLevel, format string, args
 }
 
 type dymListenerConfigHandle struct {
+	dymCommonHandle
+
 	hostConfigPtr C.envoy_dynamic_module_type_listener_filter_config_envoy_ptr
 	scheduler     *dymScheduler
 }

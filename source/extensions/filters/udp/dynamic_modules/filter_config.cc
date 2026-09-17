@@ -21,7 +21,7 @@ DynamicModuleUdpListenerFilterConfig::DynamicModuleUdpListenerFilterConfig(
                            ? std::string(DefaultMetricsNamespace)
                            : config.dynamic_module_config().metrics_namespace(),
                        ".", config.filter_name(), "."))),
-      stat_name_pool_(stats_scope_->symbolTable()) {
+      metrics_(*stats_scope_) {
 
   auto config_new_or_error = dynamic_module_->getFunctionPointer<decltype(on_filter_config_new_)>(
       "envoy_dynamic_module_on_udp_listener_filter_config_new");
