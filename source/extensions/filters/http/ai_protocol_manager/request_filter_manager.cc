@@ -20,11 +20,6 @@ class RequestFilterManager::AsyncState
       public std::enable_shared_from_this<RequestFilterManager::AsyncState>,
       public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
-  struct FilterStatus {
-    bool received{false};
-    bool propagated{false};
-  };
-
   AsyncState(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
              BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
              StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
@@ -33,7 +28,7 @@ public:
         payload_index_(std::move(payload_index)), pipeline_(filters_.size()),
         buffer_manager_(buffer_manager), stream_info_(stream_info),
         on_complete_(std::move(on_complete)), request_headers_(request_headers),
-        local_reply_fn_(std::move(local_reply_fn)), filter_status_(filters_.size()) {}
+        local_reply_fn_(std::move(local_reply_fn)), filter_handoff_status_(filters_.size()) {}
 
   ~AsyncState() override { cancel(); }
 
@@ -130,7 +125,7 @@ private:
     if (!res.has_value()) {
       co_return absl::InternalError("request handoff queue closed unexpectedly");
     }
-    filter_status_[index].received = true;
+    filter_handoff_status_[index].received = true;
     co_return std::move(*res);
   }
 
@@ -147,7 +142,7 @@ private:
       IS_ENVOY_BUG("cannot propagate null AiRequestPtr");
       co_return absl::InvalidArgumentError("cannot propagate null AiRequestPtr");
     }
-    filter_status_[index].propagated = true;
+    filter_handoff_status_[index].propagated = true;
     co_return co_await pipeline_.propagate(index, std::move(req));
   }
 
@@ -199,11 +194,11 @@ private:
       return;
     }
 
-    if (filter_status_[index].propagated) {
+    if (filter_handoff_status_[index].propagated) {
       return;
     }
 
-    if (!filter_status_[index].received) {
+    if (!filter_handoff_status_[index].received) {
       // Filter early-returned without calling receive_request (bypassed itself).
       // Forward the request in its handoff queue directly to the next stage.
       std::weak_ptr<AsyncState> weak_self = shared_from_this();
@@ -258,6 +253,11 @@ private:
     }
   }
 
+  struct FilterHandoffStatus {
+    bool received{false};
+    bool propagated{false};
+  };
+
   std::vector<AiFilterSharedPtr> filters_;
   JsonWithExtBuf payload_index_;
   FilterPipeline<AiRequestPtr> pipeline_;
@@ -267,7 +267,7 @@ private:
   Http::RequestHeaderMap* request_headers_{nullptr};
   LocalReplyFn local_reply_fn_;
   AiRequestPtr final_req_;
-  std::vector<FilterStatus> filter_status_;
+  std::vector<FilterHandoffStatus> filter_handoff_status_;
 };
 
 RequestFilterManager::RequestFilterManager(

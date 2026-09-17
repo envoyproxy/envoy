@@ -282,6 +282,11 @@ private:
   bool input_ended_{false};
 };
 
+// SSE response pipeline implementation (`Item = SseEventPtr`).
+//
+// The SSE response arrives as raw bytes and leaves as raw bytes, while filters operate on parsed
+// `SseEvent` frames via `AiFilter::encodeSSE()`. Between upstream and downstream sits
+// `SseEventDecoder`, the filter coroutine chain, and `SseEventSerializer` in the sink.
 class SseAsyncState : public ResponseAsyncState<SseEventPtr> {
 public:
   SseAsyncState(std::vector<AiFilterSharedPtr> filters, ExternalBufferFactory& buffer_factory,

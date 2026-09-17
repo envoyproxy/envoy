@@ -19,22 +19,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// Runs the configured AI filters over an SSE response body.
+// Runs the configured AI filters over a response body.
 //
-// The response arrives as bytes and must leave as bytes, but filters see neither: between them
-// sits a decode step, a chain of filter coroutines, and a re-serializing sink. The chain is built
-// out of one-slot AsyncQueues, so it is a pipeline with no buffering of its own -- a filter that
-// is slow to forward a frame stops the one behind it, and that back-pressure reaches the decoder
-// and then the upstream source, rather than accumulating in memory.
+// Owned and managed by FilterManager for the encode path. Filters execute in reverse order
+// relative to the request path. Incoming response bytes fed via onData() are buffered and
+// accounted against the stream's FilterChainBridge watermarks, decoded into response items by the
+// active response mode (e.g. SSE frames), passed through the filter pipeline, and re-serialized
+// into the output BufferManager.
 //
-// The manager is fed incrementally with onData(), which is decoupled from the pipeline by a
-// pending-input buffer and a one-slot signal queue: onData() never blocks (it cannot -- it runs on
-// the filter chain's stack), it parks the bytes, accounts them against the path's FilterChainBridge
-// watermarks, and wakes the source coroutine, which is the only thing that awaits.
-//
-// Lifetime: the pipeline outlives any single call into it, because filter coroutines suspend
-// mid-stream and resume later. Coroutines hold a weak reference and give up if the manager is
-// gone, so cancel() and destruction are safe at any point.
+// Lifetime: owns a shared_ptr<AsyncState> so coroutines can safely suspend across asynchronous
+// operations; cancel() and destruction safely tear down the pipeline at any point.
 class ResponseFilterManager {
 public:
   // Invoked once when the response has been fully processed and written, or has failed. An error
