@@ -294,20 +294,21 @@ TEST_F(FilterManagerTest, FilterLocalReply) {
   std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestLocalReplyFilter>());
 
-  FilterManager manager(
-      std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+  FilterManager manager(std::move(filters));
+
+  absl::Status status;
+  bool completed = false;
+  manager.startRequest(
+      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&status, &completed](absl::Status s) {
+        status = std::move(s);
+        completed = true;
+      },
       /*request_headers=*/nullptr,
       [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
         local_reply_code = code;
         local_reply_details = std::move(details);
       });
-
-  absl::Status status;
-  bool completed = false;
-  manager.start([&status, &completed](absl::Status s) {
-    status = std::move(s);
-    completed = true;
-  });
 
   drain();
   EXPECT_TRUE(completed);
@@ -326,20 +327,21 @@ TEST_F(FilterManagerTest, FilterErrorTriggersLocalReply) {
   std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestErrorFilter>());
 
-  FilterManager manager(
-      std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+  FilterManager manager(std::move(filters));
+
+  absl::Status status;
+  bool completed = false;
+  manager.startRequest(
+      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&status, &completed](absl::Status s) {
+        status = std::move(s);
+        completed = true;
+      },
       /*request_headers=*/nullptr,
       [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
         local_reply_code = code;
         local_reply_details = std::move(details);
       });
-
-  absl::Status status;
-  bool completed = false;
-  manager.start([&status, &completed](absl::Status s) {
-    status = std::move(s);
-    completed = true;
-  });
 
   drain();
   EXPECT_TRUE(completed);
@@ -355,15 +357,17 @@ TEST_F(FilterManagerTest, FilterLocalReplyWithoutLocalReplyFnInvokesCompletionWi
   std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestLocalReplyFilter>());
 
-  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
-                        stream_info_, /*local_reply_fn=*/nullptr);
+  FilterManager manager(std::move(filters));
 
   absl::Status status;
   bool completed = false;
-  manager.start([&status, &completed](absl::Status s) {
-    status = std::move(s);
-    completed = true;
-  });
+  manager.startRequest(
+      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&status, &completed](absl::Status s) {
+        status = std::move(s);
+        completed = true;
+      },
+      /*request_headers=*/nullptr, /*local_reply_fn=*/nullptr);
 
   drain();
   EXPECT_TRUE(completed);
@@ -412,15 +416,15 @@ TEST_F(FilterManagerTest, SynchronousFilterErrorStopsSubsequentFilterLaunches) {
   filters.push_back(std::make_unique<TestImmediateErrorFilter>());
   filters.push_back(std::make_unique<TestCountingFilter>(filter2_started));
 
-  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
-                        stream_info_);
+  FilterManager manager(std::move(filters));
 
   absl::Status status;
   bool completed = false;
-  manager.start([&status, &completed](absl::Status s) {
-    status = std::move(s);
-    completed = true;
-  });
+  manager.startRequest(std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+                       [&status, &completed](absl::Status s) {
+                         status = std::move(s);
+                         completed = true;
+                       });
 
   drain();
   EXPECT_TRUE(completed);
@@ -440,20 +444,21 @@ TEST_F(FilterManagerTest, SynchronousFilterLocalReplyStopsSubsequentFilterLaunch
   filters.push_back(std::make_unique<TestImmediateLocalReplyFilter>());
   filters.push_back(std::make_unique<TestCountingFilter>(filter2_started));
 
-  FilterManager manager(
-      std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+  FilterManager manager(std::move(filters));
+
+  absl::Status status;
+  bool completed = false;
+  manager.startRequest(
+      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&status, &completed](absl::Status s) {
+        status = std::move(s);
+        completed = true;
+      },
       /*request_headers=*/nullptr,
       [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
         local_reply_code = code;
         local_reply_details = std::move(details);
       });
-
-  absl::Status status;
-  bool completed = false;
-  manager.start([&status, &completed](absl::Status s) {
-    status = std::move(s);
-    completed = true;
-  });
 
   drain();
   EXPECT_TRUE(completed);
@@ -469,8 +474,9 @@ TEST_F(FilterManagerTest, CancelCancelsCoroutines) {
   std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<TestFieldAdderFilter>());
 
-  auto manager = std::make_unique<FilterManager>(std::move(filters), std::move(doc),
-                                                 &buffer_manager_, *dispatcher_, stream_info_);
+  auto manager = std::make_unique<FilterManager>(std::move(filters));
+  manager->startRequest(std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+                        [](absl::Status) {});
 
   manager->cancel();
   manager.reset();
@@ -515,11 +521,11 @@ TEST_F(FilterManagerTest, DestructWhileSuspendedIsSafe) {
   std::vector<AiFilterSharedPtr> filters;
   filters.push_back(std::make_unique<SuspendingFilter>(queue));
 
-  auto manager = std::make_unique<FilterManager>(std::move(filters), std::move(doc),
-                                                 &buffer_manager_, *dispatcher_, stream_info_);
+  auto manager = std::make_unique<FilterManager>(std::move(filters));
 
   bool completed = false;
-  manager->start([&completed](absl::Status) { completed = true; });
+  manager->startRequest(std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+                        [&completed](absl::Status) { completed = true; });
   drain();
 
   // Destruct the manager while the filter is still suspended in queue_->pop().
