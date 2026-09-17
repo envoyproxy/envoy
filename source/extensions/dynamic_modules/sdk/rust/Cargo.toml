@@ -12,6 +12,6 @@ mockall = "0.13.1"
 smallvec = "1"
 
 [build-dependencies]
-bindgen = "0.70.1"
+bindgen = "0.73.2"
 
 [lib]
