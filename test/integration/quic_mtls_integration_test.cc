@@ -607,7 +607,8 @@ TEST_P(QuicMtlsIntegrationTest, PeerCertificateSanMatcherCoverage) {
 TEST_P(QuicMtlsIntegrationTest, MtlsResumptionScopedToValidationConfig) {
   concurrency_ = 1;
   setupServerWithClientCertValidation("cacert.pem", "servercert.pem", "serverkey.pem",
-                                      /*require_client_cert=*/true, /*enable_resumption=*/true);
+                                      /*require_client_cert=*/true, /*accept_untrusted=*/false,
+                                      /*enable_resumption=*/true);
   initialize();
 
   establishAndResumeMtlsSession();
@@ -631,7 +632,8 @@ TEST_P(QuicMtlsIntegrationTest, MtlsResumptionScopedToValidationConfig) {
 TEST_P(QuicMtlsIntegrationTest, MtlsResumptionRefusedButRequestSucceedsWhenCertRemainsValid) {
   concurrency_ = 1;
   setupServerWithClientCertValidation("cacert.pem", "servercert.pem", "serverkey.pem",
-                                      /*require_client_cert=*/true, /*enable_resumption=*/true);
+                                      /*require_client_cert=*/true, /*accept_untrusted=*/false,
+                                      /*enable_resumption=*/true);
   initialize();
 
   establishAndResumeMtlsSession();
