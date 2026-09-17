@@ -1734,7 +1734,7 @@ TEST_P(DnsImplTest, WithBothAAndAAAARecord) {
              0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 }
 
-TEST_P(DnsImplTest, FallbackToNodataWithErrorOnA) {
+TEST_P(DnsImplTest, NoRecordsDoNotMaskErrorOnA) {
   server_->setErrorOnQtypeA(true);
   EXPECT_NE(nullptr,
             resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
@@ -1748,13 +1748,16 @@ TEST_P(DnsImplTest, FallbackToNodataWithErrorOnA) {
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
              1 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 
-  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::Auto));
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, std::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(4 /*resolve_total*/, 0 /*pending_resolutions*/, 2 /*not_found*/,
              2 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 
   EXPECT_NE(nullptr,
-            resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Preferred));
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, std::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(6 /*resolve_total*/, 0 /*pending_resolutions*/, 3 /*not_found*/,
              3 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
@@ -1765,7 +1768,7 @@ TEST_P(DnsImplTest, FallbackToNodataWithErrorOnA) {
              3 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 }
 
-TEST_P(DnsImplTest, FallbackToNodataWithErrorOnAAAA) {
+TEST_P(DnsImplTest, NoRecordsDoNotMaskErrorOnAAAA) {
   server_->setErrorOnQtypeAAAA(true);
   EXPECT_NE(nullptr,
             resolveWithExpectations("some.good.domain", DnsLookupFamily::V6Only,
@@ -1779,13 +1782,16 @@ TEST_P(DnsImplTest, FallbackToNodataWithErrorOnAAAA) {
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
              1 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 
-  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::Auto));
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, std::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(4 /*resolve_total*/, 0 /*pending_resolutions*/, 2 /*not_found*/,
              2 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 
   EXPECT_NE(nullptr,
-            resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Preferred));
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, std::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(6 /*resolve_total*/, 0 /*pending_resolutions*/, 3 /*not_found*/,
              3 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
@@ -1799,6 +1805,23 @@ TEST_P(DnsImplTest, FallbackToNodataWithErrorOnAAAA) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(7 /*resolve_total*/, 0 /*pending_resolutions*/, 3 /*not_found*/,
              4 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
+}
+
+TEST_P(DnsImplTest, SuccessfulFallbackAfterError) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
+
+  for (const auto family : {DnsLookupFamily::Auto, DnsLookupFamily::V4Preferred}) {
+    SCOPED_TRACE(static_cast<int>(family));
+    server_->setErrorOnQtypeA(family == DnsLookupFamily::V4Preferred);
+    server_->setErrorOnQtypeAAAA(family == DnsLookupFamily::Auto);
+    EXPECT_NE(nullptr,
+              resolveWithExpectations(
+                  "some.good.domain", family, DnsResolver::ResolutionStatus::Completed,
+                  family == DnsLookupFamily::Auto ? IpList{"201.134.56.7"} : IpList{"1::2"}, {},
+                  std::nullopt));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 TEST_P(DnsImplTest, ErrorWithAcceptNodataEnabled) {
