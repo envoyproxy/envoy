@@ -3,6 +3,9 @@
 #include <cmath>
 #include <map>
 #include <set>
+#include <span>
+#include <type_traits>
+#include <utility>
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
@@ -23,6 +26,8 @@ namespace {
 
 constexpr absl::string_view kCounter = "counter";
 constexpr absl::string_view kGauge = "gauge";
+constexpr absl::string_view kHistogram = "histogram";
+constexpr absl::string_view kSummary = "summary";
 
 const Regex::CompiledGoogleReMatcher& promRegex() {
   CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcherNoSafetyChecks, "[^a-zA-Z0-9_]");
@@ -81,9 +86,87 @@ struct PrimitiveMetricSnapshotLessThan {
   }
 };
 
+// Names and tags remain owned by the metric. Only values are copied for the response.
+template <class StatType, class Value> struct TextMetricSnapshot {
+  Stats::RefcountPtr<StatType> metric_;
+  Value value_;
+
+  Stats::TagVector tags() const { return metric_->tags(); }
+  const Value& value() const { return value_; }
+};
+
+struct TextHistogramValue {
+  uint64_t count_;
+  double sum_;
+  // Bucket boundaries and quantile levels are immutable and outlive the request.
+  const std::vector<double>* bounds_;
+  size_t offset_;
+};
+
+using TextCounterSnapshot = TextMetricSnapshot<Stats::Counter, uint64_t>;
+using TextGaugeSnapshot = TextMetricSnapshot<Stats::Gauge, uint64_t>;
+using TextReadoutSnapshot = TextMetricSnapshot<Stats::TextReadout, std::string>;
+using TextHistogramSnapshot = TextMetricSnapshot<Stats::ParentHistogram, TextHistogramValue>;
+
+template <class StatType> const StatType* statPointer(const Stats::RefcountPtr<StatType>& stat) {
+  return stat.get();
+}
+template <class StatType, class Value>
+const TextMetricSnapshot<StatType, Value>*
+statPointer(const TextMetricSnapshot<StatType, Value>& stat) {
+  return &stat;
+}
+template <class StatType> const StatType& statMetadata(const StatType* stat) { return *stat; }
+template <class StatType, class Value>
+const StatType& statMetadata(const TextMetricSnapshot<StatType, Value>* stat) {
+  return *stat->metric_;
+}
+
 class TextFormat : public PrometheusStatsFormatter::OutputFormat {
 public:
   void setEmitType(bool emit_type) { emit_type_ = emit_type; }
+
+  void setHistogramValues(std::span<const uint64_t> buckets, std::span<const double> quantiles) {
+    buckets_ = buckets;
+    quantiles_ = quantiles;
+  }
+
+  void generateOutput(Buffer::Instance& output,
+                      const std::vector<const TextCounterSnapshot*>& metrics,
+                      const std::string& name) const {
+    generateNumericOutput(output, metrics, name);
+  }
+  void generateOutput(Buffer::Instance& output,
+                      const std::vector<const TextGaugeSnapshot*>& metrics,
+                      const std::string& name) const {
+    generateNumericOutput(output, metrics, name);
+  }
+  void generateOutput(Buffer::Instance& output,
+                      const std::vector<const TextReadoutSnapshot*>& metrics,
+                      const std::string& name) const {
+    generateTypeOutput(output, kGauge, name);
+    for (const auto* metric : metrics) {
+      generateTextReadout(output, metric->tags(), metric->value(), name);
+    }
+  }
+  void generateOutput(Buffer::Instance& output,
+                      const std::vector<const TextHistogramSnapshot*>& metrics,
+                      const std::string& name) const {
+    const bool summary = histogramType() == HistogramType::Summary;
+    generateTypeOutput(output, summary ? kSummary : kHistogram, name);
+    for (const auto* metric : metrics) {
+      const auto& value = metric->value();
+      if (summary) {
+        generateSummary(output, metric->tags(), *value.bounds_,
+                        quantiles_.subspan(value.offset_, value.bounds_->size()), value.sum_,
+                        value.count_, name);
+      } else {
+        generateHistogram(output, metric->tags(), *value.bounds_,
+                          buckets_.subspan(value.offset_, value.bounds_->size()), value.sum_,
+                          value.count_, name);
+      }
+    }
+  }
 
   void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Counter*>& counters,
                       const std::string& prefixed_tag_extracted_name) const override {
@@ -134,17 +217,21 @@ public:
                       const std::vector<const Stats::TextReadout*>& text_readouts,
                       const std::string& prefixed_tag_extracted_name) const override {
     // TextReadout stats are returned in gauge format, so "gauge" type is set intentionally.
-    generateTypeOutput(output, "gauge", prefixed_tag_extracted_name);
+    generateTypeOutput(output, kGauge, prefixed_tag_extracted_name);
 
     for (const auto* text_readout : text_readouts) {
-      auto tags = text_readout->tags();
-      tags.push_back(Stats::Tag{"text_value", text_readout->value()});
-      const std::string formattedTags = PrometheusStatsFormatter::formattedTags(std::move(tags));
-      output.add(fmt::format("{0}{{{1}}} 0\n", prefixed_tag_extracted_name, formattedTags));
+      generateTextReadout(output, text_readout->tags(), text_readout->value(),
+                          prefixed_tag_extracted_name);
     }
   }
 
 private:
+  void generateTextReadout(Buffer::Instance& output, Stats::TagVector tags,
+                           const std::string& value, const std::string& name) const {
+    tags.push_back(Stats::Tag{"text_value", value});
+    output.add(fmt::format("{0}{{{1}}} 0\n", name,
+                           PrometheusStatsFormatter::formattedTags(std::move(tags))));
+  }
   void generateTypeOutput(Buffer::Instance& output, absl::string_view type,
                           const std::string& prefixed_tag_extracted_name) const {
     if (emit_type_) {
@@ -156,9 +243,11 @@ private:
   void generateNumericOutput(Buffer::Instance& output, const std::vector<const StatType*>& metrics,
                              const std::string& prefixed_tag_extracted_name) const {
     absl::string_view type;
-    if constexpr (std::is_same_v<Stats::Counter, StatType>) {
+    if constexpr (std::is_same_v<Stats::Counter, StatType> ||
+                  std::is_same_v<TextCounterSnapshot, StatType>) {
       type = kCounter;
-    } else if constexpr (std::is_same_v<Stats::Gauge, StatType>) {
+    } else if constexpr (std::is_same_v<Stats::Gauge, StatType> ||
+                         std::is_same_v<TextGaugeSnapshot, StatType>) {
       type = kGauge;
     } else {
       static_assert(false, "Unexpected StatsType");
@@ -201,37 +290,41 @@ private:
   void generateHistogramOutput(Buffer::Instance& output,
                                const std::vector<const Stats::ParentHistogram*>& histograms,
                                const std::string& prefixed_tag_extracted_name) const {
-    generateTypeOutput(output, "histogram", prefixed_tag_extracted_name);
+    generateTypeOutput(output, kHistogram, prefixed_tag_extracted_name);
 
     for (const auto* histogram : histograms) {
-      auto histogram_tags = histogram->tags();
-      const bool empty_tags = histogram_tags.empty();
-
-      const std::string tags = PrometheusStatsFormatter::formattedTags(std::move(histogram_tags));
-      const std::string hist_tags = empty_tags ? EMPTY_STRING : (tags + ",");
-
       const Stats::HistogramStatistics& stats = histogram->cumulativeStatistics();
-      Stats::ConstSupportedBuckets& supported_buckets = stats.supportedBuckets();
-      const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
-      for (size_t i = 0; i < supported_buckets.size(); ++i) {
-        double bucket = supported_buckets[i];
-        uint64_t value = computed_buckets[i];
-        // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
-        // doesn't have a specific modifier to format as a fixed-point value only so we use the
-        // 'g' operator which prints the number in general fixed point format or scientific format
-        // with precision 50 to round the number up to 32 significant digits in fixed point format
-        // which should cover pretty much all cases
-        output.add(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n",
-                               prefixed_tag_extracted_name, hist_tags, bucket, value));
-      }
-
-      output.add(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", prefixed_tag_extracted_name,
-                             hist_tags, stats.sampleCount()));
-      output.add(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", prefixed_tag_extracted_name, tags,
-                             stats.sampleSum()));
-      output.add(fmt::format("{0}_count{{{1}}} {2}\n", prefixed_tag_extracted_name, tags,
-                             stats.sampleCount()));
+      generateHistogram(output, histogram->tags(), stats.supportedBuckets(),
+                        stats.computedBuckets(), stats.sampleSum(), stats.sampleCount(),
+                        prefixed_tag_extracted_name);
     }
+  }
+
+  void generateHistogram(Buffer::Instance& output, Stats::TagVector histogram_tags,
+                         std::span<const double> supported_buckets,
+                         std::span<const uint64_t> computed_buckets, double sum, uint64_t count,
+                         const std::string& prefixed_tag_extracted_name) const {
+    const bool empty_tags = histogram_tags.empty();
+
+    const std::string tags = PrometheusStatsFormatter::formattedTags(std::move(histogram_tags));
+    const std::string hist_tags = empty_tags ? EMPTY_STRING : (tags + ",");
+
+    for (size_t i = 0; i < supported_buckets.size(); ++i) {
+      double bucket = supported_buckets[i];
+      uint64_t value = computed_buckets[i];
+      // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
+      // doesn't have a specific modifier to format as a fixed-point value only so we use the
+      // 'g' operator which prints the number in general fixed point format or scientific format
+      // with precision 50 to round the number up to 32 significant digits in fixed point format
+      // which should cover pretty much all cases
+      output.add(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n", prefixed_tag_extracted_name,
+                             hist_tags, bucket, value));
+    }
+
+    output.add(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", prefixed_tag_extracted_name,
+                           hist_tags, count));
+    output.add(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", prefixed_tag_extracted_name, tags, sum));
+    output.add(fmt::format("{0}_count{{{1}}} {2}\n", prefixed_tag_extracted_name, tags, count));
   }
 
   /*
@@ -242,29 +335,36 @@ private:
   void generateSummaryOutput(Buffer::Instance& output,
                              const std::vector<const Stats::ParentHistogram*>& histograms,
                              const std::string& prefixed_tag_extracted_name) const {
-    generateTypeOutput(output, "summary", prefixed_tag_extracted_name);
+    generateTypeOutput(output, kSummary, prefixed_tag_extracted_name);
 
     for (const auto* histogram : histograms) {
-      const std::string tags = PrometheusStatsFormatter::formattedTags(histogram->tags());
-      const std::string hist_tags = histogram->tags().empty() ? EMPTY_STRING : (tags + ",");
-
       const Stats::HistogramStatistics& stats = histogram->intervalStatistics();
-      Stats::ConstSupportedBuckets& supported_quantiles = stats.supportedQuantiles();
-      const std::vector<double>& computed_quantiles = stats.computedQuantiles();
-      for (size_t i = 0; i < supported_quantiles.size(); ++i) {
-        double quantile = supported_quantiles[i];
-        double value = computed_quantiles[i];
-        output.add(fmt::format("{0}{{{1}quantile=\"{2}\"}} {3:.32g}\n", prefixed_tag_extracted_name,
-                               hist_tags, quantile, value));
-      }
-
-      output.add(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", prefixed_tag_extracted_name, tags,
-                             stats.sampleSum()));
-      output.add(fmt::format("{0}_count{{{1}}} {2}\n", prefixed_tag_extracted_name, tags,
-                             stats.sampleCount()));
+      generateSummary(output, histogram->tags(), stats.supportedQuantiles(),
+                      stats.computedQuantiles(), stats.sampleSum(), stats.sampleCount(),
+                      prefixed_tag_extracted_name);
     }
   }
+
+  void generateSummary(Buffer::Instance& output, Stats::TagVector histogram_tags,
+                       std::span<const double> supported_quantiles,
+                       std::span<const double> computed_quantiles, double sum, uint64_t count,
+                       const std::string& prefixed_tag_extracted_name) const {
+    const bool empty_tags = histogram_tags.empty();
+    const std::string tags = PrometheusStatsFormatter::formattedTags(std::move(histogram_tags));
+    const std::string hist_tags = empty_tags ? EMPTY_STRING : (tags + ",");
+    for (size_t i = 0; i < supported_quantiles.size(); ++i) {
+      double quantile = supported_quantiles[i];
+      double value = computed_quantiles[i];
+      output.add(fmt::format("{0}{{{1}quantile=\"{2}\"}} {3:.32g}\n", prefixed_tag_extracted_name,
+                             hist_tags, quantile, value));
+    }
+
+    output.add(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", prefixed_tag_extracted_name, tags, sum));
+    output.add(fmt::format("{0}_count{{{1}}} {2}\n", prefixed_tag_extracted_name, tags, count));
+  }
   bool emit_type_{true};
+  std::span<const uint64_t> buckets_;
+  std::span<const double> quantiles_;
 };
 
 class ProtobufFormat : public PrometheusStatsFormatter::OutputFormat {
@@ -712,9 +812,9 @@ private:
  * family or retains its metric pointers for incremental rendering. Ownership remains with metrics.
  */
 template <class StatType, class Visit>
-uint64_t visitStatType(const StatsParams& params,
-                       const std::vector<Stats::RefcountPtr<StatType>>& metrics,
-                       const Stats::CustomStatNamespaces& custom_namespaces, Visit visit) {
+uint64_t visitStatType(const StatsParams& params, const std::vector<StatType>& metrics,
+                       const Stats::CustomStatNamespaces& custom_namespaces, Visit visit,
+                       bool filter_metrics = true) {
 
   /*
    * From
@@ -731,7 +831,7 @@ uint64_t visitStatType(const StatsParams& params,
   // be sorted before producing the final output to satisfy the "preferred" ordering from the
   // prometheus spec: metrics will be sorted by their tags' textual representation, which will be
   // consistent across calls.
-  using StatTypeUnsortedCollection = std::vector<const StatType*>;
+  using StatTypeUnsortedCollection = std::vector<decltype(statPointer(metrics.front()))>;
 
   // Return early to avoid crashing when getting the symbol table from the first metric.
   if (metrics.empty()) {
@@ -742,18 +842,21 @@ uint64_t visitStatType(const StatsParams& params,
   // interface. If this assumption changes, the name comparisons in this function
   // will have to change to compare to convert all StatNames to strings before
   // comparison.
-  const Stats::SymbolTable& global_symbol_table = metrics.front()->constSymbolTable();
+  const Stats::SymbolTable& global_symbol_table =
+      statMetadata(statPointer(metrics.front())).constSymbolTable();
 
   // Collection of metrics by their tagExtractedName.
   // Sorting will be done on the names separately.
   absl::flat_hash_map<Stats::StatName, StatTypeUnsortedCollection> groups;
 
-  for (const auto& metric : metrics) {
-    ASSERT(&global_symbol_table == &metric->constSymbolTable());
-    if (!params.shouldShowMetric(*metric)) {
+  for (const auto& entry : metrics) {
+    const auto* sample = statPointer(entry);
+    const auto& metric = statMetadata(sample);
+    ASSERT(&global_symbol_table == &metric.constSymbolTable());
+    if (filter_metrics && !params.shouldShowMetric(metric)) {
       continue;
     }
-    groups[metric->tagExtractedStatName()].push_back(metric.get());
+    groups[metric.tagExtractedStatName()].push_back(sample);
   }
 
   std::vector<Stats::StatName> sorted_stat_names;
@@ -778,7 +881,9 @@ uint64_t visitStatType(const StatsParams& params,
     // Sort before producing the final output to satisfy the "preferred" ordering from the
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will
     // be consistent across calls.
-    std::sort(group.begin(), group.end(), MetricLessThan());
+    std::sort(group.begin(), group.end(), [](const auto* a, const auto* b) {
+      return MetricLessThan()(&statMetadata(a), &statMetadata(b));
+    });
 
     visit(std::move(group), prefixed_tag_extracted_name.value());
   }
@@ -885,8 +990,9 @@ private:
   size_t metric_{0};
 };
 
-// Requests are driven serially on the admin dispatcher. The raw pointers in the cursor refer
-// to these owned snapshots, never to a live store container or a scope's metric collection.
+// Requests are created and driven on the admin dispatcher. Values and query filtering decisions
+// are captured before returning the request, so later chunks never sample live metric values.
+// Worker threads can still update counters during capture; this is not an atomic store snapshot.
 class PrometheusTextRequest : public Admin::Request {
 public:
   PrometheusTextRequest(const std::vector<Stats::CounterSharedPtr>& counters,
@@ -895,14 +1001,22 @@ public:
                         const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
                         const Upstream::ClusterManager& cluster_manager, const StatsParams& params,
                         const Stats::CustomStatNamespaces& custom_namespaces, uint64_t chunk_size)
-      : counters_(counters), gauges_(gauges), histograms_(histograms),
-        text_readouts_(text_readouts), cluster_manager_(cluster_manager), params_(params),
+      : counters_(captureValues(counters, params)), gauges_(captureValues(gauges, params)),
+        text_readouts_(captureValues(text_readouts, params)), params_(params),
         custom_namespaces_(custom_namespaces), chunk_size_(chunk_size) {
     ASSERT(chunk_size_ > 0);
     format_.setHistogramType(
         params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Summary
             ? PrometheusStatsFormatter::OutputFormat::HistogramType::Summary
             : PrometheusStatsFormatter::OutputFormat::HistogramType::ClassicHistogram);
+    captureHistograms(histograms);
+    format_.setHistogramValues(histogram_buckets_, histogram_quantiles_);
+    Upstream::HostUtility::forEachHostMetric(
+        cluster_manager,
+        [&](Stats::PrimitiveCounterSnapshot&& metric) {
+          host_counters_.push_back(std::move(metric));
+        },
+        [&](Stats::PrimitiveGaugeSnapshot&& metric) { host_gauges_.push_back(std::move(metric)); });
   }
 
   Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
@@ -930,11 +1044,71 @@ public:
 private:
   enum class Phase { Counters, Gauges, TextReadouts, Histograms, HostCounters, HostGauges, Done };
 
-  template <class StatType> void prepare(const std::vector<Stats::RefcountPtr<StatType>>& metrics) {
-    auto cursor = std::make_unique<TextStatCursorImpl<const StatType>>();
-    visitStatType(params_, metrics, custom_namespaces_, [&](auto&& group, const auto& name) {
-      cursor->addFamily(std::move(group), name);
-    });
+  template <class StatType>
+  static std::vector<TextMetricSnapshot<StatType, decltype(std::declval<StatType>().value())>>
+  captureValues(const std::vector<Stats::RefcountPtr<StatType>>& metrics,
+                const StatsParams& params) {
+    using Value = decltype(metrics.front()->value());
+    std::vector<TextMetricSnapshot<StatType, Value>> snapshots;
+    snapshots.reserve(metrics.size());
+    for (const auto& metric : metrics) {
+      if (params.shouldShowMetric(*metric)) {
+        snapshots.push_back({metric, metric->value()});
+      }
+    }
+    return snapshots;
+  }
+
+  void captureHistograms(const std::vector<Stats::ParentHistogramSharedPtr>& histograms) {
+    const bool summary = params_.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Summary;
+    size_t values_size = 0;
+    histograms_.reserve(histograms.size());
+    for (const auto& histogram : histograms) {
+      if (!params_.shouldShowMetric(*histogram)) {
+        continue;
+      }
+      const auto& stats =
+          summary ? histogram->intervalStatistics() : histogram->cumulativeStatistics();
+      const auto& bounds = summary ? stats.supportedQuantiles() : stats.supportedBuckets();
+      const size_t max_size =
+          summary ? histogram_quantiles_.max_size() : histogram_buckets_.max_size();
+      RELEASE_ASSERT(bounds.size() <= max_size - values_size, "histogram snapshot is too large");
+      histograms_.push_back(
+          {histogram, {stats.sampleCount(), stats.sampleSum(), &bounds, values_size}});
+      values_size += bounds.size();
+    }
+
+    // Allocate one flat array for all selected histograms.
+    // Both passes execute synchronously on the main/admin dispatcher, where parent histogram
+    // statistics are updated. Without yielding between passes, count/sum and bucket/quantile
+    // values come from the same merged state.
+    if (summary) {
+      histogram_quantiles_.resize(values_size);
+    } else {
+      histogram_buckets_.resize(values_size);
+    }
+    for (const auto& snapshot : histograms_) {
+      if (summary) {
+        const auto& values = snapshot.metric_->intervalStatistics().computedQuantiles();
+        ASSERT(values.size() == snapshot.value_.bounds_->size());
+        std::copy(values.begin(), values.end(),
+                  histogram_quantiles_.begin() + snapshot.value_.offset_);
+      } else {
+        const auto& values = snapshot.metric_->cumulativeStatistics().computedBuckets();
+        ASSERT(values.size() == snapshot.value_.bounds_->size());
+        std::copy(values.begin(), values.end(),
+                  histogram_buckets_.begin() + snapshot.value_.offset_);
+      }
+    }
+  }
+
+  template <class StatType> void prepare(const std::vector<StatType>& metrics) {
+    using Sample = std::remove_pointer_t<decltype(statPointer(metrics.front()))>;
+    auto cursor = std::make_unique<TextStatCursorImpl<Sample>>();
+    visitStatType(
+        params_, metrics, custom_namespaces_,
+        [&](auto&& group, const auto& name) { cursor->addFamily(std::move(group), name); },
+        false); // Inclusion was captured with the values, not re-evaluated between chunks.
     cursor_ = std::move(cursor);
   }
 
@@ -965,15 +1139,6 @@ private:
       phase_ = Phase::HostCounters;
       break;
     case Phase::HostCounters:
-      // Preserve the buffered formatter's collection point for per-endpoint metrics.
-      Upstream::HostUtility::forEachHostMetric(
-          cluster_manager_,
-          [&](Stats::PrimitiveCounterSnapshot&& metric) {
-            host_counters_.push_back(std::move(metric));
-          },
-          [&](Stats::PrimitiveGaugeSnapshot&& metric) {
-            host_gauges_.push_back(std::move(metric));
-          });
       preparePrimitive(host_counters_);
       phase_ = Phase::HostGauges;
       break;
@@ -987,11 +1152,12 @@ private:
     return true;
   }
 
-  const std::vector<Stats::CounterSharedPtr> counters_;
-  const std::vector<Stats::GaugeSharedPtr> gauges_;
-  const std::vector<Stats::ParentHistogramSharedPtr> histograms_;
-  const std::vector<Stats::TextReadoutSharedPtr> text_readouts_;
-  const Upstream::ClusterManager& cluster_manager_;
+  const std::vector<TextCounterSnapshot> counters_;
+  const std::vector<TextGaugeSnapshot> gauges_;
+  const std::vector<TextReadoutSnapshot> text_readouts_;
+  std::vector<TextHistogramSnapshot> histograms_;
+  std::vector<uint64_t> histogram_buckets_;
+  std::vector<double> histogram_quantiles_;
   const StatsParams params_;
   const Stats::CustomStatNamespaces& custom_namespaces_;
   const uint64_t chunk_size_;

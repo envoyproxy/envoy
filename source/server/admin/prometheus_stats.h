@@ -19,8 +19,10 @@ namespace Server {
  */
 class PrometheusStatsFormatter {
 public:
-  // Creates an incremental text response. Metric membership is retained for the request's
-  // lifetime; values are read when each metric is rendered.
+  // Creates an incremental text response, capturing metric values and query filtering decisions
+  // before returning. Worker threads can update values during capture, so this is not an atomic
+  // store snapshot. Subsequent chunks serialize only captured values; metric references retain
+  // immutable names and tags for the request's lifetime.
   static Admin::RequestPtr
   makeTextRequest(const std::vector<Stats::CounterSharedPtr>& counters,
                   const std::vector<Stats::GaugeSharedPtr>& gauges,
