@@ -676,8 +676,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, PreserveExistingHeaderSkipsAuthn) {
                       [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
                           .PackFrom(audience);
 
-    TestUtility::loadFromYaml(default_config_, proto_config_);
-    proto_config_.mutable_http_uri()->set_uri(std::string(Url));
+    TestUtility::loadFromYaml(new_config_, proto_config_);
     auto* token_header = proto_config_.mutable_token_header();
     token_header->set_name("Authorization");
     token_header->set_value_prefix("Bearer ");
