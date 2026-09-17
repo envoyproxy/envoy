@@ -41,7 +41,7 @@ public:
     IS_ENVOY_BUG("Should not be reached");
   }
   std::optional<uint32_t> daysUntilFirstCertExpires() const override { return std::nullopt; }
-  Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override { return nullptr; }
+  std::vector<Envoy::Ssl::CertificateDetailsPtr> getCaCertInformation() const override { return {}; }
   // Return empty string
   std::string getCaFileName() const override { return ""; }
   // Overridden to call into platform extension API asynchronously.

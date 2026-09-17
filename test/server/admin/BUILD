@@ -242,10 +242,14 @@ envoy_cc_test(
 envoy_cc_test(
     name = "server_info_handler_test",
     srcs = envoy_select_admin_functionality(["server_info_handler_test.cc"]),
+    data = [
+        "//test/common/tls/test_data:certs",
+    ],
     rbe_pool = "linux_x64_small",
     deps = [
         ":admin_instance_lib",
         "//source/common/tls:context_config_lib",
+        "//test/common/tls/test_data:cert_infos",
         "//test/test_common:logging_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
