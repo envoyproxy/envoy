@@ -19,10 +19,19 @@ namespace {
 
 // Test helper that invokes MetadataMapHelper::loadValue() on the value at the top of the Lua stack.
 // It is registered as a Lua global so tests can drive loadValue() from within a coroutine (i.e. in
-// Lua's protected mode) and observe the error status raised via luaL_error.
+// Lua's protected mode) and observe the error status raised via luaL_error. It raises the error
+// the same way the DECLARE_LUA_FUNCTION_EX() thunk does: the status is destroyed before the call
+// that unwinds the C++ stack.
 int luaLoadValue(lua_State* state) {
-  MetadataMapHelper::loadValue(state);
-  return 0;
+  LuaErrorMessage error_message;
+  {
+    const absl::StatusOr<Protobuf::Value> value = MetadataMapHelper::loadValue(state);
+    if (value.ok()) {
+      return 0;
+    }
+    error_message.set(value.status());
+  }
+  return luaL_error(state, "%s", error_message.c_str());
 }
 
 class LuaBufferWrapperTest : public LuaWrappersTestBase<BufferWrapper> {};

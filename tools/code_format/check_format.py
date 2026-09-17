@@ -395,6 +395,9 @@ class FormatChecker:
     def allow_listed_for_raw_try(self, file_path):
         return file_path in self.config.paths["raw_try"]["include"]
 
+    def allow_listed_for_lua_raising_arg_read(self, file_path):
+        return file_path in self.config.paths["lua_raising_arg_read"]["include"]
+
     def deny_listed_for_exceptions(self, file_path):
         # Returns if this file is deny listed for exceptions.
         # Header files are strongly discouraged from throwing exceptions, both for
@@ -595,6 +598,14 @@ class FormatChecker:
         # Do not include the virtual_includes headers.
         if self.config.re["virtual_include_headers"].search(line):
             report_error("Don't include the virtual includes headers.")
+        if not self.allow_listed_for_lua_raising_arg_read(file_path) and self.config.re[
+                "lua_raising_arg_read"].search(line):
+            report_error(
+                "Don't use luaL_check*()/luaL_opt*(); they raise the Lua error themselves, which "
+                "unwinds the C++ stack past any local that needs destroying. Use the non-raising "
+                "readers in source/extensions/filters/common/lua/lua.h "
+                "(checkStringOrError/checkIntegerOrError/checkNumberOrError/checkTypeOrError/"
+                "optStringOrError) and let the DECLARE_LUA_FUNCTION_EX() thunk raise.")
 
         # Some errors cannot be fixed automatically, and actionable, consistent,
         # navigable messages should be emitted to make it easy to find and fix

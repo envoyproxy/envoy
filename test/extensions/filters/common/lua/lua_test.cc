@@ -38,7 +38,7 @@ private:
   DECLARE_LUA_FUNCTION(TestObject, luaTestCall);
 };
 
-int TestObject::luaTestCall(lua_State* state) { return doTestCall(state); }
+absl::StatusOr<int> TestObject::luaTestCall(lua_State* state) { return doTestCall(state); }
 
 class LuaTest : public testing::Test {
 public:

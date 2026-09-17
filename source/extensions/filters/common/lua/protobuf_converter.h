@@ -60,14 +60,18 @@ public:
    * Process typed metadata and push the result to Lua stack
    * @param state the Lua state
    * @param typed_metadata_map the typed filter metadata map to search in
-   * @return number of values pushed to the stack (1 for table or nil)
+   * @param function the name the calling method is exported under, for the argument error
+   * @return number of values pushed to the stack (1 for table or nil), or a failed status if the
+   *         filter name argument is not a string. The caller turns it into a Lua error; see
+   *         DECLARE_LUA_FUNCTION_EX().
    *
    * This function gets the filter name from Lua stack argument at index 2, looks up typed metadata
    * by filter name, unpacks the protobuf Any message, and converts it to a Lua table.
    * Returns nil if metadata is not found or cannot be processed.
    */
-  static int processDynamicTypedMetadataFromLuaCall(
-      lua_State* state, const Protobuf::Map<std::string, Protobuf::Any>& typed_metadata_map);
+  static absl::StatusOr<int> processDynamicTypedMetadataFromLuaCall(
+      lua_State* state, const Protobuf::Map<std::string, Protobuf::Any>& typed_metadata_map,
+      absl::string_view function);
 
   /**
    * Push a Lua value onto the stack that represents the value of a field
