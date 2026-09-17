@@ -59,6 +59,7 @@ private:
   static const std::string DEFAULT_CURVES;
   static const std::string DEFAULT_CURVES_NO_PQC;
   static const std::string DEFAULT_CURVES_FIPS;
+  static const std::string DEFAULT_CURVES_FIPS_NO_PQC;
 
   const std::vector<std::string> server_names_;
   const bool require_client_certificate_;

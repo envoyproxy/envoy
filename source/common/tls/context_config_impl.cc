@@ -412,7 +412,10 @@ const std::string ClientContextConfigImpl::DEFAULT_CURVES = "X25519MLKEM768:"
 const std::string ClientContextConfigImpl::DEFAULT_CURVES_NO_PQC = "X25519:"
                                                                    "P-256";
 
-const std::string ClientContextConfigImpl::DEFAULT_CURVES_FIPS = "P-256";
+const std::string ClientContextConfigImpl::DEFAULT_CURVES_FIPS = "X25519MLKEM768:"
+                                                                 "P-256";
+
+const std::string ClientContextConfigImpl::DEFAULT_CURVES_FIPS_NO_PQC = "P-256";
 
 absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>> ClientContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
@@ -431,11 +434,9 @@ ClientContextConfigImpl::ClientContextConfigImpl(
     : ContextConfigImpl(
           config.common_tls_context(), config.auto_sni_san_validation(), DEFAULT_MIN_VERSION,
           DEFAULT_MAX_VERSION, FIPS_mode() ? DEFAULT_CIPHER_SUITES_FIPS : DEFAULT_CIPHER_SUITES,
-          FIPS_mode()
-              ? DEFAULT_CURVES_FIPS
-              : (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.pqc_default_ecdh_curves")
-                     ? DEFAULT_CURVES
-                     : DEFAULT_CURVES_NO_PQC),
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.pqc_default_ecdh_curves")
+              ? (FIPS_mode() ? DEFAULT_CURVES_FIPS : DEFAULT_CURVES)
+              : (FIPS_mode() ? DEFAULT_CURVES_FIPS_NO_PQC : DEFAULT_CURVES_NO_PQC),
           factory_context, creation_status),
       server_name_indication_(config.sni()), auto_host_sni_(config.auto_host_sni()),
       allow_renegotiation_(config.allow_renegotiation()),

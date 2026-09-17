@@ -915,7 +915,7 @@ TEST_F(ClientContextConfigImplTest, TestLoadCorruptPkcs12) {
             "Failed to load pkcs12 from <inline>");
 }
 
-// Verify that X25519MLKEM768 is included in the default ECDH curves (non-FIPS).
+// Verify that X25519MLKEM768 is included in the default ECDH curves.
 TEST_F(ClientContextConfigImplTest, DefaultCurvesIncludePqc) {
   const std::string yaml = R"EOF(
   common_tls_context:
@@ -924,7 +924,9 @@ TEST_F(ClientContextConfigImplTest, DefaultCurvesIncludePqc) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  if (!FIPS_mode()) {
+  if (FIPS_mode()) {
+    EXPECT_EQ(cfg->ecdhCurves(), "X25519MLKEM768:P-256");
+  } else {
     EXPECT_EQ(cfg->ecdhCurves(), "X25519MLKEM768:X25519:P-256");
   }
   auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
@@ -943,7 +945,9 @@ TEST_F(ClientContextConfigImplTest, DefaultCurvesNoPqcWithRuntimeFlag) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  if (!FIPS_mode()) {
+  if (FIPS_mode()) {
+    EXPECT_EQ(cfg->ecdhCurves(), "P-256");
+  } else {
     EXPECT_EQ(cfg->ecdhCurves(), "X25519:P-256");
   }
   auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);

@@ -74,7 +74,7 @@ protection against "harvest now, decrypt later" attacks by quantum computers whi
 compatibility with existing infrastructure through the hybrid construction.
 
 X25519MLKEM768 is included in the default ECDH curves for both downstream and upstream TLS
-connections (non-FIPS builds). Peers that do not support ML-KEM will gracefully fall back to
+connections (including FIPS builds). Peers that do not support ML-KEM will gracefully fall back to
 X25519 or P-256 via standard TLS group negotiation.
 
 To disable post-quantum key exchange, set the runtime flag
