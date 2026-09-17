@@ -18,20 +18,19 @@ namespace Extensions {
 namespace AiFilters {
 namespace Common {
 
-// Helper base class for AI filters that finish all request processing inline on the calling thread
-// without suspending or awaiting asynchronous operations (such as gRPC/HTTP calls, timers, or
-// external buffer reads).
+// Adapter for AI filters whose decodeSync() hook completes inline without
+// blocking or requiring asynchronous completion.
 //
-// Subclasses implement `decodeSync()`, which receives the in-memory `AiRequest` and a
-// `LocalReplier` callback. This base class manages receiving and propagating the request:
-// - If `decodeSync()` invokes `reply_locally`, the filter chain stops and sends the local reply.
-// - If `decodeSync()` returns a non-OK `absl::Status` without invoking `reply_locally`, the filter
-//   chain fails with a 502 Bad Gateway local reply.
-// - If `decodeSync()` returns `absl::OkStatus()` without invoking `reply_locally`, the request is
-//   automatically forwarded to the next filter in the chain.
+// decodeSync() inspects or mutates the request's in-memory JSON index.
+// Accessing that index does not implicitly load externally buffered payloads.
 //
-// DO NOT use this base class if the filter needs to `co_await` any asynchronous operation;
-// implement `HttpFilters::AiProtocolManager::AiFilter` directly instead.
+// Request receipt and propagation remain coroutine-based and may suspend.
+// Later serialization may also perform asynchronous external-buffer reads.
+//
+// The hook must not retain the request or local-reply callback for later use.
+// After issuing a local reply, it should return without further stream access.
+// Implement AiFilter directly when the filter's own processing must wait for
+// an HTTP/gRPC call, timer, or asynchronous payload access.
 class SyncAiFilter : public HttpFilters::AiProtocolManager::AiFilter {
 public:
   virtual absl::Status decodeSync(HttpFilters::AiProtocolManager::AiRequest& request,
