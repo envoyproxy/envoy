@@ -126,7 +126,7 @@ bazel_dep(name = "zstd", version = "1.5.7.bcr.1")
 # deps: Dev
 ####################################################################################
 
-bazel_dep(name = "google_benchmark", version = "1.9.5", dev_dependency = True, repo_name = "benchmark")
+bazel_dep(name = "google_benchmark", version = "1.9.5", repo_name = "benchmark")
 
 bazel_dep(name = "rules_fuzzing", version = "0.6.0")
 
