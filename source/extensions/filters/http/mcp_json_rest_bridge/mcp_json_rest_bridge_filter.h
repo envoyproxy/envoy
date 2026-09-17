@@ -284,7 +284,7 @@ private:
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   std::optional<nlohmann::json> session_id_;
-  std::string protocol_version_;
+  bool is_stateless_request_{false};
   std::string server_name_;
   std::string path_;
   Buffer::OwnedImpl request_body_;

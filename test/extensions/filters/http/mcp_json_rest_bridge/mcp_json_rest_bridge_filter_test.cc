@@ -689,13 +689,10 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallStatelessResponseIncludesResultType)
       "2026-07-28");
   ASSERT_OK(makeFilter());
 
-  request_headers_ = {{":method", "POST"},
-                      {":path", "/mcp"},
-                      {"content-type", "application/json"},
-                      {"mcp-protocol-version", "2026-07-28"}};
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
 
   Buffer::OwnedImpl request_body(
-      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test-codelab","key":{"displayName":"display-key"}}}})json");
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test-codelab","key":{"displayName":"display-key"}},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
 
   request_headers_.setContentLength(request_body.toString().size());
 
@@ -704,7 +701,8 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallStatelessResponseIncludesResultType)
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
 
   Protobuf::Struct expected_request_metadata;
-  MessageUtil::loadFromJson(R"json({
+  MessageUtil::loadFromJson(R"json(
+  {
     "status": "mcp_json_rest_bridge_ok",
     "method": "tools/call",
     "params": {
@@ -714,6 +712,9 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallStatelessResponseIncludesResultType)
         "key": {
           "displayName": "display-key"
         }
+      },
+      "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28"
       }
     }
   })json",
@@ -724,7 +725,8 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallStatelessResponseIncludesResultType)
                                  ProtoEq(expected_request_metadata)));
 
   Protobuf::Struct expected_response_metadata;
-  MessageUtil::loadFromJson(R"json({
+  MessageUtil::loadFromJson(R"json(
+  {
     "status": "mcp_json_rest_bridge_ok",
     "method": "tools/call",
     "params": {
@@ -734,6 +736,9 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallStatelessResponseIncludesResultType)
         "key": {
           "displayName": "display-key"
         }
+      },
+      "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28"
       }
     },
     "backend_response_code": 200
@@ -799,13 +804,13 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListStatelessResponseIncludesResultType
       "2026-07-28");
   ASSERT_OK(makeFilter());
 
-  request_headers_ = {
-      {":method", "POST"}, {":path", "/mcp"}, {"mcp-protocol-version", "2026-07-28"}};
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
 
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0","id":123,"method":"tools/list"})json");
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
 
   EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
@@ -838,6 +843,90 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListStatelessResponseIncludesResultType
           R"json({"jsonrpc":"2.0","id":123,"result":{"resultType":"complete","tools":[{"name":"google.api.CreateApiKey"}]}})json"));
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, ToolsListMaxVersionWithoutStatelessMetaDoesNotAddResultType) {
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {
+      {":method", "POST"},
+      {":path", "/mcp"},
+  };
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0","id":123,"method":"tools/list"})json");
+
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  EXPECT_THAT(request_headers_.getPathValue(),
+              StrEq("/discovery/v1/service/foo.googleapis.com/mcptools"));
+  EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
+
+  response_headers_ = {
+      {"content-type", "application/json"},
+      {"content-length", "123456"},
+      {":status", "200"},
+  };
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl response_body(R"json({"tools":[{"name":"google.api.CreateApiKey"}]})json");
+
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  EXPECT_EQ(
+      nlohmann::json::parse(response_body.toString()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":123,"result":{"tools":[{"name":"google.api.CreateApiKey"}]}})json"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest,
+       ToolsListStatelessMetaWithLegacyMaxVersionDoesNotAddResultType) {
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {
+      {":method", "POST"},
+      {":path", "/mcp"},
+  };
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
+
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  EXPECT_THAT(request_headers_.getPathValue(),
+              StrEq("/discovery/v1/service/foo.googleapis.com/mcptools"));
+  EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
+
+  response_headers_ = {
+      {"content-type", "application/json"},
+      {"content-length", "123456"},
+      {":status", "200"},
+  };
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl response_body(R"json({"tools":[{"name":"google.api.CreateApiKey"}]})json");
+
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  EXPECT_EQ(
+      nlohmann::json::parse(response_body.toString()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":123,"result":{"tools":[{"name":"google.api.CreateApiKey"}]}})json"));
+}
+
 TEST_F(McpJsonRestBridgeFilterTest, ToolsListStatelessNonObjectResponseDoesNotAddResultType) {
   proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
       "2026-07-28");
@@ -846,13 +935,13 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListStatelessNonObjectResponseDoesNotAd
   request_headers_ = {
       {":method", "POST"},
       {":path", "/mcp"},
-      {"mcp-protocol-version", "2026-07-28"},
   };
 
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0","id":123,"method":"tools/list"})json");
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
 
   EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
@@ -2540,16 +2629,19 @@ tool_config:
         .WillRepeatedly(Return(Http::ResponseHeaderMapOptRef(response_headers_)));
   }
 
-  void sendToolsCallRequest(absl::string_view protocol_version = "") {
+  void sendToolsCallRequest(bool is_stateless_request = false) {
     request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
-    if (!protocol_version.empty()) {
-      request_headers_.addCopy(Http::LowerCaseString("mcp-protocol-version"), protocol_version);
-    }
+
     ASSERT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
               Http::FilterHeadersStatus::StopIteration);
     EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-    Buffer::OwnedImpl req(
-        R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"get_api_key"}})json");
+
+    const std::string request_body =
+        is_stateless_request
+            ? R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"get_api_key","_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json"
+            : R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"get_api_key"}})json";
+
+    Buffer::OwnedImpl req(request_body);
     ASSERT_EQ(filter_->decodeData(req, /*end_stream=*/true), Http::FilterDataStatus::Continue);
   }
 
@@ -2631,7 +2723,7 @@ tool_config:
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
-  sendToolsCallRequest("2026-07-28");
+  sendToolsCallRequest(true);
 
   response_headers_ = {{":status", "200"}, {"content-length", "100"}};
 
@@ -2781,7 +2873,7 @@ tool_config:
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
-  sendToolsCallRequest("2026-07-28");
+  sendToolsCallRequest(true);
 
   response_headers_ = {{":status", "200"}, {"content-type", "text/event-stream"}};
 
@@ -3669,12 +3761,12 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalStatelessResponseIncludesResul
   request_headers_.setMethod("POST");
   request_headers_.setPath("/mcp");
   request_headers_.setContentType("application/json");
-  request_headers_.addCopy(Http::LowerCaseString("mcp-protocol-version"), "2026-07-28");
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  std::string json = R"({"jsonrpc":"2.0","method":"tools/list","id":"req-2"})";
+  std::string json =
+      R"({"jsonrpc":"2.0","method":"tools/list","id":"req-2","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})";
   Buffer::OwnedImpl data(json);
 
   EXPECT_CALL(decoder_callbacks_,
