@@ -446,7 +446,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
   if (!protocol_version_headers.empty()) {
     protocol_version_ = std::string(protocol_version_headers[0]->value().getStringView());
 
-    if (!config_->isProtocolVersionSupported(*protocol_version_)) {
+    if (!config_->isProtocolVersionSupported(*protocol_version_) && shouldRejectRequest()) {
       sendUnsupportedProtocolVersionReply(*protocol_version_);
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -456,11 +456,13 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
 
   if (protocol_version_headers.empty() && use_new_spec_semantics_) {
     config_->stats().header_mismatch_.inc();
-    sendHeaderMismatchReply("Missing required MCP-Protocol-Version header");
-    return Http::FilterHeadersStatus::StopIteration;
+    if (shouldRejectRequest()) {
+      sendHeaderMismatchReply("Missing required MCP-Protocol-Version header");
+      return Http::FilterHeadersStatus::StopIteration;
+    }
   }
 
-  if (use_new_spec_semantics_) {
+  if (use_new_spec_semantics_ && shouldRejectRequest()) {
     if (isValidMcpDeleteRequest(headers)) {
       sendMethodNotAllowedReply(
           absl::StrCat("MCP DELETE is not supported for protocol version ",
@@ -506,11 +508,13 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
           const auto decoded_name = decodeMcpHeaderValue(name_value);
           if (!decoded_name.has_value()) {
             config_->stats().header_mismatch_.inc();
-            sendHeaderMismatchReply("Invalid Base64-encoded Mcp-Name header");
-            return Http::FilterHeadersStatus::StopIteration;
+            if (shouldRejectRequest()) {
+              sendHeaderMismatchReply("Invalid Base64-encoded Mcp-Name header");
+              return Http::FilterHeadersStatus::StopIteration;
+            }
+          } else {
+            header_name_ = *decoded_name;
           }
-
-          header_name_ = *decoded_name;
         } else {
           header_name_ = std::string(name_value);
         }
@@ -520,16 +524,20 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
     if (use_new_spec_semantics_) {
       if (header_method_.empty()) {
         config_->stats().header_mismatch_.inc();
-        sendHeaderMismatchReply("Missing required Mcp-Method header");
-        return Http::FilterHeadersStatus::StopIteration;
+        if (shouldRejectRequest()) {
+          sendHeaderMismatchReply("Missing required Mcp-Method header");
+          return Http::FilterHeadersStatus::StopIteration;
+        }
       }
 
       const std::string name_path = parserConfig().getNameAttributePath(header_method_);
 
       if (!name_path.empty() && header_name_.empty()) {
         config_->stats().header_mismatch_.inc();
-        sendHeaderMismatchReply("Missing required Mcp-Name header");
-        return Http::FilterHeadersStatus::StopIteration;
+        if (shouldRejectRequest()) {
+          sendHeaderMismatchReply("Missing required Mcp-Name header");
+          return Http::FilterHeadersStatus::StopIteration;
+        }
       }
     }
 
@@ -879,17 +887,21 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   if (version_validation == ProtocolVersionValidationResult::Mismatch) {
     config_->stats().header_mismatch_.inc();
 
-    sendHeaderMismatchReply("MCP-Protocol-Version header does not match request body");
+    if (shouldRejectRequest()) {
+      sendHeaderMismatchReply("MCP-Protocol-Version header does not match request body");
 
-    return Http::FilterDataStatus::StopIterationNoBuffer;
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
   }
 
   if (!verifyHeaderAttributes()) {
     config_->stats().header_mismatch_.inc();
 
-    sendHeaderMismatchReply("MCP header attributes do not match request body");
+    if (shouldRejectRequest()) {
+      sendHeaderMismatchReply("MCP header attributes do not match request body");
 
-    return Http::FilterDataStatus::StopIterationNoBuffer;
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
   }
 
   if (config_->attributeSource() == envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS &&

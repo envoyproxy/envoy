@@ -396,7 +396,7 @@ TEST_F(McpFilterTest, HeadersAttributeSourceClearsRouteCache) {
 
 TEST_F(McpFilterTest, VerifyRejectsMissingMethodHeader) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY);
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
@@ -494,7 +494,7 @@ TEST_F(McpFilterTest, HeadersAttributeSourceFallsBackWhenNameHeaderMissing) {
 
 TEST_F(McpFilterTest, VerifyRejectsMethodMismatch) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY);
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
@@ -527,7 +527,7 @@ TEST_F(McpFilterTest, VerifyRejectsMethodMismatch) {
 
 TEST_F(McpFilterTest, VerifyRejectsNameMismatch) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY);
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
@@ -829,7 +829,7 @@ TEST_F(McpFilterTest, ProtocolVersionMetaMatchesHeader) {
 
 TEST_F(McpFilterTest, ProtocolVersionMetaMismatchRejects) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
@@ -863,9 +863,39 @@ TEST_F(McpFilterTest, ProtocolVersionMetaMismatchRejects) {
   EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
 }
 
-TEST_F(McpFilterTest, ProtocolVersionMetaMismatchReply) {
+TEST_F(McpFilterTest, ProtocolVersionMetaMismatchPassThrough) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/protocolVersion":"2025-11-25"}}})");
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
+}
+
+TEST_F(McpFilterTest, ProtocolVersionMetaMismatchReply) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
   proto_config.set_request_storage_mode(
       envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
@@ -947,7 +977,7 @@ TEST_F(McpFilterTest, MissingProtocolVersionMetaContinues) {
 
 TEST_F(McpFilterTest, NonStringProtocolVersionMetaRejects) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
@@ -983,7 +1013,7 @@ TEST_F(McpFilterTest, NonStringProtocolVersionMetaRejects) {
 
 TEST_F(McpFilterTest, NewSpecBodyRejectsMissingMethodHeader) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
   proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
 
@@ -1007,9 +1037,32 @@ TEST_F(McpFilterTest, NewSpecBodyRejectsMissingMethodHeader) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
-TEST_F(McpFilterTest, NewSpecBodyRejectsMissingNameHeader) {
+TEST_F(McpFilterTest, NewSpecPassThroughAllowsMissingMethodHeader) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
+}
+
+TEST_F(McpFilterTest, NewSpecBodyRejectsMissingNameHeader) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
   proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
 
@@ -1035,7 +1088,7 @@ TEST_F(McpFilterTest, NewSpecBodyRejectsMissingNameHeader) {
 
 TEST_F(McpFilterTest, NewSpecBodyRejectsHeaderBodyMismatch) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
   proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
 
@@ -1067,9 +1120,40 @@ TEST_F(McpFilterTest, NewSpecBodyRejectsHeaderBodyMismatch) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
-TEST_F(McpFilterTest, NewSpecRejectsDeleteWithMethodNotAllowed) {
+TEST_F(McpFilterTest, NewSpecPassThroughAllowsHeaderBodyMismatch) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "header-task"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"body-task"}})");
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
+}
+
+TEST_F(McpFilterTest, NewSpecRejectsDeleteWithMethodNotAllowed) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
@@ -1098,9 +1182,27 @@ TEST_F(McpFilterTest, NewSpecRejectsDeleteWithMethodNotAllowed) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
-TEST_F(McpFilterTest, NewSpecRejectsSseGetWithMethodNotAllowed) {
+TEST_F(McpFilterTest, NewSpecPassThroughAllowsDelete) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "DELETE"},
+                                         {"mcp-session-id", "session-123"},
+                                         {"mcp-protocol-version", "2026-07-28"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, NewSpecRejectsSseGetWithMethodNotAllowed) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
@@ -1126,6 +1228,23 @@ TEST_F(McpFilterTest, NewSpecRejectsSseGetWithMethodNotAllowed) {
       });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, NewSpecPassThroughAllowsSseGet) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {"accept", "text/event-stream"}, {"mcp-protocol-version", "2026-07-28"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
 TEST_F(McpFilterTest, UnsupportedProtocolVersionReply) {
@@ -2687,7 +2806,7 @@ TEST_F(McpFilterTest, NewSpecDecodesBase64NameBeforeBodyValidation) {
 
 TEST_F(McpFilterTest, NewSpecRejectsInvalidBase64NameHeader) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
   proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
 
