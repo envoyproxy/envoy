@@ -161,9 +161,9 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
 DynamicModuleClusterConfig::DynamicModuleClusterConfig(
     const std::string& cluster_name, const std::string& cluster_config,
     Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope)
-    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")),
-      stat_name_pool_(stats_scope_->symbolTable()), cluster_name_(cluster_name),
-      cluster_config_(cluster_config), dynamic_module_(std::move(module)) {}
+    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")), metrics_(*stats_scope_),
+      cluster_name_(cluster_name), cluster_config_(cluster_config),
+      dynamic_module_(std::move(module)) {}
 
 DynamicModuleClusterConfig::~DynamicModuleClusterConfig() {
   if (in_module_config_ != nullptr && on_cluster_config_destroy_ != nullptr) {

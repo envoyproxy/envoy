@@ -4907,7 +4907,7 @@ TEST_F(DynamicModuleClusterTest, MetricsFrozenAfterInit) {
 }
 
 // Drives concurrent labeled increments from multiple threads to verify no data race in the
-// shared `stat_name_pool_`. Run under `--config=tsan` to verify.
+// registry's shared stat name pool. Run under `--config=tsan` to verify.
 TEST_F(DynamicModuleClusterTest, MetricsConcurrentIncrementCounterVecNoRace) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
   ASSERT_OK(result);
