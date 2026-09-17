@@ -127,7 +127,6 @@ message TokenCacheConfig {
   google.protobuf.UInt64Value cache_size = 1 [(validate.rules).uint64 = {lte: 9223372036854775807}];
 }
 
-// [#next-free-field: 4]
 message TokenHeader {
   // Configuration options for preserving an existing token header.
   message PreserveExisting {
