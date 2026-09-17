@@ -2214,6 +2214,7 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
         }
       }
 
+      // The VirtualHost is not fully unpacked and instantiated until first use.
       auto init_object = std::make_shared<VirtualHostInitializationObject>(
           virtual_host_config, global_route_config, factory_context, vhost_scope_, validator,
           init_manager, validate_clusters);

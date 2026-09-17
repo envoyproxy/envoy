@@ -34,6 +34,7 @@
 #include "source/common/http/path_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/matcher/matcher.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/router/config_utility.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
@@ -521,26 +522,39 @@ struct VirtualHostInitializationObject : Logger::Loggable<Logger::Id::router> {
         factory_context_(factory_context), vhost_stats_scope_(std::move(vhost_stats_scope)),
         validator_(validator), init_manager_(init_manager), validate_clusters_(validate_clusters) {}
 
+  VirtualHostInitializationObject(
+      ArenaWrappedProto<envoy::config::route::v3::VirtualHost> vhost_proto,
+      const CommonConfigSharedPtr& global_route_config,
+      Server::Configuration::ServerFactoryContext& factory_context,
+      Stats::ScopeSharedPtr vhost_stats_scope, ProtobufMessage::ValidationVisitor& validator,
+      Init::Manager& init_manager, bool validate_clusters)
+      : vhost_proto_(std::move(vhost_proto)), global_route_config_(global_route_config),
+        factory_context_(factory_context), vhost_stats_scope_(std::move(vhost_stats_scope)),
+        validator_(validator), init_manager_(init_manager), validate_clusters_(validate_clusters) {}
+
   std::shared_ptr<const VirtualHostImpl> createVirtualHost() const {
+    if (!vhost_proto_) {
+      return nullptr;
+    }
     try {
       absl::Status creation_status = absl::OkStatus();
       auto vhost = std::make_shared<VirtualHostImpl>(
-          vhost_proto_, global_route_config_, factory_context_, *vhost_stats_scope_, validator_,
+          *vhost_proto_, global_route_config_, factory_context_, *vhost_stats_scope_, validator_,
           init_manager_, /*validate_clusters=*/false, creation_status);
       if (!creation_status.ok()) {
-        ENVOY_LOG(error, "Failed to initialize deferred virtual host '{}': {}", vhost_proto_.name(),
-                  creation_status.message());
+        ENVOY_LOG(error, "Failed to initialize deferred virtual host '{}': {}",
+                  vhost_proto_->name(), creation_status.message());
         return nullptr;
       }
       return vhost;
     } catch (const EnvoyException& e) {
-      ENVOY_LOG(error, "Exception initializing deferred virtual host '{}': {}", vhost_proto_.name(),
-                e.what());
+      ENVOY_LOG(error, "Exception initializing deferred virtual host '{}': {}",
+                vhost_proto_->name(), e.what());
       return nullptr;
     }
   }
 
-  const envoy::config::route::v3::VirtualHost vhost_proto_;
+  const ArenaWrappedProto<envoy::config::route::v3::VirtualHost> vhost_proto_;
   const CommonConfigSharedPtr global_route_config_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   const Stats::ScopeSharedPtr vhost_stats_scope_;
