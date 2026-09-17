@@ -198,6 +198,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "filter_pipeline_lib",
+    hdrs = ["filter_pipeline.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//source/common/coroutine:async_queue_lib",
+        "//source/common/coroutine:dispatcher_executor_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
     name = "response_filter_manager_lib",
     srcs = ["response_filter_manager.cc"],
     hdrs = ["response_filter_manager.h"],
@@ -206,13 +221,12 @@ envoy_cc_library(
         ":ai_response_lib",
         ":buffer_manager_lib",
         ":external_buffer_interface",
+        ":filter_pipeline_lib",
         "//envoy/buffer:buffer_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/coroutine:async_queue_lib",
-        "//source/common/coroutine:dispatcher_executor_lib",
-        "//source/common/coroutine:launch_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
         "//source/extensions/filters/http/ai_protocol_manager/sse:sse_event_codec_lib",
@@ -288,6 +302,7 @@ envoy_cc_library(
         ":ai_filter_lib",
         ":ai_request_lib",
         ":buffer_manager_lib",
+        ":filter_pipeline_lib",
         ":json_with_ext_buf_lib",
         ":serializer_lib",
         "//envoy/event:dispatcher_interface",
@@ -296,9 +311,6 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
-        "//source/common/coroutine:async_queue_lib",
-        "//source/common/coroutine:dispatcher_executor_lib",
-        "//source/common/coroutine:launch_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
         "@abseil-cpp//absl/functional:any_invocable",

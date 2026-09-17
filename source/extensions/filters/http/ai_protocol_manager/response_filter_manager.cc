@@ -9,9 +9,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/coroutine/async_queue.h"
-#include "source/common/coroutine/dispatcher_executor.h"
-#include "source/common/coroutine/launch.h"
 #include "source/common/coroutine/status_macros.h"
+#include "source/extensions/filters/http/ai_protocol_manager/filter_pipeline.h"
 
 #include "absl/status/statusor.h"
 #include "absl/types/variant.h"
@@ -46,39 +45,37 @@ using Signal = absl::monostate;
 // behind it, all the way back to the decoder.
 template <typename Item>
 class ChainState : public ResponseFilterManager::State,
+                   public FilterPipeline<Item>,
                    public std::enable_shared_from_this<ChainState<Item>>,
                    public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
   ChainState(std::vector<AiFilterSharedPtr> filters, FilterChainBridge& bridge,
              BufferManager& out_buffer_manager, ResponseFilterManager::OnCompleteFn on_complete)
-      : filters_(std::move(filters)), bridge_(bridge), out_buffer_manager_(out_buffer_manager),
-        executor_(std::make_shared<Coroutine::DispatcherExecutor>(bridge.dispatcher())),
-        on_complete_(std::move(on_complete)),
-        signal_(std::make_shared<Coroutine::AsyncQueue<Signal>>(/*max_size=*/1)) {
-    for (size_t i = 0; i <= filters_.size(); ++i) {
-      stages_.push_back(std::make_shared<Coroutine::AsyncQueue<Item>>(/*max_size=*/1));
-    }
-  }
+      : FilterPipeline<Item>(filters.size(), bridge.dispatcher(), std::move(on_complete)),
+        filters_(std::move(filters)), bridge_(bridge), out_buffer_manager_(out_buffer_manager),
+        signal_(std::make_shared<Coroutine::AsyncQueue<Signal>>(/*max_size=*/1)) {}
+
+  ~ChainState() override { cancel(); }
 
   void start() override {
     std::weak_ptr<ChainState> weak = this->weak_from_this();
     // Consumers first: every stage must be parked on its pop() before the source pushes, or the
     // first item would have nowhere to go and the source would block needlessly.
     for (size_t i = 0; i < filters_.size(); ++i) {
-      launchTask(runFilter(i), [weak, i, filter = filters_[i]](absl::Status status) {
+      this->launchTask(runFilter(i), [weak, i, filter = filters_[i]](absl::Status status) {
         if (auto self = weak.lock()) {
           self->onFilterCompletion(i, std::move(status));
         }
       });
     }
-    launchTask(runSink(), [weak](absl::Status status) {
+    this->launchTask(runSink(), [weak](absl::Status status) {
       if (auto self = weak.lock()) {
         if (!status.ok()) {
           self->fail(std::move(status));
         }
       }
     });
-    launchTask(runSource(), [weak](absl::Status status) {
+    this->launchTask(runSource(), [weak](absl::Status status) {
       if (auto self = weak.lock()) {
         if (!status.ok()) {
           self->fail(std::move(status));
@@ -88,7 +85,7 @@ public:
   }
 
   void onData(Buffer::Instance& data, bool end_stream) override {
-    if (terminated_) {
+    if (this->terminated()) {
       return;
     }
     const uint64_t len = data.length();
@@ -104,41 +101,18 @@ public:
     signal_->tryPush(Signal{});
   }
 
-  void cancel() override {
-    if (terminated_) {
-      return;
-    }
-    terminated_ = true;
+  void cancel() override { FilterPipeline<Item>::cancel(); }
+
+protected:
+  void onCancel() override {
     const uint64_t pending_len = pending_input_.length();
     pending_input_.drain(pending_len);
     if (pending_len > 0) {
       bridge_.releaseUnacked(pending_len);
     }
     signal_->close();
-    for (auto& stage : stages_) {
-      stage->close();
-    }
-    // Cancelling a handle may destroy a coroutine frame that holds the last reference to
-    // something; drop them all at once and only then return.
-    std::vector<Coroutine::DetachedHandle> handles = std::move(handles_);
-    handles_.clear();
-    for (Coroutine::DetachedHandle& handle : handles) {
-      handle.cancel();
-    }
   }
 
-  // Takes the next item for stage `index`; nullopt once the stream has ended. Public because the
-  // receiver and propagator handed to a filter reach it through a base-class reference.
-  Coroutine::Task<absl::StatusOr<std::optional<Item>>> receive(size_t index) {
-    co_return co_await stages_[index]->pop();
-  }
-
-  // Hands an item from stage `index` to the next stage.
-  Coroutine::Task<absl::Status> propagate(size_t index, Item item) {
-    co_return co_await stages_[index + 1]->push(std::move(item));
-  }
-
-protected:
   // Mode-specific hooks.
 
   // Decodes `data`, appending completed items to `out`.
@@ -187,7 +161,7 @@ private:
         CO_RETURN_IF_ERROR(co_await pushAll(items));
         // Closing cascades: each stage's pop returns nullopt, the stage finishes, and the bypass
         // launched in its place closes the stage after it.
-        stages_[0]->close();
+        this->stage(0)->close();
         co_return absl::OkStatus();
       }
     }
@@ -195,7 +169,7 @@ private:
 
   Coroutine::Task<absl::Status> pushAll(std::vector<Item>& items) {
     for (Item& item : items) {
-      CO_RETURN_IF_ERROR(co_await stages_[0]->push(std::move(item)));
+      CO_RETURN_IF_ERROR(co_await this->stage(0)->push(std::move(item)));
     }
     co_return absl::OkStatus();
   }
@@ -203,31 +177,31 @@ private:
   // Forwards a stage's input untouched, standing in for a filter that has bowed out.
   Coroutine::Task<absl::Status> bypassStage(size_t index) {
     while (true) {
-      ASSIGN_OR_CO_RETURN(auto item, co_await stages_[index]->pop());
+      ASSIGN_OR_CO_RETURN(auto item, co_await this->receive(index));
       if (!item.has_value()) {
-        stages_[index + 1]->close();
+        this->stage(index + 1)->close();
         co_return absl::OkStatus();
       }
-      CO_RETURN_IF_ERROR(co_await stages_[index + 1]->push(std::move(*item)));
+      CO_RETURN_IF_ERROR(co_await this->propagate(index, std::move(*item)));
     }
   }
 
   Coroutine::Task<absl::Status> runSink() {
-    const size_t index = stages_.size() - 1;
+    const size_t index = this->numStages() - 1;
     while (true) {
-      ASSIGN_OR_CO_RETURN(auto item, co_await stages_[index]->pop());
+      ASSIGN_OR_CO_RETURN(auto item, co_await this->receive(index));
       if (!item.has_value()) {
         break;
       }
       CO_RETURN_IF_ERROR(co_await serializeItem(std::move(*item)));
     }
     CO_RETURN_IF_ERROR(co_await finishSerialize());
-    complete(absl::OkStatus());
+    this->complete(absl::OkStatus());
     co_return absl::OkStatus();
   }
 
   void onFilterCompletion(size_t index, absl::Status status) {
-    if (terminated_) {
+    if (this->terminated()) {
       return;
     }
     if (!status.ok()) {
@@ -238,7 +212,7 @@ private:
     // received but never propagated stops here, which is a filter's own call to make -- merging
     // several frames into one, or dropping what it has buffered, is legitimate.
     std::weak_ptr<ChainState> weak = this->weak_from_this();
-    launchTask(bypassStage(index), [weak](absl::Status status) {
+    this->launchTask(bypassStage(index), [weak](absl::Status status) {
       if (auto self = weak.lock()) {
         if (!status.ok()) {
           self->fail(std::move(status));
@@ -247,51 +221,21 @@ private:
     });
   }
 
-  void launchTask(Coroutine::Task<absl::Status> task,
-                  absl::AnyInvocable<void(absl::Status)> on_done) {
-    Coroutine::DetachedHandle handle = Coroutine::launch(
-        std::move(task), executor_, std::move(on_done), Coroutine::StartMode::Inline);
-    // The task may have run to completion (and terminated the pipeline) before launch returned.
-    if (!terminated_) {
-      handles_.push_back(std::move(handle));
-    }
-  }
-
-  void complete(absl::Status status) {
-    if (terminated_) {
-      return;
-    }
-    terminated_ = true;
-    if (on_complete_ != nullptr) {
-      ResponseFilterManager::OnCompleteFn callback = std::move(on_complete_);
-      on_complete_ = nullptr;
-      callback(std::move(status));
-    }
-  }
-
   void fail(absl::Status status) {
-    if (terminated_) {
+    if (this->terminated()) {
       return;
     }
     ENVOY_LOG(debug, "ai_protocol_manager: response filter chain error: {}", status.message());
-    ResponseFilterManager::OnCompleteFn callback = std::move(on_complete_);
-    on_complete_ = nullptr;
+    auto callback = this->takeOnComplete();
     cancel();
     if (callback != nullptr) {
       callback(std::move(status));
     }
   }
 
-  std::shared_ptr<Coroutine::DispatcherExecutor> executor_;
-  ResponseFilterManager::OnCompleteFn on_complete_;
-
   std::shared_ptr<Coroutine::AsyncQueue<Signal>> signal_;
-  std::vector<std::shared_ptr<Coroutine::AsyncQueue<Item>>> stages_;
-  std::vector<Coroutine::DetachedHandle> handles_;
-
   Buffer::OwnedImpl pending_input_;
   bool input_ended_{false};
-  bool terminated_{false};
 };
 
 class SseChainState : public ChainState<SseEventPtr> {
@@ -302,6 +246,8 @@ public:
                 SseEventDecoder::Config decoder_config)
       : ChainState(std::move(filters), bridge, out_buffer_manager, std::move(on_complete)),
         decoder_(decoder_config, buffer_factory, bridge) {}
+
+  ~SseChainState() override { cancel(); }
 
 protected:
   absl::Status decode(const Buffer::Instance& data, std::vector<SseEventPtr>& out) override {
@@ -321,8 +267,8 @@ protected:
   static Coroutine::Task<absl::StatusOr<std::optional<SseEventPtr>>>
   receiveSseTask(std::weak_ptr<ChainState<SseEventPtr>> weak, size_t index) {
     auto self = weak.lock();
-    if (self == nullptr) {
-      co_return absl::CancelledError("response pipeline destroyed");
+    if (self == nullptr || self->terminated()) {
+      co_return absl::CancelledError("response pipeline cancelled or destroyed");
     }
     co_return co_await self->receive(index);
   }
@@ -330,8 +276,8 @@ protected:
   static Coroutine::Task<absl::Status> propagateSseTask(std::weak_ptr<ChainState<SseEventPtr>> weak,
                                                         size_t index, SseEventPtr event) {
     auto self = weak.lock();
-    if (self == nullptr) {
-      co_return absl::CancelledError("response pipeline destroyed");
+    if (self == nullptr || self->terminated()) {
+      co_return absl::CancelledError("response pipeline cancelled or destroyed");
     }
     if (event == nullptr) {
       // Checked here rather than trusted: the serializer would dereference it, so a filter

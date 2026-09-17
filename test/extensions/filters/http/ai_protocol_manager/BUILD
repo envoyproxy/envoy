@@ -324,3 +324,16 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "filter_pipeline_test",
+    srcs = ["filter_pipeline_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/coroutine:status_macros_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:filter_pipeline_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

@@ -10,7 +10,6 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/coroutine/dispatcher_executor.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
@@ -55,7 +54,6 @@ private:
 
   std::vector<AiFilterSharedPtr> filters_;
   JsonWithExtBuf payload_index_;
-  std::shared_ptr<Coroutine::DispatcherExecutor> executor_;
   std::shared_ptr<AsyncState> async_state_;
 };
 
