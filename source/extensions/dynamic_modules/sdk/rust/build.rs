@@ -111,9 +111,7 @@ fn main() {
   #[cfg(target_os = "windows")]
   let bindings = bindings.extern_fn_block_attrs("#[link(name = \"envoy\", kind = \"raw-dylib\")]");
 
-  let bindings = bindings
-    .generate()
-    .expect("Unable to generate bindings");
+  let bindings = bindings.generate().expect("Unable to generate bindings");
 
   bindings
     .write_to_file(out_path.join("bindings.rs"))
