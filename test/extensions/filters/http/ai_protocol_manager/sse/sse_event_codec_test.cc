@@ -117,7 +117,7 @@ TEST_F(SseEventDecoderTest, AllMetadataFields) {
 }
 
 // The grammar would have a client ignore a retry that is not all digits. The raw entry is
-// retained in metadata() for passthrough reserialization, while retry() returns std::nullopt
+// retained in metadata() for passthrough serialization, while retry() returns std::nullopt
 // per last-valid-wins semantics.
 TEST_F(SseEventDecoderTest, NonNumericRetryIsKept) {
   SseEventDecoder decoder = makeDecoder();
@@ -742,7 +742,7 @@ TEST_F(SseCodecBufferTest, ForbidsCrOrLfInMetadataSettersAndCrInRawData) {
 #endif
 }
 
-// Empty metadata values (`id:`, `event:`, `retry:`) are preserved on passthrough reserialization,
+// Empty metadata values (`id:`, `event:`, `retry:`) are preserved on passthrough serialization,
 // and an explicit empty `id:` returns `""` (distinct from `std::nullopt` when absent) so filters
 // know the frame resets the client's `lastEventId`.
 TEST_F(SseCodecBufferTest, EmptyMetadataValuesRoundTripOnPassthrough) {
@@ -757,7 +757,7 @@ TEST_F(SseCodecBufferTest, EmptyMetadataValuesRoundTripOnPassthrough) {
 }
 
 // When duplicated metadata lines contain both valid and invalid entries, getters return the last
-// valid value per the WHATWG SSE spec, passthrough reserialization preserves all raw lines in
+// valid value per the SSE specification, passthrough serialization preserves all raw lines in
 // order, and calling setters normalizes the vector to single valid entries.
 TEST_F(SseCodecBufferTest, RepeatedMetadataLastValidWinsOnReadAndPreservesRawOnPassthrough) {
   SseEventDecoder decoder = makeDecoder();

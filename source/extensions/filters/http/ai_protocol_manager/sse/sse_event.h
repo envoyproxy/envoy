@@ -46,12 +46,12 @@ public:
   // A modeled SSE metadata line (`event:`, `id:`, or `retry:`).
   //
   // All metadata lines in a frame are stored as raw values in arrival order in `metadata_`:
-  // - On passthrough (when no filter mutates the metadata), reserialization emits every entry in
+  // - On passthrough (when no filter mutates the metadata), serialization emits every entry in
   //   its original order and raw form (preserving empty `id:`, non-numeric `retry:`, and
   //   duplicates).
-  // - On inspection (`event()`, `id()`, `retry()`), getters apply the WHATWG SSE specification's
-  //   "last-valid wins" rule so filters and transcoders see the exact effective value a spec-
-  //   compliant client would act on.
+  // - On inspection (`event()`, `id()`, `retry()`), getters apply the SSE specification's
+  //   "last-valid wins" rule so filters and transcoding logic see the exact effective value a
+  //   spec-compliant client would act on.
   // - On mutation (`set_event()`, `set_id()`, `set_retry()`), setters validate the new value and
   //   normalize the vector to a single valid entry for that field kind.
   struct MetadataField {
@@ -106,7 +106,7 @@ public:
                   [](const MetadataField& f) { return f.kind == MetadataField::Kind::Event; });
   }
 
-  // Effective SSE event ID using last-valid wins per the WHATWG SSE specification:
+  // Effective SSE event ID using last-valid wins per the SSE specification:
   // lines containing U+0000 NULL are ignored.
   // Returns std::nullopt when no valid `id:` line is present in the frame. Returns "" when an
   // explicit empty `id:` line is present (which instructs the client to reset `lastEventId`).
@@ -138,7 +138,7 @@ public:
                   [](const MetadataField& f) { return f.kind == MetadataField::Kind::Id; });
   }
 
-  // Effective SSE retry interval using last-valid wins per the WHATWG SSE specification:
+  // Effective SSE retry interval using last-valid wins per the SSE specification:
   // only non-empty values consisting solely of ASCII digits are valid; all others are ignored.
   // Returns std::nullopt when no valid `retry:` line is present in the frame.
   std::optional<absl::string_view> retry() const {
