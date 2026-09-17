@@ -43,9 +43,10 @@ void UdpStatsdSink::WriterImpl::writeBuffer(Buffer::Instance& data) {
   Network::Utility::writeToSocket(*io_handle_, data, nullptr, *parent_.server_address_);
 }
 
-double timerMilliseconds(const Stats::Histogram& histogram, uint64_t value, bool scale_by_unit) {
+std::optional<double> scaledTimerMilliseconds(const Stats::Histogram& histogram, uint64_t value,
+                                              bool scale_by_unit) {
   if (!scale_by_unit) {
-    return static_cast<double>(value);
+    return std::nullopt;
   }
   switch (histogram.unit()) {
   case Stats::Histogram::Unit::Microseconds:
@@ -55,7 +56,7 @@ double timerMilliseconds(const Stats::Histogram& histogram, uint64_t value, bool
   case Stats::Histogram::Unit::Bytes:
   case Stats::Histogram::Unit::Percent:
   case Stats::Histogram::Unit::Null:
-    return static_cast<double>(value);
+    return std::nullopt;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
@@ -136,7 +137,7 @@ void UdpStatsdSink::flushBuffer(Buffer::OwnedImpl& buffer, Writer& writer) const
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
   // For statsd histograms are all timers in milliseconds except percents. Envoy histograms are not
   // necessarily timers in milliseconds, so samples are scaled according to the histogram's unit
-  // where one is declared; see timerMilliseconds().
+  // where one is declared; see scaledTimerMilliseconds().
   std::string message;
   if (histogram.unit() == Stats::Histogram::Unit::Percent) {
     // 32-bit floating point values should have plenty of range for these values, and are faster to
@@ -146,8 +147,16 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
     const float scaled = float_value / divisor;
     message = buildMessage(histogram, scaled, "|h");
   } else {
-    message = buildMessage(
-        histogram, Statsd::timerMilliseconds(histogram, value, scale_histogram_units_), "|ms");
+    const std::optional<double> scaled =
+        Statsd::scaledTimerMilliseconds(histogram, value, scale_histogram_units_);
+    if (scaled.has_value()) {
+      // Format with the shortest round-trip representation: absl::StrCat would render a double
+      // with six significant digits and scientific notation for large values.
+      message = buildMessage(histogram, fmt::format("{}", *scaled), "|ms");
+    } else {
+      // Unscaled samples keep their integer representation.
+      message = buildMessage(histogram, value, "|ms");
+    }
   }
   tls_->getTyped<Writer>().write(message);
 }
@@ -271,8 +280,14 @@ void TcpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
     const float scaled = float_value / divisor;
     tls_->getTyped<TlsSink>().onPercentHistogramComplete(histogram.name(), scaled);
   } else {
-    tls_->getTyped<TlsSink>().onTimespanComplete(
-        histogram.name(), Statsd::timerMilliseconds(histogram, value, scale_histogram_units_));
+    const std::optional<double> scaled =
+        Statsd::scaledTimerMilliseconds(histogram, value, scale_histogram_units_);
+    if (scaled.has_value()) {
+      tls_->getTyped<TlsSink>().onScaledTimespanComplete(histogram.name(), *scaled);
+    } else {
+      tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),
+                                                   std::chrono::milliseconds(value));
+    }
   }
 }
 
@@ -353,9 +368,18 @@ void TcpStatsdSink::TlsSink::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void TcpStatsdSink::TlsSink::onTimespanComplete(const std::string& name, double milliseconds) {
+void TcpStatsdSink::TlsSink::onTimespanComplete(const std::string& name,
+                                                std::chrono::milliseconds ms) {
   // Ultimately it would be nice to perf optimize this path also, but it's not very frequent. It's
   // also currently not possible that this interleaves with any counter/gauge flushing.
+  ASSERT(current_slice_mem_ == nullptr);
+  Buffer::OwnedImpl buffer(
+      fmt::format("{}.{}:{}|ms\n", parent_.getPrefix().c_str(), name, ms.count()));
+  write(buffer);
+}
+
+void TcpStatsdSink::TlsSink::onScaledTimespanComplete(const std::string& name,
+                                                      double milliseconds) {
   ASSERT(current_slice_mem_ == nullptr);
   Buffer::OwnedImpl buffer(
       fmt::format("{}.{}:{}|ms\n", parent_.getPrefix().c_str(), name, milliseconds));

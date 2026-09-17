@@ -391,6 +391,10 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.items:1|ms"));
   sink.onHistogramComplete(items, 1);
+  // Unscaled samples keep their integer representation however large they are.
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.items:1234567|ms"));
+  sink.onHistogramComplete(items, 1234567);
 
   NiceMock<Stats::MockHistogram> information;
   information.name_ = "information";
@@ -399,6 +403,9 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.information:2|ms"));
   sink.onHistogramComplete(information, 2);
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.information:2097152|ms"));
+  sink.onHistogramComplete(information, 2097152);
 
   NiceMock<Stats::MockHistogram> duration_micro;
   duration_micro.name_ = "duration";
@@ -411,6 +418,10 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.duration:1.5|ms"));
   sink.onHistogramComplete(duration_micro, 1500);
+  // Large scaled samples keep full precision and never use scientific notation.
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.duration:1234567.891|ms"));
+  sink.onHistogramComplete(duration_micro, 1234567891);
 
   NiceMock<Stats::MockHistogram> duration_milli;
   duration_milli.name_ = "duration";

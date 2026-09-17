@@ -133,6 +133,9 @@ TEST_F(TcpStatsdSinkTest, SiSuffix) {
 
   EXPECT_CALL(*connection_, write(BufferString("envoy.items:1|ms\n"), _));
   sink_->onHistogramComplete(items, 1);
+  // Unscaled samples keep their integer representation however large they are.
+  EXPECT_CALL(*connection_, write(BufferString("envoy.items:1234567|ms\n"), _));
+  sink_->onHistogramComplete(items, 1234567);
 
   NiceMock<Stats::MockHistogram> information;
   information.name_ = "information";
@@ -140,6 +143,8 @@ TEST_F(TcpStatsdSinkTest, SiSuffix) {
 
   EXPECT_CALL(*connection_, write(BufferString("envoy.information:2|ms\n"), _));
   sink_->onHistogramComplete(information, 2);
+  EXPECT_CALL(*connection_, write(BufferString("envoy.information:2097152|ms\n"), _));
+  sink_->onHistogramComplete(information, 2097152);
 
   NiceMock<Stats::MockHistogram> duration_micro;
   duration_micro.name_ = "duration";
@@ -150,6 +155,9 @@ TEST_F(TcpStatsdSinkTest, SiSuffix) {
   sink_->onHistogramComplete(duration_micro, 3);
   EXPECT_CALL(*connection_, write(BufferString("envoy.duration:1.5|ms\n"), _));
   sink_->onHistogramComplete(duration_micro, 1500);
+  // Large scaled samples keep full precision and never use scientific notation.
+  EXPECT_CALL(*connection_, write(BufferString("envoy.duration:1234567.891|ms\n"), _));
+  sink_->onHistogramComplete(duration_micro, 1234567891);
 
   NiceMock<Stats::MockHistogram> duration_milli;
   duration_milli.name_ = "duration";

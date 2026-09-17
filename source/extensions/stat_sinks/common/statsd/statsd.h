@@ -29,18 +29,19 @@ namespace Statsd {
 static const std::string& getDefaultPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "envoy"); }
 
 /**
- * Converts a histogram sample to the value reported for a statsd timer, which is always in
- * milliseconds. Samples of histograms recording microseconds are scaled; samples of histograms
- * recording milliseconds are passed through. Histograms without a unit are passed through as well
- * since many of them measure milliseconds already, as are byte histograms, for which statsd has no
- * dedicated metric type. With `scale_by_unit` false every sample is passed through unchanged,
- * which is the behavior before unit scaling was introduced.
+ * Scales a histogram sample to the milliseconds reported for a statsd timer when the histogram's
+ * unit requires it. Samples of histograms recording microseconds are scaled. Samples of histograms
+ * recording milliseconds are reported unchanged, as are those of histograms without a unit (many
+ * of which measure milliseconds already) and of byte histograms, for which statsd has no dedicated
+ * metric type; for those the sample keeps its integer representation. With `scale_by_unit` false
+ * no sample is scaled, which is the behavior before unit scaling was introduced.
  * @param histogram the histogram the sample was recorded on.
  * @param value the recorded sample in the histogram's unit.
  * @param scale_by_unit whether to scale by the histogram's unit.
- * @return double the value in milliseconds.
+ * @return the sample in milliseconds when it was scaled, or nullopt when it is reported unchanged.
  */
-double timerMilliseconds(const Stats::Histogram& histogram, uint64_t value, bool scale_by_unit);
+std::optional<double> scaledTimerMilliseconds(const Stats::Histogram& histogram, uint64_t value,
+                                              bool scale_by_unit);
 
 /**
  * Implementation of Sink that writes to a UDP statsd address.
@@ -158,7 +159,9 @@ private:
     void flushCounter(const std::string& name, uint64_t delta);
     void flushGauge(const std::string& name, uint64_t value);
     void endFlush(bool do_write);
-    void onTimespanComplete(const std::string& name, double milliseconds);
+    void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms);
+    // For samples scaled to milliseconds from a finer unit.
+    void onScaledTimespanComplete(const std::string& name, double milliseconds);
     void onPercentHistogramComplete(const std::string& name, float value);
     uint64_t usedBuffer() const;
     void write(Buffer::Instance& buffer);
