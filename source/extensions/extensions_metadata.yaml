@@ -277,6 +277,13 @@ envoy.compression.zstd.decompressor:
   status: stable
   type_urls:
   - envoy.extensions.compression.zstd.decompressor.v3.Zstd
+envoy.config.validators.dynamic_modules:
+  categories:
+  - envoy.config.validators
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.config.validators.dynamic_modules.v3.DynamicModuleConfigValidator
 envoy.config.validators.minimum_clusters_validator:
   categories:
   - envoy.config.validators
