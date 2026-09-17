@@ -13,26 +13,12 @@ namespace AiProtocolManager {
 FilterManager::FilterManager(std::vector<AiFilterSharedPtr> filters)
     : filters_(std::move(filters)) {}
 
-FilterManager::FilterManager(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
-                             BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
-                             StreamInfo::StreamInfo& stream_info,
-                             Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn)
-    : filters_(std::move(filters)),
-      request_manager_(std::make_unique<RequestFilterManager>(
-          filters_, std::move(payload_index), buffer_manager, dispatcher, stream_info,
-          request_headers, std::move(local_reply_fn))) {}
-
 FilterManager::~FilterManager() { cancel(); }
-
-void FilterManager::start(OnCompleteFn on_complete) {
-  ASSERT(request_manager_ != nullptr);
-  request_manager_->start(std::move(on_complete));
-}
 
 void FilterManager::startRequest(JsonWithExtBuf payload_index, BufferManager* buffer_manager,
                                  Event::Dispatcher& dispatcher, StreamInfo::StreamInfo& stream_info,
-                                 Http::RequestHeaderMap* request_headers,
-                                 LocalReplyFn local_reply_fn, OnCompleteFn on_complete) {
+                                 OnCompleteFn on_complete, Http::RequestHeaderMap* request_headers,
+                                 LocalReplyFn local_reply_fn) {
   ASSERT(request_manager_ == nullptr);
   request_manager_ = std::make_unique<RequestFilterManager>(
       filters_, std::move(payload_index), buffer_manager, dispatcher, stream_info, request_headers,

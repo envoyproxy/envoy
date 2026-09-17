@@ -36,23 +36,13 @@ public:
   using OnCompleteFn = absl::AnyInvocable<void(absl::Status)>;
 
   explicit FilterManager(std::vector<AiFilterSharedPtr> filters);
-
-  // Convenience constructor that initializes both the filter ownership and the request pipeline.
-  FilterManager(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
-                BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
-                StreamInfo::StreamInfo& stream_info,
-                Http::RequestHeaderMap* request_headers = nullptr,
-                LocalReplyFn local_reply_fn = nullptr);
   ~FilterManager();
-
-  // Starts the request filter chain configured by the convenience constructor.
-  void start(OnCompleteFn on_complete);
 
   // Starts the request filter chain in forward filter order (0..N-1).
   void startRequest(JsonWithExtBuf payload_index, BufferManager* buffer_manager,
                     Event::Dispatcher& dispatcher, StreamInfo::StreamInfo& stream_info,
-                    Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn,
-                    OnCompleteFn on_complete);
+                    OnCompleteFn on_complete, Http::RequestHeaderMap* request_headers = nullptr,
+                    LocalReplyFn local_reply_fn = nullptr);
 
   // Starts the SSE response filter chain in reverse filter order (N-1..0).
   void startSseResponse(ExternalBufferFactory& buffer_factory, FilterChainBridge& bridge,

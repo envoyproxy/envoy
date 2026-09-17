@@ -444,9 +444,14 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
     // TODO(penguingao): Avoid always passing downstream StreamInfo when constructing
     // FilterManager; when AI Protocol Manager is placed in an upstream filter chain, it should
     // behave differently.
-    filter_manager_ = std::make_unique<FilterManager>(
-        std::move(filters), std::move(request_json_), decode_manager_.get(),
-        decoder_callbacks_->dispatcher(), decoder_callbacks_->streamInfo(), request_headers_,
+    filter_manager_ = std::make_unique<FilterManager>(std::move(filters));
+    filter_manager_->startRequest(
+        std::move(request_json_), decode_manager_.get(), decoder_callbacks_->dispatcher(),
+        decoder_callbacks_->streamInfo(),
+        [on_complete = std::move(on_complete)](absl::Status status) {
+          on_complete(std::move(status));
+        },
+        request_headers_,
         [this](Http::Code code, std::string details) {
           ENVOY_LOG(debug, "ai_protocol_manager: rejecting request via local reply: {} {}",
                     static_cast<uint32_t>(code), details);
@@ -454,9 +459,6 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
           decoder_callbacks_->sendLocalReply(code, details, nullptr, std::nullopt,
                                              "ai_protocol_manager_filter_rejected");
         });
-    filter_manager_->start([on_complete = std::move(on_complete)](absl::Status status) {
-      on_complete(std::move(status));
-    });
   } else {
     decode_manager_->replay(0, decode_manager_->length(), std::move(on_complete));
   }
