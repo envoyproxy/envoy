@@ -22,6 +22,8 @@ namespace Extensions {
 namespace DynamicModules {
 namespace NetworkFilters {
 
+using Envoy::Extensions::DynamicModules::MetricRegistry;
+
 namespace {
 
 Network::ConnectionCloseType
@@ -827,9 +829,10 @@ envoy_dynamic_module_callback_network_filter_config_define_counter(
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   Stats::StatName main_stat_name =
-      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
-  Stats::Counter& c = Stats::Utility::counterFromStatNames(*config->stats_scope_, {main_stat_name});
-  *counter_id_ptr = config->addCounter({c});
+      config->metrics().statNamePool().add(absl::string_view(name.ptr, name.length));
+  Stats::Counter& c =
+      Stats::Utility::counterFromStatNames(config->metrics().scope(), {main_stat_name});
+  *counter_id_ptr = config->metrics().addCounter(MetricRegistry::CounterHandle(c));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -838,7 +841,7 @@ envoy_dynamic_module_callback_network_filter_increment_counter(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto counter = filter->getFilterConfig().getCounterById(id);
+  auto counter = filter->getFilterConfig().metrics().getCounterById(id);
   if (!counter.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
@@ -855,10 +858,10 @@ envoy_dynamic_module_callback_network_filter_config_define_gauge(
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   Stats::StatName main_stat_name =
-      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
-  Stats::Gauge& g = Stats::Utility::gaugeFromStatNames(*config->stats_scope_, {main_stat_name},
+      config->metrics().statNamePool().add(absl::string_view(name.ptr, name.length));
+  Stats::Gauge& g = Stats::Utility::gaugeFromStatNames(config->metrics().scope(), {main_stat_name},
                                                        Stats::Gauge::ImportMode::Accumulate);
-  *gauge_id_ptr = config->addGauge({g});
+  *gauge_id_ptr = config->metrics().addGauge(MetricRegistry::GaugeHandle(g));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -866,7 +869,7 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_network_f
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  auto gauge = filter->getFilterConfig().metrics().getGaugeById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
@@ -879,11 +882,11 @@ envoy_dynamic_module_callback_network_filter_increment_gauge(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  auto gauge = filter->getFilterConfig().metrics().getGaugeById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  gauge->add(value);
+  gauge->increase(value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -892,11 +895,11 @@ envoy_dynamic_module_callback_network_filter_decrement_gauge(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  auto gauge = filter->getFilterConfig().metrics().getGaugeById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  gauge->sub(value);
+  gauge->decrease(value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -909,10 +912,10 @@ envoy_dynamic_module_callback_network_filter_config_define_histogram(
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   Stats::StatName main_stat_name =
-      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+      config->metrics().statNamePool().add(absl::string_view(name.ptr, name.length));
   Stats::Histogram& h = Stats::Utility::histogramFromStatNames(
-      *config->stats_scope_, {main_stat_name}, Stats::Histogram::Unit::Unspecified);
-  *histogram_id_ptr = config->addHistogram({h});
+      config->metrics().scope(), {main_stat_name}, Stats::Histogram::Unit::Unspecified);
+  *histogram_id_ptr = config->metrics().addHistogram(MetricRegistry::HistogramHandle(h));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -921,7 +924,7 @@ envoy_dynamic_module_callback_network_filter_record_histogram_value(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto histogram = filter->getFilterConfig().getHistogramById(id);
+  auto histogram = filter->getFilterConfig().metrics().getHistogramById(id);
   if (!histogram.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
@@ -934,7 +937,7 @@ envoy_dynamic_module_callback_network_filter_config_increment_counter(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
-  auto counter = config->getCounterById(id);
+  auto counter = config->metrics().getCounterById(id);
   if (!counter.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
@@ -947,11 +950,11 @@ envoy_dynamic_module_callback_network_filter_config_increment_gauge(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
-  auto gauge = config->getGaugeById(id);
+  auto gauge = config->metrics().getGaugeById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  gauge->add(value);
+  gauge->increase(value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -960,11 +963,11 @@ envoy_dynamic_module_callback_network_filter_config_decrement_gauge(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
-  auto gauge = config->getGaugeById(id);
+  auto gauge = config->metrics().getGaugeById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  gauge->sub(value);
+  gauge->decrease(value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -973,7 +976,7 @@ envoy_dynamic_module_callback_network_filter_config_set_gauge(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
-  auto gauge = config->getGaugeById(id);
+  auto gauge = config->metrics().getGaugeById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
@@ -986,7 +989,7 @@ envoy_dynamic_module_callback_network_filter_config_record_histogram_value(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
-  auto histogram = config->getHistogramById(id);
+  auto histogram = config->metrics().getHistogramById(id);
   if (!histogram.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }

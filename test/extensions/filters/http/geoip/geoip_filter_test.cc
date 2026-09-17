@@ -480,8 +480,8 @@ public:
     Http::TestRequestHeaderMapImpl request_headers;
     filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
         remote_address);
-    // No lookup is attempted, so nothing is counted as a completed lookup either.
-    expectStats(0);
+    // No lookup is attempted, but the request is still counted in the total alongside skipped.
+    expectStats();
     EXPECT_CALL(stats_, counter("prefix.geoip.skipped"));
     EXPECT_CALL(*dummy_driver_, lookup(_, _)).Times(0);
     // The request must continue down the chain untouched rather than stall waiting on a lookup

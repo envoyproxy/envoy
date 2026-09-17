@@ -96,6 +96,7 @@ Network::FilterStatus GeoipFilter::onNewConnection() {
   if (remote_address == nullptr || remote_address->ip() == nullptr) {
     ENVOY_LOG(debug, "geoip: skipping lookup, no IP address available for the connection");
     config_->incSkipped();
+    config_->incTotal();
     return Network::FilterStatus::Continue;
   }
 

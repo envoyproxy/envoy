@@ -76,6 +76,7 @@ Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& hea
   if (remote_address == nullptr || remote_address->ip() == nullptr) {
     ENVOY_LOG(debug, "Geoip filter: skipping lookup, no IP address available for the request");
     config_->incSkipped();
+    config_->incTotal();
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -113,9 +114,8 @@ void GeoipFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& 
 }
 
 void GeoipFilter::onLookupComplete(Geolocation::LookupResult&& result) {
-  // The lookup may complete after the stream has been torn down: the posted callback holds a
-  // shared_ptr to this filter, so it stays alive, but the decoder callbacks and the request headers
-  // it refers to do not. Drop the result rather than continue decoding a stream that is gone.
+  // The lookup may complete after the stream has been torn down and the filter self hasn't been
+  // destructed because the deferred removal mechanism. Do nothing in this edge case.
   if (destroyed_) {
     ENVOY_LOG(debug, "Geoip filter: stream destroyed before lookup completed, dropping result");
     return;

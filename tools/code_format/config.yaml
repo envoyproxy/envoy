@@ -150,6 +150,9 @@ paths:
     - source/extensions/common/matcher
     - source/extensions/common/tap
     - source/extensions/common/wasm
+    # Config validator interfaces reject updates by throwing per interface documentation.
+    - source/extensions/config/validators/dynamic_modules/config.cc
+    - source/extensions/config/validators/dynamic_modules/config_validator.cc
     - source/extensions/config/validators/minimum_clusters/minimum_clusters_validator.cc
     - source/extensions/config_subscription
     - source/extensions/content_parsers/json/config.cc
