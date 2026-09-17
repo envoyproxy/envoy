@@ -147,9 +147,8 @@ Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
 
     // We don't yet have a subscription for type_url! Make one!
     watch_map = watch_maps_
-                    .emplace(type_url,
-                             std::make_unique<WatchMap>(options.use_namespace_matching_, type_url,
-                                                        config_validators_.get(), resources_cache))
+                    .emplace(type_url, std::make_unique<WatchMap>(
+                                           type_url, config_validators_.get(), resources_cache))
                     .first;
     subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
                                          type_url, *watch_maps_[type_url], resource_decoder,
@@ -168,14 +167,9 @@ Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
 // the whole subscription, or if a removed name has no other watch interested in it, then the
 // subscription will enqueue and attempt to send an appropriate discovery request.
 template <class S, class F, class RQ, class RS>
-void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* watch,
-                                            const absl::flat_hash_set<std::string>& resources,
-                                            const SubscriptionOptions& options) {
-  ENVOY_LOG(debug, "GrpcMuxImpl::updateWatch for {}", type_url);
-  ASSERT(watch != nullptr);
-  auto& sub = subscriptionStateFor(type_url);
-  WatchMap& watch_map = watchMapFor(type_url);
-
+absl::flat_hash_set<std::string>
+GrpcMuxImpl<S, F, RQ, RS>::effectiveResources(const absl::flat_hash_set<std::string>& resources,
+                                              const SubscriptionOptions& options) {
   // We need to prepare xdstp:// resources for the transport, by normalizing and adding any extra
   // context parameters.
   absl::flat_hash_set<std::string> effective_resources;
@@ -196,6 +190,20 @@ void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* 
       effective_resources.insert(resource);
     }
   }
+  return effective_resources;
+}
+
+template <class S, class F, class RQ, class RS>
+void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* watch,
+                                            const absl::flat_hash_set<std::string>& resources,
+                                            const SubscriptionOptions& options) {
+  ENVOY_LOG(debug, "GrpcMuxImpl::updateWatch for {}", type_url);
+  ASSERT(watch != nullptr);
+  auto& sub = subscriptionStateFor(type_url);
+  WatchMap& watch_map = watchMapFor(type_url);
+
+  const absl::flat_hash_set<std::string> effective_resources =
+      effectiveResources(resources, options);
 
   auto added_removed = watch_map.updateWatchInterest(watch, effective_resources);
   if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
@@ -207,17 +215,36 @@ void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* 
       xds_config_tracker_->onResourceUnsubscribed(type_url, resource);
     }
   }
-  if (options.use_namespace_matching_) {
-    // This is to prevent sending out of requests that contain prefixes instead of resource names
-    sub.updateSubscriptionInterest({}, {});
-  } else {
-    sub.updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
-  }
+  sub.updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
 
   // Tell the server about our change in interest, if any.
   if (sub.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();
   }
+}
+
+template <class S, class F, class RQ, class RS>
+void GrpcMuxImpl<S, F, RQ, RS>::appendWatch(const std::string& type_url, Watch* watch,
+                                            const absl::flat_hash_set<std::string>& resources,
+                                            const SubscriptionOptions& options) {
+  ASSERT(watch != nullptr);
+  auto& sub = subscriptionStateFor(type_url);
+  // Additionally update the watch-map routing, then subscribe to whatever became newly interesting
+  // across the whole subscription. This keeps the watch map and the subscription consistent.
+  auto added_removed =
+      watchMapFor(type_url).appendWatchInterest(watch, effectiveResources(resources, options));
+  sub.updateSubscriptionInterest(added_removed.added_, {});
+  if (sub.subscriptionUpdatePending()) {
+    trySendDiscoveryRequests();
+  }
+}
+
+template <class S, class F, class RQ, class RS>
+void GrpcMuxImpl<S, F, RQ, RS>::accept(const std::string& type_url, Watch* watch,
+                                       const absl::flat_hash_set<std::string>& patterns) {
+  ASSERT(watch != nullptr);
+  // Glob interest affects routing only; the subscription sent to the server is left untouched.
+  watchMapFor(type_url).accept(watch, patterns);
 }
 
 template <class S, class F, class RQ, class RS>
@@ -478,17 +505,6 @@ template class GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionStateFactory,
 GrpcMuxDelta::GrpcMuxDelta(GrpcMuxContext& grpc_mux_context)
     : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(grpc_mux_context.dispatcher_),
                   grpc_mux_context) {}
-
-// GrpcStreamCallbacks for GrpcMuxDelta
-void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
-                                         const absl::flat_hash_set<std::string>& for_update) {
-  auto& sub = subscriptionStateFor(type_url);
-  sub.updateSubscriptionInterest(for_update, {});
-  // Tell the server about our change in interest, if any.
-  if (sub.subscriptionUpdatePending()) {
-    trySendDiscoveryRequests();
-  }
-}
 
 GrpcMuxSotw::GrpcMuxSotw(GrpcMuxContext& grpc_mux_context)
     : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(grpc_mux_context.dispatcher_),

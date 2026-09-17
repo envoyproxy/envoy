@@ -246,7 +246,7 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    entry = addSubscription(type_url, options.use_namespace_matching_);
+    entry = addSubscription(type_url);
   }
 
   Watch* watch = entry->second->watch_map_.addWatch(callbacks, *resource_decoder);
@@ -293,13 +293,9 @@ NewGrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_cl
 // Updates the list of resource names watched by the given watch. If an added name is new across
 // the whole subscription, or if a removed name has no other watch interested in it, then the
 // subscription will enqueue and attempt to send an appropriate discovery request.
-void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
-                                 const absl::flat_hash_set<std::string>& resources,
-                                 const SubscriptionOptions& options) {
-  ASSERT(watch != nullptr);
-  auto sub = subscriptions_.find(type_url);
-  RELEASE_ASSERT(sub != subscriptions_.end(),
-                 fmt::format("Watch of {} has no subscription to update.", type_url));
+absl::flat_hash_set<std::string>
+NewGrpcMuxImpl::effectiveResources(const absl::flat_hash_set<std::string>& resources,
+                                   const SubscriptionOptions& options) {
   // We need to prepare xdstp:// resources for the transport, by normalizing and adding any extra
   // context parameters.
   absl::flat_hash_set<std::string> effective_resources;
@@ -320,32 +316,43 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
       effective_resources.insert(resource);
     }
   }
+  return effective_resources;
+}
+
+void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
+                                 const absl::flat_hash_set<std::string>& resources,
+                                 const SubscriptionOptions& options) {
+  ASSERT(watch != nullptr);
+  auto sub = subscriptions_.find(type_url);
+  RELEASE_ASSERT(sub != subscriptions_.end(),
+                 fmt::format("Watch of {} has no subscription to update.", type_url));
+  const absl::flat_hash_set<std::string> effective_resources =
+      effectiveResources(resources, options);
   auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, effective_resources);
   if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
     for (absl::string_view resource : added_removed.removed_) {
       xds_config_tracker_->onResourceUnsubscribed(type_url, resource);
     }
   }
-  if (options.use_namespace_matching_) {
-    // This is to prevent sending out of requests that contain prefixes instead of resource names
-    sub->second->sub_state_.updateSubscriptionInterest({}, {});
-  } else {
-    sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_,
-                                                       added_removed.removed_);
-  }
+  sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
   // Tell the server about our change in interest, if any.
   if (sub->second->sub_state_.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();
   }
 }
 
-void NewGrpcMuxImpl::requestOnDemandUpdate(const std::string& type_url,
-                                           const absl::flat_hash_set<std::string>& for_update) {
+void NewGrpcMuxImpl::appendWatch(const std::string& type_url, Watch* watch,
+                                 const absl::flat_hash_set<std::string>& resources,
+                                 const SubscriptionOptions& options) {
+  ASSERT(watch != nullptr);
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Watch of {} has no subscription to update.", type_url));
-  sub->second->sub_state_.updateSubscriptionInterest(for_update, {});
-  // Tell the server about our change in interest, if any.
+  // Additionally update the watch-map routing, then subscribe to whatever became newly interesting
+  // across the whole subscription. This keeps watch_interest_ and the subscription consistent.
+  auto added_removed =
+      sub->second->watch_map_.appendWatchInterest(watch, effectiveResources(resources, options));
+  sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_, {});
   if (sub->second->sub_state_.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();
   }
@@ -359,8 +366,18 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
+void NewGrpcMuxImpl::accept(const std::string& type_url, Watch* watch,
+                            const absl::flat_hash_set<std::string>& patterns) {
+  ASSERT(watch != nullptr);
+  auto sub = subscriptions_.find(type_url);
+  RELEASE_ASSERT(sub != subscriptions_.end(),
+                 fmt::format("Watch of {} has no subscription to update.", type_url));
+  // Glob interest affects routing only; the subscription sent to the server is left untouched.
+  sub->second->watch_map_.accept(watch, patterns);
+}
+
 NewGrpcMuxImpl::SubscriptionsMap::iterator
-NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_namespace_matching) {
+NewGrpcMuxImpl::addSubscription(const std::string& type_url) {
   // Resource cache is only used for EDS resources.
   EdsResourcesCacheOptRef resources_cache{std::nullopt};
   if (eds_resources_cache_ &&
@@ -368,9 +385,8 @@ NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_name
     resources_cache = makeOptRefFromPtr(eds_resources_cache_.get());
   }
   auto [it, success] = subscriptions_.emplace(
-      type_url, std::make_unique<SubscriptionStuff>(type_url, use_namespace_matching, dispatcher_,
-                                                    config_validators_.get(), xds_config_tracker_,
-                                                    resources_cache));
+      type_url, std::make_unique<SubscriptionStuff>(type_url, dispatcher_, config_validators_.get(),
+                                                    xds_config_tracker_, resources_cache));
   // Insertion must succeed, as the addSubscription method is only called if
   // the map doesn't have the type_url.
   ASSERT(success);
